@@ -450,3 +450,150 @@
 632 -
 633 -
 634 -
+
+## weapon
+
+42 weapon staff_orange_tier1
+43 weapon staff_orange_tier2
+44 weapon staff_orange_tier3
+45 weapon staff_orange_tier4
+46 weapon staff_orange_tier5
+47 weapon mace_tier1
+48 weapon flail_tier1
+49 weapon spear_tier1
+50 weapon warhammer_tier1
+51 weapon halberd_tier1
+52 weapon bow_wood_tier1
+53 weapon bow_wood_tier3
+96 weapon staff_blue_tier1
+97 weapon staff_blue_tier2
+98 weapon staff_blue_tier3
+99 weapon staff_blue_tier4
+100 weapon staff_blue_tier5
+101 weapon axe_tier1
+102 weapon hammer_tier1
+103 weapon hatchet_tier1
+104 weapon scythe_tier1
+105 weapon battleaxe_tier1
+106 weapon bow_wood_tier2
+107 weapon bow_magic_tier1
+150 weapon staff_pink_tier1
+151 weapon staff_pink_tier2
+152 weapon staff_pink_tier3
+153 weapon staff_pink_tier4
+154 weapon staff_pink_tier5
+155 weapon mace_tier2
+156 weapon flail_tier2
+157 weapon spear_tier2
+158 weapon warhammer_tier2
+159 weapon halberd_tier2
+160 weapon bow_magic_tier2
+161 weapon bow_wood_tier4
+204 weapon staff_green_tier1
+205 weapon staff_green_tier2
+206 weapon staff_green_tier3
+207 weapon staff_green_tier4
+208 weapon staff_green_tier5
+209 weapon axe_tier2
+210 weapon hammer_tier2
+211 weapon hatchet_tier2
+212 weapon scythe_tier2
+213 weapon battleaxe_tier2
+214 weapon bow_ebony_tier1
+215 weapon bow_ebony_tier2
+258 weapon mace_tier3
+259 weapon flail_tier3
+260 weapon spear_tier3
+261 weapon warhammer_tier3
+262 weapon halberd_tier3
+263 weapon mace_tier5
+264 weapon flail_tier5
+265 weapon spear_tier5
+266 weapon warhammer_tier5
+267 weapon halberd_tier5
+268 weapon bow_runic_tier1
+269 weapon bow_runic_tier2
+312 weapon axe_tier3
+313 weapon hammer_tier3
+314 weapon hatchet_tier3
+315 weapon scythe_tier3
+316 weapon battleaxe_tier3
+317 weapon axe_tier5
+318 weapon hammer_tier5
+319 weapon hatchet_tier5
+320 weapon scythe_tier5
+321 weapon battleaxe_tier5
+322 -
+323 -
+366 weapon sword_tier1
+367 weapon sword_tier2
+368 weapon sword_tier3
+369 weapon sword_tier4
+370 weapon sword_tier5
+371 weapon mace_tier4
+372 weapon flail_tier4
+373 weapon spear_tier4
+374 weapon warhammer_tier4
+375 weapon halberd_tier4
+376 -
+377 -
+420 weapon dagger_tier1
+421 weapon dagger_tier2
+422 weapon dagger_tier3
+423 weapon dagger_tier4
+424 weapon dagger_tier5
+425 weapon axe_tier4
+426 weapon hammer_tier4
+427 weapon hatchet_tier4
+428 weapon scythe_tier4
+429 weapon battleaxe_tier4
+430 -
+431 -
+474 weapon falchion_tier1
+475 weapon falchion_tier2
+476 weapon falchion_tier3
+477 weapon falchion_tier4
+478 weapon falchion_tier5
+479 weapon mace_tier6
+480 weapon flail_tier6
+481 weapon spear_tier6
+482 weapon warhammer_tier6
+483 weapon halberd_tier6
+484 -
+485 -
+528 weapon scimitar_tier1
+529 weapon scimitar_tier2
+530 weapon scimitar_tier3
+531 weapon scimitar_tier4
+532 weapon scimitar_tier5
+533 weapon axe_tier6
+534 weapon hammer_tier6
+535 weapon hatchet_tier6
+536 weapon scythe_tier6
+537 weapon battleaxe_tier6
+538 -
+539 -
+582 -
+583 -
+584 -
+585 -
+586 -
+587 -
+588 -
+589 -
+590 -
+591 -
+592 -
+593 -
+636 -
+637 -
+638 -
+639 -
+640 -
+641 -
+642 -
+643 -
+644 -
+645 -
+646 -
+647 -
