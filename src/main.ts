@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import './style.css';
+import { MainScene } from './main_scene';
 import { ExplorerScene } from './explorer_scene';
 
 new Phaser.Game({
@@ -13,5 +14,5 @@ new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [ExplorerScene],
+  scene: [MainScene, ExplorerScene],
 });
