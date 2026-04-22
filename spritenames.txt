@@ -105,7 +105,7 @@
 177 = 169
 178 torso shirt_purple_jester1
 179 torso amethystarmor_tier1
-222 torso leatherarmor_tier2
+222 torso leatherarmor_tier5
 223 torso leatherarmor_tier3
 224 torso leatherarmor_tier4
 225 torso leatherarmor_tier2
@@ -173,10 +173,10 @@
 497 torso ivoryarmor_tier3
 498 torso ivoryarmor_tier4
 499 torso ivoryarmor_tier2
-500 torso ebonyarmor_tier2
+500 torso ebonyarmor_tier5
 501 torso ebonyarmor_tier3
 502 torso ebonyarmor_tier4
-503 torso ebonyarmor_tier5
+503 torso ebonyarmor_tier2
 546 -
 547 -
 548 -
