@@ -1,0 +1,599 @@
+# frame category name
+# sentinels: "-" = empty cell, "= <frame>" = pixel-identical duplicate of <frame>
+
+## character
+
+0 character male_light
+1 character female_light
+54 character male_tan
+55 character female_tan
+108 character male_dark
+109 character female_dark
+162 character male_orc
+163 character female_orc
+216 -
+217 -
+270 npc female_1
+271 npc female_2
+324 npc male_1
+325 npc male_2
+378 npc female_3
+379 npc female_4
+432 npc male_3
+433 npc male_4
+486 npc female_5
+487 npc female_6
+540 npc jester
+541 npc male_5
+594 npc guard_armed
+595 npc guard_unarmed
+
+## undergarment (this section is actually just pants and shoes - I was wrong on the initial check)
+
+3 legs black
+4 feet black
+57 legs brown
+58 feet brown
+111 legs white
+112 feet white
+165 legs cream
+166 feet cream
+219 feet blue_large
+220 feet orange_large
+273 legs orange
+274 feet orange
+327 legs blue
+328 feet blue
+381 legs purple
+382 feet purple
+435 legs green
+436 feet green
+489 feet brown_large
+490 feet purple_large
+543 -
+544 -
+597 -
+598 -
+
+## outergarment (tops, robes, armor)
+
+6 torso shirt_orange_belt
+7 torso shirt_orange_long
+8 torso shirt_orange_female
+9 torso shirt_orange_apron
+10 torso shirt_blue_belt
+11 torso shirt_blue_long
+12 torso shirt_blue_female
+13 torso shirt_blue_apron
+14 torso shirt_purple_belt
+15 torso shirt_purple_long
+16 torso shirt_purple_female
+17 torso shirt_purple_apron
+60 torso toga_orange
+61 torso clotharmor_orange1
+62 torso clotharmor_orange2
+63 torso clotharmor_orange3
+64 torso toga_blue
+65 torso clotharmor_blue1
+66 torso clotharmor_blue2
+67 torso clotharmor_blue3
+68 torso toga_purple
+69 torso clotharmor_purple1
+70 torso clotharmor_purple2
+71 torso clotharmor_purple3
+114 torso dress_orange
+115 torso shirt_orange_long2
+116 torso shirt_orange
+117 torso shirt_orange_short
+118 torso dress_blue
+119 torso shirt_blue_long2
+120 torso shirt_blue
+121 torso shirt_blue_short
+122 torso dress_purple
+123 torso shirt_purple_long2
+124 torso shirt_purple
+125 torso shirt_purple_short
+168 torso shirt_orange_tattered
+169 torso shirt_orange_longsleeves
+170 torso shirt_orange_jester1
+171 torso leatherarmor_tier1
+172 = 168
+173 = 169
+174 torso shirt_orange_jester2
+175 torso ironarmor_tier1
+176 = 168
+177 = 169
+178 torso shirt_purple_jester1
+179 torso amethystarmor_tier1
+222 torso leatherarmor_tier5
+223 torso leatherarmor_tier3
+224 torso leatherarmor_tier4
+225 torso leatherarmor_tier2
+226 torso ironarmor_tier5
+227 torso ironarmor_tier3
+228 torso ironarmor_tier4
+229 torso ironarmor_tier2
+230 torso amethystarmor_tier5
+231 torso amethystarmor_tier3
+232 torso amethystarmor_tier4
+233 torso amethystarmor_tier2
+276 torso shirt_green_belt
+277 torso shirt_green_long
+278 torso shirt_green_female
+279 torso shirt_green_apron
+280 torso shirt_tan_belt
+281 torso shirt_tan_long
+282 torso shirt_tan_female
+283 torso shirt_tan_apron
+284 torso shirt_black_belt
+285 torso shirt_black_long
+286 torso shirt_black_female
+287 torso shirt_black_apron
+330 torso toga_green
+331 torso clotharmor_green1
+332 torso clotharmor_green2
+333 torso clotharmor_green3
+334 torso toga_tan
+335 torso clotharmor_tan1
+336 torso clotharmor_tan2
+337 torso clotharmor_tan3
+338 torso toga_black
+339 torso clotharmor_black1
+340 torso clotharmor_black2
+341 torso clotharmor_black3
+384 torso dress_green
+385 torso shirt_green_long2
+386 torso shirt_green
+387 torso shirt_green_short
+388 torso dress_tan
+389 torso shirt_tan_long2
+390 torso shirt_tan
+391 torso shirt_tan_short
+392 torso dress_black
+393 torso shirt_black_long2
+394 torso shirt_black
+395 torso shirt_black_short
+438 = 168
+439 = 169
+440 torso shirt_purple_jester2
+441 torso emeraldarmor_tier1
+442 = 168
+443 = 169
+444 torso shirt_white_jester1
+445 torso ivoryarmor_tier1
+446 = 168
+447 = 169
+448 torso shirt_white_jester2
+449 torso ebonyarmor_tier1
+492 torso emeraldarmor_tier5
+493 torso emeraldarmor_tier3
+494 torso emeraldarmor_tier4
+495 torso emeraldarmor_tier2
+496 torso ivoryarmor_tier5
+497 torso ivoryarmor_tier3
+498 torso ivoryarmor_tier4
+499 torso ivoryarmor_tier2
+500 torso ebonyarmor_tier5
+501 torso ebonyarmor_tier3
+502 torso ebonyarmor_tier4
+503 torso ebonyarmor_tier2
+546 -
+547 -
+548 -
+549 -
+550 -
+551 -
+552 -
+553 -
+554 -
+555 -
+556 -
+557 -
+600 -
+601 -
+602 -
+603 -
+604 -
+605 -
+606 -
+607 -
+608 -
+609 -
+610 -
+611 -
+
+## hair
+
+19 hair brown_1
+20 hair brown_2
+21 hair brown_3
+22 hair brown_4
+23 hair orange_1
+24 hair orange_2
+25 hair orange_3
+26 hair orange_4
+73 hair brown_5
+74 hair brown_6
+75 hair brown_7
+76 hair brown_8
+77 hair orange_5
+78 hair orange_6
+79 hair orange_7
+80 hair orange_8
+127 hair brown_9
+128 hair brown_10
+129 hair brown_11
+130 hair brown_12
+131 hair orange_9
+132 hair orange_10
+133 hair orange_11
+134 hair orange_12
+181 hair brown_13
+182 hair brown_14
+183 hair brown_15
+184 hair brown_16
+185 hair orange_13
+186 hair orange_14
+187 hair orange_15
+188 hair orange_16
+235 hair blonde_1
+236 hair blonde_2
+237 hair blonde_3
+238 hair blonde_4
+239 hair black_1
+240 hair black_2
+241 hair black_3
+242 hair black_4
+289 hair blonde_5
+290 hair blonde_6
+291 hair blonde_7
+292 hair blonde_8
+293 hair black_5
+294 hair black_6
+295 hair black_7
+296 hair black_8
+343 hair blonde_9
+344 hair blonde_10
+345 hair blonde_11
+346 hair blonde_12
+347 hair black_9
+348 hair black_10
+349 hair black_11
+350 hair black_12
+397 hair blonde_13
+398 hair blonde_14
+399 hair blonde_15
+400 hair blonde_16
+401 hair black_13
+402 hair black_14
+403 hair black_15
+404 hair black_16
+451 hair white_1
+452 hair white_2
+453 hair white_3
+454 hair white_4
+455 -
+456 -
+457 -
+458 -
+505 hair white_5
+506 hair white_6
+507 hair white_7
+508 hair white_8
+509 -
+510 -
+511 -
+512 -
+559 hair white_9
+560 hair white_10
+561 hair white_11
+562 hair white_12
+563 -
+564 -
+565 -
+566 -
+613 hair white_13
+614 hair white_14
+615 hair white_15
+616 hair white_16
+617 -
+618 -
+619 -
+620 -
+
+## hat
+
+28 head fullhelmet_1
+29 head fullhelmet_2
+30 head fullhelmet_3
+31 head fullhelmet_4
+82 head fullhelmet_5
+83 head fullhelmet_6
+84 head fullhelmet_7
+85 head fullhelmet_8
+136 head crown_1
+137 head crown_2
+138 head crown_3
+139 head crown_4
+190 head crown_5
+191 head crown_6
+192 head crown_7
+193 head crown_8
+244 head crown_9
+245 head crown_10
+246 head crown_11
+247 head crown_12
+298 head crown_13
+299 head crown_14
+300 head crown_15
+301 head crown_16
+352 head wingedhelmet_1
+353 head wingedhelmet_2
+354 head wingedhelmet_3
+355 head wingedhelmet_4
+406 head jesterhat_1
+407 head jesterhat_2
+408 head jesterhat_3
+409 head jesterhat_4
+460 head wizardhat_1
+461 head wizardhat_2
+462 head wizardhat_3
+463 head wizardhat_4
+514 -
+515 -
+516 -
+517 -
+568 -
+569 -
+570 -
+571 -
+622 -
+623 -
+624 -
+625 -
+
+## shield
+
+33 shield wood_buckler_tier1
+34 shield wood_shield_1
+35 shield wood_tower_tier1
+36 shield wood_tower_tier2
+37 shield iron_buckler_tier1
+38 shield iron_shield_1
+39 shield iron_tower_tier2
+40 shield iron_tower_tier1
+87 shield wood_buckler_tier2
+88 shield wood_buckler_tier3
+89 shield wood_square_tier1
+90 shield wood_square_tier2
+91 shield iron_buckler_tier3
+92 shield iron_buckler_tier2
+93 shield iron_square_tier2
+94 shield iron_square_tier1
+141 shield wood_shield_2
+142 shield wood_shield_3
+143 -
+144 -
+145 shield iron_shield_2
+146 shield iron_shield_3
+147 -
+148 -
+195 shield brass_buckler_tier1
+196 shield brass_shield_1
+197 shield brass_tower_tier1
+198 shield brass_tower_tier2
+199 shield warped_buckler_tier1
+200 shield warped_shield_1
+201 shield warped_tower_tier1
+202 shield warped_tower_tier2
+249 shield brass_buckler_tier2
+250 shield brass_buckler_tier3
+251 shield brass_square_tier1
+252 shield brass_square_tier2
+253 shield warped_buckler_tier2
+254 shield warped_buckler_tier3
+255 shield warped_square_tier1
+256 shield warped_square_tier2
+303 shield brass_shield_2
+304 shield brass_shield_3
+305 -
+306 -
+307 shield warped_shield_2
+308 shield warped_shield_3
+309 -
+310 -
+357 shield alloy_buckler_tier1
+358 shield alloy_shield_1
+359 shield alloy_tower_tier1
+360 shield alloy_tower_tier2
+361 shield painted_buckler_tier1
+362 shield painted_shield_1
+363 shield painted_tower_tier1
+364 shield painted_tower_tier2
+411 shield alloy_buckler_tier2
+412 shield alloy_buckler_tier3
+413 shield alloy_square_tier1
+414 shield alloy_square_tier2
+415 shield painted_buckler_tier2
+416 shield painted_buckler_tier3
+417 shield painted_square_tier1
+418 shield painted_square_tier2
+465 shield alloy_shield_2
+466 shield alloy_shield_3
+467 -
+468 -
+469 shield painted_shield_2
+470 shield painted_shield_3
+471 -
+472 -
+519 -
+520 -
+521 -
+522 -
+523 -
+524 -
+525 -
+526 -
+573 -
+574 -
+575 -
+576 -
+577 -
+578 -
+579 -
+580 -
+627 -
+628 -
+629 -
+630 -
+631 -
+632 -
+633 -
+634 -
+
+## weapon
+
+42 weapon staff_orange_tier1
+43 weapon staff_orange_tier2
+44 weapon staff_orange_tier3
+45 weapon staff_orange_tier4
+46 weapon staff_orange_tier5
+47 weapon mace_tier1
+48 weapon flail_tier1
+49 weapon spear_tier1
+50 weapon warhammer_tier1
+51 weapon halberd_tier1
+52 weapon bow_wood_tier1
+53 weapon bow_wood_tier3
+96 weapon staff_blue_tier1
+97 weapon staff_blue_tier2
+98 weapon staff_blue_tier3
+99 weapon staff_blue_tier4
+100 weapon staff_blue_tier5
+101 weapon axe_tier1
+102 weapon hammer_tier1
+103 weapon hatchet_tier1
+104 weapon scythe_tier1
+105 weapon battleaxe_tier1
+106 weapon bow_wood_tier2
+107 weapon bow_magic_tier1
+150 weapon staff_pink_tier1
+151 weapon staff_pink_tier2
+152 weapon staff_pink_tier3
+153 weapon staff_pink_tier4
+154 weapon staff_pink_tier5
+155 weapon mace_tier2
+156 weapon flail_tier2
+157 weapon spear_tier2
+158 weapon warhammer_tier2
+159 weapon halberd_tier2
+160 weapon bow_magic_tier2
+161 weapon bow_wood_tier4
+204 weapon staff_green_tier1
+205 weapon staff_green_tier2
+206 weapon staff_green_tier3
+207 weapon staff_green_tier4
+208 weapon staff_green_tier5
+209 weapon axe_tier2
+210 weapon hammer_tier2
+211 weapon hatchet_tier2
+212 weapon scythe_tier2
+213 weapon battleaxe_tier2
+214 weapon bow_ebony_tier1
+215 weapon bow_ebony_tier2
+258 weapon mace_tier3
+259 weapon flail_tier3
+260 weapon spear_tier3
+261 weapon warhammer_tier3
+262 weapon halberd_tier3
+263 weapon mace_tier5
+264 weapon flail_tier5
+265 weapon spear_tier5
+266 weapon warhammer_tier5
+267 weapon halberd_tier5
+268 weapon bow_runic_tier1
+269 weapon bow_runic_tier2
+312 weapon axe_tier3
+313 weapon hammer_tier3
+314 weapon hatchet_tier3
+315 weapon scythe_tier3
+316 weapon battleaxe_tier3
+317 weapon axe_tier5
+318 weapon hammer_tier5
+319 weapon hatchet_tier5
+320 weapon scythe_tier5
+321 weapon battleaxe_tier5
+322 -
+323 -
+366 weapon sword_tier1
+367 weapon sword_tier2
+368 weapon sword_tier3
+369 weapon sword_tier4
+370 weapon sword_tier5
+371 weapon mace_tier4
+372 weapon flail_tier4
+373 weapon spear_tier4
+374 weapon warhammer_tier4
+375 weapon halberd_tier4
+376 -
+377 -
+420 weapon dagger_tier1
+421 weapon dagger_tier2
+422 weapon dagger_tier3
+423 weapon dagger_tier4
+424 weapon dagger_tier5
+425 weapon axe_tier4
+426 weapon hammer_tier4
+427 weapon hatchet_tier4
+428 weapon scythe_tier4
+429 weapon battleaxe_tier4
+430 -
+431 -
+474 weapon falchion_tier1
+475 weapon falchion_tier2
+476 weapon falchion_tier3
+477 weapon falchion_tier4
+478 weapon falchion_tier5
+479 weapon mace_tier6
+480 weapon flail_tier6
+481 weapon spear_tier6
+482 weapon warhammer_tier6
+483 weapon halberd_tier6
+484 -
+485 -
+528 weapon scimitar_tier1
+529 weapon scimitar_tier2
+530 weapon scimitar_tier3
+531 weapon scimitar_tier4
+532 weapon scimitar_tier5
+533 weapon axe_tier6
+534 weapon hammer_tier6
+535 weapon hatchet_tier6
+536 weapon scythe_tier6
+537 weapon battleaxe_tier6
+538 -
+539 -
+582 -
+583 -
+584 -
+585 -
+586 -
+587 -
+588 -
+589 -
+590 -
+591 -
+592 -
+593 -
+636 -
+637 -
+638 -
+639 -
+640 -
+641 -
+642 -
+643 -
+644 -
+645 -
+646 -
+647 -
