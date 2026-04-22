@@ -1,0 +1,203 @@
+# frame category name
+# sentinels: "-" = empty cell, "= <frame>" = pixel-identical duplicate of <frame>
+
+## character
+
+0 character male_light
+1 character female_light
+54 character male_tan
+55 character female_tan
+108 character male_dark
+109 character female_dark
+162 character male_orc
+163 character female_orc
+216 -
+217 -
+270 npc female_1
+271 npc female_2
+324 npc male_1
+325 npc male_2
+378 npc female_3
+379 npc female_4
+432 npc male_3
+433 npc male_4
+486 npc female_5
+487 npc female_6
+540 npc jester
+541 npc male_5
+594 npc guard_armed
+595 npc guard_unarmed
+
+## undergarment (this section is actually just pants and shoes - I was wrong on the initial check)
+
+3 legs black
+4 feet black
+57 legs brown
+58 feet brown
+111 legs white
+112 feet white
+165 legs cream
+166 feet cream
+219 feet blue_large
+220 feet orange_large
+273 legs orange
+274 feet orange
+327 legs blue
+328 feet blue
+381 legs purple
+382 feet purple
+435 legs green
+436 feet green
+489 feet brown_large
+490 feet purple_large
+543 -
+544 -
+597 -
+598 -
+
+## outergarment (tops, robes, armor)
+
+6 torso shirt_orange_belt
+7 torso shirt_orange_long
+8 torso shirt_orange_female
+9 torso shirt_orange_apron
+10 torso shirt_blue_belt
+11 torso shirt_blue_long
+12 torso shirt_blue_female
+13 torso shirt_blue_apron
+14 torso shirt_purple_belt
+15 torso shirt_purple_long
+16 torso shirt_purple_female
+17 torso shirt_purple_apron
+60 torso toga_orange
+61 torso clotharmor_orange1
+62 torso clotharmor_orange2
+63 torso clotharmor_orange3
+64 torso toga_blue
+65 torso clotharmor_blue1
+66 torso clotharmor_blue2
+67 torso clotharmor_blue3
+68 torso toga_purple
+69 torso clotharmor_purple1
+70 torso clotharmor_purple2
+71 torso clotharmor_purple3
+114 torso dress_orange
+115 torso shirt_orange_long2
+116 torso shirt_orange
+117 torso shirt_orange_short
+118 torso dress_blue
+119 torso shirt_blue_long2
+120 torso shirt_blue
+121 torso shirt_blue_short
+122 torso dress_purple
+123 torso shirt_purple_long2
+124 torso shirt_purple
+125 torso shirt_purple_short
+168 torso shirt_orange_tattered
+169 torso shirt_orange_longsleeves
+170 torso shirt_orange_jester1
+171 torso leatherarmor_tier1
+172 = 168
+173 = 169
+174 torso shirt_orange_jester2
+175 torso ironarmor_tier1
+176 = 168
+177 = 169
+178 torso shirt_purple_jester1
+179 torso amethystarmor_tier1
+222 torso leatherarmor_tier2
+223 torso leatherarmor_tier3
+224 torso leatherarmor_tier4
+225 torso leatherarmor_tier2
+226 torso ironarmor_tier5
+227 torso ironarmor_tier3
+228 torso ironarmor_tier4
+229 torso ironarmor_tier2
+230 torso amethystarmor_tier5
+231 torso amethystarmor_tier3
+232 torso amethystarmor_tier4
+233 torso amethystarmor_tier2
+276 torso shirt_green_belt
+277 torso shirt_green_long
+278 torso shirt_green_female
+279 torso shirt_green_apron
+280 torso shirt_tan_belt
+281 torso shirt_tan_long
+282 torso shirt_tan_female
+283 torso shirt_tan_apron
+284 torso shirt_black_belt
+285 torso shirt_black_long
+286 torso shirt_black_female
+287 torso shirt_black_apron
+330 torso toga_green
+331 torso clotharmor_green1
+332 torso clotharmor_green2
+333 torso clotharmor_green3
+334 torso toga_tan
+335 torso clotharmor_tan1
+336 torso clotharmor_tan2
+337 torso clotharmor_tan3
+338 torso toga_black
+339 torso clotharmor_black1
+340 torso clotharmor_black2
+341 torso clotharmor_black3
+384 torso dress_green
+385 torso shirt_green_long2
+386 torso shirt_green
+387 torso shirt_green_short
+388 torso dress_tan
+389 torso shirt_tan_long2
+390 torso shirt_tan
+391 torso shirt_tan_short
+392 torso dress_black
+393 torso shirt_black_long2
+394 torso shirt_black
+395 torso shirt_black_short
+438 = 168
+439 = 169
+440 torso shirt_purple_jester2
+441 torso emeraldarmor_tier1
+442 = 168
+443 = 169
+444 torso shirt_white_jester1
+445 torso ivoryarmor_tier1
+446 = 168
+447 = 169
+448 torso shirt_white_jester2
+449 torso ebonyarmor_tier1
+492 torso emeraldarmor_tier5
+493 torso emeraldarmor_tier3
+494 torso emeraldarmor_tier4
+495 torso emeraldarmor_tier2
+496 torso ivoryarmor_tier5
+497 torso ivoryarmor_tier3
+498 torso ivoryarmor_tier4
+499 torso ivoryarmor_tier2
+500 torso ebonyarmor_tier2
+501 torso ebonyarmor_tier3
+502 torso ebonyarmor_tier4
+503 torso ebonyarmor_tier5
+546 -
+547 -
+548 -
+549 -
+550 -
+551 -
+552 -
+553 -
+554 -
+555 -
+556 -
+557 -
+600 -
+601 -
+602 -
+603 -
+604 -
+605 -
+606 -
+607 -
+608 -
+609 -
+610 -
+611 -
