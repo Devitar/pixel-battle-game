@@ -201,3 +201,252 @@
 609 -
 610 -
 611 -
+
+## hair
+
+19 hair brown_1
+20 hair brown_2
+21 hair brown_3
+22 hair brown_4
+23 hair orange_1
+24 hair orange_2
+25 hair orange_3
+26 hair orange_4
+73 hair brown_5
+74 hair brown_6
+75 hair brown_7
+76 hair brown_8
+77 hair orange_5
+78 hair orange_6
+79 hair orange_7
+80 hair orange_8
+127 hair brown_9
+128 hair brown_10
+129 hair brown_11
+130 hair brown_12
+131 hair orange_9
+132 hair orange_10
+133 hair orange_11
+134 hair orange_12
+181 hair brown_13
+182 hair brown_14
+183 hair brown_15
+184 hair brown_16
+185 hair orange_13
+186 hair orange_14
+187 hair orange_15
+188 hair orange_16
+235 hair blonde_1
+236 hair blonde_2
+237 hair blonde_3
+238 hair blonde_4
+239 hair black_1
+240 hair black_2
+241 hair black_3
+242 hair black_4
+289 hair blonde_5
+290 hair blonde_6
+291 hair blonde_7
+292 hair blonde_8
+293 hair black_5
+294 hair black_6
+295 hair black_7
+296 hair black_8
+343 hair blonde_9
+344 hair blonde_10
+345 hair blonde_11
+346 hair blonde_12
+347 hair black_9
+348 hair black_10
+349 hair black_11
+350 hair black_12
+397 hair blonde_13
+398 hair blonde_14
+399 hair blonde_15
+400 hair blonde_16
+401 hair black_13
+402 hair black_14
+403 hair black_15
+404 hair black_16
+451 hair white_1
+452 hair white_2
+453 hair white_3
+454 hair white_4
+455 -
+456 -
+457 -
+458 -
+505 hair white_5
+506 hair white_6
+507 hair white_7
+508 hair white_8
+509 -
+510 -
+511 -
+512 -
+559 hair white_9
+560 hair white_10
+561 hair white_11
+562 hair white_12
+563 -
+564 -
+565 -
+566 -
+613 hair white_13
+614 hair white_14
+615 hair white_15
+616 hair white_16
+617 -
+618 -
+619 -
+620 -
+
+## hat
+
+28 head fullhelmet_1
+29 head fullhelmet_2
+30 head fullhelmet_3
+31 head fullhelmet_4
+82 head fullhelmet_5
+83 head fullhelmet_6
+84 head fullhelmet_7
+85 head fullhelmet_8
+136 head crown_1
+137 head crown_2
+138 head crown_3
+139 head crown_4
+190 head crown_5
+191 head crown_6
+192 head crown_7
+193 head crown_8
+244 head crown_9
+245 head crown_10
+246 head crown_11
+247 head crown_12
+298 head crown_13
+299 head crown_14
+300 head crown_15
+301 head crown_16
+352 head wingedhelmet_1
+353 head wingedhelmet_2
+354 head wingedhelmet_3
+355 head wingedhelmet_4
+406 head jesterhat_1
+407 head jesterhat_2
+408 head jesterhat_3
+409 head jesterhat_4
+460 head wizardhat_1
+461 head wizardhat_2
+462 head wizardhat_3
+463 head wizardhat_4
+514 -
+515 -
+516 -
+517 -
+568 -
+569 -
+570 -
+571 -
+622 -
+623 -
+624 -
+625 -
+
+## shield
+
+33 shield wood_buckler_tier1
+34 shield wood_shield_1
+35 shield wood_tower_tier1
+36 shield wood_tower_tier2
+37 shield iron_buckler_tier1
+38 shield iron_shield_1
+39 shield iron_tower_tier2
+40 shield iron_tower_tier1
+87 shield wood_buckler_tier2
+88 shield wood_buckler_tier3
+89 shield wood_square_tier1
+90 shield wood_square_tier2
+91 shield iron_buckler_tier3
+92 shield iron_buckler_tier2
+93 shield iron_square_tier2
+94 shield iron_square_tier1
+141 shield wood_shield_2
+142 shield wood_shield_3
+143 -
+144 -
+145 shield iron_shield_2
+146 shield iron_shield_3
+147 -
+148 -
+195 shield brass_buckler_tier1
+196 shield brass_shield_1
+197 shield brass_tower_tier1
+198 shield brass_tower_tier2
+199 shield warped_buckler_tier1
+200 shield warped_shield_1
+201 shield warped_tower_tier1
+202 shield warped_tower_tier2
+249 shield brass_buckler_tier2
+250 shield brass_buckler_tier3
+251 shield brass_square_tier1
+252 shield brass_square_tier2
+253 shield warped_buckler_tier2
+254 shield warped_buckler_tier3
+255 shield warped_square_tier1
+256 shield warped_square_tier2
+303 shield brass_shield_2
+304 shield brass_shield_3
+305 -
+306 -
+307 shield warped_shield_2
+308 shield warped_shield_3
+309 -
+310 -
+357 shield alloy_buckler_tier1
+358 shield alloy_shield_1
+359 shield alloy_tower_tier1
+360 shield alloy_tower_tier2
+361 shield painted_buckler_tier1
+362 shield painted_shield_1
+363 shield painted_tower_tier1
+364 shield painted_tower_tier2
+411 shield alloy_buckler_tier2
+412 shield alloy_buckler_tier3
+413 shield alloy_square_tier1
+414 shield alloy_square_tier2
+415 shield painted_buckler_tier2
+416 shield painted_buckler_tier3
+417 shield painted_square_tier1
+418 shield painted_square_tier2
+465 shield alloy_shield_2
+466 shield alloy_shield_3
+467 -
+468 -
+469 shield painted_shield_2
+470 shield painted_shield_3
+471 -
+472 -
+519 -
+520 -
+521 -
+522 -
+523 -
+524 -
+525 -
+526 -
+573 -
+574 -
+575 -
+576 -
+577 -
+578 -
+579 -
+580 -
+627 -
+628 -
+629 -
+630 -
+631 -
+632 -
+633 -
+634 -
