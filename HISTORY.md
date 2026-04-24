@@ -29,6 +29,54 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-24 · Enemy data — Crypt pool + boss (Tier 1)
+
+- **What shipped:**
+  - `src/data/types.ts` extended with `EnemyId` (5 literals), `EnemyRole` (`'minion' | 'boss'`), `EnemyDef`. `AbilityId` grew by 8 enemy-only ids; `StatusId` grew by `'rotting'` and `'frailty'`.
+  - `src/data/abilities.ts` extended with 8 new enemy-only records: `bone_slash`, `bone_arrow`, `rotting_bite`, `dark_bolt`, `dark_pact`, `necrotic_wave`, `lich_strike`, `curse_of_frailty`.
+  - `src/data/enemies.ts` — `ENEMIES` registry (4 minions + Bone Lich boss), `CRYPT_POOL` (uniform list of 4 minion ids), `CRYPT_BOSS = 'bone_lich'`.
+  - `src/data/__tests__/enemies.test.ts` — 45 assertions covering registration, base-stats sanity, tags, ability references, aiPriority ⊆ abilities, preferredSlots range, spriteId format, role/pool coherence, and the caster-slot-reach invariant (every priority ability's `canCastFrom` intersects the enemy's `preferredSlots`).
+  - Existing test files adjusted: `abilities.test.ts` loosened its `canCastFrom` range to `[1..4]`; `classes.test.ts` gained a per-class check that referenced abilities stay `⊆ [1..3]`, reclaiming player-side enforcement at the right layer.
+  - Design spec at `docs/superpowers/specs/2026-04-24-crypt-enemies-design.md`; plan at `docs/superpowers/plans/2026-04-24-crypt-enemies.md`.
+- **Why:** Combat has nothing to fight without enemies. First dungeon needs a content pool, and the floor generator (task 5) and combat engine (task 4) both consume this data.
+- **Decisions:**
+  - *`EnemyDef` is its own type, not a reused `ClassDef`.* Enemies don't equip gear, don't have paperdolls, don't have a preferred weapon — stretching `ClassDef` would have forced ignored fields and awkward semantics. A small structural duplication between the two types is cheaper than muddying each one's meaning.
+  - *One unified `ENEMIES` registry with a `role: 'minion' | 'boss'` discriminator.* Lookup-by-id stays trivial; the combat scene in task 17 just grabs `ENEMIES[id]` regardless of fight kind. The pool/boss split is expressed at the composition layer (`CRYPT_POOL` + `CRYPT_BOSS`), not at the enemy-definition layer.
+  - *Logical `spriteId` strings* (`'skeleton_warrior'`, `'bone_lich'`) instead of frame numbers. Task 19 will resolve them when real enemy art lands; until then, the combat scene can map logical ids to any placeholder NPC frame. Data stays stable across art changes.
+  - *Uniform `CRYPT_POOL`, no weighting.* No balance data yet to justify weights. Moving to `WeightedOption<EnemyId>[]` later is a one-line swap (the RNG's `weighted()` helper already exists). Weighting before playtesting is guesswork.
+  - *8 enemy-only abilities instead of reusing class abilities.* Each ability record is ~6 lines; the payoff is that test output and combat logs read cleanly ("Bone Lich casts curse_of_frailty") rather than a ghoul casting `knight_slash`. Enemies are not classes.
+  - *Caster-relative `TargetSelector.side`* declared as an engine invariant this spec adds. Previous task (classes) never needed it — no class heals enemies. The Cultist's `dark_pact` (heals a wounded ally) is the first move where "ally" must mean "caster's side," not "player side." Task 4's combat engine must honor this.
+  - *Cultist tagged `'humanoid'`, not `'undead'`.* Cultists are corrupt living humans, not reanimated. Mechanically this means Smite's `radiant` × `undead` bonus does not apply — a deliberate tactical signal ("Smite wrecks skeletons and the Lich, but Cultists need normal handling").
+  - *Minions have no basic-attack fallback.* Each minion has exactly one ability castable from its preferred slot set; if repositioning pushes them out of range they shuffle to reposition. Adding a "flailing melee" default would bloat minion definitions without meaningful payoff.
+  - *Max-HP debuff clamp semantics pinned at `current = min(current, newMax)`.* On expiry, max returns but current HP stays where it was left. This makes max-HP debuffs chip damage for full-HP targets and a lasting pressure cap for already-wounded ones — a single rule that covers both cases.
+  - *`bone_arrow` and `dark_bolt` are intentionally near-identical.* Skeleton archers and cultists differ through the cultist's `dark_pact` healer behaviour, not through a contrived difference in their ranged attack.
+  - *`necrotic_wave` tuned low (power 0.4).* With Bone Lich Attack 5 and 3 player combatants, a wave deals ~6 party-wide damage. Boss feels signature without steamrolling.
+  - *Split canCastFrom validation across two test files.* abilities.test.ts checks `⊆ [1..4]` (enemy-side legal range); classes.test.ts checks `⊆ [1..3]` (player-side constraint). Enforcement lives at the layer that owns it.
+- **Alternatives considered:**
+  - *Reuse `ClassDef` for enemies.* Rejected — grew fields, muddied semantics.
+  - *Shared `CombatantDef` base interface.* Rejected — modest gain (4 common fields) against the cost of a premature abstraction for two consumers.
+  - *Separate `BOSSES` registry.* Rejected — spreads enemies across two lookups for no structural gain.
+  - *`EnemyDef = MinionDef | BossDef` union.* Rejected — speculative; Tier 1 boss needs nothing minions don't.
+  - *Weighted `CRYPT_POOL`.* Rejected for Tier 1 — no balance data; uniform is the honest baseline.
+  - *Reuse class abilities on enemies.* Rejected — test/log readability wins.
+  - *Cultist as `'undead'`.* Rejected — Smite would bonus-damage them, flattening a design axis.
+  - *Minion basic-attack fallback.* Rejected — shuffle is the intended fallback at Tier 1.
+- **Surprises / lessons:**
+  - **Plan bug caught at runtime:** I wrote a redundant-but-"harmless" second regex check into the plan as `KEBAB_CASE.source.replace(/-/g, '_')`. This ran `replace` over the entire source string, corrupting the character-class ranges (`[a-z]` → `[a_z]`). I'd *self-flagged the redundancy as imperfect-but-acceptable* during plan self-review and executed as written; it failed on all 5 enemies at the RED→GREEN transition. Lesson: if a plan step looks redundant, cut it in the plan, not during execution. Acceptance of "imperfect but probably fine" is a smell, not a decision.
+  - **Caster-relative sides become load-bearing here.** Task 2 never tested the interpretation because no class ability's `side: 'ally'` had non-party semantics. The Cultist's `dark_pact` is the first place it does. Worth flagging in task 4's plan when it lands — if the engine quietly implements absolute sides, `dark_pact` silently heals the player party.
+  - **No undead sprites in the catalog.** Confirmed by grepping `sprite_names.generated.ts` for "skeleton/zombie/ghoul/undead" — zero matches. This could have blocked the task; logical `spriteId` strings sidestepped the dependency on task 19 entirely.
+  - **Stub-then-populate TDD pattern held up.** Same shape as task 2: write the test file against a stubbed export (`{} as Record<EnemyId, EnemyDef>`), confirm RED, fill in data, GREEN. The pattern generalizes cleanly across data-layer tasks and the RED phase is genuinely useful — it caught the plan bug above within seconds.
+- **Touches:**
+  - `src/data/types.ts` (modified)
+  - `src/data/abilities.ts` (modified)
+  - `src/data/enemies.ts` (new)
+  - `src/data/__tests__/abilities.test.ts` (modified)
+  - `src/data/__tests__/classes.test.ts` (modified)
+  - `src/data/__tests__/enemies.test.ts` (new)
+  - `docs/superpowers/specs/2026-04-24-crypt-enemies-design.md` (new)
+  - `docs/superpowers/plans/2026-04-24-crypt-enemies.md` (new)
+- **Source:** `TODO.md` Cluster A · Task 3. Related: `gdd.md` §4 (The Crypt), task 2's HISTORY entry (shared type vocabulary).
+
 ### 2026-04-24 · Class data — Knight, Archer, Priest (Tier 1)
 
 - **What shipped:**

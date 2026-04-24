@@ -56,6 +56,18 @@ describe('CLASSES', () => {
     it('has a starter weapon sprite id', () => {
       expect(CLASSES[id].starterLoadout.weapon).toBeTruthy();
     });
+
+    it('references only abilities castable from player-side slots', () => {
+      for (const abilityId of CLASSES[id].abilities) {
+        const slots = ABILITIES[abilityId].canCastFrom;
+        for (const s of slots) {
+          expect(
+            [1, 2, 3],
+            `${id} references ${abilityId} with canCastFrom=${s} (must be 1-3)`,
+          ).toContain(s);
+        }
+      }
+    });
   });
 
   it('Knight starts with a shield, Archer and Priest do not', () => {

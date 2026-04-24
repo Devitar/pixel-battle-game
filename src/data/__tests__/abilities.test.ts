@@ -15,6 +15,14 @@ const EXPECTED_IDS: readonly AbilityId[] = [
   'mend',
   'smite',
   'bless',
+  'bone_slash',
+  'bone_arrow',
+  'rotting_bite',
+  'dark_bolt',
+  'dark_pact',
+  'necrotic_wave',
+  'lich_strike',
+  'curse_of_frailty',
 ];
 
 const KEBAB_CASE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -53,10 +61,10 @@ describe('ABILITIES', () => {
       expect(ABILITIES[id].id).toBe(id);
     });
 
-    it('has a non-empty canCastFrom of valid player-side slots', () => {
+    it('has a non-empty canCastFrom of valid slots', () => {
       const slots = ABILITIES[id].canCastFrom;
       expect(slots.length).toBeGreaterThan(0);
-      for (const s of slots) expect([1, 2, 3]).toContain(s);
+      for (const s of slots) expect([1, 2, 3, 4]).toContain(s);
     });
 
     it('has at least one effect', () => {

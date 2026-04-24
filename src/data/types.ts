@@ -14,9 +14,17 @@ export type AbilityId =
   | 'priest_strike'
   | 'mend'
   | 'smite'
-  | 'bless';
+  | 'bless'
+  | 'bone_slash'
+  | 'bone_arrow'
+  | 'rotting_bite'
+  | 'dark_bolt'
+  | 'dark_pact'
+  | 'necrotic_wave'
+  | 'lich_strike'
+  | 'curse_of_frailty';
 
-export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed';
+export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty';
 
 export type AbilityTag = 'radiant';
 
@@ -76,4 +84,25 @@ export interface ClassDef {
   abilities: readonly AbilityId[];
   aiPriority: readonly AbilityId[];
   starterLoadout: StarterLoadout;
+}
+
+export type EnemyId =
+  | 'skeleton_warrior'
+  | 'skeleton_archer'
+  | 'ghoul'
+  | 'cultist'
+  | 'bone_lich';
+
+export type EnemyRole = 'minion' | 'boss';
+
+export interface EnemyDef {
+  id: EnemyId;
+  name: string;
+  role: EnemyRole;
+  baseStats: Stats;
+  tags: readonly CombatantTag[];
+  abilities: readonly AbilityId[];
+  aiPriority: readonly AbilityId[];
+  preferredSlots: readonly SlotIndex[];
+  spriteId: string;
 }

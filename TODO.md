@@ -27,19 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 3 · Enemy data — Crypt pool + boss
-
-- **What:** Define 4 Crypt enemy types + 1 Crypt boss, each with stats, abilities, and AI priorities.
-- **Why:** Combat has nothing to fight without enemies. First dungeon needs a content pool.
-- **Tier:** 1
-- **Acceptance:**
-  - `src/data/enemies.ts` exports an `ENEMIES` registry and a Crypt enemy pool.
-  - 4 regular enemy types with varied slot preferences so parties meet different lineups across floors (candidates: skeleton warrior, skeleton archer, ghoul, cultist).
-  - 1 Crypt boss with at least one signature ability that differentiates it from regular fights.
-  - Abilities drawn from `src/data/abilities.ts`; new enemy-only abilities may be added to the same module.
-- **Touches:** `src/data/enemies.ts`, possibly additions to `src/data/abilities.ts`.
-- **Source:** `gdd.md` §4 (Dungeons — The Crypt).
-
 ### 4 · Combat engine — resolution loop
 
 - **What:** Pure-TS combat engine for 3v3–4 ranked combat. Turn order by Speed, AI priority picker, ability resolution with position effects, producing a structured combat log.
