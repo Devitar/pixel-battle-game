@@ -24,7 +24,7 @@ export type AbilityId =
   | 'lich_strike'
   | 'curse_of_frailty';
 
-export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty';
+export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned';
 
 export type AbilityTag = 'radiant';
 

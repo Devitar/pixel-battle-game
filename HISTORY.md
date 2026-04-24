@@ -29,6 +29,69 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-24 · Combat engine — resolution loop (Tier 1)
+
+- **What shipped:**
+  - 8 new source files under `src/combat/`: `types.ts` (rewritten), `statuses.ts`, `positions.ts`, `target_selector.ts`, `turn_order.ts`, `ability_priority.ts`, `effects.ts`, `combat.ts`.
+  - 7 new test files plus `__tests__/helpers.ts` (shared `makeHeroCombatant` / `makeEnemyCombatant` / `makeTestState` builders). +60 test assertions (total 296, was 236).
+  - `resolveCombat(initialState, rng): CombatResult` — clones input, runs rounds to completion or a 30-round cap, returns final state + the full event log + outcome.
+  - 14-kind `CombatEvent` discriminated union, one observable change per event. The combat scene (task 17) consumes this log for playback animations.
+  - 9 effect handlers honor the invariants from prior tasks: `power × Attack` damage formula, damage floor 1, Smite radiant × 1.5 vs undead, mark multi-hit, max-HP clamp on buff/debuff, caster-relative `TargetSelector.side`.
+  - `StatusId` extended with `'stunned'` as a small retrofit in `src/data/types.ts`.
+  - Design spec at `docs/superpowers/specs/2026-04-24-combat-engine-design.md`; plan at `docs/superpowers/plans/2026-04-24-combat-engine.md`.
+- **Why:** This is Tier 1's load-bearing core. Every downstream system — the combat scene (17), dungeon scene (16), save/load (9), the eventual balance simulator — consumes what this task produces. Tasks 2 and 3 were preparation; this is where those invariants get paid out in runtime code.
+- **Decisions:**
+  - *Mutation model: internal mutation with cloned input.* `resolveCombat` clones the caller's `CombatState` via `structuredClone`, mutates the working copy, and returns it. Callers never see the mutation; tests assert against the returned `finalState`. Avoids the ceremony of immutable round-by-round updates and the aliasing risk of in-place mutation.
+  - *Stable combatantIds (`p0..p2`, `e0..e3`) over implicit identity.* Slots change constantly (shove, pull, collapse); identifying combatants by `{side, slot}` would have required re-resolving at every event replay. Stable ids make the combat scene's animation loop `for (event of events) animate(event)` with no parsing.
+  - *Fine-grained event stream (14 kinds, one observable change per event).* Makes the renderer's event-to-animation dispatch trivial and lets tests assert exact event counts/orderings. The alternative coarse "per turn" event would have forced renderer re-parse and masked subtle ordering bugs.
+  - *Turn order variance: `speed + rng.int(0, max(2, floor(speed * 0.1)))`.* Scales with stat inflation. At Tier 1's speed 3–5 the floor of 2 dominates (equivalent to a flat `+0..+2`); at late-game speed 50–100 the 10% term kicks in and keeps variance meaningful. User caught the scaling gap during brainstorming.
+  - *Per-target-turn status ticking.* Status durations decrement at the start of the affected combatant's own turn, not at round boundaries. The per-round model made stun semantics weird (was the stun "this round" or "next"?); per-target-turn gives `stun duration: 1` a single predictable meaning.
+  - *Stun-check-before-tick ordering.* At turn start: (1) record whether the combatant is currently stunned, (2) tick statuses (stun expires if duration was 1), (3) if stunned-flag was set, skip the turn. This guarantees a freshly-applied `stun duration: 1` always costs exactly one turn — the target's very next turn.
+  - *`'stunned'` as a StatusId literal, retroactively added to `data/types.ts`.* The `{ kind: 'stun', duration }` effect lacked a statusId field in task 2's design; the engine needed a consistent storage key. Adding the literal is a tiny change; the alternative (making statusId optional on `stun`) would have weakened the global uniqueness rule.
+  - *Effect ordering within an ability: listed order; lethal damage no-ops subsequent effects on the dead target.* Shield Bash's `[damage, stun]` sequence means a killing blow doesn't waste a stun on the corpse. Matches DD convention.
+  - *Damage floor of 1.* `max(1, power × attack × tagBonus - defense)`. Prevents tank-vs-tank stalemates at late game; every hit does *something*. Tradeoff accepted for Tier 1; Tier 2 may reconsider if specific tank builds want to fully negate certain damage types.
+  - *Smite `radiant` × `undead` = 1.5×, flat.* Only tag-pair bonus in Tier 1. Flat multiplier (not additive) keeps the formula clean. 2× felt too dramatic for Tier 1; scales cleanly at 1.5×.
+  - *Mark persists for its full duration; every damage instance gets the bonus.* Simpler data model than single-use-and-consume. Slightly stronger than DD's single-use mark, which shifts Archer's role from "mark-then-burst" to "mark-then-steady-pressure." Rebalance later if needed.
+  - *Max-HP buff/debuff clamps `currentHp = min(currentHp, newMax)` on application; does NOT raise currentHp on positive buff; does NOT restore currentHp on expiry.* Asymmetric by design: makes +Max HP feel like "bonus headroom" (useless if not damaged) and -Max HP feel like "chip damage + lasting cap." Task 3 declared this invariant; task 4 implements it.
+  - *Deferred collapse.* Died-during-ability combatants keep their slot field until `applyAbility` finishes *all* effects, then `collapseAfterDeath` runs once per affected side. Keeps target-by-id resolution stable across AoE abilities that kill multiple targets. The alternative (collapse immediately on each death) would have produced weird half-collapsed intermediate states during multi-effect abilities.
+  - *Shuffle: adjacent-neighbor swap toward `preferredSlots` (or toward slot 1 for heroes, who lack the field).* Crude but adequate for Tier 1. Tier 2 may want smarter shuffling (pathfind-to-nearest-legal-slot) if new kits introduce combatants that can genuinely get stuck.
+  - *Round cap 30, mutual wipe = `'player_defeat'`.* Generous cap for legitimate fights; tight enough to catch infinite-loop bugs in dev. Ties losing is the conventional pessimistic reading of "the party didn't survive."
+  - *`CombatSide` ('player'|'enemy') distinct from `Side` ('self'|'ally'|'enemy').* Runtime absolute vs caster-relative. The two live under different names in `combat/types.ts` vs `data/types.ts` to prevent conflation at consumer call sites. TypeScript enforces — `combatant.side === 'ally'` would be a type error.
+- **Alternatives considered:**
+  - *Pure-function per round (`resolveRound(state, rng) => { newState, events }`).* Rejected — immutable round updates would have meant `const newState = { ...state, combatants: [...] }` scattered throughout the engine. Too much ceremony for a system that can safely mutate an internal working copy.
+  - *Mutate caller's state in place without cloning.* Rejected — aliasing risk for any caller that wanted to keep a snapshot.
+  - *Identify combatants by implicit `{side, slot}`.* Rejected — fragile across shoves/pulls/deaths. Every event would need to reference "the combatant who was in slot 2 at the time."
+  - *Coarse per-turn event grain.* Rejected — forces renderer to re-parse nested data per animation; hides ordering bugs.
+  - *Medium per-ability-plus-per-target grain.* Rejected — middle ground that wins neither clarity nor compactness.
+  - *Per-round status ticking.* Rejected — stun semantics get weird depending on applier-vs-target turn ordering.
+  - *Flat `+0..+2` variance without 10% scaling.* Rejected per user feedback — doesn't remain meaningful at speed 50+.
+  - *No variance.* Rejected — conflicts with GDD's "Speed ± small variance" language.
+  - *Immediate collapse per-death.* Rejected — messes up AoE semantics with multiple deaths.
+  - *Single-use mark (consumed on first hit).* Rejected for Tier 1 — simpler data model and slightly stronger. Revisit if balance demands.
+  - *Damage zero-floor.* Not taken. Tier 1 tank values are low enough that zero-floor wouldn't trigger; floor-of-1 prevents the stalemate case from ever happening.
+- **Surprises / lessons:**
+  - **Zero plan bugs at execution time.** All 9 tasks green on first run — no RED-phase false starts, no test-expectation mismatches. Attribute to: (a) spec self-review caught the collapse-timing contradiction *before* it got into the plan; (b) types locked in at spec time stayed consistent across every file; (c) test-helpers file meant every test had identical setup semantics. The earlier lesson from task 3 — "if a plan step looks redundant, cut it in the plan, not during execution" — was honored here.
+  - **The `CombatSide` vs `Side` terminology split paid off.** Runtime absolute vs caster-relative is a subtle distinction; giving them different names makes consumer code self-documenting. A shared `Side` name would have masked bugs like `combatant.side === 'ally'` or `targetSelector.side === 'player'` — both nonsensical but type-allowable under a single union.
+  - **`structuredClone` is the first ES2022 dependency in the engine.** Available in TS 6, Node 20+, all modern browsers. No polyfill needed for the repo's Vite/Vitest setup. Would have been a footgun in an older codebase.
+  - **The `tickStatuses` in-place mutation during `Object.keys` iteration is safe because the keys are snapshotted first.** `Object.keys(obj)` returns an array; deletions during the loop don't affect iteration. Worth noting for future status-related code.
+  - **The mutation model choice (`A`) reduced test burden.** Tests just inspect `result.finalState` and `result.events`. No "compare intermediate state at round N" pattern needed. If we'd gone with pure-function-per-round, integration tests would have been more awkward.
+  - **The stable combatantId scheme revealed its value in the determinism property test.** Comparing two runs' events with `toEqual` is only meaningful because combatant references are stable across the runs. With `{side, slot}` identity, the test would have needed a structural comparator that re-resolved slot changes.
+- **Touches:**
+  - `src/data/types.ts` (modified — `StatusId` +`'stunned'`)
+  - `src/combat/types.ts` (rewritten)
+  - `src/combat/statuses.ts` (new)
+  - `src/combat/positions.ts` (new)
+  - `src/combat/target_selector.ts` (new)
+  - `src/combat/turn_order.ts` (new)
+  - `src/combat/ability_priority.ts` (new)
+  - `src/combat/effects.ts` (new)
+  - `src/combat/combat.ts` (new)
+  - `src/combat/__tests__/helpers.ts` (new)
+  - `src/combat/__tests__/{statuses,positions,target_selector,turn_order,ability_priority,effects,combat}.test.ts` (new)
+  - `docs/superpowers/specs/2026-04-24-combat-engine-design.md` (new)
+  - `docs/superpowers/plans/2026-04-24-combat-engine.md` (new)
+- **Source:** `TODO.md` Cluster A · Task 4. Related: `gdd.md` §2 (Combat), task 2 HISTORY entry (class data types + invariants), task 3 HISTORY entry (enemy data + caster-relative sides + max-HP clamp).
+
 ### 2026-04-24 · Enemy data — Crypt pool + boss (Tier 1)
 
 - **What shipped:**

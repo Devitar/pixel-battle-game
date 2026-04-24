@@ -27,21 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 4 · Combat engine — resolution loop
-
-- **What:** Pure-TS combat engine for 3v3–4 ranked combat. Turn order by Speed, AI priority picker, ability resolution with position effects, producing a structured combat log.
-- **Why:** The core system Tier 1 proves. Everything else is setup or rendering around this.
-- **Tier:** 1
-- **Acceptance:**
-  - Given an initial `CombatState` (party + enemies in slots with HP and stats), `resolveCombat(state, rng)` runs rounds until one side is defeated or a round cap is hit.
-  - Turn order respects Speed ± small variance; ties go to the player side.
-  - `pickAbility(combatant, state)` chooses an ability using the combatant's priority list, filtered by can-cast-from-slot and target availability. Falls back to "shuffle" if nothing is castable.
-  - Abilities apply damage / heals / shoves / pulls / swaps / stuns deterministically given the same RNG state.
-  - Engine emits a list of `CombatEvent`s (attacker, ability, targets, deltas, position changes). No `phaser` imports.
-  - Tests cover: turn order math, each ability effect type, position-change correctness, win / lose / timeout outcomes.
-- **Touches:** `src/combat/combat.ts`, `src/combat/ability.ts`, `src/combat/ability_priority.ts`, `src/combat/turn_order.ts`, `src/combat/__tests__/*`.
-- **Source:** `gdd.md` §2 (Combat).
-
 ### 5 · Dungeon & linear floor generation
 
 - **What:** Floor generator for The Crypt — 3 combat nodes + 1 boss node, linear, no forks/shops/events (Tier 1 scope).
