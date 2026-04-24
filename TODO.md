@@ -27,18 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 6 · Run state & gold-only pack
-
-- **What:** Model the in-progress expedition: party HP/positions, current floor number, current node index, and the pack (gold only in Tier 1).
-- **Why:** Binds combat and dungeon together. Drives scene transitions (dungeon → combat → next node → boss → camp screen).
-- **Tier:** 1
-- **Acceptance:**
-  - `src/run/run_state.ts` models `RunState` with helpers for entering a node, completing combat (apply HP and pack deltas), transitioning to camp screen, transitioning to next floor, and handling wipes.
-  - `src/run/pack.ts` handles pack math — Tier 1 is gold-only (`addGold`, `totalGold`, `empty`).
-  - Cashout returns `{ goldBanked }`; wipe returns `{ packLost, heroesLost }`. No gear handling yet (Tier 2 adds it).
-  - Tests cover: state transitions, pack math, cashout and wipe outcomes, floor advancement.
-- **Touches:** `src/run/run_state.ts`, `src/run/pack.ts`, `src/run/camp_screen.ts`, `src/run/__tests__/*`.
-
 ### 7 · Roster & vault
 
 - **What:** Persistent camp state — roster of heroes (with cap) and the banked vault gold.

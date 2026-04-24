@@ -29,6 +29,64 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-24 · Run state & gold-only pack (Tier 1)
+
+- **What shipped:**
+  - `src/heroes/hero.ts` with `Hero` type + `createHero`. First-cut type that task 7 (roster) will build on.
+  - `src/run/pack.ts` — `Pack` type + immutable ops (`createPack`, `addGold`, `totalGold`, `emptyPack`).
+  - `src/combat/combatant.ts` — `createHeroCombatant` / `createEnemyCombatant` factories **extracted from test helpers** and promoted to production. The old helpers file becomes a shim re-exporting under `make*` names so existing tests compile without churn.
+  - `src/run/combat_setup.ts` — `buildCombatState(party, encounter): CombatState`. Applies per-floor `ScaleFactors` (HP + Attack only) via overrides; assigns stable `p${i}`/`e${i}` combatantIds.
+  - `src/run/run_state.ts` — `RunState`, `RunStatus`, `CashoutOutcome`, `WipeOutcome`, and the five transitions: `startRun`, `currentNode`, `completeCombat`, `pressOn`, `cashout`. All `readonly`; operations return new RunState values.
+  - 5 test files + 1 shim-rewrite. +36 assertions (total 360, was 324).
+  - Design spec at `docs/superpowers/specs/2026-04-24-run-state-design.md`; plan at `docs/superpowers/plans/2026-04-24-run-state.md`.
+- **Why:** This is the glue between the floor generator (task 5) and the combat engine (task 4). Run state models the in-progress expedition — party HP persisting across nodes, the gold-only pack, the current floor/node pointer, and the status that drives the dungeon/combat/camp-screen scene transitions that tasks 16–18 will consume.
+- **Decisions:**
+  - *Immutable RunState.* Every operation returns a new RunState; callers swap references. Chosen over mutable-in-place despite that being the combat engine's pattern. The "why did combat go mutable?" check made the honest answer clear: combat mutates because of iteration cost (hundreds of per-event mutations per fight) and atomic encapsulation (the caller never sees intermediate state). Run state has neither — operations are discrete, callers absolutely observe intermediate state, and `RunState === saved file` aligns cleanly with immutable serialization. Mutability's "convention match" wasn't a substantive benefit here.
+  - *Single `Hero` type defined in task 6.* Minimal Tier 1 shape: `{ id, classId, name, baseStats, currentHp, maxHp }`. Task 7 (roster) builds ops around the existing type rather than defining its own. No separate `PartyMember` indirection — the RunState's party IS an array of Heroes with their mid-run HP.
+  - *Per-node gold rewards, floor-scaled.* `15g × floorNumber` for combat nodes, `100g × floorNumber` for boss nodes. Chosen over per-kill gold (faithful to GDD but requires parsing combat events) and per-enemy `goldValue` (speculative — no gear economy to consume the variance yet). Per-node gives predictable balance knobs and preserves "gold from kills" in spirit (you only get paid if the node cleared).
+  - *Split factories: production in `src/combat/combatant.ts`, run-side builder in `src/run/combat_setup.ts`.* The test helpers `makeHeroCombatant` / `makeEnemyCombatant` were already doing production-shape factory work; promoting them to real modules deduplicates with anything the run would have written. Scaling is a run-domain concern (floor progression), so it lives in `combat_setup.ts` as override construction rather than inside the combat factories.
+  - *Hero ids are `rng.int`-derived strings* (task 8's problem to actually generate, but the shape is set). Crypto UUIDs rejected as overkill and non-deterministic.
+  - *Abandon skipped for Tier 1.* Every camp screen in Tier 1 is post-boss (no mid-floor camp nodes until Tier 2), so Abandon is structurally unreachable. Tier 2 adds it alongside camp nodes.
+  - *Combat timeout → wipe.* Rare in practice; rewarding timeout as anything other than defeat would invite exploits. Reconsider if playtesting surfaces legitimate timeouts.
+  - *Floor cache in `RunState.currentFloorNodes`.* Stored rather than regenerated from seed on demand. The dungeon scene walks the array; no need for the generator at render time.
+  - *Pack immutability* matches RunState's contract. `Pack` is tiny, but consistency across the run domain is worth more than the saved allocation.
+  - *Wipe `heroesLost` includes previously-fallen heroes.* Self-review caught this — the initial spec said "everyone alive at wipe time + newly fallen," which missed heroes who died in earlier combats (already in `runState.fallen`). The fix: `allLost = [...runState.fallen, ...newFallen, ...updatedPartyLiving]`. The returned RunState's `fallen` is set to `allLost` without double-counting.
+  - *`p${i}` / `e${i}` combatantId scheme is now load-bearing.* It's the bridge between run state's party array and the combat engine's combatant list. `completeCombat` reverses by scanning the combat result's combatants for matching ids. Stable within a single combat; re-derived per combat as party composition changes across nodes.
+- **Alternatives considered:**
+  - *Mutable RunState (option A from Q1).* Rejected — convention over substance; combat engine's mutation pattern doesn't transfer.
+  - *Mutable + `snapshot()` helper (option C from Q1).* Rejected — two mechanisms to teach for negligible payoff.
+  - *Separate `PartyMember` / `Hero` types.* Rejected — `Hero` is enough; per-run state (HP) is just a mutation of the Hero in the new RunState.
+  - *Punt `Hero` to task 7.* Rejected — forces task 6 to invent a placeholder type that task 7 would rewrite.
+  - *Per-kill gold (option A from Q3).* Rejected — requires combat-event parsing for a minor fidelity gain.
+  - *Per-enemy `goldValue` field (option C from Q3).* Rejected as speculative; Tier 2 may introduce it.
+  - *Inline factories in `run_state.ts` (option C from Q4).* Rejected — clutters `run_state.ts` with factory logic that test code also needs.
+  - *Factories in `src/run/` (option A from Q4).* Rejected — combat factories are a combat-domain concern even when the run orchestrates their use.
+  - *Tier 1 Abandon support.* Rejected — structurally unreachable without mid-floor camp nodes.
+  - *Timeout as its own distinct run outcome.* Rejected — treat as wipe.
+- **Surprises / lessons:**
+  - **"Why did the combat engine choose mutation?"** — best question of the session. It forced me to articulate the actual benefits (iteration cost + atomic encapsulation) and identify when they don't apply. Convention-matching was a weak argument once the real reasons were surfaced.
+  - **The shim-as-migration pattern worked cleanly.** `helpers.ts` became `export const makeHeroCombatant = createHeroCombatant;` and all 7 existing test files kept compiling. Lets production extraction happen in one commit without a churn-heavy rename pass. Drop the shim on the next test-rename task.
+  - **Spec self-review caught the wipe-heroesLost bug before it hit the plan.** The plan tested for it directly (test: "wipe heroesLost includes heroes who fell in earlier combats"), which passed on first run.
+  - **Immutability testing is trivially correct.** `JSON.parse(JSON.stringify(rs))` pre-op + deep-equal post-op is a one-line regression check. Mutation-based designs need much more careful "assert this specific field didn't change" assertions.
+  - **Proactive plan review catches plan bugs.** The `CombatantId` unused-import in the shim would have been a strict-tsc error at Task 3 Step 5. Catching it during pre-execution review (and fixing inline) avoided a red-then-edit cycle. Lesson holds: plan review + execution review are complementary filters.
+  - **Mock CombatResult construction is clean when factories are shared.** The test's `mockCombatResult` helper uses the same `createHeroCombatant` that production uses, so the mock has the same shape as what `buildCombatState` produces. No drift possible.
+  - **The `p${i}` scheme is now a cross-domain invariant.** If Tier 2 adds hero-swap mid-run (swapping bench heroes into the active party), the mapping from party index → combatantId needs rethinking. Worth flagging in task 6's HISTORY for future-me.
+- **Touches:**
+  - `src/heroes/hero.ts` (new)
+  - `src/heroes/__tests__/hero.test.ts` (new)
+  - `src/run/pack.ts` (new)
+  - `src/run/__tests__/pack.test.ts` (new)
+  - `src/combat/combatant.ts` (new — extracted)
+  - `src/combat/__tests__/combatant.test.ts` (new)
+  - `src/combat/__tests__/helpers.ts` (modified — shim)
+  - `src/run/combat_setup.ts` (new)
+  - `src/run/__tests__/combat_setup.test.ts` (new)
+  - `src/run/run_state.ts` (new)
+  - `src/run/__tests__/run_state.test.ts` (new)
+  - `docs/superpowers/specs/2026-04-24-run-state-design.md` (new)
+  - `docs/superpowers/plans/2026-04-24-run-state.md` (new)
+- **Source:** `TODO.md` Cluster A · Task 6. Related: `gdd.md` §1 (core loop), §7 (risk/reward economy), §8 (death & loss); task 4 HISTORY (combat engine, `p${i}` scheme origin); task 5 HISTORY (floor generation, `Encounter` + `ScaleFactors`).
+
 ### 2026-04-24 · Floor generation — The Crypt (Tier 1)
 
 - **What shipped:**
