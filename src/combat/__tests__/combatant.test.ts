@@ -22,6 +22,11 @@ describe('createHeroCombatant', () => {
     expect(c.currentHp).toBe(5);
     expect(c.maxHp).toBe(CLASSES.archer.baseStats.hp);
   });
+
+  it('propagates traitId via overrides', () => {
+    const c = createHeroCombatant('knight', 1, 'p0', { traitId: 'stout' });
+    expect(c.traitId).toBe('stout');
+  });
 });
 
 describe('createEnemyCombatant', () => {
@@ -45,5 +50,10 @@ describe('createEnemyCombatant', () => {
     expect(c.baseStats.attack).toBe(5);
     expect(c.currentHp).toBe(18);
     expect(c.maxHp).toBe(18);
+  });
+
+  it('leaves traitId undefined', () => {
+    const c = createEnemyCombatant('skeleton_warrior', 1, 'e0');
+    expect(c.traitId).toBeUndefined();
   });
 });

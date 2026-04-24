@@ -6,6 +6,7 @@ import type {
   EnemyId,
   SlotIndex,
   StatusId,
+  TraitId,
 } from '../data/types';
 
 export interface Stats {
@@ -41,6 +42,7 @@ export interface Combatant {
   aiPriority: readonly AbilityId[];
   preferredSlots?: readonly SlotIndex[];
   tags?: readonly CombatantTag[];
+  traitId?: TraitId;
   isDead: boolean;
 }
 

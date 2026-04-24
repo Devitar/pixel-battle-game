@@ -9,9 +9,9 @@ const FLAT_SCALE = { hp: 1.0, attack: 1.0 };
 describe('buildCombatState', () => {
   it('places party at slots 1..N in array order with combatantIds p0..pN-1', () => {
     const party = [
-      createHero('knight', 'K', 'h0'),
-      createHero('archer', 'A', 'h1'),
-      createHero('priest', 'P', 'h2'),
+      createHero('knight', 'K', 'h0', 'quick', 'body1'),
+      createHero('archer', 'A', 'h1', 'quick', 'body1'),
+      createHero('priest', 'P', 'h2', 'quick', 'body1'),
     ];
     const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
     const state = buildCombatState(party, encounter);
@@ -25,7 +25,7 @@ describe('buildCombatState', () => {
   });
 
   it('preserves party current HP (does not reset to max)', () => {
-    const party = [createHero('knight', 'K', 'h0')];
+    const party = [createHero('knight', 'K', 'h0', 'quick', 'body1')];
     party[0] = { ...party[0], currentHp: 7 };
     const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
     const state = buildCombatState(party, encounter);
@@ -33,7 +33,7 @@ describe('buildCombatState', () => {
   });
 
   it('respects enemy slots from placements and assigns e0..eM-1', () => {
-    const party = [createHero('knight', 'K', 'h0')];
+    const party = [createHero('knight', 'K', 'h0', 'quick', 'body1')];
     const encounter: Encounter = {
       enemies: [
         { enemyId: 'skeleton_warrior', slot: 1 },
@@ -51,7 +51,7 @@ describe('buildCombatState', () => {
   });
 
   it('applies scale to enemy HP and Attack only', () => {
-    const party = [createHero('knight', 'K', 'h0')];
+    const party = [createHero('knight', 'K', 'h0', 'quick', 'body1')];
     const scale = { hp: 1.5, attack: 1.5 };
     const encounter: Encounter = {
       enemies: [{ enemyId: 'skeleton_warrior', slot: 1 }],
@@ -69,7 +69,7 @@ describe('buildCombatState', () => {
   });
 
   it('scale at 1.0x leaves stats unchanged', () => {
-    const party = [createHero('knight', 'K', 'h0')];
+    const party = [createHero('knight', 'K', 'h0', 'quick', 'body1')];
     const encounter: Encounter = {
       enemies: [{ enemyId: 'ghoul', slot: 1 }],
       scale: FLAT_SCALE,
@@ -80,9 +80,24 @@ describe('buildCombatState', () => {
   });
 
   it('round starts at 0', () => {
-    const party = [createHero('knight', 'K', 'h0')];
+    const party = [createHero('knight', 'K', 'h0', 'quick', 'body1')];
     const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
     const state = buildCombatState(party, encounter);
     expect(state.round).toBe(0);
+  });
+});
+
+describe('buildCombatState — trait propagation', () => {
+  it('copies each Hero traitId into the resulting Combatant', () => {
+    const party = [
+      createHero('knight', 'K', 'h0', 'stout', 'body1'),
+      createHero('archer', 'A', 'h1', 'cowardly', 'body1'),
+      createHero('priest', 'P', 'h2', 'sharp_eyed', 'body1'),
+    ];
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState(party, encounter);
+    expect(state.combatants[0].traitId).toBe('stout');
+    expect(state.combatants[1].traitId).toBe('cowardly');
+    expect(state.combatants[2].traitId).toBe('sharp_eyed');
   });
 });

@@ -29,6 +29,69 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-24 · Recruitment & trait system (Tier 1)
+
+- **What shipped:**
+  - `src/data/traits.ts` — 6 Tier 1 traits (`stout`, `quick`, `sturdy`, `sharp_eyed`, `cowardly`, `nervous`). Types in `data/types.ts`: `TraitId`, `TraitDef`, `TraitHpEffect`, `TraitStatEffect`, `TraitCondition`.
+  - `src/data/names.ts` — 50 ungendered fantasy names. `src/data/body_sprites.ts` — 8 race × gender sprite frame ids.
+  - `src/heroes/hero.ts` — `Hero` gains `traitId` and `bodySpriteId`. `createHero` signature extended; HP trait effects bake at creation via `computeMaxHp`.
+  - `src/combat/types.ts` — `Combatant` gains optional `traitId?`. `src/combat/statuses.ts` — `getEffectiveStat` now reads trait effects as a third modifier source alongside base stats and statuses, with `TraitCondition` evaluation.
+  - `src/run/combat_setup.ts` — `buildCombatState` propagates `hero.traitId` through to the Combatant.
+  - `src/camp/buildings/tavern.ts` — `generateCandidate`, `generateCandidates` (3-candidate pool), `generateStarterRoster` (3 heroes, one per class), `HIRE_COST = 50`, `TAVERN_CANDIDATE_COUNT = 3`.
+  - 5 new test files, multiple extended. +60 assertions (total 444, was 384).
+  - Design spec at `docs/superpowers/specs/2026-04-24-recruitment-design.md`; plan at `docs/superpowers/plans/2026-04-24-recruitment.md`.
+- **Why:** Tavern candidate generation for task 13's UI + starter roster for task 10's boot scene. Introduces the trait system as combat's third modifier source, unlocking GDD's conditional traits like "Cowardly — −1 Speed when in slot 1."
+- **Decisions:**
+  - *Option B trait application: runtime evaluation at `getEffectiveStat`, with HP carve-out baked at Hero creation.* User explicitly picked B ("shouldn't be much more work") over A (bake-everything-simplify-Cowardly). HP is the asymmetric exception because `maxHp` is already stored per the task 4 invariant — baking matches that existing treatment. Non-HP effects evaluate at read time so Cowardly's "slot 1 only" condition actually fires.
+  - *Two effect shapes on `TraitDef` (`hpEffect` vs `statEffects`), not a unified union.* HP and non-HP follow different application rules (bake vs evaluate). Unified would have needed runtime guards like "if mode === 'percent' and stat === 'hp'," producing a class of invalid states TS couldn't rule out. Split makes intent explicit at the data site and the consumer.
+  - *Trait as third modifier source in `getEffectiveStat`.* `base + trait (if condition met) + statuses`. Order is additive so it doesn't affect results, but the layered reading keeps the three sources legible at call sites.
+  - *Candidate = Hero.* No separate `Candidate` type. The Tavern returns `Hero[]`; hiring composes `addHero(roster, hero)` + `spend(vault, HIRE_COST)` at the caller (task 13's UI).
+  - *Flat `HIRE_COST = 50`.* Module constant, not a field on Hero. Tier 2 may introduce per-class costs by promoting to `hireCostFor(classId)`.
+  - *No reroll in Tier 1.* Per GDD §10 Tier 1 scope: "Tavern (fixed 3-candidate pool, no reroll)."
+  - *Cowardly and Nervous symmetric.* Both are slot-1 conditional negatives (speed vs defense). Matches the tonal read of "front-line anxiety" traits and gives the trait roster 4 flat positives + 2 conditional negatives — mostly upbeat rolls with a couple of "interesting" traits that create positioning decisions.
+  - *`TraitCondition` is a discriminated union with one kind (`inSlot`) in Tier 1.* Exhaustive switch in `evaluateTraitCondition` will prompt TS errors when Tier 2 adds `hpBelow`, `statusActive`, etc. Non-breaking extension path.
+  - *`generateStarterRoster` in this task.* Task 10 (boot scene) will call it when no save file exists. Included here because the generation shape is identical to Tavern candidates.
+  - *`Hero.bodySpriteId` added now, not deferred.* Paperdoll rendering (tasks 11–14) will read it. Tier 2 adds outfit/hair/hat; this task anchors the body field.
+  - *`Combatant.traitId` is optional.* Enemies leave it undefined in Tier 1. Optional field supports Tier 2 enemy traits (e.g., a "Reanimated" skeleton) without schema change.
+  - *Atomic signature change strategy for `createHero`.* Added 2 required params; all callers (5 test files, 20+ call sites) updated in the same task using `'quick'` trait (no HP effect, zero assertion churn) + `'body1'` placeholder. Keeps the full test suite green across the migration.
+- **Alternatives considered:**
+  - *Option A (bake all effects, simplify Cowardly to flat).* Rejected at user's request — worth the extra work to preserve GDD's conditional trait design.
+  - *Option C full hybrid (bake flat at creation + runtime evaluate conditionals).* Rejected — the HP-only bake carve-out gives 95% of the benefit with less code than a full two-path system.
+  - *Unified `TraitEffect` shape with `mode` + `stat` + optional `condition`.* Rejected — creates invalid state combinations (percent-mode on speed) that TS can't rule out.
+  - *Separate `Candidate` type.* Rejected — `Hero` is the right shape; a candidate is just "a Hero not yet in the roster."
+  - *Per-class hire cost.* Tier 2.
+  - *With-reroll Tavern in Tier 1.* Tier 2.
+  - *Bake trait effects at Hero creation and store as `baseStats` modifications.* Rejected for non-HP stats — loses the "class base" reference value that Barracks UI wants to display.
+- **Surprises / lessons:**
+  - **Plan gap caught by strict TS at execution time.** My self-review on Task 2 listed three files with `createHero` callers (hero, run_state, combat_setup). Missed `roster.test.ts` from task 7, which has 5+ call sites. Strict TS caught it at the typecheck gate after I'd updated the "known" files. Fixed inline in ~6 edits. **Lesson: when a task says "update all callers of X," run `grep "createHero\\("` before enumerating — the grep is authoritative, my memory isn't.** Worth adding to the plan review checklist for any future signature-change tasks.
+  - **`Math.round` half-up verified in tests.** Stout Priest: 15 × 1.10 = 16.5 → `Math.round(16.5) = 17` in JavaScript. Confirmed by a targeted assertion rather than assumed. JS's `Math.round` rounds half toward positive infinity (not banker's rounding), which is what we wanted.
+  - **The HP-bake-at-creation pragma is asymmetric but clean.** Non-HP traits evaluate at runtime; HP bakes. Initially felt like a hack, but it matches how the engine already treats HP differently (`maxHp` is stored, other stats are computed). The asymmetry is in the data model, not invented here.
+  - **The two-effect-shape split prevented a class of invalid states.** A unified `TraitEffect { stat, delta, mode, condition? }` would have allowed `{ stat: 'speed', mode: 'percent' }` or `{ stat: 'hp', condition: inSlot }` at the type level — both nonsensical. Splitting into `hpEffect` and `statEffects` moves the constraint into the schema.
+  - **`TraitCondition`'s single-kind union feels overbuilt for Tier 1 but pays for itself on first extension.** Tier 2's conditional-trait additions (`hpBelow`, `statusActive`) extend without re-shaping callers — the exhaustive switch in `evaluateTraitCondition` produces a compile error that points exactly where new kinds need handlers.
+  - **`generateStarterRoster` sharing logic with `generateCandidate` is why I kept them in the same file.** If task 10 needed different starter logic (e.g., fixed name, known trait), the functions would diverge; for now they're mechanically identical except for class selection.
+- **Touches:**
+  - `src/data/types.ts` (modified — +TraitId, TraitDef, conditions)
+  - `src/data/traits.ts` (new)
+  - `src/data/names.ts` (new)
+  - `src/data/body_sprites.ts` (new)
+  - `src/data/__tests__/traits.test.ts` (new)
+  - `src/data/__tests__/names.test.ts` (new)
+  - `src/heroes/hero.ts` (rewritten — signature + HP bake)
+  - `src/heroes/__tests__/hero.test.ts` (rewritten)
+  - `src/combat/types.ts` (modified — +Combatant.traitId)
+  - `src/combat/statuses.ts` (rewritten — getEffectiveStat reads traits)
+  - `src/combat/__tests__/statuses.test.ts` (extended)
+  - `src/combat/__tests__/combatant.test.ts` (extended)
+  - `src/run/combat_setup.ts` (modified — traitId propagation)
+  - `src/run/__tests__/combat_setup.test.ts` (extended)
+  - `src/run/__tests__/run_state.test.ts` (mechanical churn)
+  - `src/camp/__tests__/roster.test.ts` (mechanical churn — caught at execution time, not in plan)
+  - `src/camp/buildings/tavern.ts` (new)
+  - `src/camp/buildings/__tests__/tavern.test.ts` (new)
+  - `docs/superpowers/specs/2026-04-24-recruitment-design.md` (new)
+  - `docs/superpowers/plans/2026-04-24-recruitment.md` (new)
+- **Source:** `TODO.md` Cluster A · Task 8. Related: `gdd.md` §3 (Recruitment roll), task 4 HISTORY (combat engine + `getEffectiveStat` architecture), task 6 HISTORY (Hero type origin + immutable pattern), task 7 HISTORY (roster integration point).
+
 ### 2026-04-24 · Roster & vault (Tier 1)
 
 - **What shipped:**

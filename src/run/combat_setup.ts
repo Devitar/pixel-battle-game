@@ -28,6 +28,7 @@ export function buildCombatState(
         baseStats: hero.baseStats,
         currentHp: hero.currentHp,
         maxHp: hero.maxHp,
+        traitId: hero.traitId,
       }),
     );
   }

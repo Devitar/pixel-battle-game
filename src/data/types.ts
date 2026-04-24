@@ -117,3 +117,32 @@ export interface DungeonDef {
   enemyPool: readonly EnemyId[];
   bossId: EnemyId;
 }
+
+export type TraitId =
+  | 'stout'
+  | 'quick'
+  | 'sturdy'
+  | 'sharp_eyed'
+  | 'cowardly'
+  | 'nervous';
+
+export type TraitCondition = { kind: 'inSlot'; slot: SlotIndex };
+
+export interface TraitHpEffect {
+  delta: number;
+  mode: 'flat' | 'percent';
+}
+
+export interface TraitStatEffect {
+  stat: 'attack' | 'defense' | 'speed';
+  delta: number;
+  condition?: TraitCondition;
+}
+
+export interface TraitDef {
+  id: TraitId;
+  name: string;
+  description: string;
+  hpEffect?: TraitHpEffect;
+  statEffects?: readonly TraitStatEffect[];
+}

@@ -27,20 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 8 · Recruitment logic
-
-- **What:** Tavern candidate generation — roll 3 candidates, each with class, body sprite, name, and trait.
-- **Why:** The Tavern UI renders what this produces, and the initial save-file creation needs a starter roster.
-- **Tier:** 1
-- **Acceptance:**
-  - `src/camp/buildings/tavern.ts` exposes a function to generate candidates using the seeded RNG.
-  - Candidates draw class from the unlocked pool (Tier 1 = Knight / Archer / Priest only).
-  - Body sprite drawn from the player race × gender catalog (4 races × 2 genders).
-  - Names from `src/data/names.ts` (a ~50-name list is enough for Tier 1).
-  - Trait from `src/data/traits.ts` — Tier 1 subset of ~6 traits (Stout, Quick, Sturdy, Cowardly, Sharp-eyed, Nervous).
-- **Touches:** `src/camp/buildings/tavern.ts`, `src/data/names.ts`, `src/data/traits.ts`.
-- **Source:** `gdd.md` §3 (Recruitment roll).
-
 ### 9 · Save / load via localStorage
 
 - **What:** Serialize `Roster + Vault + Unlocks` to localStorage; load on boot; treat missing or corrupt save as a fresh-game trigger.

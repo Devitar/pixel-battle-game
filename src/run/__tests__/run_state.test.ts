@@ -8,9 +8,9 @@ import { cashout, completeCombat, currentNode, pressOn, startRun } from '../run_
 
 function makeParty(): Hero[] {
   return [
-    createHero('knight', 'K', 'h0'),
-    createHero('archer', 'A', 'h1'),
-    createHero('priest', 'P', 'h2'),
+    createHero('knight', 'K', 'h0', 'quick', 'body1'),
+    createHero('archer', 'A', 'h1', 'quick', 'body1'),
+    createHero('priest', 'P', 'h2', 'quick', 'body1'),
   ];
 }
 
@@ -46,12 +46,12 @@ describe('startRun', () => {
   it('throws on party size != 3', () => {
     const rng = createRng(1);
     expect(() => startRun('crypt', [], 1, rng)).toThrow();
-    expect(() => startRun('crypt', [createHero('knight', 'K', 'h0')], 1, rng)).toThrow();
+    expect(() => startRun('crypt', [createHero('knight', 'K', 'h0', 'quick', 'body1')], 1, rng)).toThrow();
     const four: Hero[] = [
-      createHero('knight', 'K', 'h0'),
-      createHero('archer', 'A', 'h1'),
-      createHero('priest', 'P', 'h2'),
-      createHero('knight', 'K2', 'h3'),
+      createHero('knight', 'K', 'h0', 'quick', 'body1'),
+      createHero('archer', 'A', 'h1', 'quick', 'body1'),
+      createHero('priest', 'P', 'h2', 'quick', 'body1'),
+      createHero('knight', 'K2', 'h3', 'quick', 'body1'),
     ];
     expect(() => startRun('crypt', four, 1, rng)).toThrow();
   });
