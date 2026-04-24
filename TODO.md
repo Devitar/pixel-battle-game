@@ -27,18 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 7 · Roster & vault
-
-- **What:** Persistent camp state — roster of heroes (with cap) and the banked vault gold.
-- **Why:** Survives between runs. Consumed by recruitment, Barracks UI, and the Leave transition (banks pack gold into vault).
-- **Tier:** 1
-- **Acceptance:**
-  - `src/camp/roster.ts` manages a list of heroes with add / remove / getById operations. Enforces a 12-hero cap (Barracks upgrades are Tier 2+).
-  - `src/camp/vault.ts` is a gold accumulator with `credit`, `spend`, `balance`. No negative balance allowed.
-  - Dead heroes are removed from the roster on wipe or Fallen.
-  - Tests cover: cap enforcement, vault invariants.
-- **Touches:** `src/camp/roster.ts`, `src/camp/vault.ts`, `src/camp/__tests__/*`.
-
 ### 8 · Recruitment logic
 
 - **What:** Tavern candidate generation — roll 3 candidates, each with class, body sprite, name, and trait.

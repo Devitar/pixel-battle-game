@@ -29,6 +29,46 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-24 · Roster & vault (Tier 1)
+
+- **What shipped:**
+  - `src/camp/roster.ts` — `Roster` type + `DEFAULT_ROSTER_CAPACITY` constant + 7 immutable ops: `createRoster`, `addHero`, `removeHero`, `updateHero`, `getHero`, `listHeroes`, `canAdd`.
+  - `src/camp/vault.ts` — `Vault` type + 4 immutable ops: `createVault`, `credit`, `spend`, `balance`.
+  - 2 test files, 24 new assertions (total 384, was 360).
+  - Design spec at `docs/superpowers/specs/2026-04-24-roster-vault-design.md`; plan at `docs/superpowers/plans/2026-04-24-roster-vault.md`.
+- **Why:** Persistent camp state that survives between runs. Roster holds up to 12 heroes (Barracks L1); vault holds banked gold. Consumed by recruitment (task 8), Barracks UI (task 14), and the Leave transition in the camp-screen scene (task 18) which writes cashout outcomes back.
+- **Decisions:**
+  - *Capacity lives on the Roster struct, not a global constant.* `{ heroes, capacity }` with `DEFAULT_ROSTER_CAPACITY = 12` for Tier 1. Barracks upgrades in Tier 2 raise capacity via an immutable field update rather than a code change.
+  - *Throw on all invariant violations.* `addHero` at cap / with duplicate id; `removeHero` / `updateHero` with missing id; `credit` on negative; `spend` on negative or insufficient funds; `createRoster` with non-positive capacity. Consistent with `pack.addGold`'s throw-on-negative from task 6.
+  - *`canAdd` predicate separate from throwing `addHero`.* UI layer (Tavern hire button in task 13) uses `canAdd` for pre-click disable; `addHero` still throws on violation. Two-function pattern avoids teaching callers to use try/catch for control flow.
+  - *`updateHero` as a primitive, not composed.* Compose-from-remove+add would re-validate the cap, which is noise when the size doesn't change. `updateHero` also preserves the hero's array index — matters for Barracks list rendering.
+  - *Caller composes run-outcome application.* Task 7 exposes primitives; task 18's camp-screen scene composes them for cashout (`credit(vault, goldBanked)` + `updateHero` for returning heroes + `removeHero` for fallen heroes) and wipe (`removeHero` for all lost). Keeps this module ignorant of run state.
+  - *Immutability matches RunState + Pack.* All ops return new values. Chainable: `credit → spend → credit` preserves prior values.
+  - *Vault vs Pack naming divergence preserved.* Pack: `addGold` / `totalGold` / `emptyPack`. Vault: `credit` / `balance` / (no `emptyVault`). Different verbs because the GDD distinguishes "pack at risk" from "vault safe" — a shared `Wallet` abstraction would lose that signal at call sites.
+  - *No `emptyVault` operation.* `spend` is the only way balance decreases. Tier 2 features that drain the vault (catastrophic event, etc.) would add an operation explicitly rather than generalize.
+  - *`listHeroes` returns the internal `readonly` array without copying.* TypeScript prevents mutation through the returned reference; consumers that iterate don't pay allocation.
+  - *Roster imports only `Hero` from `src/heroes/`. Vault imports nothing.* `src/camp/` is a leaf data module. No phaser, no combat, no run state, no util.
+- **Alternatives considered:**
+  - *Hardcoded `MAX_ROSTER = 12` constant.* Rejected — Tier 2 Barracks upgrades would need a code change rather than a data change.
+  - *Compose `updateHero` from `remove` + `add`.* Rejected — re-validates the cap, noisy, loses array-index stability.
+  - *Result<T, Error> return type instead of throw.* Rejected — adds ceremony for callers; exceptions match the rest of the Tier 1 codebase.
+  - *Shared `Wallet` type for pack + vault.* Rejected — collapses the GDD's "pack = at risk" vs "vault = safe" distinction.
+  - *Roster/vault applying run outcomes directly.* Rejected — binds data modules to run-state types. Caller composition is cleaner.
+  - *`listHeroes` defensive copy.* Rejected — TypeScript's `readonly` suffices for the contract; allocation isn't free.
+- **Surprises / lessons:**
+  - **Smallest task since task 1.** Clean pass-through from spec → plan → implementation with zero plan bugs. Proof that well-scoped small tasks converge fast when the design calls are batched early.
+  - **The two-function invariant pattern (`canAdd` + throwing `addHero`) is going to recur.** Vault is a candidate next — a `canAfford(vault, amount)` predicate paired with throwing `spend` would match the Tavern UI flow. Not added preemptively (YAGNI); revisit when task 13 Tavern UI lands and actually needs it.
+  - **"Caller composes cashout" is a promise to future-me.** Task 18's camp-screen scene has a bigger integration surface than the other scenes because it orchestrates roster + vault + run state. Worth budgeting for.
+  - **Naming parallel-but-different between Pack and Vault is a game-language decision, not an abstraction failure.** The instinct is to factor out a shared `Currency` type. Resisting that preserves a real distinction players will hear ("banked to the vault" vs "carried in the pack"). Data types can legitimately diverge when the domain language does.
+- **Touches:**
+  - `src/camp/roster.ts` (new)
+  - `src/camp/vault.ts` (new)
+  - `src/camp/__tests__/roster.test.ts` (new)
+  - `src/camp/__tests__/vault.test.ts` (new)
+  - `docs/superpowers/specs/2026-04-24-roster-vault-design.md` (new)
+  - `docs/superpowers/plans/2026-04-24-roster-vault.md` (new)
+- **Source:** `TODO.md` Cluster A · Task 7. Related: `gdd.md` §6 (Camp — Barracks upgrades), task 6 HISTORY (Hero type + Pack counterpart).
+
 ### 2026-04-24 · Run state & gold-only pack (Tier 1)
 
 - **What shipped:**
