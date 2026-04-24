@@ -27,18 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 1 · Core types & seeded RNG
-
-- **What:** Establish foundational TypeScript types (Hero, Stats, Class, Ability, Enemy, Pack, RunState, Roster, SaveFile) and a seeded RNG module.
-- **Why:** Every subsequent core module needs these types and deterministic randomness. Types are the shared vocabulary; the RNG is how we make rolls reproducible in tests.
-- **Tier:** 1
-- **Acceptance:**
-  - Type definitions live in their respective domain folders (e.g., `heroes/types.ts`, `combat/types.ts`), not a single mega file.
-  - `util/rng.ts` exports a seeded PRNG (mulberry32 or similar). Given the same seed, produces the same sequence.
-  - Helper methods on the RNG for common ops: `int(min, max)`, `pick(array)`, `shuffle(array)`, `weighted(options)`.
-  - Tests confirm determinism and basic uniformity.
-- **Touches:** `src/util/rng.ts`, `src/util/__tests__/rng.test.ts`, type stubs in relevant domain folders.
-
 ### 2 · Class data — Knight, Archer, Priest
 
 - **What:** Define the three Tier 1 classes and their abilities as TS data modules.
