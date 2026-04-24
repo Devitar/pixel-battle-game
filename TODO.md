@@ -27,20 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 5 · Dungeon & linear floor generation
-
-- **What:** Floor generator for The Crypt — 3 combat nodes + 1 boss node, linear, no forks/shops/events (Tier 1 scope).
-- **Why:** Dungeon scene needs a floor structure to walk through; run state needs a node sequence to advance through.
-- **Tier:** 1
-- **Acceptance:**
-  - `src/dungeon/floor.ts` exposes `generateFloor(dungeonId, floorNumber, rng)` → ordered list of node definitions.
-  - All non-boss nodes are Combat type, drawing enemies from the dungeon's pool.
-  - Scaling is a flat per-floor multiplier on enemy HP / damage (per `gdd.md` §4).
-  - Boss node always terminates the floor.
-  - `src/data/dungeons.ts` defines The Crypt (name, theme, floor length, enemy pool reference, boss id).
-- **Touches:** `src/dungeon/floor.ts`, `src/dungeon/node.ts`, `src/dungeon/scaling.ts`, `src/data/dungeons.ts`.
-- **Source:** `gdd.md` §4.
-
 ### 6 · Run state & gold-only pack
 
 - **What:** Model the in-progress expedition: party HP/positions, current floor number, current node index, and the pack (gold only in Tier 1).

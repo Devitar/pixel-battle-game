@@ -106,3 +106,14 @@ export interface EnemyDef {
   preferredSlots: readonly SlotIndex[];
   spriteId: string;
 }
+
+export type DungeonId = 'crypt';
+
+export interface DungeonDef {
+  id: DungeonId;
+  name: string;
+  theme: string;
+  floorLength: number;
+  enemyPool: readonly EnemyId[];
+  bossId: EnemyId;
+}

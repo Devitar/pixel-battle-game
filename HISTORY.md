@@ -29,6 +29,56 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-24 · Floor generation — The Crypt (Tier 1)
+
+- **What shipped:**
+  - `src/dungeon/` — new directory housing the floor generator: `node.ts` (types), `scaling.ts` (`floorScale`), `encounter.ts` (`composeCombatEncounter`, `composeBossEncounter`), `floor.ts` (`generateFloor`).
+  - `src/data/types.ts` extended with `DungeonId` and `DungeonDef`; new `src/data/dungeons.ts` with the Crypt entry.
+  - 4 new test files — 28 assertions covering determinism, size bounds, slot assignment, front-liner guarantee (via mocked RNG), scale propagation, boss composition.
+  - Design spec at `docs/superpowers/specs/2026-04-24-floor-generation-design.md`; plan at `docs/superpowers/plans/2026-04-24-floor-generation.md`.
+- **Why:** Run state (task 6) and the dungeon scene (task 16) both need a floor structure to walk through. This task produces pure data — `Node[]` containing enemy ids, slot placements, and scale factors — leaving Combatant construction to the run state layer.
+- **Decisions:**
+  - *Linear scaling: `1 + 0.1 × (floorNumber - 1)`, applied to HP and Attack only.* Readable at every depth, leaves room for Tier 2 milestone modifiers to layer additively. Defense and Speed unscaled.
+  - *Encounter size distribution: `{ 2: 20%, 3: 60%, 4: 20% }`.* User tweak during brainstorming — initial proposal was 3 or 4 only (70/30), user pushed for min 2. Keeps 3 the typical case; 2- and 4-enemy encounters are equally likely flavor sizes.
+  - *Front-liner guarantee for combat encounters only, not boss.* If no initial pick is a front-liner, `picks[0]` is replaced by a random front-pool draw. Prevents the "all back-liner in slot 1" soft-lock (back-liners can't cast from slot 1 → infinite shuffle). Boss encounter guarantees its own front-liner structurally (minion 1 at slot 1 is always a front-liner).
+  - *Boss composition: 3 combatants (boss + 2 minions).* Matches the party's 3-size, keeps combat feeling like a proper ranked fight. Boss at slot 3 (highest in a 3-slot encounter, matches Bone Lich's `preferredSlots: [3, 4]`); minion 1 at slot 1 is guaranteed front-liner; minion 2 at slot 2 is uniform from the full pool.
+  - *Slot assignment: front-liners ascending from slot 1, back-liners descending from slot N.* Meets in the middle. Produces `[front@1, front@2, back@3]` for 2F+1B and `[front@1, back@2, back@3]` for 1F+2B. Back-liners at slot 2 are mechanically fine — their `canCastFrom` includes slot 2.
+  - *`scale` lives on `Encounter`, not on `Node`.* Every encounter on floor N shares the same scale, so it's technically redundant — but placing it on the encounter makes encounters self-describing. The run state layer can build Combatants from an `Encounter` alone without needing floor context.
+  - *Node type union narrow for Tier 1: `'combat' | 'boss'` only.* Tier 2 will extend with `'elite' | 'shop' | 'camp' | 'event'` as a non-breaking addition; the exhaustive-switch pattern means consumers get a TS error when new variants land.
+  - *Stable, meaningful node IDs: `crypt-f1-n0`, `crypt-f1-boss`.* Zero consumers read them in Tier 1, but cheap insurance for save state and event logging later.
+  - *Thin `floor.ts` orchestrator.* Does no combat/slot logic itself — sequences `floorScale`, N calls to `composeCombatEncounter`, one call to `composeBossEncounter`. Keeps the composer testable in isolation and the orchestrator trivial.
+  - *Floor generator emits data, not Combatants.* The `src/dungeon/` → `src/combat/` import direction is blocked deliberately. Converting `Encounter` → `Combatant[]` is task 6's job. Keeps floor generation runnable in a headless balance simulator without the combat engine's full weight.
+  - *Scaling returns raw multipliers; rounding happens at Combatant-construction time.* `scaledHp = round(baseHp × scale.hp)` is applied by whoever builds the Combatant (task 6), not by the floor generator. Keeps the raw factor inspectable.
+  - *RNG consumption order fixed:* size roll → N picks → optional front-liner re-roll (combat); minion1 → minion2 (boss). Deterministic per seed.
+- **Alternatives considered:**
+  - *Geometric scaling (`1.1 ^ (floorNumber - 1)`).* Rejected — floor 10 = 2.36×, floor 20 = 6.7×. Cartoonish unless hero gear scales to match.
+  - *Piecewise/milestone scaling.* Deferred to Tier 2 — the additive layer for "Armored", "Venomous", "Enraged" modifiers. Tier 1 scope explicitly excludes it per GDD §4.
+  - *Fixed encounter size of 3.* Rejected per user feedback — loses a design lever that costs nothing to include.
+  - *Random 3 or 4 only (50/50 or 70/30).* User's "minimum 2" tweak produced the cleaner 20/60/20 distribution.
+  - *Boss alone (3v1).* Rejected — weird overwhelm dynamic.
+  - *Boss + 3 minions (3v4).* Rejected — tense but risks frustration when RNG stacks supports.
+  - *Constraint "≥1 back-liner per encounter".* Rejected — all-front encounters are mechanically fine, every front-liner can cast from slot 1.
+  - *`scale` on `Node` instead of `Encounter`.* Rejected — would force consumers that build Combatants from an encounter to pass the floor context separately.
+  - *Tier 2-ready node type union (all 6 types upfront).* Rejected — speculative. Extend when needed.
+- **Surprises / lessons:**
+  - **Plan bug caught by strict TS, not by tests.** The mocked-RNG test in Task 4 had `weighted: <T>(options) => { ... }` — `T` declared but unused, `options` implicitly `any`. Vitest transform accepted it and tests passed green. Only `npx tsc --noEmit` surfaced it. Lesson: run the typecheck gate after every task, not just `npm test`. Vitest's transform is lenient about test-file types in ways production builds aren't. Fixed by importing `WeightedOption` from `util/rng` and fully typing the mock.
+  - **The "find a seed" strategy would have been fragile.** An earlier draft of the front-liner-guarantee test said "use a seed empirically known to roll all-back-liners." In practice, a 1000-seed sample through the Crypt pool never produced an all-back-liner natural draw (the pool is 50/50 front/back, so 3 picks all-back = 12.5% probability; but across many rounds of generation the RNG state never landed there coincidentally). The mocked-RNG test was essential — it exercises the code path reliably, not by coincidence.
+  - **User caught a scope gap during design.** My initial encounter-size proposal was "3 or 4 only" which missed that 2-enemy encounters are a legitimate pacing beat. Worth noting: brainstorming's one-question-at-a-time cadence made the gap visible because the user could object to a specific choice instead of a whole design.
+  - **The import-direction rule stayed intact.** `src/dungeon/` imports from `data/` and `util/` but not from `combat/`. This will matter when task 6 lands: the run state layer is where floor output (Encounters) meets combat input (Combatants). Task 6 can legally import both.
+  - **Mocked Rng in tests is easier than I expected.** Constructing an object satisfying the `Rng` interface with deterministic `pick` / `weighted` is a few lines. Useful pattern for any test that needs to force a specific RNG-driven code path.
+- **Touches:**
+  - `src/data/types.ts` (modified — `DungeonId`, `DungeonDef`)
+  - `src/data/dungeons.ts` (new)
+  - `src/dungeon/node.ts` (new)
+  - `src/dungeon/scaling.ts` (new)
+  - `src/dungeon/encounter.ts` (new)
+  - `src/dungeon/floor.ts` (new)
+  - `src/data/__tests__/dungeons.test.ts` (new)
+  - `src/dungeon/__tests__/{scaling,encounter,floor}.test.ts` (new)
+  - `docs/superpowers/specs/2026-04-24-floor-generation-design.md` (new)
+  - `docs/superpowers/plans/2026-04-24-floor-generation.md` (new)
+- **Source:** `TODO.md` Cluster A · Task 5. Related: `gdd.md` §4 (Dungeons — The Crypt), task 3 HISTORY entry (enemy pool + `preferredSlots`), task 4 HISTORY entry (combat engine — consumer of eventual Combatants).
+
 ### 2026-04-24 · Combat engine — resolution loop (Tier 1)
 
 - **What shipped:**
