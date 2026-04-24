@@ -102,7 +102,7 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Why:** Every other scene assumes assets are loaded and save state has been resolved. Also the correct replacement for `MainScene` as the default start scene.
 - **Tier:** 1
 - **Acceptance:**
-  - `src/scenes/boot_scene.ts` preloads `base_sprites.png` and any new atlases.
+  - `src/scenes/boot_scene.ts` preloads `public/assets/sprites/base_sprites.png` and any new atlases.
   - On complete, asks `save/save.ts` for the current save. If present, transitions to camp scene with loaded state. If absent, creates a fresh save with a starter roster (3 heroes — one of each class) and transitions.
   - `src/main.ts` updated to register `BootScene` first; dev scenes (`main_scene`, `explorer_scene`) stay registered but are no longer auto-started.
 - **Touches:** `src/scenes/boot_scene.ts`, `src/main.ts`.
@@ -212,4 +212,4 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
   - Every enemy id referenced by `data/enemies.ts` maps to a valid sprite frame — either new pixels drawn in LibreSprite or reuse of existing NPC frames from the catalog.
   - `spritenames.txt` updated with the new / mapped entries; `npm run generate:names` run and output committed.
   - Boss is visually distinguishable (scaled up, unique frame, or outlined).
-- **Touches:** `public/assets/base_sprites.png` (if drawing), `spritenames.txt`, `src/render/sprite_names.generated.ts` (regenerated).
+- **Touches:** `public/assets/sprites/base_sprites.png` (if drawing), `spritenames.txt`, `src/render/sprite_names.generated.ts` (regenerated).
