@@ -27,21 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 2 · Class data — Knight, Archer, Priest
-
-- **What:** Define the three Tier 1 classes and their abilities as TS data modules.
-- **Why:** Covers melee / ranged / support archetypes. Combat engine can't resolve anything without class and ability data.
-- **Tier:** 1
-- **Acceptance:**
-  - `src/data/classes.ts` exports `CLASSES` keyed by class id. Each entry includes: display name, base stats (HP / Attack / Defense / Speed), starter paperdoll loadout (Knight gets shield), ability id list, AI priority ordering, preferred weapon type.
-  - `src/data/abilities.ts` exports `ABILITIES` indexed by ability id. Each ability declares: can-cast-from slots, target selector (slot set or dynamic), effect descriptor (damage / heal / shove / pull / stun).
-  - Knight: Shield Bash, Taunt, Bulwark + basic Attack.
-  - Archer: Piercing Shot, Volley, Flare Arrow + basic Attack.
-  - Priest: Mend, Smite, Bless + basic Attack.
-  - Gear-modifies-ability variants are **not** implemented (Tier 2 scope).
-- **Touches:** `src/data/classes.ts`, `src/data/abilities.ts`, supporting types.
-- **Source:** `gdd.md` §3 (Classes table).
-
 ### 3 · Enemy data — Crypt pool + boss
 
 - **What:** Define 4 Crypt enemy types + 1 Crypt boss, each with stats, abilities, and AI priorities.
