@@ -62,6 +62,19 @@ The game design is ambitious; the build order is phased into tiers in `gdd.md §
 
 When asked to implement something, check which tier it belongs to and avoid building Tier 2/3 features before Tier 1 is done.
 
+## Workflow: bugs, ideas, TODO, HISTORY
+
+Four root-level files track the backlog and the record of work:
+
+- **[`bugs.md`](bugs.md)** — raw bug reports captured during testing. Items land here unscoped. When the user is ready, scope a bug into an actionable TODO entry (with reproduction steps, expected/actual behavior, and suspected area) and remove it from `bugs.md`.
+- **[`ideas.md`](ideas.md)** — rough design ideas. Ideas are discussed and fleshed out collaboratively in conversation (invoke brainstorming for non-trivial ones). If one is worth building, it graduates to a TODO entry; otherwise it stays in `ideas.md` or is removed. Do not build from an idea that has not been fleshed out and promoted.
+- **[`TODO.md`](TODO.md)** — the actionable backlog. Every entry has enough context (what, why, acceptance criteria or implementation hints) that a fresh session can pick it up without back-and-forth. When starting work, consult TODO.md for current priorities.
+- **[`HISTORY.md`](HISTORY.md)** — completed work with the context that git history alone can't capture (decisions made, alternatives rejected, surprises). When a TODO is finished, move its entry here and enrich it with implementation-time context. Newest on top.
+
+Lifecycle: `bugs.md` / `ideas.md` → `TODO.md` → `HISTORY.md`.
+
+When you notice a bug during work, offer to add it to `bugs.md`. When the user floats an idea mid-conversation, offer to capture it in `ideas.md`. When a task finishes, offer to migrate its TODO entry into `HISTORY.md` with decision context added. Do not modify these files without the user's direction in the current turn.
+
 ## Conventions for this repo
 
 - **Never create git commits without explicit user instruction in the current turn.** The user runs their own commits and staging. Leave written changes in the working tree; do not `git add` or `git commit` preemptively. (This overrides skill defaults that suggest auto-committing.)
@@ -71,6 +84,10 @@ When asked to implement something, check which tier it belongs to and avoid buil
 ## Pointers
 
 - [`gdd.md`](gdd.md) — full game design (combat, classes, dungeons, economy, meta, build tiers)
+- [`TODO.md`](TODO.md) — actionable backlog
+- [`HISTORY.md`](HISTORY.md) — completed work, with decision context
+- [`bugs.md`](bugs.md) — raw bug reports, unscoped
+- [`ideas.md`](ideas.md) — rough ideas, pre-brainstorm
 - [`src/README.md`](src/README.md) — `src/` directory layout and the Phaser firewall rule in detail
 - [`README.md`](README.md) — tech stack, how to run, art pipeline
 - [`spritenames.txt`](spritenames.txt) — sprite-sheet frame catalog (edit this, then `npm run generate:names`)
