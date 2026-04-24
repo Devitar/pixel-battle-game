@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { parseSpriteNames } from './parse_sprite_names';
+import { parseSpriteNames } from '../parse_sprite_names';
 
 describe('parseSpriteNames', () => {
   it('parses a simple named entry', () => {
@@ -65,7 +65,7 @@ describe('parseSpriteNames', () => {
   });
 
   it('parses the real spritenames.txt without errors', () => {
-    const path = resolve(import.meta.dirname, '..', 'spritenames.txt');
+    const path = resolve(import.meta.dirname, '..', '..', '..', 'spritenames.txt');
     const source = readFileSync(path, 'utf8');
     const r = parseSpriteNames(source);
     expect(r.errors).toEqual([]);
@@ -73,7 +73,7 @@ describe('parseSpriteNames', () => {
   });
 
   it('maps a few known names from the real file to the right frames', () => {
-    const path = resolve(import.meta.dirname, '..', 'spritenames.txt');
+    const path = resolve(import.meta.dirname, '..', '..', '..', 'spritenames.txt');
     const r = parseSpriteNames(readFileSync(path, 'utf8'));
     const byKey = new Map(r.sprites.map((s) => [`${s.category}.${s.name}`, s.frame]));
     expect(byKey.get('character.male_light')).toBe(0);

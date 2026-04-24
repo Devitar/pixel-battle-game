@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { layerFramesFor, LAYER_ORDER } from './paperdoll_layers';
+import { layerFramesFor, LAYER_ORDER } from '../paperdoll_layers';
 
 describe('layerFramesFor', () => {
   it('returns just the body when no other slots are set', () => {
