@@ -28,8 +28,9 @@ const CLOSE_X_Y = 63;
 const DUNGEON_CARD_W = 460;
 const DUNGEON_CARD_H = 220;
 
-// Stage 2 — slot row
-const SLOT_X = [170, 480, 790] as const;
+// Stage 2 — slot row. Slot 1 (front) on the right to match combat scene's
+// party layout (party on left of combat, slot 1 closest to enemies on the right).
+const SLOT_X = [790, 480, 170] as const;
 const SLOT_Y = 165;
 const SLOT_W = 220;
 const SLOT_H = 80;

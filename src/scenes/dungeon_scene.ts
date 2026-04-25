@@ -1,16 +1,14 @@
 import * as Phaser from 'phaser';
 import { removeHero } from '../camp/roster';
-import { resolveCombat } from '../combat/combat';
+import type { CombatResult } from '../combat/types';
 import { heroToLoadout } from '../render/hero_loadout';
 import { Paperdoll } from '../render/paperdoll';
-import { buildCombatState } from '../run/combat_setup';
 import {
   completeCombat,
-  currentNode,
   type WipeOutcome,
 } from '../run/run_state';
-import { createRngFromState, type Rng } from '../util/rng';
 import { appState } from './app_state';
+import { consumeCombatResult } from './combat_handoff';
 
 type DungeonSceneState =
   | 'walking_in'
@@ -32,7 +30,6 @@ const WALK_IN_DURATION = 800;
 const WALK_NEXT_DURATION = 600;
 
 export class DungeonScene extends Phaser.Scene {
-  private rng!: Rng;
   private partyContainer!: Phaser.GameObjects.Container;
   private nodeIcons: Phaser.GameObjects.Text[] = [];
   private nodeLabels: Phaser.GameObjects.Text[] = [];
@@ -48,7 +45,6 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Reset per-launch state (Phaser scene reuse trap)
     this.nodeIcons = [];
     this.nodeLabels = [];
     this.preCombatHp.clear();
@@ -62,18 +58,51 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
 
-    this.rng = createRngFromState(state.runRngState!);
-
     this.buildBackground();
     this.buildHud();
     this.buildNodes();
     this.buildParty();
     this.buildStatusBar();
+
+    const handoff = consumeCombatResult();
+    if (handoff) {
+      this.processCombatReturn(handoff.result, handoff.rngStateAfter);
+    } else {
+      this.refreshHud();
+      this.refreshNodeColors();
+      this.refreshStatusBar();
+      this.setState('walking_in');
+    }
+  }
+
+  private processCombatReturn(result: CombatResult, rngStateAfter: number): void {
+    const run = appState.get().runState!;
+
+    this.preCombatHp.clear();
+    for (const hero of run.party) {
+      this.preCombatHp.set(hero.id, hero.currentHp);
+    }
+
+    const { runState: nextRun, wipe } = completeCombat(run, result);
+
+    appState.update((s) => ({
+      ...s,
+      runState: nextRun,
+      runRngState: rngStateAfter,
+    }));
+
+    this.partyContainer.x = this.partyXForNode(run.currentNodeIndex);
+
     this.refreshHud();
     this.refreshNodeColors();
     this.refreshStatusBar();
 
-    this.setState('walking_in');
+    if (wipe) {
+      this.wipeOutcome = wipe;
+      this.setState('showing_wipe');
+    } else {
+      this.setState('showing_result');
+    }
   }
 
   private buildBackground(): void {
@@ -197,30 +226,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private startCombatAtCurrentNode(): void {
-    const run = appState.get().runState!;
-    const node = currentNode(run);
-
-    this.preCombatHp.clear();
-    for (const hero of run.party) {
-      this.preCombatHp.set(hero.id, hero.currentHp);
-    }
-
-    const combatState = buildCombatState(run.party, node.encounter);
-    const result = resolveCombat(combatState, this.rng);
-    const { runState: nextRun, wipe } = completeCombat(run, result);
-
-    appState.update((s) => ({
-      ...s,
-      runState: nextRun,
-      runRngState: this.rng.getState(),
-    }));
-
-    if (wipe) {
-      this.wipeOutcome = wipe;
-      this.setState('showing_wipe');
-    } else {
-      this.setState('showing_result');
-    }
+    this.scene.start('combat');
   }
 
   private buildResultPanel(): void {
