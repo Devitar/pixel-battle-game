@@ -29,6 +29,51 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-24 · Hero card widget (Tier 1)
+
+- **What shipped:**
+  - `src/render/hero_loadout.ts` — `heroToLoadout(hero): Loadout`. Pure TS that converts a `Hero` into the layered `Loadout` Paperdoll consumes. String-id → number-id parsing at this seam.
+  - `src/render/__tests__/hero_loadout.test.ts` — 4 unit tests (Knight + shield, Archer no shield, Priest no shield, body field uses `bodySpriteId`).
+  - `src/ui/hero_card.ts` — `HeroCard extends Phaser.GameObjects.Container`. Reusable widget with `small` / `large` sizes, `isDead` mode, optional click handler, and a `setHero(hero)` rebuild method.
+  - First entry into `src/ui/` — the new home for reusable Phaser widgets.
+  - +4 assertions (total 481, was 477).
+  - Design spec at `docs/superpowers/specs/2026-04-24-hero-card-design.md`; plan at `docs/superpowers/plans/2026-04-24-hero-card.md`.
+- **Why:** Three Tier 1 scenes need to render heroes — Tavern (candidates, task 13), Barracks (roster, task 14), post-boss Camp Screen (task 18). One widget instead of three drifting reimplementations. Builds the pattern for future shared UI components.
+- **Decisions:**
+  - *Both size variants use a horizontal layout* (paperdoll on the left, text + HP bar on the right). Decided by visual brainstorming with the new browser companion. Three side-by-side mockups (small horizontal+large vertical / both vertical / both horizontal) made the choice obvious in a way text descriptions wouldn't have. Both-horizontal gives consistency across contexts — small (180×56) for list rows, large (280×120) for inspection panels.
+  - *`heroToLoadout` lives in `src/render/hero_loadout.ts`* — pure TS, separate from `paperdoll.ts`. The Loadout type stays in `paperdoll_layers.ts`; this new file is the Hero→Loadout transformation. Reusable beyond HeroCard (e.g., dungeon scene's party-walking sprites in task 16).
+  - *String-to-number `parseInt` at the `heroToLoadout` seam.* `Hero.bodySpriteId` and `ClassDef.starterLoadout.weapon/shield` are stringified frame indices (per task 2 convention); Paperdoll's Loadout expects numbers. This file is the boundary; consumers don't think about it.
+  - *`HeroCard` is a Phaser Container subclass.* Idiomatic Phaser. Children added via `this.add(...)`; whole card moves/scales as a unit.
+  - *`setHero(newHero)` rebuilds all children* via `removeAll(true)` + `buildChildren()`. No diffing. Cards aren't update-heavy in Tier 1; correctness over micro-optimization.
+  - *`isDead` is an explicit constructor option, not derived from `currentHp ≤ 0`.* Mid-combat, party heroes can be at 0 HP without yet being categorized as fallen by run state. The caller knows the difference; the card renders what it's told.
+  - *Dead state visual:* paperdoll alpha 0.5, "(Fallen)" suffix on name, HP bar / stats hidden, border swapped to muted red. Hero stays recognizable but clearly inactive.
+  - *HP bar color thresholds at 50% (green→yellow) and 25% (yellow→red).* At-a-glance health read.
+  - *Click handler attached to the background rectangle.* `setInteractive({ useHandCursor: true })` on the rect gives a single uniform hit area covering the whole card.
+  - *No unit tests for the HeroCard class itself.* ~120 lines of Phaser glue; mocking `Phaser.GameObjects.Container`, `scene.add.text/rectangle`, and `Paperdoll` is high-effort, low-yield. The pure logic (loadout derivation, HP color thresholds) is unit-tested or trivial; the rest is well-tested by Phaser itself.
+  - *Smoke testing deferred to task 13 (Tavern UI).* Task 13 is the first real consumer; visual validation lands there in context. Risk is low — Phaser primitives (text, rectangle, container) are battle-tested.
+  - *Tier 1 Loadout fields only.* Body, weapon, shield. Legs / feet / outfit / hair / hat are randomized at recruitment in Tier 2's gear/cosmetic system. The `Loadout` type already has them as optional; we leave them undefined.
+- **Alternatives considered:**
+  - *Small horizontal + large vertical (visual option A).* Rejected — gives small a different orientation than large, leading to layout drift between contexts.
+  - *Both vertical (visual option B).* Rejected — vertical small variant felt cramped when seen visually.
+  - *Reactive AppState subscription on the card.* Tier 2. Tier 1 caller drives updates via `setHero`.
+  - *Diffing in `setHero`* (only update changed children). Rejected — premature optimization. Simpler rebuild is correct and fast enough for Tier 1's update cadence.
+  - *HP-derived dead state* (auto-detect `currentHp ≤ 0`). Rejected — loses the caller's intent. A combat hero at 0 HP isn't necessarily "fallen" yet.
+  - *Mocking Phaser for unit tests on the HeroCard class.* Rejected — disproportionate effort for marginal coverage gain over what `heroToLoadout` already tests.
+  - *Including stats inline in the small variant.* Rejected — small is already 56px tall; cramming ATK/DEF/SPD doesn't fit. Stats live on `large` only.
+- **Surprises / lessons:**
+  - **First visual companion use validated the workflow.** Three layout mockups in side-by-side HTML made the orientation question (small horizontal? both horizontal? both vertical?) immediate to decide. Text descriptions of the same options would have produced more back-and-forth. Worth using for future layout/composition questions; not worth the overhead for architecture or tradeoff discussions.
+  - **`src/ui/` finally exists.** First widget. The `src/README.md` directory map predicted it; the firewall rule held: `src/render/` stays phaser-free, `src/ui/` is where Phaser glue lives.
+  - **Two consecutive tasks with zero execution-time plan bugs (tasks 10, 11).** The "interface-extension audit" subsection in the plan self-review keeps catching its target — both tasks added new types but didn't modify existing interfaces, and the audit confirmed it explicitly. Establishing this as part of the brainstorming → plan → execute pipeline for Cluster B was a deliberate carryover from the Cluster A retrospective.
+  - **The "string-id at the data layer, number-id at the render layer" convention has its first real consumer.** `heroToLoadout` is the bridge. Future code that needs sprite-frame numbers from Hero / ClassDef data goes through this seam (or a similar one). If it grows past 2-3 callers, factor a generic `parseSpriteId` helper.
+  - **Smoke-test-via-real-consumer pattern works for small widgets.** HeroCard's correctness is mostly typecheck + sensible Phaser primitives. The first time it'll render in a real scene is task 13; if anything looks off there, fix is a small focused change. Compared to mocking Phaser to verify the rendering pipeline, this is much lower-effort.
+- **Touches:**
+  - `src/render/hero_loadout.ts` (new)
+  - `src/render/__tests__/hero_loadout.test.ts` (new)
+  - `src/ui/hero_card.ts` (new — first file in src/ui/)
+  - `docs/superpowers/specs/2026-04-24-hero-card-design.md` (new)
+  - `docs/superpowers/plans/2026-04-24-hero-card.md` (new)
+- **Source:** `TODO.md` Cluster B · Task 11. Related: task 6 HISTORY (Hero type), task 8 HISTORY (Hero.bodySpriteId), task 10 HISTORY (AppState — what scenes will use to drive HeroCards), task 0 (paperdoll system).
+
 ### 2026-04-24 · Boot scene + asset preload + save-aware routing (Tier 1) — Cluster B begins
 
 - **What shipped:**

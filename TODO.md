@@ -33,18 +33,6 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
 
-### 11 · Hero card widget
-
-- **What:** A reusable Phaser Container that renders a hero (paperdoll + name + class + core stats). Used by Tavern, Barracks, Camp Screen.
-- **Why:** Shared UI. One component instead of three drifting reimplementations.
-- **Tier:** 1
-- **Acceptance:**
-  - `src/ui/hero_card.ts` exports a class taking a `Hero` instance.
-  - Configurable size (e.g., `small` for list rows, `large` for inspection).
-  - Exposes a click handler for selection.
-  - Updates when hero state changes (HP bar, dead state overlay).
-- **Touches:** `src/ui/hero_card.ts`.
-
 ### 12 · Camp scene shell
 
 - **What:** The village hub scene — clickable "buildings" (Tavern, Barracks, Noticeboard) that each open their panel.
