@@ -29,6 +29,49 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-25 · Camp scene shell (Tier 1)
+
+- **What shipped:**
+  - `src/scenes/camp_scene.ts` — rewritten from task 10's stub. Side-scrolling village hub with HUD (vault gold), three clickable buildings (Tavern / Barracks / Noticeboard) on a ground line, dev shortcut hint.
+  - `src/scenes/tavern_panel_scene.ts` — stub overlay scene for task 13.
+  - `src/scenes/barracks_panel_scene.ts` — stub overlay scene for task 14.
+  - `src/scenes/noticeboard_panel_scene.ts` — stub overlay scene for task 15.
+  - `src/main.ts` — registers the 3 new panel scenes alongside existing.
+  - No new tests (Phaser glue; smoke-tested in dev server).
+  - Design spec at `docs/superpowers/specs/2026-04-24-camp-scene-shell-design.md`; plan at `docs/superpowers/plans/2026-04-24-camp-scene-shell.md`.
+- **Why:** Player's home base. Boot routes here; every run cashout/wipe returns here. After this task, the game has a navigable shell — stubs at the panel level, real flow at the scene level.
+- **Decisions:**
+  - *Overlay panel architecture (option B from brainstorming).* `scene.launch(panelKey)` + `scene.pause('camp')` opens a panel as a modal popover with the camp dimmed underneath. Close: `scene.stop()` + `scene.resume('camp')`. More DD-like feel than full scene swaps; camp stays in memory so HUD state isn't rebuilt from scratch on every panel close.
+  - *Side-scrolling village layout (option C from visual brainstorming).* Three side-by-side mockups in the visual companion made this an instant pick — buildings on a ground line at varied heights, HUD top-left, dev hint bottom-right. GDD-aligned ("Camp is presented as a side-scrolling village"). Other options (HUD top-right with row of buildings, HUD as a bottom status bar) felt static by comparison.
+  - *HUD refresh on `Phaser.Scenes.Events.RESUME`.* When a panel closes via `scene.resume('camp')`, Phaser fires the RESUME event on camp's event emitter. The handler re-reads `appState.get().vault` and calls `setText` on the gold text. Simplest reactive-state pattern that works without an event bus on AppState itself.
+  - *Three near-duplicate panel stub files (no shared base class).* YAGNI — bodies will diverge significantly when filled in (Tavern shows candidate cards, Barracks shows roster list, Noticeboard shows dungeon list). A common base class would have to be torn apart for each. Stubs are ~40 lines each and will be replaced in tasks 13/14/15.
+  - *Both ESC key and × button close the panel.* ESC for keyboard convenience, × button for mouse-only users and visual affordance. Both call the same `close()` helper that does `scene.stop()` + `scene.resume('camp')`.
+  - *Dev shortcuts on `9` / `0`* (not `1`/`2`/`3`). Keeps the latter open for per-building hotkeys when Tier 1 / Tier 2 wants them. `9` → MainScene (paperdoll demo), `0` → ExplorerScene (sprite catalog).
+  - *Tier 1 placeholder visuals — labeled rectangles.* Tavern brown (`#664433`), Barracks gray (`#555555`), Noticeboard tan (`#998866`). Tier 2+ adds sprite art. The `buildBuilding(...)` helper takes color + size as args; swapping to `buildBuildingSprite(...)` later is mechanical.
+  - *Stub panel scenes are registered globally in `main.ts`.* Three scene-manager slots; negligible overhead. Registering up-front means tasks 13/14/15 don't have to also touch `main.ts` when they fill in the bodies.
+- **Alternatives considered:**
+  - *Full scene swap (option A) — `scene.start('tavern')` instead of overlay.* Rejected per user — overlay matches the GDD's modal-popover flavor and avoids reconstructing camp from scratch on every panel close.
+  - *Panels as Containers inside camp scene (option C from architecture Q1).* Rejected — camp would become a fat state machine and scale poorly to Tier 2's 5+ buildings.
+  - *One generic `placeholder_panel_scene.ts` parameterized by name.* Rejected — couples the three stubs together; tasks 13/14/15 would have to untangle them anyway when filling in.
+  - *HUD top-right with row of buildings (visual option A).* Rejected — flat row of buildings feels static.
+  - *HUD as a bottom status bar (visual option B).* Rejected — more game-UI-conventional but doesn't match the "village" tone.
+  - *ESC-only or button-only close.* Rejected — both improves discoverability without UI clutter.
+  - *Drop dev shortcuts entirely.* Rejected — useful during Cluster B development; can be removed later via an `import.meta.env.DEV` gate.
+- **Surprises / lessons:**
+  - **Three consecutive zero-plan-bug tasks (10, 11, 12) in Cluster B.** The interface-extension audit subsection has been a reliable "did I change any existing types?" prompt; combined with the smoke-test-via-real-consumer pattern (defer scene-level testing until the next consumer task), Cluster B's plan velocity is consistently clean. Worth carrying both forward.
+  - **`Phaser.Scenes.Events.RESUME` is the right hook for HUD refresh** without needing a reactive AppState. The pattern is: caller pauses, panel does its thing (auto-saves to AppState/localStorage), panel close fires RESUME on the camp, camp re-reads. No pub/sub needed for Tier 1's "panels close after each meaningful action" model. If panels grow live-update needs (e.g., a Tavern that previews stat changes from gear loadout in real time), that's the point to revisit.
+  - **Visual companion's second outing was clean.** Layout C (side-scrolling village) was the obvious GDD-aligned choice once seen as a mockup. Text descriptions of three layout variants would have taken multiple back-and-forth rounds; the visual pulled the answer out in one click. Pattern: use the companion when the question is "how should this look in space," skip it for architecture or tradeoff discussions.
+  - **Three near-duplicate stub files in source is fine.** The "DRY = always extract common code" instinct is wrong here — the bodies will diverge in tasks 13/14/15, and a common base class would have to be torn apart for each. Recognizing when duplication is temporary (stubs) vs permanent (call sites) matters.
+- **Touches:**
+  - `src/scenes/camp_scene.ts` (rewritten)
+  - `src/scenes/tavern_panel_scene.ts` (new)
+  - `src/scenes/barracks_panel_scene.ts` (new)
+  - `src/scenes/noticeboard_panel_scene.ts` (new)
+  - `src/main.ts` (modified — scene registrations)
+  - `docs/superpowers/specs/2026-04-24-camp-scene-shell-design.md` (new)
+  - `docs/superpowers/plans/2026-04-24-camp-scene-shell.md` (new)
+- **Source:** `TODO.md` Cluster B · Task 12. Related: `gdd.md` §6 (Camp / Buildings), task 10 HISTORY (BootScene routes here; AppState singleton consumed by HUD), task 7 HISTORY (`vault.balance` for gold display).
+
 ### 2026-04-24 · Hero card widget (Tier 1)
 
 - **What shipped:**

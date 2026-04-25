@@ -33,18 +33,6 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
 
-### 12 · Camp scene shell
-
-- **What:** The village hub scene — clickable "buildings" (Tavern, Barracks, Noticeboard) that each open their panel.
-- **Why:** The player's home base between runs. Where boot routes to and every run ends (cashout or wipe).
-- **Tier:** 1
-- **Acceptance:**
-  - `src/scenes/camp_scene.ts` renders three building entry points (sprites or labeled boxes — placeholder OK for Tier 1).
-  - Clicking a building opens its panel (Tavern / Barracks / Noticeboard).
-  - Panel close returns to camp scene.
-  - HUD shows current vault gold balance.
-- **Touches:** `src/scenes/camp_scene.ts`.
-
 ### 13 · Tavern UI
 
 - **What:** Panel showing 3 candidates with hire buttons.
