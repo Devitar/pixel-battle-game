@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SHEET, CATEGORIES, frameAt, firstFrameOf } from './frames';
+import { SHEET, CATEGORIES, frameAt, firstFrameOf } from '../frames';
 
 describe('SHEET', () => {
   it('matches the Kenney Roguelike Characters pack layout', () => {

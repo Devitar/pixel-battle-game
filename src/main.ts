@@ -1,7 +1,14 @@
 import * as Phaser from 'phaser';
 import './style.css';
-import { MainScene } from './main_scene';
-import { ExplorerScene } from './explorer_scene';
+import { BarracksPanelScene } from './scenes/barracks_panel_scene';
+import { BootScene } from './scenes/boot_scene';
+import { CampScene } from './scenes/camp_scene';
+import { CampScreenScene } from './scenes/camp_screen_scene';
+import { ExplorerScene } from './scenes/dev/explorer_scene';
+import { MainScene } from './scenes/dev/main_scene';
+import { DungeonScene } from './scenes/dungeon_scene';
+import { NoticeboardPanelScene } from './scenes/noticeboard_panel_scene';
+import { TavernPanelScene } from './scenes/tavern_panel_scene';
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -14,5 +21,15 @@ new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [MainScene, ExplorerScene],
+  scene: [
+    BootScene,
+    CampScene,
+    TavernPanelScene,
+    BarracksPanelScene,
+    NoticeboardPanelScene,
+    DungeonScene,
+    CampScreenScene,
+    MainScene,
+    ExplorerScene,
+  ],
 });

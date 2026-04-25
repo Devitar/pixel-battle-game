@@ -22,19 +22,26 @@ npm run preview  # serve the production build locally
 
 ```
 index.html        # Vite entry, mounts the game into #game
-src/
-  main.ts         # Phaser.Game config + scene registration
-  style.css       # host-page styling (canvas sizing, background)
+src/              # game code — see src/README.md for the layout
 public/           # static assets served as-is (sprites, audio, etc.)
+scripts/          # build-time helpers (sprite name codegen, etc.)
 ```
+
+See [`src/README.md`](src/README.md) for the `src/` directory structure and the rules about where new files belong.
 
 ## Art pipeline
 
-Author sprites in LibreSprite, then **File → Export Sprite Sheet** to generate a PNG + JSON atlas. Drop both into `public/assets/` and load them in a scene's `preload()`:
+Author sprites in LibreSprite, then **File → Export Sprite Sheet** to generate a PNG + JSON atlas. Drop both into `public/assets/sprites/` (or `public/assets/animated/` for animated sprites) and load them in a scene's `preload()`:
 
 ```ts
-this.load.atlas('hero', 'assets/hero.png', 'assets/hero.json');
+this.load.atlas('hero', 'assets/sprites/hero.png', 'assets/sprites/hero.json');
 ```
+
+Asset layout under `public/assets/`:
+
+- `sprites/` — static sprite sheets (characters, tilesets, props).
+- `animated/` — animated sprites + frame metadata (`animation_info.json`).
+- `fonts/` — pixel fonts.
 
 ## Notes
 

@@ -1,10 +1,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { parseSpriteNames } from '../src/parse_sprite_names.ts';
+import { parseSpriteNames } from '../src/render/parse_sprite_names.ts';
 
 const root = resolve(import.meta.dirname, '..');
 const sourcePath = resolve(root, 'spritenames.txt');
-const outPath = resolve(root, 'src/sprite_names.generated.ts');
+const outPath = resolve(root, 'src/render/sprite_names.generated.ts');
 
 const source = readFileSync(sourcePath, 'utf8');
 const result = parseSpriteNames(source);

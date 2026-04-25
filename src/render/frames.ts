@@ -1,6 +1,6 @@
 export const SHEET = {
   key: 'base',
-  url: 'assets/base_sprites.png',
+  url: 'assets/sprites/base_sprites.png',
   columns: 54,
   rows: 12,
   frameWidth: 16,

@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { SHEET, CATEGORIES, frameAt, firstFrameOf, type CategoryName } from './frames';
+import { SHEET, CATEGORIES, frameAt, firstFrameOf, type CategoryName } from '../../render/frames';
 
 const CATEGORY_ORDER: readonly CategoryName[] = [
   'character',

@@ -1,0 +1,12 @@
+{
+  "candle": {
+    "frameWidth": 8,
+    "frameHeight": 16,
+    "frameDurationMs": 200
+  },
+  "torch": {
+    "frameWidth": 16,
+    "frameHeight": 24,
+    "frameDurationMs": 200
+  }
+}
