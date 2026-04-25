@@ -33,17 +33,6 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
 
-### 10 · Boot scene + asset preload + save-aware routing
-
-- **What:** Entry scene that preloads the sprite sheet and resolves save state, then transitions into the appropriate next scene.
-- **Why:** Every other scene assumes assets are loaded and save state has been resolved. Also the correct replacement for `MainScene` as the default start scene.
-- **Tier:** 1
-- **Acceptance:**
-  - `src/scenes/boot_scene.ts` preloads `public/assets/sprites/base_sprites.png` and any new atlases.
-  - On complete, asks `save/save.ts` for the current save. If present, transitions to camp scene with loaded state. If absent, creates a fresh save with a starter roster (3 heroes — one of each class) and transitions.
-  - `src/main.ts` updated to register `BootScene` first; dev scenes (`main_scene`, `explorer_scene`) stay registered but are no longer auto-started.
-- **Touches:** `src/scenes/boot_scene.ts`, `src/main.ts`.
-
 ### 11 · Hero card widget
 
 - **What:** A reusable Phaser Container that renders a hero (paperdoll + name + class + core stats). Used by Tavern, Barracks, Camp Screen.

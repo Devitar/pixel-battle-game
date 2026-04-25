@@ -29,6 +29,54 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-24 · Boot scene + asset preload + save-aware routing (Tier 1) — Cluster B begins
+
+- **What shipped:**
+  - `src/save/boot.ts` — `resolveSaveState(storage, rng): { saveFile, isNew }`. Pure-TS load-or-create-fresh logic.
+  - `src/scenes/app_state.ts` — `AppState` singleton class + exported `appState` instance. `init` / `get` / `update(producer)` / `reset`. **Auto-saves on every update.**
+  - `src/scenes/boot_scene.ts` — `BootScene` (preload sprite sheet, resolve save, init AppState, transition to camp).
+  - `src/scenes/camp_scene.ts` — stub `CampScene`. Renders save-state summary + keyboard shortcuts (`1` → dev paperdoll demo, `2` → sprite explorer). **Replaced in task 12.**
+  - `src/main.ts` — registers `BootScene` first; `MainScene` and `ExplorerScene` stay registered as dev-only scenes.
+  - 4 new test files. +13 assertions (total 477, was 464).
+  - Design spec at `docs/superpowers/specs/2026-04-24-boot-scene-design.md`; plan at `docs/superpowers/plans/2026-04-24-boot-scene.md`.
+- **Why:** First Cluster B task. Cluster A's pure-TS modules needed a runtime entry point. The boot scene resolves save state, populates the cross-scene `AppState` singleton, and transitions to camp — every subsequent scene assumes both assets are loaded and AppState is initialized.
+- **Decisions:**
+  - *Stub `CampScene` now, replaced in task 12.* Throwaway ~30 lines that give the boot scene a real transition target. Keeps scene keys (`'camp'`) stable across tasks 10–12. Renders save-state summary so smoke testing shows actual data.
+  - *`AppState` singleton class with auto-save on every update.* Producer pattern (`update(prev => newState)`) matches Cluster A's immutable contract. Auto-save removes a class of "forgot to persist after X" bugs at the cost of one localStorage write per state change — fast enough not to matter.
+  - *Pure-TS / Phaser-glue split.* `resolveSaveState` (pure logic) and `AppState` (plain TS class) are unit-tested with a `MemoryStorage` shim. `BootScene` and `CampScene` are smoke-tested via the dev server only. Scene classes are thin enough (~30 lines each) that smoke-testing is sufficient verification.
+  - *`resolveSaveState` lives in `src/save/boot.ts` (firewall-pure).* Even though it's the bootstrap-time function, its logic is save-domain — testable without phaser. Naming convention: `boot.ts` next to `save.ts` signals "save-side bootstrap pairs with the BootScene."
+  - *`AppState` singleton lives in `src/scenes/app_state.ts`.* Conceptually scene-domain (it's how scenes share state) but the file itself imports nothing phaser-related. Tests work without phaser.
+  - *Dev scene access via keyboard shortcuts in stub camp.* `1` → MainScene (paperdoll demo), `2` → ExplorerScene (sprite catalog). Throwaway; goes away when task 12 lands real camp UI.
+  - *Mid-run save handling deferred to task 16.* If `saveFile.runState` is present, the boot scene still routes to camp; task 16's dungeon scene will detect a present `runState` in `appState` and offer "resume run" UI when it lands.
+  - *`Date.now()` seeds the boot rng.* Only non-deterministic source in the codebase. Affects fresh-save hero rolls only — produces varied starter rosters per fresh launch. Combat/floor RNG uses run-specific seeds traceable from `RunState.seed`.
+  - *`window.localStorage` hardcoded in `BootScene.create()`.* The save module's storage abstraction is for testability; the production boot path is the one place real localStorage gets injected. Pragmatic concentration of "production glue" in one location.
+  - *`reset()` on AppState is test-only.* Marked in doc comment; production never calls it. Vitest's `beforeEach(appState.reset)` provides test isolation despite the singleton's module-scoped state.
+  - *No reactive event emitter on AppState.* Scenes that need fresh state call `appState.get()` at lifecycle hooks. Tier 2 may add subscribe/notify when reactive UI components arrive (Tavern hire button, vault gold display, etc.).
+- **Alternatives considered:**
+  - *Route to `MainScene` as placeholder (instead of stub camp).* Rejected — leaks a dev scene into the production flow that has to be undone in task 12.
+  - *BootScene displays state and stops.* Rejected — leaves the player in a "what now?" dead-end with no path to dev scenes.
+  - *Phaser registry direct (`this.registry.set/get`).* Rejected — type-unsafe (every read is a cast), no auto-save mechanism.
+  - *Phaser registry with typed helpers.* Rejected — same backing store as direct registry; doesn't add the auto-save and producer pattern that the singleton class provides.
+  - *Inline `resolveSaveState` logic in `BootScene.create()`.* Rejected — couples the load-or-create logic to a Phaser scene, making it hard to test without a Phaser game context.
+  - *Reactive AppState with subscribe/notify.* Tier 2 scope. Tier 1 scenes pull state on lifecycle hooks; no reactive UI yet.
+- **Surprises / lessons:**
+  - **Zero plan bugs at execution.** Two prior tasks (8 and 9) hit grep-related self-review gaps. This task had no interface or signature changes — the plan's interface-extension audit subsection confirmed it explicitly. The "no signature changes" status was the easiest audit to verify.
+  - **The phaser firewall held perfectly on first runtime task.** `boot.ts` and `app_state.ts` stay phaser-free; only `boot_scene.ts` and `camp_scene.ts` import phaser. The Cluster A invariant ("pure TS in firewalled folders") translates cleanly to "pure-TS layer + Phaser glue layer" in production code.
+  - **Singleton-with-auto-save is the right shape for save-mutating scenes.** Every Cluster B scene that changes save state (camp recruitment, post-combat updates, run start/end) will call `appState.update(producer)`. The pattern hides storage entirely — scenes never touch `Storage` directly. Forecast: this becomes the most-used pattern in Cluster B.
+  - **Stub-as-bridge unblocks downstream tasks.** Task 10 needed a transition target (camp scene) that doesn't land until task 12. ~30 lines of throwaway stub code with a clear "replaced in task 12" comment got task 10 to a real visual milestone without blocking on the full camp implementation. Useful pattern when a task's natural transition target is several tasks downstream.
+  - **Smoke testing scene classes is sufficient.** `BootScene` has 3 lines of meaningful code (resolve, init, transition) that the unit-tested `resolveSaveState` and `AppState` already validate. Forcing scene unit tests would mean mocking Phaser — high effort, low yield. The dev-server smoke test caught nothing the unit tests didn't already cover, but takes 30 seconds and provides confidence that the wiring works end-to-end.
+- **Touches:**
+  - `src/save/boot.ts` (new)
+  - `src/save/__tests__/boot.test.ts` (new)
+  - `src/scenes/app_state.ts` (new)
+  - `src/scenes/__tests__/app_state.test.ts` (new)
+  - `src/scenes/boot_scene.ts` (new)
+  - `src/scenes/camp_scene.ts` (new — stub)
+  - `src/main.ts` (modified — BootScene registered first)
+  - `docs/superpowers/specs/2026-04-24-boot-scene-design.md` (new)
+  - `docs/superpowers/plans/2026-04-24-boot-scene.md` (new)
+- **Source:** `TODO.md` Cluster B · Task 10. Related: `gdd.md` §1 (core loop's boot flow), task 8 HISTORY (`generateStarterRoster` consumed here), task 9 HISTORY (save module + `createDefaultUnlocks`).
+
 ### 2026-04-24 · Save / load via localStorage (Tier 1) — Cluster A complete
 
 - **What shipped:**
