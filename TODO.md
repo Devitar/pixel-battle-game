@@ -33,19 +33,6 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
 
-### 17 · Combat scene
-
-- **What:** Renders 3v3–4 ranked combat and animates playback of the combat log produced by the engine. Fast-forward toggle.
-- **Why:** The readout of all the setup decisions. The scene that sells the game.
-- **Tier:** 1
-- **Acceptance:**
-  - `src/scenes/combat_scene.ts` takes a starting `CombatState`, calls the engine to produce a log, then plays the log back with simple animations — attacker steps forward on attack, defender flashes on hit, HP bars tick, dead combatants collapse.
-  - Position changes (shove / pull / swap) visibly animate.
-  - Fast-forward toggle switches between 1× and 3× playback.
-  - On combat end, returns control to dungeon scene with updated `RunState`.
-  - **Refactor `dungeon_scene.startCombatAtCurrentNode`** (currently calls `resolveCombat` synchronously inline). After this task, the dungeon scene launches the combat scene, gets the `CombatResult` back via scene-data callback or shared registry, then continues with `completeCombat` + `appState.update`. The result panel + walk-to-next + camp_screen / wipe transitions stay where they are. (See task 16 HISTORY decisions.)
-- **Touches:** `src/scenes/combat_scene.ts`, `src/scenes/dungeon_scene.ts`.
-
 ### 18 · Camp Screen (post-boss)
 
 - **What:** The risk / reward decision screen — shows the pack, the party condition, Leave / Press On buttons.

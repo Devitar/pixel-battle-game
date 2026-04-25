@@ -43,7 +43,7 @@ describe('resolveSaveState', () => {
     expect(isNew).toBe(true);
     expect(saveFile.version).toBe(CURRENT_SCHEMA_VERSION);
     expect(saveFile.roster.heroes).toHaveLength(3);
-    expect(saveFile.vault).toEqual({ gold: 0 });
+    expect(saveFile.vault).toEqual({ gold: 500 });
     expect(saveFile.unlocks).toEqual(createDefaultUnlocks());
     expect(saveFile.runState).toBeUndefined();
   });
