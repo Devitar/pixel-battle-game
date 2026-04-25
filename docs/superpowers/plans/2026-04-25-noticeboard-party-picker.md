@@ -1,3 +1,154 @@
+# Noticeboard & Party Picker Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Replace task 12's `NoticeboardPanelScene` stub with the real "begin a run" flow — a two-stage panel (dungeon list → drag-and-drop party picker) that constructs `RunState` + `runRngState` on Descend and transitions to a new throwaway `DungeonScene` stub.
+
+**Architecture:** Two units. (1) A throwaway `DungeonScene` stub at `src/scenes/dungeon_scene.ts` with key `'dungeon'`, registered in `main.ts`, that the picker's Descend can navigate to. (2) A single-file rewrite of `src/scenes/noticeboard_panel_scene.ts` with an internal stage state machine, a `setStage(next)` helper that tears down + rebuilds via a `stageContainer`, and Phaser drag-and-drop wired through scene-level `drag`/`drop`/`dragend` handlers that mutate a `formation: (Hero | null)[]` and call `refreshPickerLayout()` to render from state.
+
+**Tech Stack:** TypeScript 6 (strict, `verbatimModuleSyntax`), Vitest 4 (existing 493 tests stay green; no new tests), Phaser 4 (Scene, Container, Rectangle, Text, drag-and-drop input plugin via `setInteractive({ draggable, dropZone })`).
+
+**Spec:** `docs/superpowers/specs/2026-04-25-noticeboard-party-picker-design.md`
+
+---
+
+## File structure
+
+| Path | Action | Responsibility |
+|---|---|---|
+| `src/scenes/dungeon_scene.ts` | **Create** | Throwaway stub. `'dungeon'` scene key, renders `Dungeon (stub)` + run summary. ESC clears `runState`/`runRngState` and transitions to camp. ~40 lines. |
+| `src/main.ts` | **Modify** | Add `DungeonScene` import + entry to the `scene: [...]` array. |
+| `src/scenes/noticeboard_panel_scene.ts` | **Rewrite** | Full two-stage panel: dungeon-list card → party-picker (drag-drop slots + eligible grid + Descend). Same overlay pattern as Tavern/Barracks. ~380 lines. |
+
+The two-task split is for review boundaries; per the Tavern/Barracks lesson, strict-mode `noUnusedLocals` rules out incremental scaffolding inside Task 2 — the noticeboard scene is one rewrite.
+
+---
+
+## Task 1: Dungeon scene stub + main.ts wiring
+
+**Files:**
+- Create: `src/scenes/dungeon_scene.ts`
+- Modify: `src/main.ts`
+
+The Descend handler in Task 2 calls `this.scene.start('dungeon')`. That key must resolve to a registered scene — Phaser throws otherwise. This task creates the stub and registers it. After this task, `npm run dev` still runs (the stub isn't reachable from any UI yet), so the value is purely making Task 2 compilable + smoke-testable end to end.
+
+- [ ] **Step 1: Create `src/scenes/dungeon_scene.ts`**
+
+```ts
+import * as Phaser from 'phaser';
+import { appState } from './app_state';
+
+export class DungeonScene extends Phaser.Scene {
+  constructor() {
+    super('dungeon');
+  }
+
+  create(): void {
+    this.add
+      .rectangle(0, 0, this.scale.width, this.scale.height, 0x111111)
+      .setOrigin(0, 0);
+
+    this.add
+      .text(480, 240, 'Dungeon (stub)', {
+        fontFamily: 'monospace',
+        fontSize: '24px',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5);
+
+    const state = appState.get();
+    if (state.runState) {
+      this.add
+        .text(
+          480,
+          290,
+          `Run active: ${state.runState.dungeonId}, floor ${state.runState.currentFloorNumber}`,
+          {
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            color: '#aaaaaa',
+          },
+        )
+        .setOrigin(0.5);
+    }
+
+    this.add
+      .text(480, 360, 'Press ESC to abandon and return to camp', {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: '#888888',
+      })
+      .setOrigin(0.5);
+
+    this.input.keyboard?.on('keydown-ESC', () => this.abandon());
+  }
+
+  private abandon(): void {
+    appState.update((s) => ({ ...s, runState: undefined, runRngState: undefined }));
+    this.scene.start('camp');
+  }
+}
+```
+
+- [ ] **Step 2: Register `DungeonScene` in `src/main.ts`**
+
+Open `src/main.ts`. Add the import next to the other scene imports (alphabetical insertion between `CampScene` and `ExplorerScene`):
+
+```ts
+import { DungeonScene } from './scenes/dungeon_scene';
+```
+
+Add `DungeonScene` to the `scene:` array. Insert it after `NoticeboardPanelScene` and before `MainScene`. The full updated array should read:
+
+```ts
+  scene: [
+    BootScene,
+    CampScene,
+    TavernPanelScene,
+    BarracksPanelScene,
+    NoticeboardPanelScene,
+    DungeonScene,
+    MainScene,
+    ExplorerScene,
+  ],
+```
+
+- [ ] **Step 3: Typecheck**
+
+Run: `npx tsc --noEmit`
+Expected: clean.
+
+- [ ] **Step 4: Existing tests still pass**
+
+Run: `npm test`
+Expected: 493 tests pass (no test changes).
+
+- [ ] **Step 5: Build still succeeds**
+
+Run: `npm run build`
+Expected: succeeds.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/scenes/dungeon_scene.ts src/main.ts
+git commit -m "scenes: add dungeon scene stub with abandon-to-camp"
+```
+
+---
+
+## Task 2: Rewrite `NoticeboardPanelScene` with two-stage panel + drag-and-drop
+
+**Files:**
+- Rewrite: `src/scenes/noticeboard_panel_scene.ts`
+
+Full rewrite in one task — same lesson as Tavern (task 13) and Barracks (task 14). The single file holds: stage state machine, both stage-build helpers, drag handlers, layout-from-state refresh, descend flow, close.
+
+- [ ] **Step 1: Rewrite the scene file**
+
+Replace the entire contents of `src/scenes/noticeboard_panel_scene.ts` with:
+
+```ts
 import * as Phaser from 'phaser';
 import { listHeroes } from '../camp/roster';
 import { DUNGEONS } from '../data/dungeons';
@@ -493,3 +644,87 @@ export class NoticeboardPanelScene extends Phaser.Scene {
     this.scene.resume('camp');
   }
 }
+```
+
+- [ ] **Step 2: Typecheck**
+
+Run: `npx tsc --noEmit`
+Expected: clean.
+
+- [ ] **Step 3: Existing tests still pass**
+
+Run: `npm test`
+Expected: 493 tests pass (no test changes).
+
+- [ ] **Step 4: Production build succeeds**
+
+Run: `npm run build`
+Expected: succeeds.
+
+- [ ] **Step 5: Smoke test (manual, dev server)**
+
+Run: `npm run dev`. Open `http://localhost:5173`.
+
+Walk through the spec's smoke-test sequence (`docs/superpowers/specs/2026-04-25-noticeboard-party-picker-design.md` §Tests > Smoke test):
+
+1. **Open Noticeboard from camp.** Title `Noticeboard`, single centered Crypt card with theme + floor count + CTA hint. Card hover → border yellow.
+2. **Click Crypt card.** Stage swaps to picker. Title `The Crypt — Pick Your Party`. Three empty slot zones with `drag a hero here`. Eligible 3×3 grid shows all roster heroes with `currentHp > 0`. Descend disabled, label `Descend (0/3)`, reason `Need 3 heroes`.
+3. **Drag a hero from list onto slot 2.** Card follows cursor; on drop, slot 2 fills (yellow border, hero card placed; remove × visible). Eligible list re-flows. Label `Descend (1/3)`.
+4. **Drag a different hero onto slot 1.** Label `Descend (2/3)`.
+5. **Drag a hero onto slot 3.** Label flips to `Descend`. Button turns green; reason text clears.
+6. **Drag the slot-1 hero onto slot 3** (swap). Slot 3's hero moves to slot 1; cards repaint. Descend stays valid.
+7. **Click slot 2's remove ×.** Hero returns to eligible list; slot 2 empty. Descend disables, `Need 3 heroes`.
+8. **Drag a hero onto slot 2 from the list, release outside any drop zone** (cancel). Card snaps back to its source position — no state change.
+9. **Click ← Back.** Stage 1 returns. Click Crypt — stage 2 reopens with empty formation.
+10. **Fill all 3 slots, click Descend.** Panel disappears; dungeon stub appears with `Dungeon (stub)` + `Run active: crypt, floor 1` + ESC hint.
+11. **Inspect localStorage `pixel-battle-game/save`.** `runState.dungeonId === 'crypt'`, `runState.party` is the 3 heroes in slot order, `runRngState` is a number, `currentFloorNodes` populated, `currentNodeIndex === 0`.
+12. **Press ESC in the dungeon stub.** `runState`/`runRngState` cleared. Camp scene re-appears with previous gold HUD.
+13. **Empty / sparse roster.** Clear localStorage, set `roster.heroes` to 0–2 heroes via DevTools, reload. Open Noticeboard → Crypt. Picker shows the few eligible heroes; Descend stays disabled with `Need 3 heroes`.
+
+If any step diverges, stop and debug before committing. The most likely breakage points (per the spec's drag-and-drop risk note) are: drop-zone hit testing on overlapping zones, drag visual lag, or `dragend` ordering vs `drop`.
+Stop the dev server.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/scenes/noticeboard_panel_scene.ts
+git commit -m "noticeboard: rewrite stub with dungeon list + drag-drop party picker"
+```
+
+---
+
+## Verification summary
+
+After both tasks:
+
+- `npx tsc --noEmit` — clean
+- `npm test` — 493 tests passing (no new tests; pure-logic deps unchanged)
+- `npm run build` — succeeds
+- Manual smoke test — all 13 steps pass
+- After Descend, `localStorage` has paired `runState` + `runRngState` (save invariant from task 9 holds)
+
+---
+
+## Out of scope (per spec §Risks and follow-ups)
+
+- "Remember last party" pre-fill (Tier 2 polish)
+- Combined-party stat preview (Tier 2)
+- Sort / filter eligible list (Tier 2)
+- Boot-time route into dungeon when `runState` is present (task 16's concern)
+- Real wipe semantics for the dungeon stub's "abandon" (task 16 territory)
+- Party-composition validation (intentionally absent)
+- Dashed slot-border rendering — Phaser doesn't support natively; solid muted color used in practice (documented in spec)
+
+---
+
+## Notes for the implementer
+
+- **Phaser scene reuse trap.** `create()` runs every `scene.launch`, but the JS instance persists. The state reset at the top of `create()` is load-bearing for re-opens. Same pattern as Tavern (task 13) and Barracks (task 14).
+- **Drag-and-drop event order.** Phaser fires `drop` before `dragend` when a drop hits a zone, with `dragend`'s `dropped` arg `true`. When the drag releases outside any zone, only `dragend` fires with `dropped: false`. The handlers split responsibility: `drop` calls `placeHeroInSlot` (which updates state and re-renders); `dragend` only re-renders on cancel. Either path leaves the layout consistent with `formation` + `eligibleHeroes`.
+- **State-driven render is load-bearing.** Drag visuals can drift mid-drag (cards follow the cursor); on every drop / cancel the layout snaps back via `refreshPickerLayout()`. Don't try to track "where is each card" alongside `formation` — derive everything from state.
+- **Drop zones are explicitly tagged.** `zone.setData('slotIndex', i)`. The drop handler reads back via `zone.getData('slotIndex')`. Same pattern for the dragged hero (`bg.setData('heroId', hero.id)`). If a future drop target needs different bookkeeping, change the data key, not the handlers' shape.
+- **Atomic Descend.** `appState.update` writes `runState` and `runRngState` in a single producer call — required by the save invariant in `src/save/save.ts:20` (both fields paired or both absent).
+- **`scene.start('dungeon')` not `scene.resume('camp')`** — Descend leaves camp permanently. The dungeon scene will return control to camp via `scene.start('camp')` (or `scene.resume('camp')` once task 16's real dungeon scene exists). The current stub uses `scene.start('camp')`, which restarts camp from `create()`.
+- **Camp's RESUME listener does not fire on Descend.** The Descend path stops the noticeboard panel and starts a different scene; the camp's `pause/resume` cycle isn't completed. Camp will be re-created when the dungeon scene transitions back. Slight overhead, acceptable.
+- **`setInteractive({ dropZone: true })` requires `setInteractive` first.** For Rectangle game objects, `setInteractive({ dropZone: true })` works without an explicit hit area — Phaser uses the rectangle's bounds. If a drop zone fails to register, double-check the rectangle's `width` / `height` are set before `setInteractive`.
+- **`obj.getData('key')` returns undefined when no data is set.** The drop handler tolerates this with the `=== undefined` guard. If you see drops being dropped (no pun intended), check that `setData` was called before the `setInteractive`.

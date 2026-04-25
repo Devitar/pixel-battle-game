@@ -33,18 +33,6 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
 
-### 15 · Noticeboard & party picker
-
-- **What:** Panel for starting a run — pick a dungeon, then pick 3 heroes and assign them to formation slots 1 / 2 / 3.
-- **Why:** The "begin a run" entry point. Where setup decisions land.
-- **Tier:** 1
-- **Acceptance:**
-  - Noticeboard shows available dungeons (Tier 1: only The Crypt).
-  - Selecting a dungeon opens a party picker.
-  - Party picker shows all living, non-injured roster heroes; player assigns three of them into slots 1 / 2 / 3 via click or drag.
-  - Descend button enabled only when 3 heroes are slotted; on click, constructs the initial `RunState` and transitions to the dungeon scene.
-- **Touches:** `src/ui/noticeboard_panel.ts`, `src/ui/formation_editor.ts`.
-
 ### 16 · Dungeon scene
 
 - **What:** Side-scrolling scene where the party walks through a floor. Each node triggers its payload (combat → combat scene; boss → combat scene; post-boss → camp screen scene).
@@ -55,7 +43,9 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
   - Approaches each node and triggers it (Tier 1: all non-boss nodes are combat).
   - On combat complete, updates `RunState` (HP + pack), continues to next node, or transitions to camp screen after boss.
   - On wipe: shows a wipe summary and returns to camp scene with heroes removed from the roster and pack discarded.
-- **Touches:** `src/scenes/dungeon_scene.ts`.
+  - **Replaces task 15's stub.** The current `dungeon_scene.ts` is a throwaway with an ESC-to-abandon escape hatch that wipes `runState`/`runRngState`. The rewrite must remove this — abandon should be either disallowed or treated as a real wipe. (See task 15 HISTORY decisions.)
+  - **Boot routing.** When a save has `runState` set on page load, the boot scene currently still routes to camp. Decide here: either (a) boot routes directly to dungeon when `runState` is present and this scene's `create()` resumes from it, or (b) camp's HUD shows a "resume run" prompt. Either way, this task must close the "page-reload mid-run lands at camp" gap left by task 15.
+- **Touches:** `src/scenes/dungeon_scene.ts`, possibly `src/scenes/boot_scene.ts`.
 
 ### 17 · Combat scene
 

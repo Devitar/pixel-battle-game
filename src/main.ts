@@ -5,6 +5,7 @@ import { BootScene } from './scenes/boot_scene';
 import { CampScene } from './scenes/camp_scene';
 import { ExplorerScene } from './scenes/dev/explorer_scene';
 import { MainScene } from './scenes/dev/main_scene';
+import { DungeonScene } from './scenes/dungeon_scene';
 import { NoticeboardPanelScene } from './scenes/noticeboard_panel_scene';
 import { TavernPanelScene } from './scenes/tavern_panel_scene';
 
@@ -25,6 +26,7 @@ new Phaser.Game({
     TavernPanelScene,
     BarracksPanelScene,
     NoticeboardPanelScene,
+    DungeonScene,
     MainScene,
     ExplorerScene,
   ],
