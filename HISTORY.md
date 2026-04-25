@@ -29,6 +29,49 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-25 · Barracks UI (Tier 1)
+
+- **What shipped:**
+  - `src/scenes/barracks_panel_scene.ts` — full rewrite of task 12's stub. Split-pane panel: 380×360 list pane on the left with a 2×6 grid of `HeroCard` `small` variants (filled or faded `empty` placeholder), 440×360 detail pane on the right with paperdoll, name/class, stats line, trait line, and four ability blocks rendered via the new `describeAbility` helper. Selection by hero id with `#ffcc66` 2px outline; auto-selects `roster.heroes[0]` on open.
+  - `src/data/ability_describe.ts` — pure TS, ~110 lines. `describeAbility(ability) → { castLine, targetLine, effectLines }` synthesizes display text from `Ability.canCastFrom + target + effects`. Reusable later for combat tooltips (task 17).
+  - `src/data/__tests__/ability_describe.test.ts` — 12 unit tests covering each effect kind (damage / heal / stun / buff / debuff / mark / taunt) and target shape (slots `[n]` / `'all'`, filters `hurt` / `lacksStatus` / `hasStatus` / `hasTag`, picks `lowestHp` / `'first'`).
+  - +12 assertions (total 493, was 481).
+  - Read-only — no `appState` mutation. Camp's `RESUME` listener fires on close as a no-op refresh.
+  - Design spec at `docs/superpowers/specs/2026-04-25-barracks-ui-design.md`; plan at `docs/superpowers/plans/2026-04-25-barracks-ui.md`.
+- **Why:** Lets the player inspect their roster and plan party composition. Per the user's "this is the true gameplay" framing, the detail pane goes beyond name+stats — it shows full ability mechanics (cast slots, target rule with filter/pick, every effect on its own line) so a player can reason about who pairs with whom before committing to a party at the noticeboard.
+- **Decisions:**
+  - *Split-pane layout (visual option A).* List left, detail right, both visible. Selected. Beats swap-mode (option B, two screens in one panel — more friction) and sub-panel overlay (option C, extra close stack). Best for browsing/comparing heroes quickly without losing context.
+  - *Full ability breakdown (option C from clarifying questions).* User explicit: "this area is the true gameplay — knowing exactly how a hero works is crucial." Added the `describeAbility` helper rather than just listing names. Ability block format = name (13px bold) + combined `Cast: X · Target: Y` meta line + one `→ effect` line per `effects[]` entry.
+  - *`describeAbility` lives in `src/data/`.* Pure TS, paired with `abilities.ts`. Data layer owns its own presentation; firewalled from Phaser. Tests mount `ABILITIES` directly — no fixtures needed. Reusable by the combat scene later for tooltips.
+  - *Selection by hero id, not index.* Future-proofs against roster reordering and external mutation. Cheap insurance — Tier 1 doesn't reorder, but `selectHero(id)` keeps `rebuildDetail` correct under any data change.
+  - *`bg` Rectangle as both click target and selection outline.* 184×60 (4px larger than `HeroCard` 180×56) with fill alpha 0 (transparent) and stroke `#ffcc66` toggled between alpha 0 (hidden) and alpha 1 (visible) on selection. Avoids the toggle-`setInteractive`/`disableInteractive` churn from earlier panels and keeps the cursor consistent.
+  - *Auto-select `roster.heroes[0]` on open* (Q3 option A). No dead-pane-on-open. Selection isn't persisted in `SaveFile`/`appState`; each launch is fresh.
+  - *Stat display is mixed-fidelity.* HP shows `hero.maxHp` (post-trait, since `computeMaxHp` bakes Stout's +10% at hero creation). ATK/DEF/SPD show `hero.baseStats` (pre-trait, since stat traits apply at combat time via `getEffectiveStat`). The trait line below resolves the inconsistency by being explicit (`trait: Quick — +1 Speed`). Rejected the alternative of computing effective stats in the UI — would duplicate `getEffectiveStat`'s slot-aware logic.
+  - *Combined `Cast:` and `Target:` onto one meta line* (rather than two). Caught during spec self-review: 4 ability blocks at 4 lines each + gaps would have overflowed the 360px detail pane bottom by 21px. Combining into one line drops one row per block; total height ≈ 208px now fits with 7px clearance.
+  - *Empty placeholder cells.* Slots beyond `heroes.length` render as faded 180×56 rectangles with `empty` text in muted gray. Visual consistency over blank space; trivial Tier-2 hook for "Recruit at Tavern" CTA buttons.
+  - *No equip / formation default / dismiss.* Per spec scope and TODO §14 acceptance — read-only in Tier 1. Tier 2 replaces `selectHero`'s detail rebuild with an editable variant + action buttons.
+  - *No sort / filter.* Roster cap is 12; the 2×6 grid handles it. Tier 2 may add filters when the class roster grows past 6.
+- **Alternatives considered:**
+  - *Swap-mode panel* (visual option B). Rejected — two distinct screens in one panel adds a back-button click for every hero comparison.
+  - *Sub-panel overlay for detail* (visual option C). Rejected — adds a layer to the close stack and more visual chrome without payoff.
+  - *Name-only ability rendering* (option A from clarifying questions, "compact"). Rejected per user emphasis on gameplay depth.
+  - *Simple `name + one-line description` ability format* (option B). Rejected for the same reason — not enough info for party-comp planning.
+  - *Effective-stats display* (compute trait + slot-aware modifiers in the UI). Rejected — would duplicate `getEffectiveStat` and require a slot-less variant for the camp context. The trait line resolves the inconsistency well enough.
+  - *Per-task incremental scaffold* (Task 1 = chrome, Task 2 = list, Task 3 = detail, etc.). Rejected up front based on the Tavern lesson — strict-mode `noUnusedLocals` kills declare-ahead plans. Combined into two tasks (helper, then full scene rewrite).
+- **Surprises / lessons:**
+  - **The "any slot" naming was inconsistent between spec and data.** Spec called Bulwark "any slot," but Bulwark's `canCastFrom` is `[1, 2, 3]` (player has only 3 slots), not `[1, 2, 3, 4]`. My initial helper rendered it as `slot 1, 2, or 3`. Tests caught the mismatch on first run. Fix: treat both `[1,2,3]` (player full) and `[1,2,3,4]` (enemy full) as `'any slot'` — for either audience there is no positional restriction. Lesson: when the spec uses player-facing language ("any slot"), check what the data actually says — natural-language descriptions don't translate mechanically. The fix is in the helper, not the data.
+  - **Spec self-review caught four layout-arithmetic bugs** (Tavern caught one, Barracks four). Pattern: when a spec specifies *both* container and content dimensions, sum content + gaps and verify fit; this caught panel-too-narrow (cards overflow), columns-abutting (no gap), rows-overflow (cards extend above pane top), and detail-pane-too-short (ability blocks overflow bottom). All fixed inline by adjusting coordinates / merging the cast+target lines. Adding "layout arithmetic check" to the spec-review mental model has now paid off twice.
+  - **Pure-TS `describeAbility` paired with data was the right placement.** It's TDD-friendly (no Phaser to mock), reusable for future combat tooltips, and the test file mounts `ABILITIES` directly — no fixtures, no test-only synthetic data except for the single-slot edge case. The instinct to put presentation helpers in `src/ui/` would have made it harder to test and would have coupled it to Phaser-importing folders.
+  - **Stroke-alpha toggling for selection outlines is cleaner than re-binding interactivity.** `setStrokeStyle(2, color, alpha)` accepts alpha as third arg. Toggling 0/1 hides/shows the outline without re-creating the rectangle or fiddling with `setInteractive`/`disableInteractive`. Worth carrying forward for any "highlightable click target" pattern (tavern's hire button used the same hand-cursor-stays approach but with fill, not stroke; this is the stroke variant).
+  - **Visual companion's third outing was clean.** Split-pane was the obvious pick once seen vs. swap-mode (two screens, friction) and sub-panel overlay (extra close stack). Text descriptions of three layout structures would have taken multiple back-and-forth rounds. Same observation as task 12's camp layout — pattern: use the companion when the question is "how should this look in space," skip it for architecture or tradeoff discussions.
+- **Touches:**
+  - `src/scenes/barracks_panel_scene.ts` (rewritten)
+  - `src/data/ability_describe.ts` (new)
+  - `src/data/__tests__/ability_describe.test.ts` (new)
+  - `docs/superpowers/specs/2026-04-25-barracks-ui-design.md` (new)
+  - `docs/superpowers/plans/2026-04-25-barracks-ui.md` (new)
+- **Source:** `TODO.md` Cluster B · Task 14. Related: `gdd.md` §6 (Camp / Buildings · Barracks) and §10 (Tier 1 build plan), task 11 HISTORY (HeroCard small variant — second consumer here), task 12 HISTORY (panel overlay architecture, RESUME-driven HUD refresh), task 13 HISTORY (Tavern UI — first panel consumer of the same close pattern), task 7 HISTORY (`roster.listHeroes`), task 8 HISTORY (`TraitDef.description` field surfaced here).
+
 ### 2026-04-25 · Tavern UI (Tier 1)
 
 - **What shipped:**

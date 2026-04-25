@@ -33,18 +33,6 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
 
-### 14 · Barracks UI
-
-- **What:** Panel listing the roster; click a hero to inspect their full stats and abilities.
-- **Why:** Lets the player see their roster and plan. Also the home Tier 2 will extend with equip and formation-default editing.
-- **Tier:** 1
-- **Acceptance:**
-  - Opens as a panel over camp scene, lists all roster heroes via small hero cards.
-  - Click a card to open a detail view (larger card + ability list + stats table).
-  - No equip / swap operations in Tier 1 (no gear drops yet).
-  - Close button returns to camp.
-- **Touches:** `src/ui/barracks_panel.ts`.
-
 ### 15 · Noticeboard & party picker
 
 - **What:** Panel for starting a run — pick a dungeon, then pick 3 heroes and assign them to formation slots 1 / 2 / 3.
