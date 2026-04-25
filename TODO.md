@@ -33,20 +33,6 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
 
-### 16 · Dungeon scene
-
-- **What:** Side-scrolling scene where the party walks through a floor. Each node triggers its payload (combat → combat scene; boss → combat scene; post-boss → camp screen scene).
-- **Why:** The forward-motion connective tissue between camp setup and combat readout.
-- **Tier:** 1
-- **Acceptance:**
-  - `src/scenes/dungeon_scene.ts` takes a `RunState` and renders the party walking in formation using paperdolls.
-  - Approaches each node and triggers it (Tier 1: all non-boss nodes are combat).
-  - On combat complete, updates `RunState` (HP + pack), continues to next node, or transitions to camp screen after boss.
-  - On wipe: shows a wipe summary and returns to camp scene with heroes removed from the roster and pack discarded.
-  - **Replaces task 15's stub.** The current `dungeon_scene.ts` is a throwaway with an ESC-to-abandon escape hatch that wipes `runState`/`runRngState`. The rewrite must remove this — abandon should be either disallowed or treated as a real wipe. (See task 15 HISTORY decisions.)
-  - **Boot routing.** When a save has `runState` set on page load, the boot scene currently still routes to camp. Decide here: either (a) boot routes directly to dungeon when `runState` is present and this scene's `create()` resumes from it, or (b) camp's HUD shows a "resume run" prompt. Either way, this task must close the "page-reload mid-run lands at camp" gap left by task 15.
-- **Touches:** `src/scenes/dungeon_scene.ts`, possibly `src/scenes/boot_scene.ts`.
-
 ### 17 · Combat scene
 
 - **What:** Renders 3v3–4 ranked combat and animates playback of the combat log produced by the engine. Fast-forward toggle.
@@ -57,7 +43,8 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
   - Position changes (shove / pull / swap) visibly animate.
   - Fast-forward toggle switches between 1× and 3× playback.
   - On combat end, returns control to dungeon scene with updated `RunState`.
-- **Touches:** `src/scenes/combat_scene.ts`.
+  - **Refactor `dungeon_scene.startCombatAtCurrentNode`** (currently calls `resolveCombat` synchronously inline). After this task, the dungeon scene launches the combat scene, gets the `CombatResult` back via scene-data callback or shared registry, then continues with `completeCombat` + `appState.update`. The result panel + walk-to-next + camp_screen / wipe transitions stay where they are. (See task 16 HISTORY decisions.)
+- **Touches:** `src/scenes/combat_scene.ts`, `src/scenes/dungeon_scene.ts`.
 
 ### 18 · Camp Screen (post-boss)
 
@@ -69,6 +56,7 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
   - Any Fallen heroes are listed (Tier 1: no equipment recovery since there's no gear flow, but the lost heroes are still named).
   - **Leave** button banks pack gold to vault, returns survivors to roster, transitions to camp scene. Saves first.
   - **Press On** button advances the floor in `RunState`, generates the next floor, transitions to dungeon scene. Saves first.
+  - **Replaces task 16's stub.** The current `camp_screen_scene.ts` shows the run summary as plain text and exposes only a `Return to Camp` button (which does the cashout work — bank gold, update HP, remove fallen). The rewrite must add the `Press On` button and replace the text summary with party `HeroCard`s. The cashout logic in `returnToCamp` moves into the new `Leave` handler essentially unchanged. (See task 16 HISTORY decisions.)
 - **Touches:** `src/scenes/camp_screen_scene.ts`.
 
 ### 19 · Enemy art for Crypt

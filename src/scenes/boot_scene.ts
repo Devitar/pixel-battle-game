@@ -22,6 +22,11 @@ export class BootScene extends Phaser.Scene {
     const rng = createRng(Date.now());
     const { saveFile } = resolveSaveState(window.localStorage, rng);
     appState.init(saveFile, window.localStorage);
-    this.scene.start('camp');
+
+    if (saveFile.runState) {
+      this.scene.start('dungeon');
+    } else {
+      this.scene.start('camp');
+    }
   }
 }

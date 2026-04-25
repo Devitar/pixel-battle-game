@@ -3,6 +3,7 @@ import './style.css';
 import { BarracksPanelScene } from './scenes/barracks_panel_scene';
 import { BootScene } from './scenes/boot_scene';
 import { CampScene } from './scenes/camp_scene';
+import { CampScreenScene } from './scenes/camp_screen_scene';
 import { ExplorerScene } from './scenes/dev/explorer_scene';
 import { MainScene } from './scenes/dev/main_scene';
 import { DungeonScene } from './scenes/dungeon_scene';
@@ -27,6 +28,7 @@ new Phaser.Game({
     BarracksPanelScene,
     NoticeboardPanelScene,
     DungeonScene,
+    CampScreenScene,
     MainScene,
     ExplorerScene,
   ],
