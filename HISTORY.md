@@ -29,6 +29,44 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-25 · Tavern UI (Tier 1)
+
+- **What shipped:**
+  - `src/scenes/tavern_panel_scene.ts` — full rewrite of task 12's stub. 920×340 panel overlay; three large `HeroCard`s in a row at x=170/480/790; hire button + reason text per slot; footer HUD `Vault: Ng · Roster: M / 12` inside the panel; close × + ESC handler preserved from stub.
+  - Hire flow: re-read `appState`, gate on `canAdd(roster) && balance(vault) >= 50`, single `appState.update` that combines `spend` + `addHero` (auto-saved by AppState), reroll that slot's candidate via `generateCandidate(rng, unlocks.classes)`, `card.setHero(...)` to repaint, then `refreshButtons()` + `refreshFooter()`.
+  - First real consumer of `HeroCard` (task 11). No new tests — pure-logic deps already covered by tasks 7 and 8.
+  - Design spec at `docs/superpowers/specs/2026-04-25-tavern-ui-design.md`; plan at `docs/superpowers/plans/2026-04-25-tavern-ui.md`.
+- **Why:** Primary path for new heroes into the roster, and the most-touched gameplay surface in Cluster B's camp loop. First task that exercises HeroCard end-to-end.
+- **Decisions:**
+  - *Re-roll candidates on every panel open* (option A). No persistent tavern state in SaveFile — closing + reopening produces fresh candidates. Tier 1's "no reroll" rule from GDD §10 is preserved as "no reroll button," not "fixed-across-sessions candidates." Tier 2's paid-reroll button + cost addresses the implicit free-reroll exploit directly; Tier 1 accepts it.
+  - *3 cards in a row* (visual option A). Visual companion mockup pulled the answer in one click — "browse the lineup" feel beats list-style "3 rows" (option B).
+  - *Single atomic `appState.update` for hire.* Producer combines `spend(s.vault, HIRE_COST)` and `addHero(s.roster, hired)` so the auto-save reflects the consistent post-hire state. Single-threaded JS makes the read-then-write window safe even under rapid double-click — the second invocation re-reads `appState.get()` after the first's update.
+  - *Per-slot reroll on hire.* Only the hired slot's candidate is replaced; the other two are untouched. Player keeps their other choices visible — feels like the tavern responding to their action, not the world resetting.
+  - *Gold-first reason ordering.* When both gold and roster cap would block, the button shows "Not enough gold" (not "Roster full"). Reason: players refill gold faster than they free roster slots — the gold reason is the more actionable one.
+  - *Buttons stay interactive in disabled state.* Hand cursor stays consistent across enabled/disabled; clicks while disabled are silent no-ops gated by `hire()`'s top guard. Cleaner than toggling `setInteractive`/`disableInteractive` on every refresh.
+  - *Re-read `appState.get().unlocks.classes` on every reroll* rather than caching at scene create. Cheap (one record access). If Tier 3 ever exposes mid-Tavern unlocks that should affect the next roll, this is correct; if not, no harm.
+  - *Hire button uses one shared enabled-state across all 3 slots.* All three light up or grey out together because the gating is global (vault gold + roster cap). If Tier 2 introduces per-candidate prices or class-specific cap rules, the loop becomes per-button.
+  - *No new unit tests.* `hire()` is a 4-line composition of `spend` + `addHero` (tested in task 7) and `generateCandidate` (tested in task 8). The rest is Phaser glue. Smoke-tested in dev server against the spec's 11-step sequence.
+  - *No keyboard hire shortcuts (1/2/3).* Hire is a destructive action — gold spend, permanent roster change — and benefits from a deliberate click. ESC still closes.
+  - *Panel widened from spec's draft 880 → 920 during self-review.* Original layout claimed "cards stay inside" but the math didn't work: 280-wide cards at x=170/480/790 span x=30..930, overflowing an 880-wide panel (x=40..920) by 10px on each side. Caught inline before plan; close × position recalculated to (933, 113).
+- **Alternatives considered:**
+  - *Persistent candidates in SaveFile* (option B from clarifying). Rejected for Tier 1 — adds schema complexity for no Tier-1 payoff. If Tier 2 persists, the migration trivially adds `tavernCandidates: undefined`.
+  - *3 rows with hire button beside each card* (visual option B). Rejected — "list" feel vs "browse the lineup" feel of A; A also reads better at the 920×340 panel size.
+  - *Per-button enabled state.* Rejected — Tier 1 gating is global. Tier 2 may flip this if per-candidate prices or class-cap rules arrive.
+  - *Cache `unlocks.classes` at scene create.* Rejected — one record access on each reroll is negligible; future-proofs against mid-Tavern unlock changes.
+  - *Disable interactivity on grey buttons.* Rejected — toggling `setInteractive`/`disableInteractive` per refresh adds churn and inconsistent cursor feedback. Inline guard in `hire()` is simpler and equivalent.
+  - *Per-task incremental scaffold during execution.* Rejected mid-execution — see Surprises below. Plan's Tasks 1–4 commit boundaries collapsed into a single rewrite.
+- **Surprises / lessons:**
+  - **Phaser scene instances are reused across `scene.launch` calls.** Class field initializers (`this.candidates = []`) run once when the scene is first added to the game; subsequent launches re-run `create()` but the JS instance persists. Without an explicit `this.candidates = []; this.hireButtons = []` at the top of `create()`, re-opening the panel would retain destroyed-game-object references from the prior session. The plan caught this in the "Notes for the implementer" section, but it's the kind of trap that would have produced a baffling bug on second open. Worth flagging for any future scene that holds per-launch state in fields.
+  - **Strict-mode `noUnusedLocals` killed the "declare-ahead, wire later" plan strategy.** The plan had Task 1 lay down `SLOT_X`, `hireButtons`, `footerText`, etc. in advance and Tasks 2–4 progressively use them. `npx tsc --noEmit` rejected the Task 1 commit because seven identifiers were unused. Collapsed to a single rewrite mid-execution. Lesson for future plans: in strict-mode codebases, every task boundary must be typecheck-clean on its own — no forward declarations. Either combine tasks that share scaffolding, or stage the declarations alongside their first use.
+  - **Spec self-review caught a layout overflow before the plan was even written.** The 880×340 panel + 280-wide cards math didn't add up; cards overflowed by 10px on each side. Pure arithmetic on the spec's own numbers, but easy to miss when sketching coordinates. Rule of thumb: when a spec specifies both container and content dimensions, sum the content + gaps and check it fits. (Specs that *infer* container dimensions from content avoid this entirely — something to consider for future layout specs.)
+  - **The disabled-but-still-interactive pattern beat the toggle-interactivity pattern.** Cursor consistency + zero re-binding on every state change. The hire() top guard is the only safety net, and it's also the place that matters for testability. Worth carrying forward whenever a Phaser button has a "disabled but visible" state.
+- **Touches:**
+  - `src/scenes/tavern_panel_scene.ts` (rewritten)
+  - `docs/superpowers/specs/2026-04-25-tavern-ui-design.md` (new)
+  - `docs/superpowers/plans/2026-04-25-tavern-ui.md` (new)
+- **Source:** `TODO.md` Cluster B · Task 13. Related: `gdd.md` §6 (Camp / Buildings · Tavern) and §10 (Tier 1 build plan), task 11 HISTORY (HeroCard widget, large variant consumed here), task 12 HISTORY (camp scene + panel overlay architecture, RESUME-driven HUD refresh), task 7 HISTORY (`vault.spend`, `roster.addHero`/`canAdd`/`listHeroes`), task 8 HISTORY (`generateCandidate`, `HIRE_COST`).
+
 ### 2026-04-25 · Camp scene shell (Tier 1)
 
 - **What shipped:**

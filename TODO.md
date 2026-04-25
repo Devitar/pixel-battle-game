@@ -33,18 +33,6 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
 
-### 13 · Tavern UI
-
-- **What:** Panel showing 3 candidates with hire buttons.
-- **Why:** Primary way new heroes enter the roster.
-- **Tier:** 1
-- **Acceptance:**
-  - Panel opens over camp scene with 3 candidates generated via `camp/buildings/tavern.ts`, each rendered as a large hero card.
-  - Hire button disabled if vault balance < cost or roster is at cap (with reason shown).
-  - On hire: deducts cost, adds to roster, re-rolls that candidate slot.
-  - Close button returns to camp.
-- **Touches:** `src/ui/tavern_panel.ts`.
-
 ### 14 · Barracks UI
 
 - **What:** Panel listing the roster; click a hero to inspect their full stats and abilities.
