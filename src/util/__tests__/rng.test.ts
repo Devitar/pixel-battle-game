@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createRng } from '../rng';
+import { createRng, createRngFromState } from '../rng';
 
 describe('rng.int', () => {
   it('returns integers within [min, max] inclusive', () => {
@@ -198,6 +198,40 @@ describe('createRng', () => {
     for (const count of buckets) {
       expect(count).toBeGreaterThan(750);
       expect(count).toBeLessThan(1250);
+    }
+  });
+});
+
+describe('getState / createRngFromState', () => {
+  it('getState returns a finite number', () => {
+    const rng = createRng(42);
+    expect(typeof rng.getState()).toBe('number');
+    expect(Number.isFinite(rng.getState())).toBe(true);
+  });
+
+  it('state advances after next()', () => {
+    const rng = createRng(42);
+    const before = rng.getState();
+    rng.next();
+    const after = rng.getState();
+    expect(after).not.toBe(before);
+  });
+
+  it('round-trip: rng resumed from state produces identical sequence', () => {
+    const original = createRng(42);
+    for (let i = 0; i < 10; i++) original.next();
+    const captured = original.getState();
+    const resumed = createRngFromState(captured);
+    for (let i = 0; i < 5; i++) {
+      expect(resumed.next()).toBe(original.next());
+    }
+  });
+
+  it('two rngs created from the same state produce identical sequences', () => {
+    const a = createRngFromState(123456);
+    const b = createRngFromState(123456);
+    for (let i = 0; i < 10; i++) {
+      expect(a.next()).toBe(b.next());
     }
   });
 });

@@ -9,10 +9,11 @@ export interface Rng {
   pick<T>(array: readonly T[]): T;
   shuffle<T>(array: readonly T[]): T[];
   weighted<T>(options: readonly WeightedOption<T>[]): T;
+  getState(): number;
 }
 
-export function createRng(seed: number): Rng {
-  let state = seed >>> 0;
+function createRngInternal(initialState: number): Rng {
+  let state = initialState >>> 0;
 
   const next = (): number => {
     state = (state + 0x6d2b79f5) >>> 0;
@@ -51,5 +52,16 @@ export function createRng(seed: number): Rng {
       }
       return options[options.length - 1].value;
     },
+    getState() {
+      return state;
+    },
   };
+}
+
+export function createRng(seed: number): Rng {
+  return createRngInternal(seed);
+}
+
+export function createRngFromState(state: number): Rng {
+  return createRngInternal(state);
 }

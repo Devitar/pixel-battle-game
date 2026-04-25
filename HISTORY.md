@@ -29,6 +29,80 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-24 · Save / load via localStorage (Tier 1) — Cluster A complete
+
+- **What shipped:**
+  - `src/save/save.ts` — `SaveFile` interface, `STORAGE_KEY`, `save` / `load` / `clearSave` / `createDefaultUnlocks` over a dependency-injected `Storage`. Re-exports `CURRENT_SCHEMA_VERSION`.
+  - `src/save/migration.ts` — `CURRENT_SCHEMA_VERSION = 1`, empty `MIGRATIONS` registry, `migrate(raw)` runner.
+  - `src/data/types.ts` — `Unlocks { classes, dungeons }`.
+  - `src/util/rng.ts` — refactored to share `createRngInternal`. `Rng` interface gains `getState(): number`. New `createRngFromState(state)` for resuming.
+  - 4 new test files / extensions; +20 assertions (total 464, was 444).
+  - Design spec at `docs/superpowers/specs/2026-04-24-save-load-design.md`; plan at `docs/superpowers/plans/2026-04-24-save-load.md`.
+- **Why:** Persistence layer for the player's progress. Without it, refresh = lose everything. Mid-run save means a player can close the browser at any point during a 25-minute run and resume.
+- **Decisions:**
+  - *Save mid-run state, not just persistent state.* User explicitly chose option B during brainstorming. Costs RNG-state serialization but means refresh during a run doesn't wipe it. The pairing invariant `runState ↔ runRngState` keeps the two fields in lock-step.
+  - *Dependency-injected `Storage`.* `save(data, storage)` / `load(storage)`. Production passes `window.localStorage`; tests pass a `MemoryStorage` shim (~10 lines). Avoids the vitest environment switch that direct `window.localStorage` would have required.
+  - *Pairing invariant — `save` throws, `load` recovers.* Asymmetric on purpose: caller bugs surface immediately at write; corrupted-file edge cases drop the run gracefully and keep persistent state. Recovery hierarchy: pairing violation → drop run; corrupt JSON / shape mismatch / future version / migration failure → null + warn; missing key → null (not an error).
+  - *Crash-free `load`.* `console.warn + return null` on every error path. Boot scene treats null as "create a new game." Never throws.
+  - *Migration framework keyed by `fromVersion`.* Each entry produces a save at `version + 1`; chain runs until `CURRENT_SCHEMA_VERSION`. Empty in Tier 1; Tier 2's first schema bump exercises it end-to-end.
+  - *`CURRENT_SCHEMA_VERSION` lives in `migration.ts` (re-exported from `save.ts`).* Avoids a runtime circular reference. `save.ts` imports value `migrate` + `CURRENT_SCHEMA_VERSION` from migration; `migration.ts` imports `type SaveFile` (erased at compile time via `verbatimModuleSyntax`). One-way value dependency.
+  - *RNG state as a single `number`.* mulberry32's internal state is one 32-bit integer; `getState()` exposes it, `createRngFromState(state)` resumes. Round-trip property tested.
+  - *`Unlocks` is `{ classes: ClassId[], dungeons: DungeonId[] }`.* Tier 1 default: knight/archer/priest, crypt. Tier 2+ extensions append via migrations.
+  - *Single localStorage key (`pixel-battle-game/save`).* One JSON blob, atomic save/load. No partial keys.
+  - *`createDefaultUnlocks` lives in `save.ts`, not `data/`.* "What's in a fresh save" co-located with the SaveFile type that defines it. If the default later needs to be data-driven, move it.
+- **Alternatives considered:**
+  - *Option A — only persistent state saves; mid-run is ephemeral.* Rejected per user's explicit "B" call.
+  - *Direct `window.localStorage` access in save.ts.* Rejected — tests would need a vitest environment switch (jsdom).
+  - *Module-scoped `storage` variable with setter.* Rejected — subtle test-isolation issues.
+  - *Throw on read corruption.* Rejected — boot scene depends on the crash-free guarantee.
+  - *Final-shape validator after migration.* Rejected — overlaps with migration's responsibility.
+  - *`CURRENT_SCHEMA_VERSION` in save.ts (with type-only `import type` from save in migration).* Tried first; the value circular reference would have worked via lazy evaluation but is fragile. Migrating it to migration.ts is cleaner.
+- **Surprises / lessons:**
+  - **Second plan-bug of the same shape: interface extension breaks inline mocks.** I added `getState()` to the `Rng` interface. My self-review's "caller-update audit" claimed no external `Rng` implementations existed because I `grep`'d for `createRng(`. Missed that `encounter.test.ts` (task 5) has **3 inline `Rng = { ... }` mocks** that don't implement `getState`. Strict TS caught it at the typecheck gate; fix was 3 line additions. **Compound lesson with task 8:** when changing public surface, the right grep depends on what's changing.
+    - Adding **a method** to an interface → grep `: Rng`, `Rng = {`, `as Rng`, `extends Rng` (for impls).
+    - Changing **a function signature** → grep `functionName(` (for callers).
+    - Both can break, and a single grep won't catch both cases.
+    - **Action item for Cluster B:** add an "interface-extension audit" sub-step to plan self-reviews when a task touches public types or function signatures.
+  - **The pairing-invariant idiom is reusable.** "These two fields are both present or both absent" applies to `runState`/`runRngState` here. It's likely useful elsewhere when state spans multiple values that must transition atomically.
+  - **`verbatimModuleSyntax: true` made the migration↔save circular reference clean.** Type-only imports are fully erased at compile time, so a value cycle can't form. The compiler enforces it: bare `import { SaveFile }` would have been an error.
+  - **Round-trip testing for the RNG state was satisfying.** `createRngFromState(rng.getState())` produces an RNG whose subsequent sequence matches the original. Five lines of test code; load-bearing for save/load correctness.
+- **Touches:**
+  - `src/data/types.ts` (modified — +Unlocks)
+  - `src/util/rng.ts` (refactored — shared internal, +getState, +createRngFromState)
+  - `src/util/__tests__/rng.test.ts` (extended — round-trip tests)
+  - `src/dungeon/__tests__/encounter.test.ts` (modified — getState added to 3 inline Rng mocks; caught at execution)
+  - `src/save/save.ts` (new)
+  - `src/save/migration.ts` (new)
+  - `src/save/__tests__/save.test.ts` (new)
+  - `src/save/__tests__/migration.test.ts` (new)
+  - `docs/superpowers/specs/2026-04-24-save-load-design.md` (new)
+  - `docs/superpowers/plans/2026-04-24-save-load.md` (new)
+- **Source:** `TODO.md` Cluster A · Task 9. Related: every prior Cluster A task (this is where their persistence contracts validate).
+
+---
+
+#### Cluster A retrospective
+
+Cluster A's nine tasks landed all of the pure-TypeScript foundation: rng + types, classes, enemies, combat engine, floor generator, run state, roster/vault, recruitment + traits, save/load. **464 tests, zero phaser imports outside of the firewalled directories, full deterministic replay** (same seeds → same outcomes for combat, floor generation, recruitment, all of it).
+
+**Design decisions that proved load-bearing across multiple tasks:**
+
+- **Immutable state with explicit return-the-new-value contract.** Used in run state, pack, vault, roster, save file. Made testing trivial (`JSON.parse(JSON.stringify(state))` snapshot + post-op deep-equal). Cost: a small amount of allocation. Worth it.
+- **Stable `combatantId` scheme (`p0..p2`, `e0..e3`).** Bridges the run state's party array with the combat engine's combatant list. Persisted unchanged from task 4 through task 9.
+- **`Hero` as cross-domain anchor.** Defined in task 6; consumed by combat (combatant factories), run (party), camp (roster), save (persistence). One type, four domains.
+- **`data/types.ts` as central type module.** Every domain imports from it. Centralized literal unions (`ClassId`, `EnemyId`, `DungeonId`, `TraitId`, `StatusId`) made cross-domain references cheap and safe.
+- **Throw-on-invariant + paired predicate pattern.** `canAdd` + `addHero`-throws; `addGold`-throws-on-negative; `save`-throws-on-pairing-violation. Two-function pattern at every data-layer boundary.
+- **Caster-relative `Side` (`'self' | 'ally' | 'enemy'`) vs absolute `CombatSide` (`'player' | 'enemy'`).** Separate names prevented a class of bugs at consumer call sites where the union types would have allowed nonsensical assignments.
+
+**Recurring plan-bug pattern:** interface or signature changes that break callers/implementations the grep didn't surface.
+
+- Task 8: changed `createHero` signature; missed `roster.test.ts`'s 5 callers in self-review.
+- Task 9: added `getState()` to `Rng`; missed `encounter.test.ts`'s 3 inline `Rng` mocks.
+
+Both cases were caught by strict TS at the typecheck gate. The crash-free habit (run typecheck after every task, not just `npm test`) saved both. **Cluster B's brainstorming should add an "interface-extension audit" subroutine** when a task changes public types or function signatures: grep both for the type name AND for factory/constructor calls; enumerate callers/implementations explicitly in the plan.
+
+**Cluster B begins next:** Phaser scenes, UI widgets, the actual playable game shell. Cluster B can import phaser. Every Cluster A type and function gets its first runtime consumer in scenes — design decisions that survived the test suite get their second validation against real gameplay.
+
 ### 2026-04-24 · Recruitment & trait system (Tier 1)
 
 - **What shipped:**

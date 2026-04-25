@@ -27,17 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 9 · Save / load via localStorage
-
-- **What:** Serialize `Roster + Vault + Unlocks` to localStorage; load on boot; treat missing or corrupt save as a fresh-game trigger.
-- **Why:** Without this, every refresh wipes progress — the whole persistent-roster premise dies.
-- **Tier:** 1
-- **Acceptance:**
-  - `src/save/save.ts` defines a versioned `SaveFile` type and `save()` / `load()` helpers.
-  - Schema version embedded; `src/save/migration.ts` stub exists for future migrations.
-  - Tests cover: roundtrip preserves roster and vault; missing save yields default new-game state; corrupt JSON yields default new-game state + a console warning, no crash.
-- **Touches:** `src/save/save.ts`, `src/save/migration.ts`, `src/save/__tests__/save.test.ts`.
-
 ---
 
 ## Cluster B — Scenes & UI (Phaser)

@@ -146,3 +146,8 @@ export interface TraitDef {
   hpEffect?: TraitHpEffect;
   statEffects?: readonly TraitStatEffect[];
 }
+
+export interface Unlocks {
+  classes: readonly ClassId[];
+  dungeons: readonly DungeonId[];
+}
