@@ -14,7 +14,7 @@ import type {
   CombatState,
 } from './types';
 
-const ROUND_CAP = 30;
+const ROUND_CAP = 1000;
 
 function livingBySide(state: CombatState, side: CombatSide): Combatant[] {
   return state.combatants.filter((c) => c.side === side && !c.isDead);
@@ -24,10 +24,9 @@ function bothSidesAlive(state: CombatState): boolean {
   return livingBySide(state, 'player').length > 0 && livingBySide(state, 'enemy').length > 0;
 }
 
-function computeOutcome(state: CombatState, hitCap: boolean): CombatOutcome {
+function computeOutcome(state: CombatState): CombatOutcome {
   const playerAlive = livingBySide(state, 'player').length > 0;
   const enemyAlive = livingBySide(state, 'enemy').length > 0;
-  if (hitCap && playerAlive && enemyAlive) return 'timeout';
   if (playerAlive && !enemyAlive) return 'player_victory';
   return 'player_defeat';
 }
@@ -42,10 +41,17 @@ export function resolveCombat(initialState: CombatState, rng: Rng): CombatResult
     enemies: livingBySide(state, 'enemy').map((c) => c.id),
   });
 
-  let hitCap = false;
-
   for (let round = 1; round <= ROUND_CAP; round++) {
     state.round = round;
+
+    if (round === 100) {
+      state.exhaustionLevel = 1;
+      events.push({ kind: 'exhaustion_applied', level: 1 });
+    } else if (round > 100 && (round - 100) % 5 === 0) {
+      state.exhaustionLevel += 1;
+      events.push({ kind: 'exhaustion_applied', level: state.exhaustionLevel });
+    }
+
     const order = computeInitiative(
       state.combatants.filter((c) => !c.isDead),
       rng,
@@ -93,13 +99,10 @@ export function resolveCombat(initialState: CombatState, rng: Rng): CombatResult
     events.push({ kind: 'round_end', round });
 
     if (combatEndedMidRound) break;
-    if (round === ROUND_CAP && bothSidesAlive(state)) {
-      hitCap = true;
-      break;
-    }
+    if (round === ROUND_CAP) break;
   }
 
-  const outcome = computeOutcome(state, hitCap);
+  const outcome = computeOutcome(state);
   events.push({ kind: 'combat_end', outcome });
 
   return { finalState: state, events, outcome };

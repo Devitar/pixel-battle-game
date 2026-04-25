@@ -90,7 +90,7 @@ export function completeCombat(
     }
   }
 
-  if (result.outcome === 'player_defeat' || result.outcome === 'timeout') {
+  if (result.outcome === 'player_defeat') {
     const allLost: Hero[] = [
       ...runState.fallen,
       ...newFallen,

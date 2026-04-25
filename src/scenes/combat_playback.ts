@@ -130,6 +130,7 @@ export class CombatPlayback {
       case 'position_changed': return this.onPositionChanged(ev);
       case 'death': return this.onDeath(ev);
       case 'round_end': return this.onRoundEnd();
+      case 'exhaustion_applied': return this.onExhaustionApplied();
       case 'combat_end': return this.onCombatEnd();
     }
   }
@@ -348,6 +349,10 @@ export class CombatPlayback {
 
   private async onRoundEnd(): Promise<number> {
     await this.delay(D_ROUND_END);
+    return 1;
+  }
+
+  private async onExhaustionApplied(): Promise<number> {
     return 1;
   }
 

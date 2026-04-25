@@ -21,6 +21,7 @@ function applyDamage(
   target: Combatant,
   effect: Extract<AbilityEffect, { kind: 'damage' }>,
   ability: Ability,
+  state: CombatState,
   events: CombatEvent[],
 ): void {
   const bonus = tagBonusMultiplier(ability, target);
@@ -30,13 +31,17 @@ function applyDamage(
     raw = Math.round(raw * (1 + mark.effect.damageBonus));
   }
   const final = Math.max(1, raw - getEffectiveStat(target, 'defense'));
-  target.currentHp -= final;
+  const amplified =
+    target.side === 'player' && state.exhaustionLevel > 0
+      ? Math.max(1, Math.round(final * (1 + 0.10 * state.exhaustionLevel)))
+      : final;
+  target.currentHp -= amplified;
   const lethal = target.currentHp <= 0;
   events.push({
     kind: 'damage_applied',
     sourceId: caster.id,
     targetId: target.id,
-    amount: final,
+    amount: amplified,
     lethal,
   });
   if (lethal) {
@@ -91,7 +96,7 @@ function applyEffect(
   if (target.isDead) return;
   switch (effect.kind) {
     case 'damage':
-      applyDamage(caster, target, effect, ability, events);
+      applyDamage(caster, target, effect, ability, state, events);
       return;
     case 'heal':
       applyHeal(caster, target, effect, events);
