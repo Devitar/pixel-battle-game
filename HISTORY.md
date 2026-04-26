@@ -29,6 +29,47 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-26 · Camp Screen — post-boss decision (Tier 1)
+
+- **What shipped:**
+  - `src/scenes/camp_screen_scene.ts` — full rewrite of task 16's stub. Header (`Floor Cleared!` + `The Crypt · Floor N`), tan-bordered Pack pill (`Pack: Ng`, prominent), three large `HeroCard`s in a horizontal row at x=180/480/780, optional Fallen line (only rendered when `run.fallen.length > 0`), and two outcome-on-button buttons: `Leave (+Ng to vault)` (green, x=300) and `Press On → Floor N+1` (warm-orange, x=660). Background `#1a1020` (matches dungeon scene).
+  - **Press On handler.** Reads `runRngState`, `createRngFromState` → `pressOn(run, rng)` → atomic `appState.update` writes paired `{ runState: nextRun, runRngState: rng.getState() }` → `scene.start('dungeon')`. Single rng round-trip same as Noticeboard's Descend and dungeon-scene's combat-return.
+  - **Leave handler.** Body verbatim from task 16's `returnToCamp`: `cashout(run)` → atomic `appState.update` writes `vault` (credited), `roster` (HP-updated for survivors, fallen pruned), `runState`/`runRngState` (cleared as a pair) → `scene.start('camp')`. Renamed only.
+  - `src/scenes/boot_scene.ts` — three-way routing replaces the two-way: `runState?.status === 'camp_screen'` → `'camp_screen'`, else `runState` set → `'dungeon'`, else `'camp'`. Closes the page-reload-mid-decision gap that had previously bounced `camp_screen`-status saves to camp via the dungeon scene's guard.
+  - No new tests (matches task 16 precedent — pure-logic deps `pressOn`, `cashout`, `credit`, `updateHero`, `removeHero`, `createRngFromState`, save invariant all covered by tasks 4 / 6 / 7 / 9). Tests stayed at 511 green, tsc clean, vite build clean.
+  - Design spec at `docs/superpowers/specs/2026-04-25-camp-screen-design.md`; plan at `docs/superpowers/plans/2026-04-25-camp-screen.md`.
+- **Why:** The post-boss decision screen is the emotional centerpiece of the Tier 1 gambling loop (per GDD §1) — the only place the player is *expected* to pause and think about cash-out vs press-on. Task 16's stub did real cashout work but had only a `Return to Camp` button; this rewrite adds the Press On path that makes the loop close. The boot-routing fix matters more here than for any other Tier 1 scene because camp_screen is the most-saved state once it's actually a decision (the player walks away from their machine to think).
+- **Decisions:**
+  - *Three large `HeroCard`s in a horizontal row (option A of three).* The post-boss decision is *about the party* — same level of detail used for Tavern recruits and Barracks selection applies here. 280×120 × 3 + 20px gaps fits cleanly in 960×540 with 40px margins; centers at x=180/480/780.
+  - *Outcome-on-button labels (option B of three).* `Leave (+Ng to vault)` and `Press On → Floor N+1` put the decision math on the buttons themselves. Beat minimal labels (player has to look elsewhere to compute the trade-off) and "minimal label + caption" (redundant with the Pack panel that's already on screen).
+  - *Boot routing fix bundled with the rewrite.* The cost is ~3 lines and closes a gap that would have otherwise hit on the most-saved Tier 1 state. Symmetric with task 16's "page-reload-mid-run gap" closure for the dungeon scene; doing both fixes in matched tasks keeps the routing logic legible.
+  - *No private scene fields.* Every visual object lives only in Phaser's display list; no `private foo!: Phaser.GameObjects.X` slots. Eliminates the orphan-field strict-mode failure class that bit task 16 during execution. The scene is fully render-from-state — `run` is read once in `create()` and passed into the builders.
+  - *No confirmation modals.* The cash-out vs press-on decision is the moment Tier 1 hangs on commitment; second-guessing dialogs would dilute the design intent. Tier 2 polish if playtest reveals "I keep misclicking Press On."
+  - *Cards pack leftward, original formation indices not preserved.* `completeCombat` filters dead heroes out of `run.party`, so a slot-2 death collapses the array — the surviving slot-3 hero renders at `PARTY_X[1] = 480`, not at 780. Fallen line by name is the only record of who was where. Matches dungeon scene's existing rendering convention.
+  - *Press On uses `scene.start('dungeon')` not `'camp_screen'`.* After `pressOn`, status flips back to `'in_dungeon'`, so a re-entry to camp_screen would hit its own guard and bounce to camp.
+  - *Leave handler kept verbatim from the stub.* The TODO entry called this out explicitly — it's the same body, renamed. No risk of regressing the cashout work that task 16 already smoke-tested end-to-end.
+- **Alternatives considered:**
+  - *Three small (180×56) `HeroCard`s.* Rejected during clarifying Q1 — the post-boss screen is a decision *about the party*, large cards give the right level of detail.
+  - *Darkest-Dungeon-style party-left, decisions-right split.* Rejected during clarifying Q1 — horizontal full-width row reads better at 960×540.
+  - *Boot routing fix as a separate follow-up task.* Rejected during clarifying Q2 — the cost is ~3 lines and the gap matters most precisely on this scene; doing both at once keeps the routing logic legible.
+  - *Animated gold-counting on screen open.* Tier 2 polish; static value reads instantly.
+  - *Upcoming-floor preview on Press On.* Noticeboard doesn't preview node types either; preserves Tier 1's "you don't know what's ahead" tension.
+  - *`Abandon` button.* Per GDD §4, Abandon only exists on mid-floor camp nodes (Tier 2). On the post-boss screen, Leave already pays out — "abandon" is meaningless.
+  - *Confirmation modal on either button.* Tier 1 commitment is the design intent.
+- **Surprises / lessons:**
+  - **Spec self-review caught a layout-claim that survived all the design discussion.** I'd written "1- or 2-survivor parties leave the trailing slot positions empty; cards always occupy their original-formation indices." But `completeCombat` filters dead heroes out of `run.party` — the array collapses, so cards pack leftward. Fixed inline before plan-writing. The lesson: trace each visual claim back through the data shape it depends on, especially for "what does the screen look like in degenerate cases."
+  - **Smoke testing surfaced two combat bugs that had nothing to do with task 18 but blocked its verification.** Cultist's `dark_pact` (heal, no cooldown) is its first AI priority, so any encounter with a Cultist stalls forever — and the new exhaustion mechanic ramps damage taken on the *player* side only, so the player wipes against an unkillable enemy team. Couldn't reach the camp_screen at all in some runs. Captured both bugs in `bugs.md` (heal cooldowns, archer-volley AI). Applied a 1-line *test fixture* to `src/data/enemies.ts` — flipped Cultist priority to `['dark_bolt', 'dark_pact']` so heal only fires when bolt has no target. Comment in the file points at `bugs.md` so the temporary nature is documented and revertable when the proper cooldown system lands.
+  - **The render-from-state-with-no-private-fields pattern paid off immediately.** No strict-mode `noUnusedLocals` issues during execution — task 16's HISTORY explicitly called out three orphan fields the spec had wanted that turned out unused. Avoiding scene-local state entirely (passing `run` into each builder method) made every field's existence justified by use.
+  - **The pressOn rng round-trip is the same shape as Descend + combat-return, third instance now.** `createRngFromState(state.runRngState!)` → call the run-state transition with the rng → `appState.update` with `rng.getState()` paired. Three call sites now use this exact pattern (Noticeboard, dungeon-scene, camp-screen). Worth a small helper if a fourth shows up; not yet.
+- **Touches:**
+  - `src/scenes/camp_screen_scene.ts` (rewritten)
+  - `src/scenes/boot_scene.ts` (modified — three-way routing)
+  - `docs/superpowers/specs/2026-04-25-camp-screen-design.md` (new)
+  - `docs/superpowers/plans/2026-04-25-camp-screen.md` (new)
+  - `bugs.md` (modified — heal-cooldown and archer-volley entries)
+  - `src/data/enemies.ts` (modified — Cultist priority flipped as test fixture; revert when heal cooldowns ship)
+- **Source:** `TODO.md` Cluster B · Task 18. Related: `gdd.md` §1 (camp screen as the gambling-loop hinge) and §4 (run-end paths), task 6 HISTORY (`pressOn`, `cashout`, `CashoutOutcome`), task 7 HISTORY (`credit`, `updateHero`, `removeHero`), task 9 HISTORY (save invariant — `runState`/`runRngState` pairing), task 11 HISTORY (`HeroCard` reuse), task 16 HISTORY (camp_screen stub + boot-routing precedent for dungeon — symmetric fix here for camp_screen; the orphan-field strict-mode lesson explicitly avoided this time).
+
 ### 2026-04-25 · Combat exhaustion soft cap (replaces 30-round timeout)
 
 - **What shipped:**

@@ -33,19 +33,6 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
 
-### 18 · Camp Screen (post-boss)
-
-- **What:** The risk / reward decision screen — shows the pack, the party condition, Leave / Press On buttons.
-- **Why:** The emotional centerpiece of the design. The whole gambling loop lands here.
-- **Tier:** 1
-- **Acceptance:**
-  - `src/scenes/camp_screen_scene.ts` shows current pack gold total and party hero cards with HP.
-  - Any Fallen heroes are listed (Tier 1: no equipment recovery since there's no gear flow, but the lost heroes are still named).
-  - **Leave** button banks pack gold to vault, returns survivors to roster, transitions to camp scene. Saves first.
-  - **Press On** button advances the floor in `RunState`, generates the next floor, transitions to dungeon scene. Saves first.
-  - **Replaces task 16's stub.** The current `camp_screen_scene.ts` shows the run summary as plain text and exposes only a `Return to Camp` button (which does the cashout work — bank gold, update HP, remove fallen). The rewrite must add the `Press On` button and replace the text summary with party `HeroCard`s. The cashout logic in `returnToCamp` moves into the new `Leave` handler essentially unchanged. (See task 16 HISTORY decisions.)
-- **Touches:** `src/scenes/camp_screen_scene.ts`.
-
 ### 19 · Enemy art for Crypt
 
 - **What:** Produce sprites for the 4 Crypt enemy types + 1 boss. Placeholder reuse of existing NPC frames is acceptable for Tier 1; bespoke pixel art can come later.
