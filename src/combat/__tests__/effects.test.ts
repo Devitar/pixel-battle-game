@@ -9,8 +9,13 @@ const rng = createRng(1);
 
 describe('damage effect', () => {
   it('computes power × attack - defense with floor 1', () => {
-    const p0 = makeHeroCombatant('knight', 1, 'p0');
-    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    // crit=0/dodge=0 on both so no RNG is consumed; assertion is deterministic.
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 4, speed: 3, mind: 0, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 12, attack: 3, defense: 2, speed: 3, mind: 0, crit: 0, dodge: 0 },
+    });
     const state = makeTestState([p0], [e0]);
     const events: CombatEvent[] = [];
     applyAbility(ABILITIES.knight_slash, p0, ['e0'], state, rng, events);
@@ -29,21 +34,23 @@ describe('damage effect', () => {
   });
 
   it('applies radiant × undead = 1.5× bonus', () => {
+    // smite is mind-scaling: round(1.1 * priest.mind=5 * 1.5) = 8 raw, minus skeleton.defense=2 = 6 dmg. 12-6=6.
     const p0 = makeHeroCombatant('priest', 2, 'p0');
     const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
     const state = makeTestState([p0], [e0]);
     const events: CombatEvent[] = [];
     applyAbility(ABILITIES.smite, p0, ['e0'], state, rng, events);
-    expect(e0.currentHp).toBe(9);
+    expect(e0.currentHp).toBe(6);
   });
 
   it('does not apply radiant bonus against humanoid', () => {
+    // smite is mind-scaling: round(1.1 * priest.mind=5) = 6 raw, minus cultist.defense=1 = 5 dmg. 10-5=5.
     const p0 = makeHeroCombatant('priest', 2, 'p0');
     const e0 = makeEnemyCombatant('cultist', 3, 'e0');
     const state = makeTestState([p0], [e0]);
     const events: CombatEvent[] = [];
     applyAbility(ABILITIES.smite, p0, ['e0'], state, rng, events);
-    expect(e0.currentHp).toBe(8);
+    expect(e0.currentHp).toBe(5);
   });
 
   it('mark multiplies damage for every hit in its duration', () => {
@@ -91,14 +98,15 @@ describe('heal effect', () => {
   });
 
   it('heals up to the cap', () => {
+    // mend is mind-scaling: round(1.2 * priest.mind=5) = 6 hp. 10+6=16.
     const p0 = makeHeroCombatant('priest', 2, 'p0');
     const p1 = makeHeroCombatant('knight', 1, 'p1', { currentHp: 10, maxHp: 20 });
     const state = makeTestState([p0, p1], []);
     const events: CombatEvent[] = [];
     applyAbility(ABILITIES.mend, p0, ['p1'], state, rng, events);
-    expect(p1.currentHp).toBe(14);
+    expect(p1.currentHp).toBe(16);
     const heal = events.find((e) => e.kind === 'heal_applied');
-    expect(heal).toMatchObject({ amount: 4 });
+    expect(heal).toMatchObject({ amount: 6 });
   });
 });
 
@@ -138,12 +146,12 @@ describe('buff / debuff', () => {
 describe('damage effect — exhaustion amplification', () => {
   it('amplifies damage taken on player-side target by 10% per level, rounded', () => {
     const p0 = makeHeroCombatant('knight', 1, 'p0', {
-      baseStats: { hp: 100, attack: 1, defense: 0, speed: 1 },
+      baseStats: { hp: 100, attack: 1, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
       currentHp: 100,
       maxHp: 100,
     });
     const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
-      baseStats: { hp: 100, attack: 10, defense: 0, speed: 1 },
+      baseStats: { hp: 100, attack: 10, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
       currentHp: 100,
       maxHp: 100,
     });
@@ -153,12 +161,12 @@ describe('damage effect — exhaustion amplification', () => {
     const baseline = (baselineEvents.find((e) => e.kind === 'damage_applied') as { amount: number }).amount;
 
     const p1 = makeHeroCombatant('knight', 1, 'p0', {
-      baseStats: { hp: 100, attack: 1, defense: 0, speed: 1 },
+      baseStats: { hp: 100, attack: 1, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
       currentHp: 100,
       maxHp: 100,
     });
     const e1 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
-      baseStats: { hp: 100, attack: 10, defense: 0, speed: 1 },
+      baseStats: { hp: 100, attack: 10, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
       currentHp: 100,
       maxHp: 100,
     });
@@ -215,5 +223,116 @@ describe('multi-effect ability', () => {
     expect(e0.statuses['stunned']).toBeUndefined();
     const stunEvents = events.filter((e) => e.kind === 'status_applied');
     expect(stunEvents).toHaveLength(0);
+  });
+});
+
+describe('damage scaling stat', () => {
+  it('defaults to attack when scalingStat is unset', () => {
+    // priest with crit=0 so no crit roll; e0 dodge=0 so no dodge roll.
+    const p0 = makeHeroCombatant('priest', 1, 'p0', {
+      baseStats: { hp: 15, attack: 3, defense: 2, speed: 4, mind: 5, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'priest_strike' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0 }],
+    };
+    applyAbility(ability, p0, ['e0'], state, rng, events);
+    const dmg = events.find((e) => e.kind === 'damage_applied');
+    expect(dmg).toMatchObject({ amount: 3 });
+  });
+
+  it('uses mind when scalingStat is "mind"', () => {
+    const p0 = makeHeroCombatant('priest', 1, 'p0', {
+      baseStats: { hp: 15, attack: 3, defense: 2, speed: 4, mind: 5, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'priest_strike' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0, scalingStat: 'mind' as const }],
+    };
+    applyAbility(ability, p0, ['e0'], state, rng, events);
+    const dmg = events.find((e) => e.kind === 'damage_applied');
+    expect(dmg).toMatchObject({ amount: 5 });
+  });
+});
+
+describe('heal scaling stat', () => {
+  it('uses mind when scalingStat is "mind"', () => {
+    const p0 = makeHeroCombatant('priest', 1, 'p0', { currentHp: 1 });
+    const state = makeTestState([p0], []);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'mend' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'self' as const },
+      effects: [{ kind: 'heal' as const, power: 1.2, scalingStat: 'mind' as const }],
+    };
+    applyAbility(ability, p0, ['p0'], state, rng, events);
+    const h = events.find((e) => e.kind === 'heal_applied');
+    expect(h).toMatchObject({ amount: 6 });
+  });
+});
+
+describe('crit', () => {
+  it('does not roll crit when caster crit is 0', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.knight_slash, p0, ['e0'], state, rng, events);
+    const dmg = events.find((e) => e.kind === 'damage_applied');
+    expect(dmg).toMatchObject({ wasCrit: false });
+  });
+
+  it('always crits when caster crit is 100, doubling raw before defense', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 0, speed: 3, mind: 0, crit: 100, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 3, speed: 0, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.knight_slash, p0, ['e0'], state, rng, events);
+    const dmg = events.find((e) => e.kind === 'damage_applied');
+    // raw = round(1.0 * 4) = 4; crit doubles to 8; defense subtracts 3; final = 5.
+    expect(dmg).toMatchObject({ wasCrit: true, amount: 5 });
+  });
+
+  it('crit doubles before defense (proves the difference)', () => {
+    // Doubling-after-defense would give max(1, 4 - 3) * 2 = 2.
+    // Doubling-before-defense gives max(1, 4*2 - 3) = 5.
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 0, speed: 3, mind: 0, crit: 100, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 3, speed: 0, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.knight_slash, p0, ['e0'], state, rng, events);
+    const dmg = events.find((e) => e.kind === 'damage_applied') as { amount: number };
+    expect(dmg.amount).toBe(5);
+    expect(dmg.amount).not.toBe(2);
   });
 });

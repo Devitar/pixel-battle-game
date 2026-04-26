@@ -12,6 +12,9 @@ function scaleEnemyStats(enemyId: EnemyId, scale: ScaleFactors): Stats {
     attack: Math.round(base.attack * scale.attack),
     defense: base.defense,
     speed: base.speed,
+    mind: base.mind,
+    crit: base.crit,
+    dodge: base.dodge,
   };
 }
 

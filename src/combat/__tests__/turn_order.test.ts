@@ -19,7 +19,7 @@ describe('computeInitiative', () => {
     const rng = createRng(1);
     const fastHero = makeHeroCombatant('archer', 3, 'p0');
     const slowHero = makeHeroCombatant('priest', 2, 'p1', {
-      baseStats: { hp: 15, attack: 3, defense: 2, speed: 1 },
+      baseStats: { hp: 15, attack: 3, defense: 2, speed: 1, mind: 0, crit: 0, dodge: 0 },
     });
     const order = computeInitiative([slowHero, fastHero], rng);
     expect(order).toEqual(['p0', 'p1']);
@@ -27,10 +27,10 @@ describe('computeInitiative', () => {
 
   it('ties go to player side', () => {
     const hero = makeHeroCombatant('knight', 1, 'p0', {
-      baseStats: { hp: 20, attack: 4, defense: 4, speed: 3 },
+      baseStats: { hp: 20, attack: 4, defense: 4, speed: 3, mind: 0, crit: 0, dodge: 0 },
     });
     const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
-      baseStats: { hp: 12, attack: 3, defense: 2, speed: 3 },
+      baseStats: { hp: 12, attack: 3, defense: 2, speed: 3, mind: 0, crit: 0, dodge: 0 },
     });
     for (let seed = 1; seed <= 10; seed++) {
       const localRng = createRng(seed);
@@ -50,7 +50,7 @@ describe('computeInitiative', () => {
 
   it('a single combatant is placed first', () => {
     const bigSpeedHero = makeHeroCombatant('archer', 1, 'p0', {
-      baseStats: { hp: 10, attack: 1, defense: 1, speed: 100 },
+      baseStats: { hp: 10, attack: 1, defense: 1, speed: 100, mind: 0, crit: 0, dodge: 0 },
     });
     for (let seed = 1; seed <= 5; seed++) {
       const rng = createRng(seed);

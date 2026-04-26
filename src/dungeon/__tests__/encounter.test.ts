@@ -60,6 +60,7 @@ describe('composeCombatEncounter', () => {
         return arr[0];
       },
       shuffle: <T>(arr: readonly T[]): T[] => [...arr],
+      percent: () => false,
       getState: () => 0,
       weighted: <T>(options: readonly WeightedOption<T>[]): T => {
         calls.push('weighted');
@@ -84,6 +85,7 @@ describe('composeCombatEncounter', () => {
         return result ?? arr[0];
       },
       shuffle: <T>(arr: readonly T[]): T[] => [...arr],
+      percent: () => false,
       getState: () => 0,
       weighted: <T>(options: readonly WeightedOption<T>[]): T => options[1].value,
     };
@@ -109,6 +111,7 @@ describe('composeCombatEncounter', () => {
         return result ?? arr[0];
       },
       shuffle: <T>(arr: readonly T[]): T[] => [...arr],
+      percent: () => false,
       getState: () => 0,
       weighted: <T>(options: readonly WeightedOption<T>[]): T => options[1].value,
     };

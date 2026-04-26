@@ -14,6 +14,9 @@ export interface Stats {
   attack: number;
   defense: number;
   speed: number;
+  mind: number;
+  crit: number;
+  dodge: number;
 }
 
 export type CombatantId = string;
@@ -62,7 +65,8 @@ export type CombatEvent =
   | { kind: 'turn_skipped'; combatantId: CombatantId; reason: 'stunned' | 'dead' }
   | { kind: 'ability_cast'; casterId: CombatantId; abilityId: AbilityId; targetIds: readonly CombatantId[] }
   | { kind: 'shuffle'; combatantId: CombatantId }
-  | { kind: 'damage_applied'; sourceId: CombatantId; targetId: CombatantId; amount: number; lethal: boolean }
+  | { kind: 'damage_applied'; sourceId: CombatantId; targetId: CombatantId; amount: number; lethal: boolean; wasCrit: boolean }
+  | { kind: 'attack_dodged'; sourceId: CombatantId; targetId: CombatantId; abilityId: AbilityId }
   | { kind: 'heal_applied'; sourceId: CombatantId; targetId: CombatantId; amount: number }
   | { kind: 'status_applied'; sourceId: CombatantId; targetId: CombatantId; statusId: StatusId; duration: number }
   | { kind: 'status_expired'; targetId: CombatantId; statusId: StatusId }

@@ -39,12 +39,12 @@ describe('resolveCombat — scripted scenarios', () => {
 
   it('extreme stalemate resolves via exhaustion (never times out)', () => {
     const hero = makeHeroCombatant('knight', 1, 'p0', {
-      baseStats: { hp: 100, attack: 1, defense: 100, speed: 3 },
+      baseStats: { hp: 100, attack: 1, defense: 100, speed: 3, mind: 0, crit: 0, dodge: 0 },
       currentHp: 100,
       maxHp: 100,
     });
     const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
-      baseStats: { hp: 100, attack: 1, defense: 100, speed: 3 },
+      baseStats: { hp: 100, attack: 1, defense: 100, speed: 3, mind: 0, crit: 0, dodge: 0 },
       currentHp: 100,
       maxHp: 100,
     });
@@ -69,7 +69,7 @@ describe('resolveCombat — scripted scenarios', () => {
   it('Shield Bash stun causes a skipped turn for the target', () => {
     const knight = makeHeroCombatant('knight', 1, 'p0');
     const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
-      baseStats: { hp: 100, attack: 3, defense: 2, speed: 2 },
+      baseStats: { hp: 100, attack: 3, defense: 2, speed: 2, mind: 0, crit: 0, dodge: 0 },
       currentHp: 100,
       maxHp: 100,
     });
@@ -83,12 +83,12 @@ describe('resolveCombat — scripted scenarios', () => {
 
   it('emits exhaustion_applied at level 1 at the top of round 100', () => {
     const hero = makeHeroCombatant('knight', 1, 'p0', {
-      baseStats: { hp: 10000, attack: 1, defense: 1000, speed: 3 },
+      baseStats: { hp: 10000, attack: 1, defense: 1000, speed: 3, mind: 0, crit: 0, dodge: 0 },
       currentHp: 10000,
       maxHp: 10000,
     });
     const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
-      baseStats: { hp: 10000, attack: 1, defense: 1000, speed: 3 },
+      baseStats: { hp: 10000, attack: 1, defense: 1000, speed: 3, mind: 0, crit: 0, dodge: 0 },
       currentHp: 10000,
       maxHp: 10000,
     });
@@ -103,12 +103,12 @@ describe('resolveCombat — scripted scenarios', () => {
 
   it('ramps exhaustion level by 1 every 5 rounds after round 100', () => {
     const hero = makeHeroCombatant('knight', 1, 'p0', {
-      baseStats: { hp: 10000, attack: 1, defense: 1000, speed: 3 },
+      baseStats: { hp: 10000, attack: 1, defense: 1000, speed: 3, mind: 0, crit: 0, dodge: 0 },
       currentHp: 10000,
       maxHp: 10000,
     });
     const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
-      baseStats: { hp: 10000, attack: 1, defense: 1000, speed: 3 },
+      baseStats: { hp: 10000, attack: 1, defense: 1000, speed: 3, mind: 0, crit: 0, dodge: 0 },
       currentHp: 10000,
       maxHp: 10000,
     });
@@ -136,12 +136,12 @@ describe('resolveCombat — scripted scenarios', () => {
   it('extreme stalemate always resolves below the 1000-round safety cap across seeds', () => {
     for (const seed of [1, 7, 42, 99, 12345]) {
       const hero = makeHeroCombatant('knight', 1, 'p0', {
-        baseStats: { hp: 100, attack: 1, defense: 100, speed: 3 },
+        baseStats: { hp: 100, attack: 1, defense: 100, speed: 3, mind: 0, crit: 0, dodge: 0 },
         currentHp: 100,
         maxHp: 100,
       });
       const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
-        baseStats: { hp: 100, attack: 1, defense: 100, speed: 3 },
+        baseStats: { hp: 100, attack: 1, defense: 100, speed: 3, mind: 0, crit: 0, dodge: 0 },
         currentHp: 100,
         maxHp: 100,
       });

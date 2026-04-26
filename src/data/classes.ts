@@ -5,7 +5,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
   knight: {
     id: 'knight',
     name: 'Knight',
-    baseStats: { hp: 20, attack: 4, defense: 4, speed: 3 },
+    baseStats: { hp: 20, attack: 4, defense: 4, speed: 3, mind: 0, crit: 5, dodge: 5 },
     preferredWeapon: 'sword',
     abilities: ['knight_slash', 'shield_bash', 'bulwark', 'taunt'],
     aiPriority: ['shield_bash', 'bulwark', 'taunt', 'knight_slash'],
@@ -17,7 +17,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
   archer: {
     id: 'archer',
     name: 'Archer',
-    baseStats: { hp: 14, attack: 5, defense: 2, speed: 5 },
+    baseStats: { hp: 14, attack: 5, defense: 2, speed: 5, mind: 0, crit: 15, dodge: 10 },
     preferredWeapon: 'bow',
     abilities: ['archer_shoot', 'piercing_shot', 'volley', 'flare_arrow'],
     aiPriority: ['flare_arrow', 'piercing_shot', 'volley', 'archer_shoot'],
@@ -28,7 +28,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
   priest: {
     id: 'priest',
     name: 'Priest',
-    baseStats: { hp: 15, attack: 3, defense: 2, speed: 4 },
+    baseStats: { hp: 15, attack: 3, defense: 2, speed: 4, mind: 5, crit: 5, dodge: 5 },
     preferredWeapon: 'holy_symbol',
     abilities: ['priest_strike', 'mend', 'smite', 'bless'],
     aiPriority: ['mend', 'bless', 'smite', 'priest_strike'],

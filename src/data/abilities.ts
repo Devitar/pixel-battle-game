@@ -76,7 +76,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     name: 'Mend',
     canCastFrom: [2, 3],
     target: { side: 'ally', filter: { kind: 'hurt' }, pick: 'lowestHp' },
-    effects: [{ kind: 'heal', power: 1.2 }],
+    effects: [{ kind: 'heal', power: 1.2, scalingStat: 'mind' }],
     cooldown: 2,
   },
   smite: {
@@ -84,7 +84,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     name: 'Smite',
     canCastFrom: [2, 3],
     target: { side: 'enemy', slots: [1] },
-    effects: [{ kind: 'damage', power: 1.1 }],
+    effects: [{ kind: 'damage', power: 1.1, scalingStat: 'mind' }],
     tags: ['radiant'],
   },
   bless: {
@@ -134,14 +134,14 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     name: 'Dark Bolt',
     canCastFrom: [2, 3, 4],
     target: { side: 'enemy', slots: 'all', pick: 'first' },
-    effects: [{ kind: 'damage', power: 0.9 }],
+    effects: [{ kind: 'damage', power: 0.9, scalingStat: 'mind' }],
   },
   dark_pact: {
     id: 'dark_pact',
     name: 'Dark Pact',
     canCastFrom: [2, 3, 4],
     target: { side: 'ally', filter: { kind: 'hurt' }, pick: 'lowestHp' },
-    effects: [{ kind: 'heal', power: 1.0 }],
+    effects: [{ kind: 'heal', power: 1.0, scalingStat: 'mind' }],
     cooldown: 2,
   },
   necrotic_wave: {
@@ -149,7 +149,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     name: 'Necrotic Wave',
     canCastFrom: [1, 2, 3, 4],
     target: { side: 'enemy', slots: 'all' },
-    effects: [{ kind: 'damage', power: 0.4 }],
+    effects: [{ kind: 'damage', power: 0.4, scalingStat: 'mind' }],
   },
   lich_strike: {
     id: 'lich_strike',

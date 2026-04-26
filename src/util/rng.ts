@@ -9,6 +9,7 @@ export interface Rng {
   pick<T>(array: readonly T[]): T;
   shuffle<T>(array: readonly T[]): T[];
   weighted<T>(options: readonly WeightedOption<T>[]): T;
+  percent(p: number): boolean;
   getState(): number;
 }
 
@@ -51,6 +52,12 @@ function createRngInternal(initialState: number): Rng {
         if (roll < 0) return o.value;
       }
       return options[options.length - 1].value;
+    },
+    percent(p: number): boolean {
+      const clamped = p < 0 ? 0 : p > 100 ? 100 : p;
+      if (clamped <= 0) return false;
+      if (clamped >= 100) return true;
+      return next() * 100 < clamped;
     },
     getState() {
       return state;

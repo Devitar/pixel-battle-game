@@ -37,7 +37,7 @@ export type SlotIndex = 1 | 2 | 3 | 4;
 
 export type Side = 'self' | 'ally' | 'enemy';
 
-export type BuffableStat = 'hp' | 'attack' | 'defense' | 'speed';
+export type BuffableStat = 'hp' | 'attack' | 'defense' | 'speed' | 'mind' | 'crit' | 'dodge';
 
 export type TargetFilter =
   | { kind: 'hurt' }
@@ -53,8 +53,8 @@ export interface TargetSelector {
 }
 
 export type AbilityEffect =
-  | { kind: 'damage'; power: number }
-  | { kind: 'heal'; power: number }
+  | { kind: 'damage'; power: number; scalingStat?: 'attack' | 'mind' }
+  | { kind: 'heal'; power: number; scalingStat?: 'attack' | 'mind' }
   | { kind: 'stun'; duration: number }
   | { kind: 'shove'; slots: number }
   | { kind: 'pull'; slots: number }

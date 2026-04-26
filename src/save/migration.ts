@@ -1,6 +1,6 @@
 import type { SaveFile } from './save';
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 type MigrationFn = (raw: Record<string, unknown>) => Record<string, unknown>;
 

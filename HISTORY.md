@@ -29,6 +29,60 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-26 · Full 7-stat model: Mind, Crit, Dodge
+
+- **What shipped:**
+  - `src/combat/types.ts` — `Stats` extended from 4 fields (hp/attack/defense/speed) to 7 (added `mind`, `crit`, `dodge`). `damage_applied` event variant gained a required `wasCrit: boolean`. New `attack_dodged` variant added to `CombatEvent`.
+  - `src/data/types.ts` — `BuffableStat` extended to include `mind | crit | dodge` so future buffs/debuffs/perks can target the new stats. Damage and heal `AbilityEffect` variants gained an optional `scalingStat?: 'attack' | 'mind'`.
+  - `src/util/rng.ts` — new `percent(p: number): boolean` method on the `Rng` interface. Clamps p to [0, 100], short-circuits at 0 and 100 (no `next()` consumed) so combatants with no crit/dodge cost zero RNG.
+  - `src/data/classes.ts` — backfilled all three classes per spec §8: Knight `mind 0 / crit 5 / dodge 5`, Archer `0 / 15 / 10`, Priest `5 / 5 / 5`.
+  - `src/data/enemies.ts` — backfilled all six enemies per spec §8 (cultist gets `mind 3` so its kit math is unchanged; bone_lich gets `mind 4 / crit 10 / dodge 5`).
+  - `src/data/abilities.ts` — `mend`, `smite`, `dark_pact`, `dark_bolt`, `necrotic_wave` now carry `scalingStat: 'mind'`. Intentionally NOT tagged: `chilling_touch` (kept attack-scaling — see Decisions).
+  - `src/combat/effects.ts` — `applyDamage` and `applyHeal` honor `scalingStat`; `applyDamage` rolls crit and emits `wasCrit`; `applyAbility` runs a per-target dodge gate that skips ALL effects on the dodged target (not just damage). Loop order changed from effect-major to target-major to support per-target dodge cleanly. `applyDamage` and `applyEffect` signatures gained `rng` parameter.
+  - `src/run/combat_setup.ts` — `scaleEnemyStats` propagates the new fields (defense/speed/mind/crit/dodge are unscaled; only hp/attack scale per existing `ScaleFactors`).
+  - `src/save/migration.ts` — `CURRENT_SCHEMA_VERSION` bumped 1 → 2. No migration registered; old v1 saves return `null` from the loader and the boot scene generates a fresh save (per project's pre-launch policy).
+  - `src/scenes/combat_playback.ts` — new `onAttackDodged` handler spawns a light-blue "Miss!" floater + appends `<defender> dodged` to the action log. `onDamage` now spawns a gold "CRIT!" floater + suffixes the log with `(crit)` when `wasCrit: true`. AoE damage rolls show `*` after individual crit values in the joined log line.
+  - `src/render/combat_actor.ts` — flash logic unified across hero/enemy paths (now walks `bodyView.list` regardless of paperdoll vs enemy sprite, consequence of cleanup discovered while wiring crit floaters); unused `bodyType` field removed.
+  - `src/util/__tests__/rng.test.ts` — 5 new tests for `percent` (boundaries, clamping, distribution at p=50, determinism).
+  - `src/combat/__tests__/effects.test.ts` — 3 new tests for `scalingStat` (defaults to attack, uses mind, heal uses mind), 3 new tests for crit (skipped at 0, fires at 100, doubles before defense). Updated `mend`/`smite`-radiant/`smite`-humanoid expected values to reflect the priest's new mind=5 scaling.
+  - `src/combat/__tests__/dodge.test.ts` — new test file, 5 tests (no roll at dodge=0, full skip at dodge=100, skips riders like `shield_bash`'s stun, no roll for utility abilities, per-target on AoE).
+  - All test fixtures that build `Stats` literals or mock RNGs were extended with the new fields (combat.test.ts, combatant.test.ts, turn_order.test.ts, encounter.test.ts mock rng, combat_setup.ts, effects.test.ts).
+  - Tests: 531 → **547 passing**, build clean.
+  - Design spec at `docs/superpowers/specs/2026-04-26-full-7-stat-model-design.md`; implementation plan at `docs/superpowers/plans/2026-04-26-full-7-stat-model.md`.
+  - This work also completes Cluster B task 1 (Combat HUD: crit + dodge readouts) — playback rendering shipped together with the engine math.
+- **Why:** Foundation for the full Tier 2 design. Mage (Cluster A task 3, formerly task 4) is purely Mind-scaled and would be unbuildable without it; Crit appears in trait/perk/gear designs across the rest of Tier 2; Dodge is similarly load-bearing for Rogue's Vanish ability. Without this, every Tier 2 class and gear task would have to repeatedly carry the stat extension as a sub-task.
+- **Decisions:**
+  - *Per-effect `scalingStat: 'attack' | 'mind'` field over a coarser `magical` ability tag (brainstorm Q1, option A vs option B).* The user explicitly preferred the per-effect approach for extensibility — opens the door to future scaling sources (`'currentHp'` for execute-style abilities, etc.) that an ability-level boolean tag can't express. The data churn is one extra field on a handful of effect literals; the cost is small relative to the flexibility.
+  - *Crit doubles raw before defense (brainstorm Q2).* Defense still mitigates a crit; a crit on a tanky target is meaningfully better than on a soft target. Matches Darkest Dungeon convention. Beat doubling-after-defense (which makes crits trivially huge against soft targets and meaningless against tanks) and doubling-replacing-mark (which would clobber the existing mark composition rule).
+  - *Per-target dodge that skips ALL effects on a dodged target (brainstorm Q3).* A missed swing didn't connect, so its riders (e.g., `shield_bash`'s stun) shouldn't land either. Dodge gated on the ability having a damage effect — pure-utility abilities (`bulwark`, `taunt`, `bless`, `flare_arrow`) can never be dodged. AoE rolls dodge per-target so one enemy can dodge volley while others get hit.
+  - *Integer percent (0-100) for crit/dodge units (brainstorm Q4a).* Reads naturally in data and tooltip text ("+5% Crit" matches gdd phrasing); the `/100` lives in one place (`rng.percent`).
+  - *No save migration — bump version + discard old saves (brainstorm Q5, option C).* Pre-launch with only the user testing internally; the simpler path is to drop saves on schema change. The user explicitly asked to be re-asked at every save-schema change; this preference is now captured in user-memory and will surface again at every future schema change.
+  - *`chilling_touch` (ghost) intentionally kept attack-scaling, not tagged mind.* The ghost has `mind: 0` per its strawman defaults; tagging chilling_touch as mind-scaling would near-zero its damage. Caught at spec-self-review time before code; documented in spec §10. Could revisit if we ever give the ghost a non-zero Mind value.
+  - *Gating crit/dodge rolls on `> 0` to preserve RNG determinism.* Combatants with crit=0 or dodge=0 consume zero `next()` calls — the existing 5-seed determinism test stays green without modification because all default-stat fixtures used by older tests have either zero or low values that coincidentally don't fire at the tested seed states. Subtle but important: this is what makes the change non-breaking for the existing combat behavior contract.
+  - *Loop restructure in `applyAbility` from effect-major to target-major.* Required to roll a single dodge per target and short-circuit ALL of that target's effects on success. Side effect: event order changed from "all damage events then all stun events" to "per-target events grouped together". No existing tests asserted the old order, so this didn't break anything — but worth knowing if a future feature needs the old grouping.
+  - *Loader is silent when discarding old-version saves.* Currently `migrate` returns null when no migration is registered, and `load` returns null without a `console.warn` for that path (only the JSON-parse failure and shape-mismatch paths warn). Worth a small DX improvement to log "discarding save with unsupported version N" so the discard is visible during real player support — flagged for `bugs.md` but not done here.
+  - *Priest re-balanced (intentional, surfaced in spec §10 before implementation).* `mend` heals 4 → 6 (50% buff); `smite` raw damage 3 → 6 (100% buff). Cultist's `dark_pact`/`dark_bolt` math is unchanged because cultist mind=3 was deliberately set to match cultist attack=3. The Priest buff matches gdd's framing of Priest as Mind-primary; before this work the Priest was strictly attack-bound and underpowered.
+- **Alternatives considered:**
+  - *Coarser `magical` tag at the ability level instead of per-effect `scalingStat`.* Rejected — see Decisions §1; user wanted extensibility for future non-attack/non-mind scaling sources.
+  - *Crit on healing.* Out of scope; healing is deterministic. Could add later if Priest/Cultist heal feels too predictable.
+  - *Mind-scaling for buff/debuff *amounts* (e.g., `bless`'s +2 attack scales with priest mind).* Out of scope; Tier 2 polish per gdd. Current numbers are static.
+  - *Build a real schema-1-to-2 migration that backfills mind/crit/dodge from class defaults.* Rejected per the user's pre-launch policy; would have been ~10 lines but adds a maintenance contract we don't want yet. Class-default backfill is the canonical pattern when this becomes load-bearing post-launch.
+  - *Add a "no-op rng" helper for tests instead of zeroing crit/dodge in test fixtures.* Considered while debugging post-Task-5 test failures; rejected because the explicit zero-stat fixture is more discoverable (you can see *why* the test is deterministic right at the call site) and matches the pattern the spec already prescribes.
+- **Surprises / lessons:**
+  - **The dodge restructure (target-major loop) shifted RNG consumption per turn, breaking 2 existing damage-asserting tests.** Two tests in `effects.test.ts` had been passing with default class stats (knight crit=5, skeleton dodge=5) because the shared module-level `rng` happened to be at a state where neither rolled true. After Task 5 added the dodge gate, the per-test RNG state drifted and one test crit-doubled when it shouldn't have. The fix was to zero crit/dodge on those test fixtures explicitly — the spec §11 pattern. **Lesson:** RNG-dependent tests with default stats are time bombs. Any test asserting a specific damage value needs explicit `crit: 0, dodge: 0` overrides to be robust against future changes that consume more RNG. We should consider applying this proactively to *all* damage/heal-asserting tests in `effects.test.ts`, not just the two that broke.
+  - **Vitest still doesn't typecheck by default — a recurring lesson.** Same as the previous combat-speed task: TS errors only surface via `npx tsc --noEmit` or the `npm run build` pipeline, not via `npm test` alone. Consider adding `--typecheck` to vitest config to catch type drift in tests sooner.
+  - **Browser-driven smoke test now possible via Claude in Chrome.** Verified post-implementation by driving Chrome from this session: confirmed schema bump (v2), all three classes' stats match spec §8, planted-v1-save → reload → fresh-v2-save discard path, console clean. Visual rendering (CRIT!/Miss! floaters, mend healing 6) was still verified manually by the user — driving the canvas through enough combat turns to trigger 5%/15% probabilistic events would be possible but token-heavy.
+- **Touches:**
+  - `src/combat/types.ts`, `src/combat/effects.ts`, `src/combat/__tests__/effects.test.ts`, `src/combat/__tests__/dodge.test.ts` (new), `src/combat/__tests__/combat.test.ts`, `src/combat/__tests__/combatant.test.ts`, `src/combat/__tests__/turn_order.test.ts`
+  - `src/data/types.ts`, `src/data/classes.ts`, `src/data/enemies.ts`, `src/data/abilities.ts`
+  - `src/util/rng.ts`, `src/util/__tests__/rng.test.ts`
+  - `src/run/combat_setup.ts`
+  - `src/save/migration.ts`
+  - `src/scenes/combat_playback.ts`, `src/render/combat_actor.ts`
+  - `src/dungeon/__tests__/encounter.test.ts` (mock rng got `percent` stub)
+  - `docs/superpowers/specs/2026-04-26-full-7-stat-model-design.md`, `docs/superpowers/plans/2026-04-26-full-7-stat-model.md` (new)
+- **Source:** TODO Cluster A task 1 (gdd §2 + §10 Tier 2). Also closes Cluster B task 1 (combat HUD crit/dodge readouts).
+
 ### 2026-04-26 · Combat speed toggle persists across combats and reloads
 
 - **What shipped:**

@@ -42,7 +42,7 @@ describe('createEnemyCombatant', () => {
 
   it('applies overrides — scaled baseStats', () => {
     const c = createEnemyCombatant('skeleton_warrior', 1, 'e0', {
-      baseStats: { hp: 18, attack: 5, defense: 2, speed: 3 },
+      baseStats: { hp: 18, attack: 5, defense: 2, speed: 3, mind: 0, crit: 0, dodge: 0 },
       currentHp: 18,
       maxHp: 18,
     });
