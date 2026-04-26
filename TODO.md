@@ -33,13 +33,19 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
 
-### 19 · Enemy art for Crypt
+---
 
-- **What:** Produce sprites for the 4 Crypt enemy types + 1 boss. Placeholder reuse of existing NPC frames is acceptable for Tier 1; bespoke pixel art can come later.
-- **Why:** Combat scene needs enemy sprites. Without this, enemies are unrenderable.
-- **Tier:** 1
+## Cluster C — Art polish (non-blocking)
+
+Art tasks that aren't blocking gameplay. Enemies, heroes, and rooms already render with placeholder / reused frames; entries here replace placeholders with bespoke pixel art. Deprioritised relative to Clusters A/B.
+
+### 1 · Bespoke enemy art for Crypt
+
+- **What:** Produce dedicated sprites for the 4 Crypt enemy types + 1 boss, replacing the current placeholder NPC-frame mappings.
+- **Why:** Enemies currently render via reused NPC frames (placeholder), which is functional but visually undifferentiated and doesn't read as "Crypt-themed." Bespoke art makes the dungeon feel distinct.
+- **Tier:** 1 (originally) — non-blocking now that placeholders work.
 - **Acceptance:**
-  - Every enemy id referenced by `data/enemies.ts` maps to a valid sprite frame — either new pixels drawn in LibreSprite or reuse of existing NPC frames from the catalog.
-  - `spritenames.txt` updated with the new / mapped entries; `npm run generate:names` run and output committed.
-  - Boss is visually distinguishable (scaled up, unique frame, or outlined).
-- **Touches:** `public/assets/sprites/base_sprites.png` (if drawing), `spritenames.txt`, `src/render/sprite_names.generated.ts` (regenerated).
+  - Every enemy id referenced by `data/enemies.ts` maps to a dedicated sprite frame (no shared NPC frames where possible).
+  - `spritenames.txt` updated with the new entries; `npm run generate:names` run and output committed.
+  - Boss is visually distinguishable beyond just scale (unique frame or silhouette).
+- **Touches:** `public/assets/sprites/base_sprites.png`, `spritenames.txt`, `src/render/sprite_names.generated.ts` (regenerated).
