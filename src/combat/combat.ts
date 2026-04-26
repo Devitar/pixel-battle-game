@@ -1,6 +1,7 @@
 import { ABILITIES } from '../data/abilities';
 import type { Rng } from '../util/rng';
 import { pickAbility } from './ability_priority';
+import { setCooldown, tickCooldowns } from './cooldowns';
 import { applyAbility } from './effects';
 import { shuffle } from './positions';
 import { tickStatuses } from './statuses';
@@ -70,20 +71,21 @@ export function resolveCombat(initialState: CombatState, rng: Rng): CombatResult
 
       const willBeStunned = 'stunned' in combatant.statuses;
       tickStatuses(combatant, events);
+      tickCooldowns(combatant);
 
       if (willBeStunned) {
         events.push({ kind: 'turn_skipped', combatantId: id, reason: 'stunned' });
       } else {
         const picked = pickAbility(combatant, state, rng);
         if (picked) {
-          applyAbility(
-            ABILITIES[picked.abilityId],
-            combatant,
-            picked.targetIds,
-            state,
-            rng,
-            events,
-          );
+          const ability = ABILITIES[picked.abilityId];
+          applyAbility(ability, combatant, picked.targetIds, state, rng, events);
+          if (ability.cooldown !== undefined) {
+            // Store cooldown + 1: tickCooldowns runs at the start of every subsequent
+            // caster-turn before the skip-check, so the stored value must survive
+            // `cooldown` decrements before being deleted to give that many skip-turns.
+            setCooldown(combatant, ability.id, ability.cooldown + 1);
+          }
         } else {
           events.push({ kind: 'shuffle', combatantId: id });
           shuffle(combatant, state, events);

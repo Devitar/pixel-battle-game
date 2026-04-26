@@ -69,6 +69,7 @@ export interface Ability {
   target: TargetSelector;
   effects: readonly AbilityEffect[];
   tags?: readonly AbilityTag[];
+  cooldown?: number;
 }
 
 export interface StarterLoadout {

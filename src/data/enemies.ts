@@ -41,9 +41,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     baseStats: { hp: 10, attack: 3, defense: 1, speed: 3 },
     tags: ['humanoid'],
     abilities: ['dark_pact', 'dark_bolt'],
-    // Bolt before pact until heal cooldowns exist (see bugs.md). Without a cooldown,
-    // pact-first stalls every fight into an exhaustion wipe.
-    aiPriority: ['dark_bolt', 'dark_pact'],
+    aiPriority: ['dark_pact', 'dark_bolt'],
     preferredSlots: [3, 4],
     spriteId: 'cultist',
   },

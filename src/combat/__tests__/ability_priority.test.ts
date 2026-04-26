@@ -41,4 +41,14 @@ describe('pickAbility', () => {
     const picked = pickAbility(e0, state, rng);
     expect(picked).toBeNull();
   });
+
+  it('skips abilities whose cooldown > 0', () => {
+    const rng = createRng(1);
+    const priest = makeHeroCombatant('priest', 2, 'p0', { cooldowns: { mend: 2 } });
+    const knight = makeHeroCombatant('knight', 1, 'p1', { currentHp: 5 });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    const state = makeTestState([priest, knight], [e0]);
+    const picked = pickAbility(priest, state, rng);
+    expect(picked?.abilityId).toBe('bless');
+  });
 });

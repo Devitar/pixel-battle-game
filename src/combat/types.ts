@@ -38,6 +38,7 @@ export interface Combatant {
   currentHp: number;
   maxHp: number;
   statuses: Record<string, StatusInstance>;
+  cooldowns: Partial<Record<AbilityId, number>>;
   abilities: readonly AbilityId[];
   aiPriority: readonly AbilityId[];
   preferredSlots?: readonly SlotIndex[];
