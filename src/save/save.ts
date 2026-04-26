@@ -14,6 +14,11 @@ export interface SaveFile {
   unlocks: Unlocks;
   runState?: RunState;
   runRngState?: number;
+  preferences?: Preferences;
+}
+
+export interface Preferences {
+  combatSpeed: 1 | 3;
 }
 
 export function save(data: SaveFile, storage: Storage): void {

@@ -86,6 +86,25 @@ describe('save / load roundtrip', () => {
     const data: SaveFile = { ...makeBaseSave(), runRngState: 42 };
     expect(() => save(data, storage)).toThrow();
   });
+
+  it('round-trips preferences.combatSpeed', () => {
+    const storage = new MemoryStorage();
+    const original: SaveFile = {
+      ...makeBaseSave(),
+      preferences: { combatSpeed: 3 },
+    };
+    save(original, storage);
+    const loaded = load(storage);
+    expect(loaded?.preferences).toEqual({ combatSpeed: 3 });
+  });
+
+  it('loads an old save without preferences (field is optional)', () => {
+    const storage = new MemoryStorage();
+    save(makeBaseSave(), storage);
+    const loaded = load(storage);
+    expect(loaded).not.toBeNull();
+    expect(loaded?.preferences).toBeUndefined();
+  });
 });
 
 describe('load — missing / corrupt', () => {

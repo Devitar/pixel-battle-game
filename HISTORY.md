@@ -29,6 +29,35 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-26 · Combat speed toggle persists across combats and reloads
+
+- **What shipped:**
+  - `src/save/save.ts` — new optional `preferences?: Preferences` field on `SaveFile`, with a sibling `Preferences` interface holding `combatSpeed: 1 | 3`. No version bump, no migration: the field is optional, the loader's plausibility check only requires `version`, and `migrate` already passes extra fields through.
+  - `src/scenes/combat_scene.ts` — `create()` now reads `appState.get().preferences?.combatSpeed ?? 1` instead of hardcoding `this.speed = 1`. The FF HUD's initial label and stroke colour both derive from `this.speed` (was hardcoded `'1×'` / `0x666666`). After `CombatPlayback` is constructed, `playback.setSpeed(this.speed)` is called once so the engine's `tweens.timeScale` / `time.timeScale` are restored to the persisted value before playback runs (the SHUTDOWN handler still resets them to `1` between scenes — the new `create()` re-applies the preference). `toggleSpeed()` now also writes back via `appState.update`, spreading existing preferences so future fields aren't clobbered.
+  - `src/save/__tests__/save.test.ts` — two new tests: round-trip of `preferences.combatSpeed: 3`, and an old-save-without-preferences regression guard (loads cleanly, `preferences === undefined`).
+  - Tests: 521 → **523 passing**, no regressions, build clean.
+  - Design spec at `docs/superpowers/specs/2026-04-26-combat-speed-persistence-design.md`; plan at `docs/superpowers/plans/2026-04-26-combat-speed-persistence.md`.
+- **Why:** Carried over from TODO #20. The FF (1× / 3×) toggle resetting every fight cost 4+ clicks per floor for any player who preferred 3× playback. Surfaced during task 18 (camp_screen) smoke testing — the same session that produced the cooldown work below.
+- **Decisions:**
+  - *Cross-session persistence (save file) over in-session (module variable).* Both options were viable; cross-session was picked because `appState.update()` already does the persistence work, the marginal cost was one optional field, and it survives page reloads (the standard ARPG / auto-battler convention). It also opens a `preferences` slot for the next setting (audio mute, autosave, etc.) without re-litigating the storage choice.
+  - *Optional field, no version bump, no migration.* Old saves load with `preferences === undefined`; the read site defaults to `1`. The save schema already tolerates extra fields by construction (`migrate` returns `cur as unknown as SaveFile` and `isPlausibleRawSave` only checks `version`).
+  - *`Preferences` is its own interface, not inlined on `SaveFile`.* Future preferences land on `Preferences` without touching `SaveFile` again. Same shape decision the cooldown work applied to combatant state.
+  - *Kept the `tweens.timeScale = 1` / `time.timeScale = 1` reset in the SHUTDOWN handler.* `timeScale` is a Phaser engine property that persists across scene transitions on the same game instance — without the reset, switching to camp/dungeon at 3× would speed up those scenes too. The persisted-speed restoration happens on the *next* combat's `create()` via `playback.setSpeed`, which is the right pairing.
+- **Alternatives considered:**
+  - *In-session only (module-level `let lastSpeed`).* Rejected — friction worsens on reload; the cost delta to cross-session was tiny.
+  - *Drop the SHUTDOWN reset entirely.* Rejected — would leak `timeScale = 3` into camp / dungeon / boss-screen scenes.
+  - *Top-level `combatSpeed` field on `SaveFile` (no `preferences` namespace).* Rejected as a YAGNI inversion — the namespace costs nothing now and avoids the inevitable migration when the second preference lands.
+- **Surprises / lessons:**
+  - **Vitest doesn't typecheck by default.** The new round-trip test passed at runtime *before* the `Preferences` type existed, because esbuild strips types and JSON round-trips arbitrary fields. The TS error only surfaced via `npx tsc --noEmit`. Worth remembering: when adding a new field as a TDD-style "test first then add type," confirm the failure with `tsc`, not vitest. `npm run build` does the typecheck as part of the build pipeline (it runs `tsc` before vite).
+  - **Spreading `undefined` in object spread is a no-op.** `{ ...s.preferences, combatSpeed: 3 }` works whether `s.preferences` is `undefined` or `{ otherField: ... }`. No defensive `s.preferences ?? {}` needed at the write site.
+- **Touches:**
+  - `src/save/save.ts` (modified — added `Preferences` interface, optional field on `SaveFile`)
+  - `src/save/__tests__/save.test.ts` (modified — 2 new tests)
+  - `src/scenes/combat_scene.ts` (modified — read in `create()`, derive HUD initial state, apply via `playback.setSpeed`, write in `toggleSpeed`)
+  - `TODO.md` (entry removed); `HISTORY.md` (this entry added)
+  - `docs/superpowers/specs/2026-04-26-combat-speed-persistence-design.md`, `docs/superpowers/plans/2026-04-26-combat-speed-persistence.md` (new)
+- **Source:** TODO #20.
+
 ### 2026-04-26 · Ability cooldowns (heal stalemate + archer Volley fix)
 
 - **What shipped:**
