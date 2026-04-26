@@ -28,5 +28,3 @@ One section per idea. A sentence is fine for seeds; a paragraph or two for more 
   - Per-class data: do all Tier 1 classes get `preferredSlots`, or only ones that should shuffle?
   - Tier 2 interaction: this rule probably wants to interact with `taunting` (taunt should override slot preference for the targeted enemy).
 - **Status:** seed. Surfaced during task 17 smoke testing — combat scene was correctly animating engine output; engine just didn't produce shuffle events for heroes in non-preferred slots.
-
-### Mobile should be in landscape mode
