@@ -10,7 +10,6 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     abilities: ['bone_slash'],
     aiPriority: ['bone_slash'],
     preferredSlots: [1, 2],
-    spriteId: 'skeleton_warrior',
   },
   skeleton_archer: {
     id: 'skeleton_archer',
@@ -21,18 +20,26 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     abilities: ['bone_arrow'],
     aiPriority: ['bone_arrow'],
     preferredSlots: [3, 4],
-    spriteId: 'skeleton_archer',
   },
-  ghoul: {
-    id: 'ghoul',
-    name: 'Ghoul',
+  ghost: {
+    id: 'ghost',
+    name: 'Ghost',
     role: 'minion',
-    baseStats: { hp: 14, attack: 3, defense: 2, speed: 3 },
+    baseStats: { hp: 12, attack: 3, defense: 1, speed: 4 },
+    tags: ['undead'],
+    abilities: ['chilling_touch'],
+    aiPriority: ['chilling_touch'],
+    preferredSlots: [1, 2],
+  },
+  zombie: {
+    id: 'zombie',
+    name: 'Zombie',
+    role: 'minion',
+    baseStats: { hp: 16, attack: 3, defense: 1, speed: 2 },
     tags: ['undead'],
     abilities: ['rotting_bite'],
     aiPriority: ['rotting_bite'],
     preferredSlots: [1, 2],
-    spriteId: 'ghoul',
   },
   cultist: {
     id: 'cultist',
@@ -43,7 +50,6 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     abilities: ['dark_pact', 'dark_bolt'],
     aiPriority: ['dark_pact', 'dark_bolt'],
     preferredSlots: [3, 4],
-    spriteId: 'cultist',
   },
   bone_lich: {
     id: 'bone_lich',
@@ -54,14 +60,14 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     abilities: ['curse_of_frailty', 'necrotic_wave', 'lich_strike'],
     aiPriority: ['curse_of_frailty', 'necrotic_wave', 'lich_strike'],
     preferredSlots: [3, 4],
-    spriteId: 'bone_lich',
   },
 };
 
 export const CRYPT_POOL: readonly EnemyId[] = [
   'skeleton_warrior',
   'skeleton_archer',
-  'ghoul',
+  'ghost',
+  'zombie',
   'cultist',
 ];
 

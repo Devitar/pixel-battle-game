@@ -6,7 +6,8 @@ import type { EnemyId } from '../types';
 const EXPECTED_IDS: readonly EnemyId[] = [
   'skeleton_warrior',
   'skeleton_archer',
-  'ghoul',
+  'ghost',
+  'zombie',
   'cultist',
   'bone_lich',
 ];
@@ -17,8 +18,6 @@ const STATS: readonly ('hp' | 'attack' | 'defense' | 'speed')[] = [
   'defense',
   'speed',
 ];
-
-const SPRITE_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
 
 describe('ENEMIES', () => {
   it('registers every expected enemy id', () => {
@@ -70,10 +69,6 @@ describe('ENEMIES', () => {
       const slots = ENEMIES[id].preferredSlots;
       expect(slots.length).toBeGreaterThan(0);
       for (const s of slots) expect([1, 2, 3, 4]).toContain(s);
-    });
-
-    it('has a non-empty snake_case spriteId', () => {
-      expect(ENEMIES[id].spriteId).toMatch(SPRITE_ID_PATTERN);
     });
 
     it('every priority ability overlaps preferredSlots', () => {

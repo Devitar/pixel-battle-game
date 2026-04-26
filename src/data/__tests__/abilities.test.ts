@@ -23,6 +23,7 @@ const EXPECTED_IDS: readonly AbilityId[] = [
   'necrotic_wave',
   'lich_strike',
   'curse_of_frailty',
+  'chilling_touch',
 ];
 
 const KEBAB_CASE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;

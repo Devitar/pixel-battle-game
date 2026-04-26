@@ -2,7 +2,7 @@ import * as Phaser from 'phaser';
 import type { CombatantId } from '../combat/types';
 import type { EnemyId, StatusId } from '../data/types';
 import type { Hero } from '../heroes/hero';
-import { EnemyPlaceholder } from './enemy_placeholder';
+import { EnemySprite } from './enemy_sprite';
 import { heroToLoadout } from './hero_loadout';
 import { Paperdoll } from './paperdoll';
 
@@ -14,6 +14,7 @@ const STATUS_GLYPHS: Partial<Record<StatusId, { letter: string; color: string }>
   blessed: { letter: '+', color: '#ffdd66' },
   rotting: { letter: 'r', color: '#aa44aa' },
   frailty: { letter: '−', color: '#888888' },
+  chilled: { letter: 'c', color: '#88ccff' },
 };
 const STATUS_FALLBACK = { letter: '?', color: '#888888' };
 
@@ -68,7 +69,7 @@ export type CombatActorInit = HeroActorInit | EnemyActorInit;
 
 export class CombatActor extends Phaser.GameObjects.Container {
   readonly combatantId: CombatantId;
-  private bodyView: Paperdoll | EnemyPlaceholder;
+  private bodyView: Paperdoll | EnemySprite;
   private bodyScale: number;
   private nameText: Phaser.GameObjects.Text;
   private hpBarBg: Phaser.GameObjects.Rectangle;
@@ -79,20 +80,18 @@ export class CombatActor extends Phaser.GameObjects.Container {
   private actorOutline: Phaser.GameObjects.Rectangle;
   private currentHp: number;
   private maxHp: number;
-  private bodyType: CombatActorKind;
 
   constructor(scene: Phaser.Scene, x: number, y: number, init: CombatActorInit) {
     super(scene, x, y);
     this.combatantId = init.combatantId;
     this.currentHp = init.currentHp;
     this.maxHp = init.maxHp;
-    this.bodyType = init.kind;
 
     if (init.kind === 'hero') {
       this.bodyView = new Paperdoll(scene, 0, 0, heroToLoadout(init.hero));
       this.bodyScale = 3;
     } else {
-      this.bodyView = new EnemyPlaceholder(scene, 0, 0, init.enemyId);
+      this.bodyView = new EnemySprite(scene, 0, 0, init.enemyId);
       this.bodyScale = init.bodyScale ?? 3;
     }
     this.bodyView.setScale(this.bodyScale);
@@ -185,17 +184,7 @@ export class CombatActor extends Phaser.GameObjects.Container {
   }
 
   private flashColor(color: number): Promise<void> {
-    if (this.bodyType === 'enemy') {
-      (this.bodyView as EnemyPlaceholder).flash(color);
-      return new Promise(resolve => {
-        this.scene.time.delayedCall(FLASH_HIT_DURATION, () => {
-          (this.bodyView as EnemyPlaceholder).unflash();
-          resolve();
-        });
-      });
-    }
-    const paperdoll = this.bodyView as Paperdoll;
-    for (const child of paperdoll.list) {
+    for (const child of this.bodyView.list) {
       const img = child as Phaser.GameObjects.Image;
       if (img.setTint) {
         img.setTint(color);
@@ -204,7 +193,7 @@ export class CombatActor extends Phaser.GameObjects.Container {
     }
     return new Promise(resolve => {
       this.scene.time.delayedCall(FLASH_HIT_DURATION, () => {
-        for (const child of paperdoll.list) {
+        for (const child of this.bodyView.list) {
           const img = child as Phaser.GameObjects.Image;
           if (img.clearTint) img.clearTint();
         }

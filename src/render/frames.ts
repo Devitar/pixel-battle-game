@@ -9,6 +9,17 @@ export const SHEET = {
   margin: 0,
 } as const;
 
+export const ENEMY_SHEET = {
+  key: 'enemy',
+  url: 'assets/sprites/enemy_sprites.png',
+  columns: 2,
+  rows: 2,
+  frameWidth: 16,
+  frameHeight: 16,
+  spacing: 1,
+  margin: 0,
+} as const;
+
 export type CategoryName =
   | 'character'
   | 'undergarment'

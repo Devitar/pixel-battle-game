@@ -71,12 +71,12 @@ describe('buildCombatState', () => {
   it('scale at 1.0x leaves stats unchanged', () => {
     const party = [createHero('knight', 'K', 'h0', 'quick', 'body1')];
     const encounter: Encounter = {
-      enemies: [{ enemyId: 'ghoul', slot: 1 }],
+      enemies: [{ enemyId: 'ghost', slot: 1 }],
       scale: FLAT_SCALE,
     };
     const state = buildCombatState(party, encounter);
     const e0 = state.combatants.find((c) => c.id === 'e0')!;
-    expect(e0.baseStats).toEqual(ENEMIES.ghoul.baseStats);
+    expect(e0.baseStats).toEqual(ENEMIES.ghost.baseStats);
   });
 
   it('round starts at 0', () => {

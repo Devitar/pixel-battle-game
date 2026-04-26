@@ -59,7 +59,7 @@ describe('swap', () => {
 
   it('throws on cross-side swap', () => {
     const p0 = makeHeroCombatant('knight', 1, 'p0');
-    const e0 = makeEnemyCombatant('ghoul', 1, 'e0');
+    const e0 = makeEnemyCombatant('ghost', 1, 'e0');
     expect(() => swap(p0, e0, [])).toThrow();
   });
 });
@@ -68,7 +68,7 @@ describe('collapseAfterDeath', () => {
   it('shifts living combatants forward after a death', () => {
     const e1 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
     const e2 = makeEnemyCombatant('skeleton_archer', 2, 'e1');
-    const e3 = makeEnemyCombatant('ghoul', 3, 'e2');
+    const e3 = makeEnemyCombatant('ghost', 3, 'e2');
     e1.isDead = true;
     const state = makeTestState([], [e1, e2, e3]);
     const events: CombatEvent[] = [];
@@ -94,7 +94,7 @@ describe('collapseAfterDeath', () => {
 describe('shuffle', () => {
   it('moves back-row enemy in slot 1 toward preferred range', () => {
     const e0 = makeEnemyCombatant('skeleton_archer', 1, 'e0');
-    const e1 = makeEnemyCombatant('ghoul', 2, 'e1');
+    const e1 = makeEnemyCombatant('ghost', 2, 'e1');
     const state = makeTestState([], [e0, e1]);
     const events: CombatEvent[] = [];
     shuffle(e0, state, events);

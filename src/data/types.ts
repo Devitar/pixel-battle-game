@@ -22,9 +22,10 @@ export type AbilityId =
   | 'dark_pact'
   | 'necrotic_wave'
   | 'lich_strike'
-  | 'curse_of_frailty';
+  | 'curse_of_frailty'
+  | 'chilling_touch';
 
-export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned';
+export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled';
 
 export type AbilityTag = 'radiant';
 
@@ -90,7 +91,8 @@ export interface ClassDef {
 export type EnemyId =
   | 'skeleton_warrior'
   | 'skeleton_archer'
-  | 'ghoul'
+  | 'ghost'
+  | 'zombie'
   | 'cultist'
   | 'bone_lich';
 
@@ -105,7 +107,6 @@ export interface EnemyDef {
   abilities: readonly AbilityId[];
   aiPriority: readonly AbilityId[];
   preferredSlots: readonly SlotIndex[];
-  spriteId: string;
 }
 
 export type DungeonId = 'crypt';
