@@ -4,10 +4,19 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Pixel Battle" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>Pixel Battle</title>
   </head>
   <body>
     <div id="game"></div>
+    <div id="rotate-prompt" role="alert" aria-live="polite">
+      <div class="rotate-prompt-icon" aria-hidden="true">&#x21BB;</div>
+      <div class="rotate-prompt-text">Please rotate your device to landscape</div>
+    </div>
+    <button id="fullscreen-toggle" type="button" aria-label="Toggle fullscreen">&#x26F6;</button>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

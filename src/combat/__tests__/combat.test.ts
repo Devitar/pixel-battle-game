@@ -37,7 +37,7 @@ describe('resolveCombat — scripted scenarios', () => {
     expect(result.outcome).toBe('player_victory');
   });
 
-  it('no-damage matchup times out at 30 rounds', () => {
+  it('extreme stalemate resolves via exhaustion (never times out)', () => {
     const hero = makeHeroCombatant('knight', 1, 'p0', {
       baseStats: { hp: 100, attack: 1, defense: 100, speed: 3 },
       currentHp: 100,
@@ -50,7 +50,9 @@ describe('resolveCombat — scripted scenarios', () => {
     });
     const initial = makeTestState([hero], [enemy]);
     const result = resolveCombat(initial, createRng(1));
-    expect(result.outcome).toBe('timeout');
+    expect(['player_victory', 'player_defeat']).toContain(result.outcome);
+    const exhaustionEvents = result.events.filter((e) => e.kind === 'exhaustion_applied');
+    expect(exhaustionEvents.length).toBeGreaterThan(0);
   });
 
   it('Priest mends a wounded ally on round 1', () => {
@@ -79,6 +81,81 @@ describe('resolveCombat — scripted scenarios', () => {
     expect(stunSkip).toBeDefined();
   });
 
+  it('emits exhaustion_applied at level 1 at the top of round 100', () => {
+    const hero = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 10000, attack: 1, defense: 1000, speed: 3 },
+      currentHp: 10000,
+      maxHp: 10000,
+    });
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 10000, attack: 1, defense: 1000, speed: 3 },
+      currentHp: 10000,
+      maxHp: 10000,
+    });
+    const initial = makeTestState([hero], [enemy]);
+    const result = resolveCombat(initial, createRng(1));
+    const exhaustionEvents = result.events.filter(
+      (e) => e.kind === 'exhaustion_applied',
+    ) as Array<{ kind: 'exhaustion_applied'; level: number }>;
+    expect(exhaustionEvents.length).toBeGreaterThan(0);
+    expect(exhaustionEvents[0].level).toBe(1);
+  });
+
+  it('ramps exhaustion level by 1 every 5 rounds after round 100', () => {
+    const hero = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 10000, attack: 1, defense: 1000, speed: 3 },
+      currentHp: 10000,
+      maxHp: 10000,
+    });
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 10000, attack: 1, defense: 1000, speed: 3 },
+      currentHp: 10000,
+      maxHp: 10000,
+    });
+    const initial = makeTestState([hero], [enemy]);
+    const result = resolveCombat(initial, createRng(1));
+    const exhaustionEvents = result.events.filter(
+      (e) => e.kind === 'exhaustion_applied',
+    ) as Array<{ kind: 'exhaustion_applied'; level: number }>;
+    for (let i = 0; i < exhaustionEvents.length; i++) {
+      expect(exhaustionEvents[i].level).toBe(i + 1);
+    }
+    expect(exhaustionEvents.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('emits no exhaustion events when combat ends before round 100', () => {
+    const hero = makeHeroCombatant('knight', 1, 'p0');
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    const initial = makeTestState([hero], [enemy]);
+    const result = resolveCombat(initial, createRng(1));
+    expect(result.outcome).toBe('player_victory');
+    const exhaustionEvents = result.events.filter((e) => e.kind === 'exhaustion_applied');
+    expect(exhaustionEvents).toHaveLength(0);
+  });
+
+  it('extreme stalemate always resolves below the 1000-round safety cap across seeds', () => {
+    for (const seed of [1, 7, 42, 99, 12345]) {
+      const hero = makeHeroCombatant('knight', 1, 'p0', {
+        baseStats: { hp: 100, attack: 1, defense: 100, speed: 3 },
+        currentHp: 100,
+        maxHp: 100,
+      });
+      const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+        baseStats: { hp: 100, attack: 1, defense: 100, speed: 3 },
+        currentHp: 100,
+        maxHp: 100,
+      });
+      const initial = makeTestState([hero], [enemy]);
+      const result = resolveCombat(initial, createRng(seed));
+      expect(['player_victory', 'player_defeat']).toContain(result.outcome);
+      const lastRoundEnd = [...result.events]
+        .reverse()
+        .find((e) => e.kind === 'round_end') as { kind: 'round_end'; round: number } | undefined;
+      expect(lastRoundEnd).toBeDefined();
+      expect(lastRoundEnd!.round).toBeLessThan(500);
+    }
+  });
+
   it('Full Crypt-boss scenario runs to completion', () => {
     const initial = makeTestState(
       [
@@ -93,7 +170,7 @@ describe('resolveCombat — scripted scenarios', () => {
       ],
     );
     const result = resolveCombat(initial, createRng(42));
-    expect(['player_victory', 'player_defeat', 'timeout']).toContain(result.outcome);
+    expect(['player_victory', 'player_defeat']).toContain(result.outcome);
     expect(result.events[result.events.length - 1].kind).toBe('combat_end');
   });
 });

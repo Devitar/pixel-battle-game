@@ -33,18 +33,18 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
 
-### 18 · Camp Screen (post-boss)
+### 20 · Combat speed toggle persists between combats
 
-- **What:** The risk / reward decision screen — shows the pack, the party condition, Leave / Press On buttons.
-- **Why:** The emotional centerpiece of the design. The whole gambling loop lands here.
-- **Tier:** 1
+- **What:** The combat scene's FF (1× / 3×) toggle currently resets to 1× on every new combat. Persist the player's last choice so they only have to click it once per session (or once ever).
+- **Why:** Players who prefer 3× playback have to re-toggle every fight — that's 4 clicks per floor in Tier 1 (3 combats + 1 boss), more in deeper floors. Pure friction; the toggle exists *because* the unmodified speed feels slow once you've seen the rhythm. Surfaced during task 18 (camp_screen) smoke testing.
+- **Tier:** 2 (QoL polish, not Tier 1 critical)
 - **Acceptance:**
-  - `src/scenes/camp_screen_scene.ts` shows current pack gold total and party hero cards with HP.
-  - Any Fallen heroes are listed (Tier 1: no equipment recovery since there's no gear flow, but the lost heroes are still named).
-  - **Leave** button banks pack gold to vault, returns survivors to roster, transitions to camp scene. Saves first.
-  - **Press On** button advances the floor in `RunState`, generates the next floor, transitions to dungeon scene. Saves first.
-  - **Replaces task 16's stub.** The current `camp_screen_scene.ts` shows the run summary as plain text and exposes only a `Return to Camp` button (which does the cashout work — bank gold, update HP, remove fallen). The rewrite must add the `Press On` button and replace the text summary with party `HeroCard`s. The cashout logic in `returnToCamp` moves into the new `Leave` handler essentially unchanged. (See task 16 HISTORY decisions.)
-- **Touches:** `src/scenes/camp_screen_scene.ts`.
+  - Player toggles to 3× in combat A. Combat A ends. Combat B starts. Speed is still 3×; the FF button reflects 3×; tweens/time are scaled.
+  - The `tweens.timeScale = 1` / `time.timeScale = 1` reset in the shutdown handler (`combat_scene.ts:82-83`) is reconciled — either kept (and the new state restored on the next `create()`) or removed (with the next scene's expectations updated).
+  - **Open design call (resolve at brainstorm time):** in-session only (a module-level variable in `combat_scene.ts`, lost on page reload) vs cross-session (saved to `appState` as a top-level `preferences: { combatSpeed: 1 | 3 }` — survives reload). Cross-session is the standard ARPG/auto-battler convention; in-session is simpler and probably enough. Either is acceptable for the first pass.
+  - If cross-session: extend the save schema (bump version if needed), default new saves to `1`, no migration needed for existing saves (treat missing as `1`).
+- **Touches:** `src/scenes/combat_scene.ts` (read persisted value in `create()`, write on toggle, drop or adjust shutdown reset). If cross-session: also `src/save/save.ts` (schema), `src/scenes/app_state.ts` (no change — `appState.update` already handles it), possibly `src/save/migrations.ts`.
+- **Source:** ad-hoc, smoke testing during task 18.
 
 ### 19 · Enemy art for Crypt
 

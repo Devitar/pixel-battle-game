@@ -46,6 +46,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     canCastFrom: [2, 3],
     target: { side: 'enemy', slots: [3, 4], pick: 'first' },
     effects: [{ kind: 'damage', power: 1.4 }],
+    cooldown: 2,
   },
   volley: {
     id: 'volley',
@@ -60,6 +61,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     canCastFrom: [2, 3],
     target: { side: 'enemy', filter: { kind: 'lacksStatus', statusId: 'marked' }, pick: 'first' },
     effects: [{ kind: 'mark', damageBonus: 0.5, duration: 2, statusId: 'marked' }],
+    cooldown: 2,
   },
 
   priest_strike: {
@@ -75,6 +77,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     canCastFrom: [2, 3],
     target: { side: 'ally', filter: { kind: 'hurt' }, pick: 'lowestHp' },
     effects: [{ kind: 'heal', power: 1.2 }],
+    cooldown: 2,
   },
   smite: {
     id: 'smite',
@@ -129,6 +132,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     canCastFrom: [2, 3, 4],
     target: { side: 'ally', filter: { kind: 'hurt' }, pick: 'lowestHp' },
     effects: [{ kind: 'heal', power: 1.0 }],
+    cooldown: 2,
   },
   necrotic_wave: {
     id: 'necrotic_wave',

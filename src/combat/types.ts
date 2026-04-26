@@ -38,6 +38,7 @@ export interface Combatant {
   currentHp: number;
   maxHp: number;
   statuses: Record<string, StatusInstance>;
+  cooldowns: Partial<Record<AbilityId, number>>;
   abilities: readonly AbilityId[];
   aiPriority: readonly AbilityId[];
   preferredSlots?: readonly SlotIndex[];
@@ -49,9 +50,10 @@ export interface Combatant {
 export interface CombatState {
   combatants: Combatant[];
   round: number;
+  exhaustionLevel: number;
 }
 
-export type CombatOutcome = 'player_victory' | 'player_defeat' | 'timeout';
+export type CombatOutcome = 'player_victory' | 'player_defeat';
 
 export type CombatEvent =
   | { kind: 'combat_start'; party: readonly CombatantId[]; enemies: readonly CombatantId[] }
@@ -67,6 +69,7 @@ export type CombatEvent =
   | { kind: 'position_changed'; combatantId: CombatantId; fromSlot: SlotIndex; toSlot: SlotIndex; reason: 'shove' | 'pull' | 'swap' | 'collapse' | 'shuffle' }
   | { kind: 'death'; combatantId: CombatantId }
   | { kind: 'round_end'; round: number }
+  | { kind: 'exhaustion_applied'; level: number }
   | { kind: 'combat_end'; outcome: CombatOutcome };
 
 export interface CombatResult {

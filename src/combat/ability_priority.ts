@@ -12,6 +12,7 @@ export interface PickedAction {
 export function pickAbility(caster: Combatant, state: CombatState, rng: Rng): PickedAction | null {
   for (const abilityId of caster.aiPriority) {
     const ability = ABILITIES[abilityId];
+    if ((caster.cooldowns[abilityId] ?? 0) > 0) continue;
     if (!ability.canCastFrom.includes(caster.slot)) continue;
     const targetIds = resolveTargetSelector(ability.target, caster, state, rng);
     if (targetIds.length === 0) continue;

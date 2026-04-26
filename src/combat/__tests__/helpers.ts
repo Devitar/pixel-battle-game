@@ -11,6 +11,7 @@ export function makeTestState(
   return {
     combatants: [...heroes, ...enemies],
     round: 0,
+    exhaustionLevel: 0,
   };
 }
 

@@ -10,6 +10,7 @@ import { MainScene } from './scenes/dev/main_scene';
 import { DungeonScene } from './scenes/dungeon_scene';
 import { NoticeboardPanelScene } from './scenes/noticeboard_panel_scene';
 import { TavernPanelScene } from './scenes/tavern_panel_scene';
+import { installPwaPrompt } from './util/pwa_install_prompt';
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -35,3 +36,38 @@ new Phaser.Game({
     ExplorerScene,
   ],
 });
+
+const fullscreenButton = document.getElementById('fullscreen-toggle');
+const fsRoot = document.documentElement as HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void>;
+};
+const fullscreenSupported = !!(fsRoot.requestFullscreen || fsRoot.webkitRequestFullscreen);
+if (fullscreenButton && !fullscreenSupported) {
+  fullscreenButton.style.display = 'none';
+}
+if (fullscreenButton && fullscreenSupported) {
+  fullscreenButton.addEventListener('click', async () => {
+    fullscreenButton.textContent = '…';
+    try {
+      const fsDoc = document as Document & {
+        webkitFullscreenElement?: Element;
+        webkitExitFullscreen?: () => Promise<void>;
+      };
+      const isFs = !!(document.fullscreenElement ?? fsDoc.webkitFullscreenElement);
+      if (isFs) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (fsDoc.webkitExitFullscreen) await fsDoc.webkitExitFullscreen();
+      } else {
+        if (fsRoot.requestFullscreen) await fsRoot.requestFullscreen();
+        else if (fsRoot.webkitRequestFullscreen) await fsRoot.webkitRequestFullscreen();
+      }
+      fullscreenButton.textContent = '⛶';
+    } catch (err) {
+      fullscreenButton.textContent = '⛶';
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Fullscreen failed: ${msg}`);
+    }
+  });
+}
+
+installPwaPrompt();

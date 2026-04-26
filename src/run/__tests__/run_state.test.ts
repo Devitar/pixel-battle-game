@@ -28,7 +28,7 @@ function mockCombatResult(
       isDead: finalHp <= 0,
     });
   });
-  const state: CombatState = { combatants, round: 1 };
+  const state: CombatState = { combatants, round: 1, exhaustionLevel: 0 };
   return { finalState: state, events: [], outcome };
 }
 
@@ -118,7 +118,7 @@ describe('completeCombat — victory on boss node', () => {
   });
 });
 
-describe('completeCombat — defeat or timeout', () => {
+describe('completeCombat — defeat', () => {
   it('player_defeat triggers wipe', () => {
     const rs = startRun('crypt', makeParty(), 1, createRng(1));
     const result = mockCombatResult(rs.party, [0, 0, 0], 'player_defeat');
@@ -128,14 +128,6 @@ describe('completeCombat — defeat or timeout', () => {
     expect(rs2.pack).toEqual({ gold: 0 });
     expect(wipe).toBeDefined();
     expect(wipe?.packLost).toEqual({ gold: 0 });
-    expect(wipe?.heroesLost).toHaveLength(3);
-  });
-
-  it('timeout triggers wipe', () => {
-    const rs = startRun('crypt', makeParty(), 1, createRng(1));
-    const result = mockCombatResult(rs.party, [15, 10, 8], 'timeout');
-    const { wipe } = completeCombat(rs, result);
-    expect(wipe).toBeDefined();
     expect(wipe?.heroesLost).toHaveLength(3);
   });
 

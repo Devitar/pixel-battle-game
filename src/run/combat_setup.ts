@@ -45,5 +45,5 @@ export function buildCombatState(
     );
   }
 
-  return { combatants, round: 0 };
+  return { combatants, round: 0, exhaustionLevel: 0 };
 }
