@@ -1,5 +1,16 @@
 import * as Phaser from 'phaser';
 import { SHEET, CATEGORIES, frameAt, firstFrameOf, type CategoryName } from '../../render/frames';
+import { SPRITE_NAMES } from '../../render/sprite_names.generated';
+
+const FRAME_TO_NAME: Map<number, string> = (() => {
+  const map = new Map<number, string>();
+  for (const category of Object.values(SPRITE_NAMES) as Record<string, number>[]) {
+    for (const [name, frame] of Object.entries(category)) {
+      if (!map.has(frame)) map.set(frame, name);
+    }
+  }
+  return map;
+})();
 
 const CATEGORY_ORDER: readonly CategoryName[] = [
   'character',
@@ -138,8 +149,9 @@ export class ExplorerScene extends Phaser.Scene {
     const sheetCol = firstCol + this.cursorCol;
     const frame = frameAt(sheetCol, this.cursorRow);
 
+    const name = FRAME_TO_NAME.get(frame) ?? '(unnamed)';
     this.headerText.setText(
-      `${category}  [cols ${firstCol}–${lastCol}]    frame ${frame}   col ${sheetCol}  row ${this.cursorRow}`,
+      `${category}  [cols ${firstCol}–${lastCol}]    ${name}    frame ${frame}   col ${sheetCol}  row ${this.cursorRow}`,
     );
     this.spritePreview.setFrame(frame);
     this.dressedOverlay.setFrame(frame);

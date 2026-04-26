@@ -7,7 +7,7 @@ describe('resolveCombat — determinism', () => {
   it('produces identical events and final state for the same seed', () => {
     const initial = makeTestState(
       [makeHeroCombatant('knight', 1, 'p0'), makeHeroCombatant('archer', 2, 'p1')],
-      [makeEnemyCombatant('skeleton_warrior', 1, 'e0'), makeEnemyCombatant('ghoul', 2, 'e1')],
+      [makeEnemyCombatant('skeleton_warrior', 1, 'e0'), makeEnemyCombatant('ghost', 2, 'e1')],
     );
     const a = resolveCombat(initial, createRng(123));
     const b = resolveCombat(initial, createRng(123));

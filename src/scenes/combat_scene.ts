@@ -39,7 +39,7 @@ export class CombatScene extends Phaser.Scene {
   create(): void {
     this.actors = new Map();
     this.playback = undefined;
-    this.speed = 1;
+    this.speed = appState.get().preferences?.combatSpeed ?? 1;
 
     const state = appState.get();
     if (!state.runState || state.runState.status !== 'in_dungeon') {
@@ -72,6 +72,7 @@ export class CombatScene extends Phaser.Scene {
       combatState,
       displayNames,
     );
+    this.playback.setSpeed(this.speed);
     this.playback.onComplete = () => {
       setCombatResult(result, rng.getState());
       this.scene.start('dungeon');
@@ -121,9 +122,9 @@ export class CombatScene extends Phaser.Scene {
     this.ffBg = this.add
       .rectangle(FF_X, FF_Y, FF_W, FF_H, 0x222222)
       .setOrigin(1, 0)
-      .setStrokeStyle(2, 0x666666);
+      .setStrokeStyle(2, this.speed === 3 ? 0x44cc44 : 0x666666);
     this.ffLabel = this.add
-      .text(FF_X - FF_W / 2, FF_Y + FF_H / 2, '1×', {
+      .text(FF_X - FF_W / 2, FF_Y + FF_H / 2, `${this.speed}×`, {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#ffffff',
@@ -141,6 +142,10 @@ export class CombatScene extends Phaser.Scene {
     this.playback?.setSpeed(this.speed);
     this.ffLabel.setText(`${this.speed}×`);
     this.ffBg.setStrokeStyle(2, this.speed === 3 ? 0x44cc44 : 0x666666);
+    appState.update((s) => ({
+      ...s,
+      preferences: { ...s.preferences, combatSpeed: this.speed },
+    }));
   }
 
   private buildDisplayNames(

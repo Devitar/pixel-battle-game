@@ -73,7 +73,7 @@ describe('composeCombatEncounter', () => {
   });
 
   it('slot assignment: front-liners ascending, back-liners descending (2 front + 1 back)', () => {
-    const picks: EnemyId[] = ['skeleton_warrior', 'ghoul', 'skeleton_archer'];
+    const picks: EnemyId[] = ['skeleton_warrior', 'ghost', 'skeleton_archer'];
     let pickIdx = 0;
     const mockRng: Rng = {
       next: () => 0,
@@ -91,7 +91,7 @@ describe('composeCombatEncounter', () => {
     const bySlot = [...enc.enemies].sort((a, b) => a.slot - b.slot);
     expect(bySlot[0].enemyId).toBe('skeleton_warrior');
     expect(bySlot[0].slot).toBe(1);
-    expect(bySlot[1].enemyId).toBe('ghoul');
+    expect(bySlot[1].enemyId).toBe('ghost');
     expect(bySlot[1].slot).toBe(2);
     expect(bySlot[2].enemyId).toBe('skeleton_archer');
     expect(bySlot[2].slot).toBe(3);

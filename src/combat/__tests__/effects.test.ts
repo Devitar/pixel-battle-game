@@ -65,7 +65,7 @@ describe('damage effect', () => {
   it('lethal damage emits death and collapses the line', () => {
     const p0 = makeHeroCombatant('knight', 1, 'p0');
     const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', { currentHp: 2 });
-    const e1 = makeEnemyCombatant('ghoul', 2, 'e1');
+    const e1 = makeEnemyCombatant('ghost', 2, 'e1');
     const state = makeTestState([p0], [e0, e1]);
     const events: CombatEvent[] = [];
     applyAbility(ABILITIES.knight_slash, p0, ['e0'], state, rng, events);

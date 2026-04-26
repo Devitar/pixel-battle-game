@@ -119,6 +119,16 @@ export const ABILITIES: Record<AbilityId, Ability> = {
       { kind: 'debuff', stat: 'attack', delta: -1, duration: 2, statusId: 'rotting' },
     ],
   },
+  chilling_touch: {
+    id: 'chilling_touch',
+    name: 'Chilling Touch',
+    canCastFrom: [1, 2],
+    target: { side: 'enemy', slots: [1] },
+    effects: [
+      { kind: 'damage', power: 0.9 },
+      { kind: 'debuff', stat: 'speed', delta: -1, duration: 2, statusId: 'chilled' },
+    ],
+  },
   dark_bolt: {
     id: 'dark_bolt',
     name: 'Dark Bolt',

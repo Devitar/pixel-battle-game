@@ -39,7 +39,7 @@ describe('resolveTargetSelector', () => {
   it('excludes the dead', () => {
     const p0 = makeHeroCombatant('knight', 1, 'p0');
     const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', { isDead: true });
-    const e1 = makeEnemyCombatant('ghoul', 2, 'e1');
+    const e1 = makeEnemyCombatant('ghost', 2, 'e1');
     const state = makeTestState([p0], [e0, e1]);
     expect(resolveTargetSelector({ side: 'enemy' }, p0, state, rng)).toEqual(['e1']);
   });
@@ -47,7 +47,7 @@ describe('resolveTargetSelector', () => {
   it('slots: [1] filters to slot 1', () => {
     const p0 = makeHeroCombatant('knight', 1, 'p0');
     const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
-    const e1 = makeEnemyCombatant('ghoul', 2, 'e1');
+    const e1 = makeEnemyCombatant('ghost', 2, 'e1');
     const state = makeTestState([p0], [e0, e1]);
     expect(resolveTargetSelector({ side: 'enemy', slots: [1] }, p0, state, rng)).toEqual(['e0']);
   });
@@ -55,7 +55,7 @@ describe('resolveTargetSelector', () => {
   it("slots: 'all' keeps everyone", () => {
     const p0 = makeHeroCombatant('knight', 1, 'p0');
     const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
-    const e1 = makeEnemyCombatant('ghoul', 2, 'e1');
+    const e1 = makeEnemyCombatant('ghost', 2, 'e1');
     const state = makeTestState([p0], [e0, e1]);
     expect(resolveTargetSelector({ side: 'enemy', slots: 'all' }, p0, state, rng).sort()).toEqual(
       ['e0', 'e1'].sort(),
@@ -65,7 +65,7 @@ describe('resolveTargetSelector', () => {
   it("slots: 'furthest' keeps only the highest-occupied slot", () => {
     const p0 = makeHeroCombatant('knight', 1, 'p0');
     const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
-    const e1 = makeEnemyCombatant('ghoul', 2, 'e1');
+    const e1 = makeEnemyCombatant('ghost', 2, 'e1');
     const e2 = makeEnemyCombatant('skeleton_archer', 3, 'e2');
     const state = makeTestState([p0], [e0, e1, e2]);
     expect(resolveTargetSelector({ side: 'enemy', slots: 'furthest' }, p0, state, rng)).toEqual([
@@ -96,7 +96,7 @@ describe('resolveTargetSelector', () => {
       effect: { kind: 'mark', damageBonus: 0.5, duration: 2, statusId: 'marked' },
       sourceId: 'p0',
     };
-    const e1 = makeEnemyCombatant('ghoul', 2, 'e1');
+    const e1 = makeEnemyCombatant('ghost', 2, 'e1');
     const state = makeTestState([p0], [e0, e1]);
     const result = resolveTargetSelector(
       { side: 'enemy', filter: { kind: 'lacksStatus', statusId: 'marked' }, pick: 'first' },
@@ -139,7 +139,7 @@ describe('resolveTargetSelector', () => {
   it("pick: 'first' returns lowest-slot candidate", () => {
     const p0 = makeHeroCombatant('knight', 1, 'p0');
     const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
-    const e1 = makeEnemyCombatant('ghoul', 2, 'e1');
+    const e1 = makeEnemyCombatant('ghost', 2, 'e1');
     const state = makeTestState([p0], [e0, e1]);
     const result = resolveTargetSelector(
       { side: 'enemy', slots: 'all', pick: 'first' },
