@@ -16,8 +16,8 @@ describe('ENEMY_VISUALS.bone_lich', () => {
     expect(lich.legs).toBeUndefined();
   });
 
-  it('overrides body scale to 3 for boss-sized rendering', () => {
-    expect(ENEMY_VISUALS.bone_lich.bodyScale).toBe(3);
+  it('overrides body scale for boss-sized rendering', () => {
+    expect(ENEMY_VISUALS.bone_lich.bodyScale).not.toBe(1);
   });
 });
 

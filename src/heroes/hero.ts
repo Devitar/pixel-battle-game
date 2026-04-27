@@ -1,6 +1,6 @@
 import { CLASSES } from '../data/classes';
 import { TRAITS } from '../data/traits';
-import type { ClassId, TraitDef, TraitId } from '../data/types';
+import type { ClassId, TraitDef, TraitId, Wound } from '../data/types';
 import type { Stats } from '../combat/types';
 
 export interface Hero {
@@ -12,6 +12,7 @@ export interface Hero {
   maxHp: number;
   traitId: TraitId;
   bodySpriteId: string;
+  wounds: Wound[];
 }
 
 export function createHero(
@@ -32,6 +33,7 @@ export function createHero(
     maxHp,
     traitId,
     bodySpriteId,
+    wounds: [],
   };
 }
 

@@ -29,6 +29,23 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-26 · Wounds system + schema reset to v1
+
+- **Why:** Tier 2 drip cost per gdd §7 — wounds nudge the player toward Hospital trips and create cumulative-damage tension across runs without a hard wall. First persistent-across-runs hero state outside of equipment/level.
+- **Decisions:**
+  - Trigger fires inside `applyDamage` (not end-of-combat) on (heavy hit ≥30% maxHp) OR crit, gated by 30% chance, hero-only, non-lethal-only. *Why:* user wanted immediate feedback during combat AND wanted crits to wound regardless of damage size; gating on non-lethal avoids "the dead can't be wounded" weirdness.
+  - Wounds emit as `wound_inflicted` events; the post-combat handler in `completeCombat` walks events and appends to `Hero.wounds`. *Why:* keeps the combat resolver pure-events; mutation lives at the run-state boundary.
+  - Two wound shapes: `statDelta` (most wounds) and `damageTakenMult` (Bruised — multiplier on incoming damage). *Why:* Bruised semantically isn't a stat reduction; modeling it as a defense debuff would scale wrong against big hits. Added `Combatant.damageTakenMultiplier?: number`, applied in `applyDamage` after exhaustion.
+  - End-of-run wound tick fires on BOTH cashout AND wipe (in scene handlers). *Why:* benched heroes shouldn't death-spiral when the active party keeps wiping; passive heal is a minor mercy.
+  - Wounds stack additively (2 × Bruised = 1.40× damage taken). *Why:* simpler than capping; player's choice to leave them untreated. Hospital pressure is the brake.
+  - **Schema reset to `CURRENT_SCHEMA_VERSION = 1`** (was 5); migrations cleared. *Why:* per the user, version inflation pre-launch was meaningless. New policy: keep schema pinned at 1 until launch; the loader's "newer-than-supported" check naturally discards stale browser saves. Memory updated.
+- **Surprises / lessons:**
+  - **Wound trigger has to skip the lethal branch.** First test failed because the heavy hit (20 dmg vs 20 maxHp) was lethal — `if (lethal)` returns before the wound roll, so the dead hero never got wounded. Fixed in tests by ensuring damage is heavy-but-not-lethal. The non-lethal gate in code is correct; the test fixture was wrong. Future "trigger-on-X" mechanics should check this same edge case explicitly.
+  - **`describeEffect` exhaustiveness needed updating** for the new effect kinds (`moveToSlot`, `poison`, etc. — caught earlier; this task didn't add new effect kinds but the pattern is now well-known: any AbilityEffect kind addition surfaces as a `tsc` error in the describe switch. Run `npm run build` not just `npm test`).
+  - **Stat-display ambiguity discovered late.** With wounds applied at combat-build, `Combatant.baseStats` shows wounded stats. The original `Hero.baseStats` is preserved untouched. Hospital UI (Cluster B) will need to read both — Hero.baseStats for "true" stats, Hero.wounds for the active modifications, then derive effective. Worth surfacing now so the UI task doesn't re-discover.
+  - The post-combat handler is in `run_state.ts:completeCombat` — same place that updates HP and splits survivors/fallen. Co-located with related Hero-state-after-combat logic. Pattern for future "combat events that mutate hero state": pipe through completeCombat.
+- **Source:** TODO Cluster A task 3 (gdd §7 + §10 Tier 2). Spec at `docs/superpowers/specs/2026-04-26-wounds-system-design.md`. Hospital UI is Cluster B task 1; wound display in hero card is Cluster B task 9.
+
 ### 2026-04-26 · Class: Mage + generic chance-on-effect
 
 - **What shipped:**

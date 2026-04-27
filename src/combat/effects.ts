@@ -1,4 +1,5 @@
 import type { Ability, AbilityEffect } from '../data/types';
+import { HEAVY_HIT_WOUND_THRESHOLD, WOUND_CHANCE_PERCENT, WOUND_IDS } from '../data/wounds';
 import type { Rng } from '../util/rng';
 import { collapseAfterDeath, moveTo, pull, shove, swap } from './positions';
 import { getEffectiveStat } from './statuses';
@@ -35,10 +36,14 @@ function applyDamage(
   const wasCrit = rng.percent(getEffectiveStat(caster, 'crit') + (effect.bonusCrit ?? 0));
   if (wasCrit) raw = raw * 2;
   const final = Math.max(1, raw - getEffectiveStat(target, 'defense'));
-  const amplified =
+  const exhAmp =
     target.side === 'player' && state.exhaustionLevel > 0
       ? Math.max(1, Math.round(final * (1 + 0.10 * state.exhaustionLevel)))
       : final;
+  const amplified =
+    target.damageTakenMultiplier !== undefined && target.damageTakenMultiplier !== 1
+      ? Math.max(1, Math.round(exhAmp * target.damageTakenMultiplier))
+      : exhAmp;
   target.currentHp -= amplified;
   const lethal = target.currentHp <= 0;
   events.push({
@@ -62,6 +67,12 @@ function applyDamage(
         targetId: caster.id,
         amount: actual,
       });
+    }
+  } else if (target.kind === 'hero') {
+    const isHeavy = amplified >= target.maxHp * HEAVY_HIT_WOUND_THRESHOLD;
+    if ((isHeavy || wasCrit) && rng.percent(WOUND_CHANCE_PERCENT)) {
+      const woundId = rng.pick(WOUND_IDS);
+      events.push({ kind: 'wound_inflicted', combatantId: target.id, woundId });
     }
   }
 }

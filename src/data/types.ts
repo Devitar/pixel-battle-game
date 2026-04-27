@@ -97,6 +97,29 @@ export interface StarterLoadout {
   shield?: string;
 }
 
+export type WoundId =
+  | 'bruised'
+  | 'hobbled'
+  | 'concussed'
+  | 'winded'
+  | 'unsteady'
+  | 'broken_bone';
+
+export type WoundEffect =
+  | { kind: 'statDelta'; stat: BuffableStat; delta: number }
+  | { kind: 'damageTakenMult'; multiplier: number };
+
+export interface WoundDef {
+  id: WoundId;
+  name: string;
+  effect: WoundEffect;
+}
+
+export interface Wound {
+  id: WoundId;
+  runsRemaining: number;
+}
+
 export interface ClassDef {
   id: ClassId;
   name: string;

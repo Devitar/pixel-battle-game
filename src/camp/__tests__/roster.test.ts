@@ -8,6 +8,8 @@ import {
   getHero,
   listHeroes,
   removeHero,
+  tickRosterWounds,
+  treatHeroWound,
   updateHero,
 } from '../roster';
 
@@ -114,5 +116,58 @@ describe('canAdd', () => {
     let r = createRoster(1);
     r = addHero(r, createHero('knight', 'A', 'h1', 'quick', 'body1'));
     expect(canAdd(r)).toBe(false);
+  });
+});
+
+describe('tickRosterWounds', () => {
+  it('decrements runsRemaining on every wound by 1', () => {
+    const hero = createHero('knight', 'A', 'h0', 'quick', 'body1');
+    hero.wounds = [
+      { id: 'bruised', runsRemaining: 5 },
+      { id: 'winded', runsRemaining: 3 },
+    ];
+    const roster = addHero(createRoster(), hero);
+    const next = tickRosterWounds(roster);
+    expect(next.heroes[0].wounds).toEqual([
+      { id: 'bruised', runsRemaining: 4 },
+      { id: 'winded', runsRemaining: 2 },
+    ]);
+  });
+
+  it('removes wounds whose runsRemaining hits 0', () => {
+    const hero = createHero('knight', 'A', 'h0', 'quick', 'body1');
+    hero.wounds = [
+      { id: 'bruised', runsRemaining: 1 },
+      { id: 'winded', runsRemaining: 3 },
+    ];
+    const roster = addHero(createRoster(), hero);
+    const next = tickRosterWounds(roster);
+    expect(next.heroes[0].wounds).toEqual([{ id: 'winded', runsRemaining: 2 }]);
+  });
+
+  it('hero with no wounds is unchanged', () => {
+    const hero = createHero('knight', 'A', 'h0', 'quick', 'body1');
+    const roster = addHero(createRoster(), hero);
+    const next = tickRosterWounds(roster);
+    expect(next.heroes[0].wounds).toEqual([]);
+  });
+});
+
+describe('treatHeroWound', () => {
+  it('removes the wound at the given index', () => {
+    const hero = createHero('knight', 'A', 'h0', 'quick', 'body1');
+    hero.wounds = [
+      { id: 'bruised', runsRemaining: 5 },
+      { id: 'winded', runsRemaining: 3 },
+    ];
+    const treated = treatHeroWound(hero, 0);
+    expect(treated.wounds).toEqual([{ id: 'winded', runsRemaining: 3 }]);
+  });
+
+  it('throws on invalid index', () => {
+    const hero = createHero('knight', 'A', 'h0', 'quick', 'body1');
+    hero.wounds = [{ id: 'bruised', runsRemaining: 5 }];
+    expect(() => treatHeroWound(hero, 1)).toThrow();
+    expect(() => treatHeroWound(hero, -1)).toThrow();
   });
 });

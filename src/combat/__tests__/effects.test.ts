@@ -700,3 +700,192 @@ describe('chance field', () => {
     expect(e0.statuses['stunned']).toBeUndefined();
   });
 });
+
+describe('wound_inflicted event', () => {
+  it('heavy hit (>=30% maxHp) on hero rolls wound chance — fires when rng allows', () => {
+    const ability = {
+      id: 'bone_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0 }],
+    };
+    // Try seeds until we find one that produces a wound (wound chance is 30%).
+    let foundWound = false;
+    for (let seed = 1; seed <= 50; seed++) {
+      const localP = makeHeroCombatant('knight', 1, 'p0', {
+        baseStats: { hp: 60, attack: 0, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+        currentHp: 60,
+        maxHp: 60,
+      });
+      const localE = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+        baseStats: { hp: 100, attack: 20, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+        currentHp: 100,
+        maxHp: 100,
+      });
+      const localState = makeTestState([localP], [localE]);
+      const events: CombatEvent[] = [];
+      applyAbility(ability, localE, ['p0'], localState, createRng(seed), events);
+      // 20 dmg vs 60 maxHp = 33% — heavy, non-lethal.
+      if (!localP.isDead && events.find((e) => e.kind === 'wound_inflicted')) {
+        foundWound = true;
+        break;
+      }
+    }
+    expect(foundWound).toBe(true);
+  });
+
+  it('light hit (<30% maxHp) on hero never rolls a wound when not a crit', () => {
+    const ability = {
+      id: 'bone_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0 }],
+    };
+    // 1 dmg out of 100 maxHp = 1% — way below threshold. Try many seeds; expect no wound across all.
+    for (let seed = 1; seed <= 30; seed++) {
+      const localP = makeHeroCombatant('knight', 1, 'p0', {
+        baseStats: { hp: 100, attack: 0, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+        currentHp: 100,
+        maxHp: 100,
+      });
+      const localE = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+        baseStats: { hp: 100, attack: 1, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+        currentHp: 100,
+        maxHp: 100,
+      });
+      const localState = makeTestState([localP], [localE]);
+      const events: CombatEvent[] = [];
+      applyAbility(ability, localE, ['p0'], localState, createRng(seed), events);
+      expect(events.find((e) => e.kind === 'wound_inflicted')).toBeUndefined();
+    }
+  });
+
+  it('crit on hero can trigger wound regardless of damage size', () => {
+    // Force crit via bonusCrit: 100. Hit is small but crit triggers wound roll.
+    const ability = {
+      id: 'bone_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0, bonusCrit: 100 }],
+    };
+    let foundWound = false;
+    for (let seed = 1; seed <= 50; seed++) {
+      const p = makeHeroCombatant('knight', 1, 'p0', {
+        baseStats: { hp: 100, attack: 0, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+        currentHp: 100,
+        maxHp: 100,
+      });
+      const e = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+        baseStats: { hp: 100, attack: 1, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+        currentHp: 100,
+        maxHp: 100,
+      });
+      const state = makeTestState([p], [e]);
+      const events: CombatEvent[] = [];
+      applyAbility(ability, e, ['p0'], state, createRng(seed), events);
+      if (!p.isDead && events.find((e) => e.kind === 'wound_inflicted')) {
+        foundWound = true;
+        break;
+      }
+    }
+    expect(foundWound).toBe(true);
+  });
+
+  it('hits on enemy targets never roll wounds (hero-only)', () => {
+    const heroStats = { hp: 20, attack: 100, defense: 0, speed: 3, mind: 0, crit: 100, dodge: 0 };
+    const enemyStats = { hp: 1000, attack: 0, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 };
+    const ability = {
+      id: 'knight_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0, bonusCrit: 100 }],
+    };
+    for (let seed = 1; seed <= 20; seed++) {
+      const events: CombatEvent[] = [];
+      const localState = makeTestState(
+        [makeHeroCombatant('knight', 1, 'p0', { baseStats: { ...heroStats }, currentHp: 20, maxHp: 20 })],
+        [makeEnemyCombatant('skeleton_warrior', 1, 'e0', { baseStats: { ...enemyStats }, currentHp: 1000, maxHp: 1000 })],
+      );
+      applyAbility(ability, localState.combatants[0], ['e0'], localState, createRng(seed), events);
+      expect(events.find((e) => e.kind === 'wound_inflicted')).toBeUndefined();
+    }
+  });
+
+  it('lethal hit does not roll a wound (dead heroes can not be wounded)', () => {
+    const ability = {
+      id: 'bone_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0 }],
+    };
+    for (let seed = 1; seed <= 20; seed++) {
+      const p = makeHeroCombatant('knight', 1, 'p0', {
+        baseStats: { hp: 5, attack: 0, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+        currentHp: 5,
+        maxHp: 5,
+      });
+      const e = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+        baseStats: { hp: 100, attack: 100, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+        currentHp: 100,
+        maxHp: 100,
+      });
+      const state = makeTestState([p], [e]);
+      const events: CombatEvent[] = [];
+      applyAbility(ability, e, ['p0'], state, createRng(seed), events);
+      // p0 should be dead from a 100-attack hit on 5 hp
+      expect(p.isDead).toBe(true);
+      expect(events.find((e) => e.kind === 'wound_inflicted')).toBeUndefined();
+    }
+  });
+});
+
+describe('damageTakenMultiplier', () => {
+  it('multiplies amplified damage by the damageTakenMultiplier (1.20 × 4 = 5)', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      damageTakenMultiplier: 1.20,
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 4, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const ability = {
+      id: 'bone_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0 }],
+    };
+    const events: CombatEvent[] = [];
+    applyAbility(ability, e0, ['p0'], state, rng, events);
+    const dmg = events.find((e) => e.kind === 'damage_applied') as { amount: number };
+    // raw 4 × 1.0 = 4, no defense, exhaustion 0 → exhAmp 4. Then × 1.20 = 4.8 → round = 5.
+    expect(dmg.amount).toBe(5);
+  });
+
+  it('no multiplier (undefined) means damage unchanged', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 4, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const ability = {
+      id: 'bone_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0 }],
+    };
+    const events: CombatEvent[] = [];
+    applyAbility(ability, e0, ['p0'], state, rng, events);
+    const dmg = events.find((e) => e.kind === 'damage_applied') as { amount: number };
+    expect(dmg.amount).toBe(4);
+  });
+});

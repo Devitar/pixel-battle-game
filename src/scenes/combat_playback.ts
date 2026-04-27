@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { ABILITIES } from '../data/abilities';
 import type { AbilityId, SlotIndex, StatusId } from '../data/types';
+import { WOUNDS } from '../data/wounds';
 import type {
   CombatantId,
   CombatEvent,
@@ -133,6 +134,7 @@ export class CombatPlayback {
       case 'round_end': return this.onRoundEnd();
       case 'exhaustion_applied': return this.onExhaustionApplied();
       case 'combat_end': return this.onCombatEnd();
+      case 'wound_inflicted': return this.onWoundInflicted(ev);
     }
   }
 
@@ -259,6 +261,17 @@ export class CombatPlayback {
     target?.spawnNumber('Miss!', '#aaccff');
     if (targetEntry) {
       this.appendLog(` — ${targetEntry.displayName} dodged`);
+    }
+    return 1;
+  }
+
+  private async onWoundInflicted(ev: Extract<CombatEvent, { kind: 'wound_inflicted' }>): Promise<number> {
+    const target = this.actors.get(ev.combatantId);
+    const targetEntry = this.running.get(ev.combatantId);
+    const woundName = WOUNDS[ev.woundId].name;
+    target?.spawnNumber(`${woundName}!`, '#cc4422');
+    if (targetEntry) {
+      this.appendLog(` — ${targetEntry.displayName} wounded: ${woundName}`);
     }
     return 1;
   }

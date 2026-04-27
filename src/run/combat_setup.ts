@@ -1,9 +1,32 @@
 import { ENEMIES } from '../data/enemies';
-import type { EnemyId, SlotIndex } from '../data/types';
+import type { EnemyId, SlotIndex, Wound } from '../data/types';
+import { WOUNDS } from '../data/wounds';
 import { createEnemyCombatant, createHeroCombatant } from '../combat/combatant';
 import type { CombatState, Combatant, Stats } from '../combat/types';
 import type { Encounter, ScaleFactors } from '../dungeon/node';
 import type { Hero } from '../heroes/hero';
+
+function applyWoundsToStats(base: Stats, wounds: readonly Wound[]): Stats {
+  const result: Stats = { ...base };
+  for (const wound of wounds) {
+    const effect = WOUNDS[wound.id].effect;
+    if (effect.kind === 'statDelta') {
+      result[effect.stat] += effect.delta;
+    }
+  }
+  return result;
+}
+
+function computeDamageTakenMultiplier(wounds: readonly Wound[]): number {
+  let mult = 1;
+  for (const wound of wounds) {
+    const effect = WOUNDS[wound.id].effect;
+    if (effect.kind === 'damageTakenMult') {
+      mult += effect.multiplier - 1;
+    }
+  }
+  return mult;
+}
 
 function scaleEnemyStats(enemyId: EnemyId, scale: ScaleFactors): Stats {
   const base = ENEMIES[enemyId].baseStats;
@@ -26,12 +49,16 @@ export function buildCombatState(
 
   for (let i = 0; i < party.length; i++) {
     const hero = party[i];
+    const woundedStats = applyWoundsToStats(hero.baseStats, hero.wounds);
+    const damageTakenMultiplier = computeDamageTakenMultiplier(hero.wounds);
+    const woundedMaxHp = woundedStats.hp;
     combatants.push(
       createHeroCombatant(hero.classId, (i + 1) as SlotIndex, `p${i}`, {
-        baseStats: hero.baseStats,
-        currentHp: hero.currentHp,
-        maxHp: hero.maxHp,
+        baseStats: woundedStats,
+        currentHp: Math.min(hero.currentHp, woundedMaxHp),
+        maxHp: woundedMaxHp,
         traitId: hero.traitId,
+        ...(damageTakenMultiplier !== 1 ? { damageTakenMultiplier } : {}),
       }),
     );
   }

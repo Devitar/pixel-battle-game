@@ -4,4 +4,5 @@ export const NAMES: readonly string[] = [
   'Ulric', 'Vesna', 'Wren', 'Xara', 'Yven', 'Zara', 'Ashen', 'Bryn', 'Cora', 'Doran',
   'Elara', 'Faren', 'Glyn', 'Hadrian', 'Ivor', 'Jora', 'Kestrel', 'Lark', 'Merek', 'Nell',
   'Oren', 'Perrin', 'Quill', 'Roran', 'Sable', 'Tamar', 'Vesper', 'Wilder', 'Yara', 'Zephyr',
+  'Lilith', 'Asher', 'Bulby',
 ];

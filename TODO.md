@@ -27,18 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 3 · Wounds system
-
-- **What:** Wounds — flat stat debuffs applied on heavy combat hits (or specific events). Each wound has a category (e.g., "Bruised: −2 Speed", "Hobbled: −2 Attack") and persists between fights and runs until healed at the Hospital or passively over N runs.
-- **Why:** Tier 2 drip cost. Pushes the player toward Hospital visits and creates risk-of-cumulative-damage between cashouts.
-- **Tier:** 2
-- **Acceptance:**
-  - `Hero` carries `wounds: Wound[]`; effective stats subtract wound deltas at combat-build time.
-  - Wound roll fires on big-damage hits (threshold defined in data); wound types live in `data/wounds.ts`.
-  - Wounds persist via the save schema (version bump + migration).
-- **Touches:** `src/data/wounds.ts` (new), `src/heroes/hero.ts`, `src/combat/combatant.ts`, `src/save/save.ts` + migration, tests.
-- **Source:** gdd §7 + §10 Tier 2.
-
 ### 4 · Gear rarity tiers (common → rare)
 
 - **What:** Add rarity to gear: Common, Uncommon, Rare. Each tier is a meaningful stat bump; Rare can carry an extra property (e.g., burn-on-hit). Drop weights skew toward higher rarity at deeper floors / higher dungeon tiers.

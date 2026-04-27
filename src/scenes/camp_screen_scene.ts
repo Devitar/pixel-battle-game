@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { removeHero, updateHero } from '../camp/roster';
+import { removeHero, tickRosterWounds, updateHero } from '../camp/roster';
 import { credit } from '../camp/vault';
 import { cashout, pressOn, type RunState } from '../run/run_state';
 import { HeroCard } from '../ui/hero_card';
@@ -132,6 +132,7 @@ export class CampScreenScene extends Phaser.Scene {
           roster = removeHero(roster, id);
         }
       }
+      roster = tickRosterWounds(roster);
       return {
         ...s,
         vault,
