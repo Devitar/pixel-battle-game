@@ -1,3 +1,4 @@
+import type { Wound } from '../data/types';
 import type { Hero } from '../heroes/hero';
 
 export const DEFAULT_ROSTER_CAPACITY = 12;
@@ -55,4 +56,29 @@ export function getHero(roster: Roster, heroId: string): Hero | undefined {
 
 export function listHeroes(roster: Roster): readonly Hero[] {
   return roster.heroes;
+}
+
+function tickWound(wound: Wound): Wound | null {
+  const next = wound.runsRemaining - 1;
+  return next <= 0 ? null : { ...wound, runsRemaining: next };
+}
+
+export function tickRosterWounds(roster: Roster): Roster {
+  return {
+    ...roster,
+    heroes: roster.heroes.map((h) => ({
+      ...h,
+      wounds: h.wounds.map(tickWound).filter((w): w is Wound => w !== null),
+    })),
+  };
+}
+
+export function treatHeroWound(hero: Hero, woundIndex: number): Hero {
+  if (woundIndex < 0 || woundIndex >= hero.wounds.length) {
+    throw new Error(`treatHeroWound: invalid index ${woundIndex} (have ${hero.wounds.length})`);
+  }
+  return {
+    ...hero,
+    wounds: hero.wounds.filter((_, i) => i !== woundIndex),
+  };
 }

@@ -100,4 +100,49 @@ describe('buildCombatState — trait propagation', () => {
     expect(state.combatants[1].traitId).toBe('cowardly');
     expect(state.combatants[2].traitId).toBe('sharp_eyed');
   });
+
+  it('applies a statDelta wound (winded) to baseStats.attack', () => {
+    const hero = createHero('knight', 'K', 'h0', 'quick', 'body1');
+    hero.wounds = [{ id: 'winded', runsRemaining: 5 }];
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    expect(state.combatants[0].baseStats.attack).toBe(hero.baseStats.attack - 2);
+  });
+
+  it('applies a damageTakenMult wound (bruised) to combatant.damageTakenMultiplier', () => {
+    const hero = createHero('knight', 'K', 'h0', 'quick', 'body1');
+    hero.wounds = [{ id: 'bruised', runsRemaining: 5 }];
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    expect(state.combatants[0].damageTakenMultiplier).toBeCloseTo(1.20);
+  });
+
+  it('stacks two bruised wounds → damageTakenMultiplier 1.40', () => {
+    const hero = createHero('knight', 'K', 'h0', 'quick', 'body1');
+    hero.wounds = [
+      { id: 'bruised', runsRemaining: 5 },
+      { id: 'bruised', runsRemaining: 5 },
+    ];
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    expect(state.combatants[0].damageTakenMultiplier).toBeCloseTo(1.40);
+  });
+
+  it('broken_bone wound reduces baseStats.hp AND maxHp AND clamps currentHp', () => {
+    const hero = createHero('knight', 'K', 'h0', 'quick', 'body1');
+    hero.wounds = [{ id: 'broken_bone', runsRemaining: 5 }];
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    const c = state.combatants[0];
+    expect(c.baseStats.hp).toBe(hero.baseStats.hp - 10);
+    expect(c.maxHp).toBe(hero.maxHp - 10);
+    expect(c.currentHp).toBeLessThanOrEqual(c.maxHp);
+  });
+
+  it('no wounds → no damageTakenMultiplier set on combatant', () => {
+    const hero = createHero('knight', 'K', 'h0', 'quick', 'body1');
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    expect(state.combatants[0].damageTakenMultiplier).toBeUndefined();
+  });
 });

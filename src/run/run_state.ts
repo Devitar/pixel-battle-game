@@ -1,7 +1,8 @@
-import type { DungeonId } from '../data/types';
+import type { DungeonId, Wound } from '../data/types';
+import { DEFAULT_WOUND_RUNS_REMAINING } from '../data/wounds';
 import { generateFloor } from '../dungeon/floor';
 import type { Node } from '../dungeon/node';
-import type { CombatResult } from '../combat/types';
+import type { CombatEvent, CombatResult } from '../combat/types';
 import type { Hero } from '../heroes/hero';
 import type { Rng } from '../util/rng';
 import { addGold, createPack, type Pack, totalGold } from './pack';
@@ -82,7 +83,12 @@ export function completeCombat(
       updatedPartyLiving.push(original);
       continue;
     }
-    const updated: Hero = { ...original, currentHp: Math.max(0, combatant.currentHp) };
+    const newWounds = woundsFromEvents(result.events, `p${i}`);
+    const updated: Hero = {
+      ...original,
+      currentHp: Math.max(0, combatant.currentHp),
+      wounds: newWounds.length > 0 ? [...original.wounds, ...newWounds] : original.wounds,
+    };
     if (combatant.isDead) {
       newFallen.push(updated);
     } else {
@@ -168,4 +174,17 @@ export function cashout(runState: RunState): { runState: RunState; outcome: Cash
     runState: { ...runState, status: 'ended' },
     outcome,
   };
+}
+
+function woundsFromEvents(
+  events: readonly CombatEvent[],
+  combatantId: string,
+): Wound[] {
+  const wounds: Wound[] = [];
+  for (const ev of events) {
+    if (ev.kind === 'wound_inflicted' && ev.combatantId === combatantId) {
+      wounds.push({ id: ev.woundId, runsRemaining: DEFAULT_WOUND_RUNS_REMAINING });
+    }
+  }
+  return wounds;
 }

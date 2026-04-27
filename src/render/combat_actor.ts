@@ -2,7 +2,9 @@ import * as Phaser from 'phaser';
 import type { CombatantId } from '../combat/types';
 import type { EnemyId, StatusId } from '../data/types';
 import type { Hero } from '../heroes/hero';
+import { ENEMY_VISUALS } from './enemy_sprites';
 import { EnemySprite } from './enemy_sprite';
+import { BOSS_SHEET, ENEMY_SHEET, SHEET } from './frames';
 import { heroToLoadout } from './hero_loadout';
 import { Paperdoll } from './paperdoll';
 
@@ -15,6 +17,10 @@ const STATUS_GLYPHS: Partial<Record<StatusId, { letter: string; color: string }>
   rotting: { letter: 'r', color: '#aa44aa' },
   frailty: { letter: '−', color: '#888888' },
   chilled: { letter: 'c', color: '#88ccff' },
+  enraged: { letter: 'E', color: '#ff4444' },
+  vanished: { letter: 'V', color: '#aaccff' },
+  poisoned: { letter: 'P', color: '#88cc44' },
+  slowed: { letter: 's', color: '#88ccff' },
 };
 const STATUS_FALLBACK = { letter: '?', color: '#888888' };
 
@@ -22,8 +28,8 @@ const HP_BAR_W = 56;
 const HP_BAR_H = 4;
 const STATUS_SPACING = 10;
 const STATUS_FONT = '10px';
-const OUTLINE_W = 60;
-const OUTLINE_H = 80;
+const OUTLINE_PAD_X = 6;
+const OUTLINE_PAD_Y = 6;
 const OUTLINE_COLOR = 0xffcc66;
 const FLASH_HIT_DURATION = 100;
 const FLASH_HIT_COLOR = 0xffffff;
@@ -39,10 +45,15 @@ const COLLAPSE_DURATION = 400;
 const COLLAPSE_DROP = 8;
 const SLOT_MOVE_DURATION = 300;
 
-const NAME_Y = -56;
-const HPBAR_Y = -44;
-const HPTEXT_Y = -38;
-const STATUS_Y = 38;
+const FLOOR_Y = 24;
+const HPBAR_BELOW_FEET = 6;
+const HPTEXT_BELOW_FEET = 14;
+const NAME_BELOW_FEET = 24;
+const STATUS_ABOVE_HEAD = 10;
+
+const HERO_FRAME_SIZE = SHEET.frameWidth;
+const HERO_BODY_SCALE = 3;
+const ENEMY_FRAME_SIZE = ENEMY_SHEET.frameWidth;
 
 export type CombatActorKind = 'hero' | 'enemy';
 
@@ -87,25 +98,40 @@ export class CombatActor extends Phaser.GameObjects.Container {
     this.currentHp = init.currentHp;
     this.maxHp = init.maxHp;
 
+    let frameSize: number;
     if (init.kind === 'hero') {
       this.bodyView = new Paperdoll(scene, 0, 0, heroToLoadout(init.hero));
-      this.bodyScale = 3;
+      this.bodyScale = HERO_BODY_SCALE;
+      frameSize = HERO_FRAME_SIZE;
     } else {
       this.bodyView = new EnemySprite(scene, 0, 0, init.enemyId);
       this.bodyScale = init.bodyScale ?? 3;
+      const visual = ENEMY_VISUALS[init.enemyId];
+      frameSize = visual.bossSprite !== undefined ? BOSS_SHEET.frameWidth : ENEMY_FRAME_SIZE;
     }
+
+    const bodySize = frameSize * this.bodyScale;
+    const halfBody = bodySize / 2;
+    const bodyCenterY = FLOOR_Y - halfBody;
+
+    this.bodyView.setPosition(0, bodyCenterY);
     this.bodyView.setScale(this.bodyScale);
     this.add(this.bodyView);
 
+    const hpBarY = FLOOR_Y + HPBAR_BELOW_FEET;
+    const hpTextY = FLOOR_Y + HPTEXT_BELOW_FEET;
+    const nameY = FLOOR_Y + NAME_BELOW_FEET;
+    const statusY = bodyCenterY - halfBody - STATUS_ABOVE_HEAD;
+
     this.actorOutline = scene.add
-      .rectangle(0, 0, OUTLINE_W, OUTLINE_H)
+      .rectangle(0, bodyCenterY, bodySize + 2 * OUTLINE_PAD_X, bodySize + 2 * OUTLINE_PAD_Y)
       .setStrokeStyle(2, OUTLINE_COLOR)
       .setFillStyle();
     this.actorOutline.setAlpha(0);
     this.add(this.actorOutline);
 
     this.nameText = scene.add
-      .text(0, NAME_Y, init.displayName, {
+      .text(0, nameY, init.displayName, {
         fontFamily: 'monospace',
         fontSize: '9px',
         color: '#ffffff',
@@ -113,15 +139,15 @@ export class CombatActor extends Phaser.GameObjects.Container {
       .setOrigin(0.5);
     this.add(this.nameText);
 
-    this.hpBarBg = scene.add.rectangle(0, HPBAR_Y, HP_BAR_W, HP_BAR_H, 0x333333);
+    this.hpBarBg = scene.add.rectangle(0, hpBarY, HP_BAR_W, HP_BAR_H, 0x333333);
     this.add(this.hpBarBg);
     this.hpBarFill = scene.add
-      .rectangle(-HP_BAR_W / 2, HPBAR_Y, HP_BAR_W, HP_BAR_H, this.hpColor(1))
+      .rectangle(-HP_BAR_W / 2, hpBarY, HP_BAR_W, HP_BAR_H, this.hpColor(1))
       .setOrigin(0, 0.5);
     this.add(this.hpBarFill);
 
     this.hpText = scene.add
-      .text(0, HPTEXT_Y, `${init.currentHp}/${init.maxHp}`, {
+      .text(0, hpTextY, `${init.currentHp}/${init.maxHp}`, {
         fontFamily: 'monospace',
         fontSize: '8px',
         color: '#cccccc',
@@ -129,7 +155,7 @@ export class CombatActor extends Phaser.GameObjects.Container {
       .setOrigin(0.5);
     this.add(this.hpText);
 
-    this.statusStrip = scene.add.container(0, STATUS_Y);
+    this.statusStrip = scene.add.container(0, statusY);
     this.add(this.statusStrip);
 
     this.refreshHpVisual();

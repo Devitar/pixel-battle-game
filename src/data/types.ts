@@ -1,6 +1,6 @@
 import type { Stats } from '../combat/types';
 
-export type ClassId = 'knight' | 'archer' | 'priest';
+export type ClassId = 'knight' | 'archer' | 'priest' | 'barbarian' | 'rogue' | 'mage';
 
 export type AbilityId =
   | 'knight_slash'
@@ -23,21 +23,33 @@ export type AbilityId =
   | 'necrotic_wave'
   | 'lich_strike'
   | 'curse_of_frailty'
-  | 'chilling_touch';
+  | 'chilling_touch'
+  | 'barbarian_swing'
+  | 'cleave'
+  | 'rampage'
+  | 'bloodthirst'
+  | 'rogue_strike'
+  | 'backstab'
+  | 'vanish'
+  | 'poison_strike'
+  | 'mage_zap'
+  | 'firebolt'
+  | 'frost_nova'
+  | 'arc_shock';
 
-export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled';
+export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished' | 'slowed';
 
 export type AbilityTag = 'radiant';
 
 export type CombatantTag = 'undead' | 'beast' | 'humanoid';
 
-export type WeaponType = 'sword' | 'bow' | 'holy_symbol';
+export type WeaponType = 'sword' | 'bow' | 'holy_symbol' | 'axe' | 'daggers' | 'staff';
 
 export type SlotIndex = 1 | 2 | 3 | 4;
 
 export type Side = 'self' | 'ally' | 'enemy';
 
-export type BuffableStat = 'hp' | 'attack' | 'defense' | 'speed';
+export type BuffableStat = 'hp' | 'attack' | 'defense' | 'speed' | 'mind' | 'crit' | 'dodge';
 
 export type TargetFilter =
   | { kind: 'hurt' }
@@ -53,15 +65,21 @@ export interface TargetSelector {
 }
 
 export type AbilityEffect =
-  | { kind: 'damage'; power: number }
-  | { kind: 'heal'; power: number }
-  | { kind: 'stun'; duration: number }
-  | { kind: 'shove'; slots: number }
-  | { kind: 'pull'; slots: number }
-  | { kind: 'buff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId }
-  | { kind: 'debuff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId }
-  | { kind: 'mark'; damageBonus: number; duration: number; statusId: StatusId }
-  | { kind: 'taunt'; duration: number; statusId: StatusId };
+  | { kind: 'damage'; power: number; scalingStat?: 'attack' | 'mind'; healOnKill?: number; bonusCrit?: number; chance?: number }
+  | { kind: 'heal'; power: number; scalingStat?: 'attack' | 'mind'; chance?: number }
+  | { kind: 'stun'; duration: number; chance?: number }
+  | { kind: 'shove'; slots: number; chance?: number }
+  | { kind: 'pull'; slots: number; chance?: number }
+  | { kind: 'moveToSlot'; slot: SlotIndex; chance?: number }
+  | { kind: 'poison'; damagePerTurn: number; duration: number; statusId: StatusId; chance?: number }
+  | { kind: 'buff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean; chance?: number }
+  | { kind: 'debuff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean; chance?: number }
+  | { kind: 'mark'; damageBonus: number; duration: number; statusId: StatusId; chance?: number }
+  | { kind: 'taunt'; duration: number; statusId: StatusId; chance?: number };
+
+export type AiCondition =
+  | { kind: 'minTargets'; n: number }
+  | { kind: 'casterHpBelow'; ratio: number };
 
 export interface Ability {
   id: AbilityId;
@@ -71,11 +89,35 @@ export interface Ability {
   effects: readonly AbilityEffect[];
   tags?: readonly AbilityTag[];
   cooldown?: number;
+  aiCondition?: AiCondition;
 }
 
 export interface StarterLoadout {
   weapon: string;
   shield?: string;
+}
+
+export type WoundId =
+  | 'bruised'
+  | 'hobbled'
+  | 'concussed'
+  | 'winded'
+  | 'unsteady'
+  | 'broken_bone';
+
+export type WoundEffect =
+  | { kind: 'statDelta'; stat: BuffableStat; delta: number }
+  | { kind: 'damageTakenMult'; multiplier: number };
+
+export interface WoundDef {
+  id: WoundId;
+  name: string;
+  effect: WoundEffect;
+}
+
+export interface Wound {
+  id: WoundId;
+  runsRemaining: number;
 }
 
 export interface ClassDef {

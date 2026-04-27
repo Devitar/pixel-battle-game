@@ -1,13 +1,14 @@
 import type { SaveFile } from './save';
 
+// Pre-launch: stays at 1. Schema changes discard old saves via the loader's
+// "newer-than-supported" rejection (which catches saves persisted at any prior
+// transient bump value). Migrations get registered post-launch when real
+// player saves exist.
 export const CURRENT_SCHEMA_VERSION = 1;
 
 type MigrationFn = (raw: Record<string, unknown>) => Record<string, unknown>;
 
-const MIGRATIONS: Record<number, MigrationFn> = {
-  // Tier 1: empty.
-  // Future example: { 1: (raw) => ({ ...raw, version: 2, stash: { items: [] } }) }
-};
+const MIGRATIONS: Record<number, MigrationFn> = {};
 
 export function migrate(raw: unknown): SaveFile | null {
   if (typeof raw !== 'object' || raw === null) return null;

@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { ABILITIES } from '../data/abilities';
 import type { AbilityId, SlotIndex, StatusId } from '../data/types';
+import { WOUNDS } from '../data/wounds';
 import type {
   CombatantId,
   CombatEvent,
@@ -124,6 +125,7 @@ export class CombatPlayback {
       case 'ability_cast': return this.onAbilityCast(ev);
       case 'shuffle': return this.onShuffle(ev);
       case 'damage_applied': return this.onDamage(ev);
+      case 'attack_dodged': return this.onAttackDodged(ev);
       case 'heal_applied': return this.onHeal(ev);
       case 'status_applied': return this.onStatusApplied(ev);
       case 'status_expired': return this.onStatusExpired(ev);
@@ -132,6 +134,7 @@ export class CombatPlayback {
       case 'round_end': return this.onRoundEnd();
       case 'exhaustion_applied': return this.onExhaustionApplied();
       case 'combat_end': return this.onCombatEnd();
+      case 'wound_inflicted': return this.onWoundInflicted(ev);
     }
   }
 
@@ -216,7 +219,7 @@ export class CombatPlayback {
       const damagePromises = followingDamages.map(d => this.applyDamageVisual(d));
       await Promise.all([pulsePromise, ...damagePromises]);
       if (followingDamages.length > 0) {
-        const dmgs = followingDamages.map(d => d.amount).join('/');
+        const dmgs = followingDamages.map(d => (d.wasCrit ? `${d.amount}*` : `${d.amount}`)).join('/');
         this.appendLog(` — ${dmgs} dmg`);
       }
       return 1 + followingDamages.length;
@@ -241,8 +244,35 @@ export class CombatPlayback {
 
   private async onDamage(ev: Extract<CombatEvent, { kind: 'damage_applied' }>): Promise<number> {
     await this.applyDamageVisual(ev);
-    this.appendLog(` — ${ev.amount} dmg`);
+    if (ev.wasCrit) {
+      const target = this.actors.get(ev.targetId);
+      target?.spawnNumber('CRIT!', '#ffcc44');
+      this.appendLog(` — ${ev.amount} dmg (crit)`);
+    } else {
+      this.appendLog(` — ${ev.amount} dmg`);
+    }
     if (D_DAMAGE_BUFFER > 0) await this.delay(D_DAMAGE_BUFFER);
+    return 1;
+  }
+
+  private async onAttackDodged(ev: Extract<CombatEvent, { kind: 'attack_dodged' }>): Promise<number> {
+    const target = this.actors.get(ev.targetId);
+    const targetEntry = this.running.get(ev.targetId);
+    target?.spawnNumber('Miss!', '#aaccff');
+    if (targetEntry) {
+      this.appendLog(` — ${targetEntry.displayName} dodged`);
+    }
+    return 1;
+  }
+
+  private async onWoundInflicted(ev: Extract<CombatEvent, { kind: 'wound_inflicted' }>): Promise<number> {
+    const target = this.actors.get(ev.combatantId);
+    const targetEntry = this.running.get(ev.combatantId);
+    const woundName = WOUNDS[ev.woundId].name;
+    target?.spawnNumber(`${woundName}!`, '#cc4422');
+    if (targetEntry) {
+      this.appendLog(` — ${targetEntry.displayName} wounded: ${woundName}`);
+    }
     return 1;
   }
 

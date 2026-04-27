@@ -3,7 +3,7 @@ import { ABILITIES } from '../abilities';
 import { CLASSES } from '../classes';
 import type { ClassId } from '../types';
 
-const EXPECTED_IDS: readonly ClassId[] = ['knight', 'archer', 'priest'];
+const EXPECTED_IDS: readonly ClassId[] = ['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage'];
 const STATS: readonly ('hp' | 'attack' | 'defense' | 'speed')[] = [
   'hp',
   'attack',

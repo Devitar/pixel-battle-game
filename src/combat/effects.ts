@@ -1,6 +1,7 @@
 import type { Ability, AbilityEffect } from '../data/types';
+import { HEAVY_HIT_WOUND_THRESHOLD, WOUND_CHANCE_PERCENT, WOUND_IDS } from '../data/wounds';
 import type { Rng } from '../util/rng';
-import { collapseAfterDeath, pull, shove } from './positions';
+import { collapseAfterDeath, moveTo, pull, shove, swap } from './positions';
 import { getEffectiveStat } from './statuses';
 import type { Combatant, CombatantId, CombatEvent, CombatState, StatusInstance } from './types';
 
@@ -22,19 +23,27 @@ function applyDamage(
   effect: Extract<AbilityEffect, { kind: 'damage' }>,
   ability: Ability,
   state: CombatState,
+  rng: Rng,
   events: CombatEvent[],
 ): void {
   const bonus = tagBonusMultiplier(ability, target);
-  let raw = Math.round(effect.power * getEffectiveStat(caster, 'attack') * bonus);
+  const scalingStat = effect.scalingStat ?? 'attack';
+  let raw = Math.round(effect.power * getEffectiveStat(caster, scalingStat) * bonus);
   const mark = target.statuses['marked'];
   if (mark && mark.effect.kind === 'mark') {
     raw = Math.round(raw * (1 + mark.effect.damageBonus));
   }
+  const wasCrit = rng.percent(getEffectiveStat(caster, 'crit') + (effect.bonusCrit ?? 0));
+  if (wasCrit) raw = raw * 2;
   const final = Math.max(1, raw - getEffectiveStat(target, 'defense'));
-  const amplified =
+  const exhAmp =
     target.side === 'player' && state.exhaustionLevel > 0
       ? Math.max(1, Math.round(final * (1 + 0.10 * state.exhaustionLevel)))
       : final;
+  const amplified =
+    target.damageTakenMultiplier !== undefined && target.damageTakenMultiplier !== 1
+      ? Math.max(1, Math.round(exhAmp * target.damageTakenMultiplier))
+      : exhAmp;
   target.currentHp -= amplified;
   const lethal = target.currentHp <= 0;
   events.push({
@@ -43,10 +52,28 @@ function applyDamage(
     targetId: target.id,
     amount: amplified,
     lethal,
+    wasCrit,
   });
   if (lethal) {
     target.isDead = true;
     events.push({ kind: 'death', combatantId: target.id });
+    if (effect.healOnKill !== undefined) {
+      const healAmount = Math.round(effect.healOnKill * getEffectiveStat(caster, scalingStat));
+      const actual = Math.min(healAmount, caster.maxHp - caster.currentHp);
+      caster.currentHp += actual;
+      events.push({
+        kind: 'heal_applied',
+        sourceId: caster.id,
+        targetId: caster.id,
+        amount: actual,
+      });
+    }
+  } else if (target.kind === 'hero') {
+    const isHeavy = amplified >= target.maxHp * HEAVY_HIT_WOUND_THRESHOLD;
+    if ((isHeavy || wasCrit) && rng.percent(WOUND_CHANCE_PERCENT)) {
+      const woundId = rng.pick(WOUND_IDS);
+      events.push({ kind: 'wound_inflicted', combatantId: target.id, woundId });
+    }
   }
 }
 
@@ -56,7 +83,8 @@ function applyHeal(
   effect: Extract<AbilityEffect, { kind: 'heal' }>,
   events: CombatEvent[],
 ): void {
-  const amount = Math.round(effect.power * getEffectiveStat(caster, 'attack'));
+  const scalingStat = effect.scalingStat ?? 'attack';
+  const amount = Math.round(effect.power * getEffectiveStat(caster, scalingStat));
   const actual = Math.min(amount, target.maxHp - target.currentHp);
   target.currentHp += actual;
   events.push({ kind: 'heal_applied', sourceId: caster.id, targetId: target.id, amount: actual });
@@ -91,12 +119,14 @@ function applyEffect(
   caster: Combatant,
   target: Combatant,
   state: CombatState,
+  rng: Rng,
   events: CombatEvent[],
 ): void {
   if (target.isDead) return;
+  if (effect.chance !== undefined && !rng.percent(effect.chance)) return;
   switch (effect.kind) {
     case 'damage':
-      applyDamage(caster, target, effect, ability, state, events);
+      applyDamage(caster, target, effect, ability, state, rng, events);
       return;
     case 'heal':
       applyHeal(caster, target, effect, events);
@@ -116,12 +146,27 @@ function applyEffect(
     case 'taunt':
       storeStatus(caster, target, effect.statusId, effect, effect.duration, events);
       return;
+    case 'poison':
+      storeStatus(caster, target, effect.statusId, effect, effect.duration, events);
+      return;
     case 'shove':
       shove(target, effect.slots, state, events);
       return;
     case 'pull':
       pull(target, effect.slots, state, events);
       return;
+    case 'moveToSlot': {
+      const sameSide = state.combatants.filter(
+        (c) => c.side === caster.side && !c.isDead && c.id !== caster.id,
+      );
+      const occupant = sameSide.find((c) => c.slot === effect.slot);
+      if (occupant) {
+        swap(caster, occupant, events);
+      } else {
+        moveTo(caster, effect.slot, events);
+      }
+      return;
+    }
   }
 }
 
@@ -130,22 +175,50 @@ export function applyAbility(
   caster: Combatant,
   targetIds: readonly CombatantId[],
   state: CombatState,
-  _rng: Rng,
+  rng: Rng,
   events: CombatEvent[],
 ): void {
   events.push({ kind: 'ability_cast', casterId: caster.id, abilityId: ability.id, targetIds });
 
+  // Self-target effects fire once per cast, regardless of how many targets dodge.
+  // Flavor: a fully-dodged Rampage still costs the caster their defense — the
+  // over-extension happens whether or not the swing connects.
+  for (const effect of ability.effects) {
+    const isSelfTarget =
+      effect.kind === 'moveToSlot' ||
+      ((effect.kind === 'buff' || effect.kind === 'debuff') && effect.selfTarget === true);
+    if (isSelfTarget && !caster.isDead) {
+      applyEffect(ability, effect, caster, caster, state, rng, events);
+    }
+  }
+
+  const hasDamage = ability.effects.some((e) => e.kind === 'damage');
   const sidesWithDeaths = new Set<Combatant['side']>();
 
-  for (const effect of ability.effects) {
-    for (const tid of targetIds) {
-      const target = findById(state, tid);
-      if (!target) continue;
-      if (target.isDead) continue;
-      const wasAlive = !target.isDead;
-      applyEffect(ability, effect, caster, target, state, events);
-      if (wasAlive && target.isDead) sidesWithDeaths.add(target.side);
+  for (const tid of targetIds) {
+    const target = findById(state, tid);
+    if (!target) continue;
+    if (target.isDead) continue;
+
+    if (hasDamage && rng.percent(getEffectiveStat(target, 'dodge'))) {
+      events.push({
+        kind: 'attack_dodged',
+        sourceId: caster.id,
+        targetId: target.id,
+        abilityId: ability.id,
+      });
+      continue;
     }
+
+    const wasAlive = !target.isDead;
+    for (const effect of ability.effects) {
+      if (target.isDead) break;
+      const isSelfTarget =
+        (effect.kind === 'buff' || effect.kind === 'debuff') && effect.selfTarget === true;
+      if (isSelfTarget) continue;
+      applyEffect(ability, effect, caster, target, state, rng, events);
+    }
+    if (wasAlive && target.isDead) sidesWithDeaths.add(target.side);
   }
 
   for (const side of sidesWithDeaths) {

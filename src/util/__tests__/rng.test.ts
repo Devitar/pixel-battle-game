@@ -235,3 +235,36 @@ describe('getState / createRngFromState', () => {
     }
   });
 });
+
+describe('rng.percent', () => {
+  it('returns false for p = 0', () => {
+    const rng = createRng(1);
+    for (let i = 0; i < 100; i++) expect(rng.percent(0)).toBe(false);
+  });
+
+  it('returns true for p = 100', () => {
+    const rng = createRng(1);
+    for (let i = 0; i < 100; i++) expect(rng.percent(100)).toBe(true);
+  });
+
+  it('returns true roughly half the time for p = 50 over many rolls', () => {
+    const rng = createRng(42);
+    let trues = 0;
+    const N = 1000;
+    for (let i = 0; i < N; i++) if (rng.percent(50)) trues++;
+    expect(trues).toBeGreaterThan(400);
+    expect(trues).toBeLessThan(600);
+  });
+
+  it('clamps p outside [0, 100]', () => {
+    const rng = createRng(1);
+    for (let i = 0; i < 50; i++) expect(rng.percent(-50)).toBe(false);
+    for (let i = 0; i < 50; i++) expect(rng.percent(150)).toBe(true);
+  });
+
+  it('is deterministic for the same seed', () => {
+    const a = createRng(7);
+    const b = createRng(7);
+    for (let i = 0; i < 50; i++) expect(a.percent(37)).toBe(b.percent(37));
+  });
+});

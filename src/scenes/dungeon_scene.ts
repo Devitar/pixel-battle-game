@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { removeHero } from '../camp/roster';
+import { removeHero, tickRosterWounds } from '../camp/roster';
 import type { CombatResult } from '../combat/types';
 import { heroToLoadout } from '../render/hero_loadout';
 import { Paperdoll } from '../render/paperdoll';
@@ -371,6 +371,7 @@ export class DungeonScene extends Phaser.Scene {
           roster = removeHero(roster, id);
         }
       }
+      roster = tickRosterWounds(roster);
       return {
         ...s,
         roster,

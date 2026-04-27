@@ -4,6 +4,7 @@ import type { CombatantId, CombatState } from '../combat/types';
 import { ENEMIES } from '../data/enemies';
 import type { Hero } from '../heroes/hero';
 import { CombatActor } from '../render/combat_actor';
+import { ENEMY_VISUALS } from '../render/enemy_sprites';
 import { buildCombatState } from '../run/combat_setup';
 import { currentNode, type RunState } from '../run/run_state';
 import { createRngFromState } from '../util/rng';
@@ -187,6 +188,8 @@ export class CombatScene extends Phaser.Scene {
       } else {
         const enemyId = c.enemyId!;
         const isBoss = ENEMIES[enemyId].role === 'boss';
+        const visual = ENEMY_VISUALS[enemyId];
+        const bodyScale = visual.bodyScale ?? (isBoss ? BOSS_BODY_SCALE : 3);
         actor = new CombatActor(this, x, ROW_Y, {
           kind: 'enemy',
           combatantId: c.id,
@@ -194,7 +197,7 @@ export class CombatScene extends Phaser.Scene {
           enemyId,
           currentHp: c.currentHp,
           maxHp: c.maxHp,
-          bodyScale: isBoss ? BOSS_BODY_SCALE : 3,
+          bodyScale,
         });
       }
       this.actors.set(c.id, actor);

@@ -5,7 +5,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
   knight: {
     id: 'knight',
     name: 'Knight',
-    baseStats: { hp: 20, attack: 4, defense: 4, speed: 3 },
+    baseStats: { hp: 20, attack: 4, defense: 4, speed: 3, mind: 0, crit: 5, dodge: 5 },
     preferredWeapon: 'sword',
     abilities: ['knight_slash', 'shield_bash', 'bulwark', 'taunt'],
     aiPriority: ['shield_bash', 'bulwark', 'taunt', 'knight_slash'],
@@ -17,7 +17,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
   archer: {
     id: 'archer',
     name: 'Archer',
-    baseStats: { hp: 14, attack: 5, defense: 2, speed: 5 },
+    baseStats: { hp: 14, attack: 5, defense: 2, speed: 5, mind: 0, crit: 15, dodge: 10 },
     preferredWeapon: 'bow',
     abilities: ['archer_shoot', 'piercing_shot', 'volley', 'flare_arrow'],
     aiPriority: ['flare_arrow', 'piercing_shot', 'volley', 'archer_shoot'],
@@ -28,12 +28,45 @@ export const CLASSES: Record<ClassId, ClassDef> = {
   priest: {
     id: 'priest',
     name: 'Priest',
-    baseStats: { hp: 15, attack: 3, defense: 2, speed: 4 },
+    baseStats: { hp: 15, attack: 3, defense: 2, speed: 4, mind: 5, crit: 5, dodge: 5 },
     preferredWeapon: 'holy_symbol',
     abilities: ['priest_strike', 'mend', 'smite', 'bless'],
     aiPriority: ['mend', 'bless', 'smite', 'priest_strike'],
     starterLoadout: {
       weapon: String(SPRITE_NAMES.weapon.mace_tier1),
+    },
+  },
+  barbarian: {
+    id: 'barbarian',
+    name: 'Barbarian',
+    baseStats: { hp: 22, attack: 6, defense: 3, speed: 3, mind: 0, crit: 10, dodge: 5 },
+    preferredWeapon: 'axe',
+    abilities: ['barbarian_swing', 'cleave', 'rampage', 'bloodthirst'],
+    aiPriority: ['rampage', 'cleave', 'bloodthirst', 'barbarian_swing'],
+    starterLoadout: {
+      weapon: String(SPRITE_NAMES.weapon.battleaxe_tier1),
+    },
+  },
+  rogue: {
+    id: 'rogue',
+    name: 'Rogue',
+    baseStats: { hp: 13, attack: 5, defense: 1, speed: 6, mind: 0, crit: 20, dodge: 15 },
+    preferredWeapon: 'daggers',
+    abilities: ['rogue_strike', 'backstab', 'vanish', 'poison_strike'],
+    aiPriority: ['vanish', 'backstab', 'poison_strike', 'rogue_strike'],
+    starterLoadout: {
+      weapon: String(SPRITE_NAMES.weapon.dagger_tier1),
+    },
+  },
+  mage: {
+    id: 'mage',
+    name: 'Mage',
+    baseStats: { hp: 12, attack: 2, defense: 1, speed: 4, mind: 8, crit: 5, dodge: 5 },
+    preferredWeapon: 'staff',
+    abilities: ['mage_zap', 'firebolt', 'frost_nova', 'arc_shock'],
+    aiPriority: ['frost_nova', 'firebolt', 'arc_shock', 'mage_zap'],
+    starterLoadout: {
+      weapon: String(SPRITE_NAMES.weapon.staff_blue_tier1),
     },
   },
 };
