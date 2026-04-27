@@ -200,4 +200,42 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     target: { side: 'enemy', slots: [1] },
     effects: [{ kind: 'damage', power: 1.0, healOnKill: 0.5 }],
   },
+
+  rogue_strike: {
+    id: 'rogue_strike',
+    name: 'Strike',
+    canCastFrom: [1, 2, 3],
+    target: { side: 'enemy', slots: [1] },
+    effects: [{ kind: 'damage', power: 1.0 }],
+  },
+  backstab: {
+    id: 'backstab',
+    name: 'Backstab',
+    canCastFrom: [2, 3],
+    target: { side: 'enemy', slots: 'furthest' },
+    effects: [{ kind: 'damage', power: 1.2, bonusCrit: 25 }],
+    cooldown: 2,
+  },
+  vanish: {
+    id: 'vanish',
+    name: 'Vanish',
+    canCastFrom: [1, 2],
+    target: { side: 'self' },
+    effects: [
+      { kind: 'moveToSlot', slot: 3 },
+      { kind: 'buff', stat: 'dodge', delta: 15, duration: 2, statusId: 'vanished', selfTarget: true },
+    ],
+    cooldown: 2,
+    aiCondition: { kind: 'casterHpBelow', ratio: 0.5 },
+  },
+  poison_strike: {
+    id: 'poison_strike',
+    name: 'Poison Strike',
+    canCastFrom: [1, 2, 3],
+    target: { side: 'enemy', filter: { kind: 'lacksStatus', statusId: 'poisoned' }, pick: 'first' },
+    effects: [
+      { kind: 'damage', power: 0.8 },
+      { kind: 'poison', damagePerTurn: 2, duration: 3, statusId: 'poisoned' },
+    ],
+  },
 };

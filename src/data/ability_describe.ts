@@ -47,6 +47,8 @@ const STATUS_LABEL: Record<StatusId, string> = {
   stunned: 'stunned',
   chilled: 'chilled',
   enraged: 'enraged',
+  poisoned: 'poisoned',
+  vanished: 'vanished',
 };
 
 function describeFilter(filter: TargetSelector['filter']): string {
@@ -141,5 +143,9 @@ function describeEffect(e: AbilityEffect): string {
       return `Mark target for +${Math.round(e.damageBonus * 100)}% damage (${e.duration} ${turnWord(e.duration)})`;
     case 'taunt':
       return `Taunt for ${e.duration} ${turnWord(e.duration)}`;
+    case 'moveToSlot':
+      return `Move to slot ${e.slot}`;
+    case 'poison':
+      return `Poison target for ${e.damagePerTurn} dmg/turn (${e.duration} ${turnWord(e.duration)})`;
   }
 }

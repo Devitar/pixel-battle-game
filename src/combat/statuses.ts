@@ -1,6 +1,6 @@
 import { TRAITS } from '../data/traits';
 import type { BuffableStat, TraitCondition } from '../data/types';
-import type { Combatant, CombatEvent } from './types';
+import type { Combatant, CombatantId, CombatEvent } from './types';
 
 function evaluateTraitCondition(
   condition: TraitCondition | undefined,
@@ -38,6 +38,13 @@ export function tickStatuses(combatant: Combatant, events: CombatEvent[]): void 
   const ids = Object.keys(combatant.statuses);
   for (const id of ids) {
     const status = combatant.statuses[id];
+
+    // Poison ticks first, before decrement, so it fires every turn including the expiry turn.
+    // Poison damage bypasses defense / crit / dodge — true damage per auto-battler convention.
+    if (status.effect.kind === 'poison' && !combatant.isDead) {
+      applyPoisonDamage(combatant, status.effect.damagePerTurn, status.sourceId, events);
+    }
+
     status.remainingTurns -= 1;
     if (status.remainingTurns <= 0) {
       const e = status.effect;
@@ -47,5 +54,27 @@ export function tickStatuses(combatant: Combatant, events: CombatEvent[]): void 
       delete combatant.statuses[id];
       events.push({ kind: 'status_expired', targetId: combatant.id, statusId: status.statusId });
     }
+  }
+}
+
+function applyPoisonDamage(
+  target: Combatant,
+  damagePerTurn: number,
+  sourceId: CombatantId,
+  events: CombatEvent[],
+): void {
+  target.currentHp -= damagePerTurn;
+  const lethal = target.currentHp <= 0;
+  events.push({
+    kind: 'damage_applied',
+    sourceId,
+    targetId: target.id,
+    amount: damagePerTurn,
+    lethal,
+    wasCrit: false,
+  });
+  if (lethal) {
+    target.isDead = true;
+    events.push({ kind: 'death', combatantId: target.id });
   }
 }

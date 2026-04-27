@@ -1,6 +1,6 @@
 import type { Stats } from '../combat/types';
 
-export type ClassId = 'knight' | 'archer' | 'priest' | 'barbarian';
+export type ClassId = 'knight' | 'archer' | 'priest' | 'barbarian' | 'rogue';
 
 export type AbilityId =
   | 'knight_slash'
@@ -27,15 +27,19 @@ export type AbilityId =
   | 'barbarian_swing'
   | 'cleave'
   | 'rampage'
-  | 'bloodthirst';
+  | 'bloodthirst'
+  | 'rogue_strike'
+  | 'backstab'
+  | 'vanish'
+  | 'poison_strike';
 
-export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged';
+export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished';
 
 export type AbilityTag = 'radiant';
 
 export type CombatantTag = 'undead' | 'beast' | 'humanoid';
 
-export type WeaponType = 'sword' | 'bow' | 'holy_symbol' | 'axe';
+export type WeaponType = 'sword' | 'bow' | 'holy_symbol' | 'axe' | 'daggers';
 
 export type SlotIndex = 1 | 2 | 3 | 4;
 
@@ -57,11 +61,13 @@ export interface TargetSelector {
 }
 
 export type AbilityEffect =
-  | { kind: 'damage'; power: number; scalingStat?: 'attack' | 'mind'; healOnKill?: number }
+  | { kind: 'damage'; power: number; scalingStat?: 'attack' | 'mind'; healOnKill?: number; bonusCrit?: number }
   | { kind: 'heal'; power: number; scalingStat?: 'attack' | 'mind' }
   | { kind: 'stun'; duration: number }
   | { kind: 'shove'; slots: number }
   | { kind: 'pull'; slots: number }
+  | { kind: 'moveToSlot'; slot: SlotIndex }
+  | { kind: 'poison'; damagePerTurn: number; duration: number; statusId: StatusId }
   | { kind: 'buff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean }
   | { kind: 'debuff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean }
   | { kind: 'mark'; damageBonus: number; duration: number; statusId: StatusId }

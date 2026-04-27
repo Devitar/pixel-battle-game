@@ -27,19 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 1 · Class: Rogue
-
-- **What:** Implement the Rogue. Kit: Backstab (teleport behind + hit enemy rear, high crit), Vanish (move self to slot 3, +Dodge), Poison Strike (DoT). Preferred slot 2, daggers.
-- **Why:** Striker archetype with positional disruption — first class that mutates its own slot mid-combat. Forces the formation system to handle non-shuffle moves cleanly.
-- **Tier:** 2
-- **Acceptance:**
-  - `data/classes.ts` adds `rogue`; abilities added.
-  - Backstab moves the caster to enemy slot 4 (or temporarily resolves the hit there) cleanly within the existing slot model.
-  - Poison Strike applies a DoT status ticking N turns. Extends `src/combat/statuses.ts` if needed.
-  - Vanish swaps caster to slot 3 and applies a +Dodge status.
-- **Touches:** `src/data/classes.ts`, `src/data/abilities.ts`, `src/combat/statuses.ts`, `src/combat/ability_priority.ts`, tests.
-- **Source:** gdd §3 + §10 Tier 2.
-
 ### 2 · Class: Mage
 
 - **What:** Implement the Mage. Kit: Firebolt (single-target enemy 3–4), Frost Nova (AoE + slow), Arc Shock (chance-stun). Preferred slot 3, staff / wand. Scales primarily off Mind.

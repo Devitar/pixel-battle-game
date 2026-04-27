@@ -174,3 +174,33 @@ describe('resolveCombat — scripted scenarios', () => {
     expect(result.events[result.events.length - 1].kind).toBe('combat_end');
   });
 });
+
+describe('resolveCombat — poison kills mid-turn', () => {
+  it('a poisoned combatant who dies from poison on their own turn skips the rest of the turn', () => {
+    const hero = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 4, speed: 5, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 1,
+      maxHp: 20,
+    });
+    hero.statuses['poisoned'] = {
+      statusId: 'poisoned',
+      remainingTurns: 3,
+      effect: { kind: 'poison', damagePerTurn: 2, duration: 3, statusId: 'poisoned' },
+      sourceId: 'e0',
+    };
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 100,
+      maxHp: 100,
+    });
+    const initial = makeTestState([hero], [enemy]);
+    const result = resolveCombat(initial, createRng(1));
+    expect(result.outcome).toBe('player_defeat');
+    const heroDeathIdx = result.events.findIndex((e) => e.kind === 'death' && e.combatantId === 'p0');
+    expect(heroDeathIdx).toBeGreaterThanOrEqual(0);
+    const heroCastsAfterDeath = result.events
+      .slice(heroDeathIdx + 1)
+      .some((e) => e.kind === 'ability_cast' && e.casterId === 'p0');
+    expect(heroCastsAfterDeath).toBe(false);
+  });
+});

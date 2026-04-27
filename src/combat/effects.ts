@@ -1,6 +1,6 @@
 import type { Ability, AbilityEffect } from '../data/types';
 import type { Rng } from '../util/rng';
-import { collapseAfterDeath, pull, shove } from './positions';
+import { collapseAfterDeath, moveTo, pull, shove, swap } from './positions';
 import { getEffectiveStat } from './statuses';
 import type { Combatant, CombatantId, CombatEvent, CombatState, StatusInstance } from './types';
 
@@ -32,7 +32,7 @@ function applyDamage(
   if (mark && mark.effect.kind === 'mark') {
     raw = Math.round(raw * (1 + mark.effect.damageBonus));
   }
-  const wasCrit = rng.percent(getEffectiveStat(caster, 'crit'));
+  const wasCrit = rng.percent(getEffectiveStat(caster, 'crit') + (effect.bonusCrit ?? 0));
   if (wasCrit) raw = raw * 2;
   const final = Math.max(1, raw - getEffectiveStat(target, 'defense'));
   const amplified =
@@ -134,12 +134,27 @@ function applyEffect(
     case 'taunt':
       storeStatus(caster, target, effect.statusId, effect, effect.duration, events);
       return;
+    case 'poison':
+      storeStatus(caster, target, effect.statusId, effect, effect.duration, events);
+      return;
     case 'shove':
       shove(target, effect.slots, state, events);
       return;
     case 'pull':
       pull(target, effect.slots, state, events);
       return;
+    case 'moveToSlot': {
+      const sameSide = state.combatants.filter(
+        (c) => c.side === caster.side && !c.isDead && c.id !== caster.id,
+      );
+      const occupant = sameSide.find((c) => c.slot === effect.slot);
+      if (occupant) {
+        swap(caster, occupant, events);
+      } else {
+        moveTo(caster, effect.slot, events);
+      }
+      return;
+    }
   }
 }
 
@@ -158,7 +173,8 @@ export function applyAbility(
   // over-extension happens whether or not the swing connects.
   for (const effect of ability.effects) {
     const isSelfTarget =
-      (effect.kind === 'buff' || effect.kind === 'debuff') && effect.selfTarget === true;
+      effect.kind === 'moveToSlot' ||
+      ((effect.kind === 'buff' || effect.kind === 'debuff') && effect.selfTarget === true);
     if (isSelfTarget && !caster.isDead) {
       applyEffect(ability, effect, caster, caster, state, rng, events);
     }

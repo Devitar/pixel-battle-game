@@ -498,3 +498,128 @@ describe('selfTarget on buff/debuff effects', () => {
     expect(statusEvents[0]).toMatchObject({ targetId: 'p0' });
   });
 });
+
+describe('bonusCrit', () => {
+  it('always crits when caster.crit + bonusCrit >= 100', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'knight_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0, bonusCrit: 100 }],
+    };
+    applyAbility(ability, p0, ['e0'], state, rng, events);
+    const dmg = events.find((e) => e.kind === 'damage_applied') as { wasCrit: boolean; amount: number };
+    expect(dmg.wasCrit).toBe(true);
+    expect(dmg.amount).toBe(8);
+  });
+
+  it('never crits when caster.crit + bonusCrit <= 0', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'knight_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0 }],
+    };
+    applyAbility(ability, p0, ['e0'], state, rng, events);
+    const dmg = events.find((e) => e.kind === 'damage_applied') as { wasCrit: boolean };
+    expect(dmg.wasCrit).toBe(false);
+  });
+});
+
+describe('moveToSlot', () => {
+  it('swaps caster with ally currently in destination slot', () => {
+    const p0 = makeHeroCombatant('knight', 2, 'p0');
+    const p1 = makeHeroCombatant('archer', 3, 'p1');
+    const state = makeTestState([p0, p1], []);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'knight_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'self' as const },
+      effects: [{ kind: 'moveToSlot' as const, slot: 3 as const }],
+    };
+    applyAbility(ability, p0, ['p0'], state, rng, events);
+    expect(p0.slot).toBe(3);
+    expect(p1.slot).toBe(2);
+    const moves = events.filter((e) => e.kind === 'position_changed');
+    expect(moves).toHaveLength(2);
+  });
+
+  it('moves caster directly when destination slot is empty', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0');
+    const state = makeTestState([p0], []);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'knight_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'self' as const },
+      effects: [{ kind: 'moveToSlot' as const, slot: 3 as const }],
+    };
+    applyAbility(ability, p0, ['p0'], state, rng, events);
+    expect(p0.slot).toBe(3);
+    const moves = events.filter((e) => e.kind === 'position_changed');
+    expect(moves).toHaveLength(1);
+  });
+
+  it('is a no-op when caster already in destination slot', () => {
+    const p0 = makeHeroCombatant('knight', 3, 'p0');
+    const state = makeTestState([p0], []);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'knight_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'self' as const },
+      effects: [{ kind: 'moveToSlot' as const, slot: 3 as const }],
+    };
+    applyAbility(ability, p0, ['p0'], state, rng, events);
+    expect(p0.slot).toBe(3);
+    const moves = events.filter((e) => e.kind === 'position_changed');
+    expect(moves).toHaveLength(0);
+  });
+});
+
+describe('poison effect', () => {
+  it('stores a "poisoned" status on the target', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'knight_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'poison' as const, damagePerTurn: 2, duration: 3, statusId: 'poisoned' as const }],
+    };
+    applyAbility(ability, p0, ['e0'], state, rng, events);
+    expect(e0.statuses['poisoned']).toBeDefined();
+    expect(e0.statuses['poisoned'].remainingTurns).toBe(3);
+    const statusEvent = events.find((e) => e.kind === 'status_applied' && e.statusId === 'poisoned');
+    expect(statusEvent).toBeDefined();
+  });
+});

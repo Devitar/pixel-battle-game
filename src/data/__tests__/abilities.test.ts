@@ -28,6 +28,10 @@ const EXPECTED_IDS: readonly AbilityId[] = [
   'cleave',
   'rampage',
   'bloodthirst',
+  'rogue_strike',
+  'backstab',
+  'vanish',
+  'poison_strike',
 ];
 
 const KEBAB_CASE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;

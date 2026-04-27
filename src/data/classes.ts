@@ -47,4 +47,15 @@ export const CLASSES: Record<ClassId, ClassDef> = {
       weapon: String(SPRITE_NAMES.weapon.battleaxe_tier1),
     },
   },
+  rogue: {
+    id: 'rogue',
+    name: 'Rogue',
+    baseStats: { hp: 13, attack: 5, defense: 1, speed: 6, mind: 0, crit: 20, dodge: 15 },
+    preferredWeapon: 'daggers',
+    abilities: ['rogue_strike', 'backstab', 'vanish', 'poison_strike'],
+    aiPriority: ['vanish', 'backstab', 'poison_strike', 'rogue_strike'],
+    starterLoadout: {
+      weapon: String(SPRITE_NAMES.weapon.dagger_tier1),
+    },
+  },
 };

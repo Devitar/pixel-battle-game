@@ -16,6 +16,8 @@ const STATUS_GLYPHS: Partial<Record<StatusId, { letter: string; color: string }>
   frailty: { letter: '−', color: '#888888' },
   chilled: { letter: 'c', color: '#88ccff' },
   enraged: { letter: 'E', color: '#ff4444' },
+  vanished: { letter: 'V', color: '#aaccff' },
+  poisoned: { letter: 'P', color: '#88cc44' },
 };
 const STATUS_FALLBACK = { letter: '?', color: '#888888' };
 

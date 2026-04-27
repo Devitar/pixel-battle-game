@@ -3,7 +3,7 @@ import type { Rng } from '../util/rng';
 import { pickAbility } from './ability_priority';
 import { setCooldown, tickCooldowns } from './cooldowns';
 import { applyAbility } from './effects';
-import { shuffle } from './positions';
+import { collapseAfterDeath, shuffle } from './positions';
 import { tickStatuses } from './statuses';
 import { computeInitiative } from './turn_order';
 import type {
@@ -71,6 +71,14 @@ export function resolveCombat(initialState: CombatState, rng: Rng): CombatResult
 
       const willBeStunned = 'stunned' in combatant.statuses;
       tickStatuses(combatant, events);
+
+      if (combatant.isDead) {
+        // Poison (or future tick-damage status) killed them on their own turn.
+        // Collapse the side and skip the rest of the turn.
+        collapseAfterDeath(combatant.side, state, events);
+        continue;
+      }
+
       tickCooldowns(combatant);
 
       if (willBeStunned) {

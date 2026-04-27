@@ -167,9 +167,9 @@ describe('clearSave', () => {
 });
 
 describe('createDefaultUnlocks', () => {
-  it('includes the four launch classes and Crypt', () => {
+  it('includes the five launch classes and Crypt', () => {
     const u = createDefaultUnlocks();
-    expect([...u.classes].sort()).toEqual(['archer', 'barbarian', 'knight', 'priest']);
+    expect([...u.classes].sort()).toEqual(['archer', 'barbarian', 'knight', 'priest', 'rogue']);
     expect(u.dungeons).toEqual(['crypt']);
   });
 });

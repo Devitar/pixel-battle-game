@@ -76,7 +76,7 @@ export function clearSave(storage: Storage): void {
 
 export function createDefaultUnlocks(): Unlocks {
   return {
-    classes: ['knight', 'archer', 'priest', 'barbarian'],
+    classes: ['knight', 'archer', 'priest', 'barbarian', 'rogue'],
     dungeons: ['crypt'],
   };
 }

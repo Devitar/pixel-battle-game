@@ -50,6 +50,14 @@ export function swap(a: Combatant, b: Combatant, events: CombatEvent[]): void {
   setSlot(b, aSlot, 'swap', events);
 }
 
+export function moveTo(
+  combatant: Combatant,
+  toSlot: SlotIndex,
+  events: CombatEvent[],
+): void {
+  setSlot(combatant, toSlot, 'swap', events);
+}
+
 export function collapseAfterDeath(side: CombatSide, state: CombatState, events: CombatEvent[]): void {
   const living = state.combatants
     .filter((c) => c.side === side && !c.isDead)
