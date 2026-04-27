@@ -9,7 +9,7 @@ const ENEMY_BODY = {
 } as const;
 
 export interface EnemyVisual {
-  bodyFrame: number;
+  bodyFrame?: number;
   legs?: number;
   feet?: number;
   outfit?: number;
@@ -17,6 +17,8 @@ export interface EnemyVisual {
   hat?: number;
   weapon?: number;
   shield?: number;
+  bossSprite?: number;
+  bodyScale?: number;
 }
 
 export const ENEMY_VISUALS: Record<EnemyId, EnemyVisual> = {
@@ -52,8 +54,7 @@ export const ENEMY_VISUALS: Record<EnemyId, EnemyVisual> = {
     weapon: SPRITE_NAMES.weapon.staff_green_tier2,
   },
   bone_lich: {
-    bodyFrame: ENEMY_BODY.skeleton,
-    outfit: SPRITE_NAMES.torso.leatherarmor_tier5,
-    weapon: SPRITE_NAMES.weapon.staff_green_tier5,
+    bossSprite: 0,
+    bodyScale: 2,
   },
 };

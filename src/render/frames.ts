@@ -20,6 +20,17 @@ export const ENEMY_SHEET = {
   margin: 0,
 } as const;
 
+export const BOSS_SHEET = {
+  key: 'boss',
+  url: 'assets/sprites/bone_lich.png',
+  columns: 1,
+  rows: 1,
+  frameWidth: 48,
+  frameHeight: 48,
+  spacing: 0,
+  margin: 0,
+} as const;
+
 export type CategoryName =
   | 'character'
   | 'undergarment'

@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { resolveSaveState } from '../save/boot';
-import { SHEET, ENEMY_SHEET } from '../render/frames';
+import { SHEET, ENEMY_SHEET, BOSS_SHEET } from '../render/frames';
 import { createRng } from '../util/rng';
 import { appState } from './app_state';
 
@@ -21,6 +21,12 @@ export class BootScene extends Phaser.Scene {
       frameHeight: ENEMY_SHEET.frameHeight,
       margin: ENEMY_SHEET.margin,
       spacing: ENEMY_SHEET.spacing,
+    });
+    this.load.spritesheet(BOSS_SHEET.key, BOSS_SHEET.url, {
+      frameWidth: BOSS_SHEET.frameWidth,
+      frameHeight: BOSS_SHEET.frameHeight,
+      margin: BOSS_SHEET.margin,
+      spacing: BOSS_SHEET.spacing,
     });
   }
 

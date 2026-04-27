@@ -20,6 +20,8 @@ One section per bug. Keep it terse — this is a triage bin, not a formal tracke
 
 <!-- Add bugs below this line. Newest at the top. -->
 
+### "Results" modal after a combat does not indicate deceased party members
+
 ### Save loader silently discards old-version saves
 
 - **What:** When a save's `version` is older than `CURRENT_SCHEMA_VERSION` and no migration is registered for that version, `migrate()` returns `null` and `load()` returns `null` without emitting a `console.warn`. The boot scene then generates a fresh save with no indication that an old save was thrown away.
