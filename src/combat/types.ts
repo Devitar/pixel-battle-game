@@ -49,6 +49,11 @@ export interface Combatant {
   tags?: readonly CombatantTag[];
   traitId?: TraitId;
   damageTakenMultiplier?: number;
+  // Candidates for consolidation into a `passives` bag once 3+ more land.
+  lifestealPercent?: number;
+  thornsDamage?: number;
+  regenPerRound?: number;
+  burningWeaponDamage?: number;
   isDead: boolean;
 }
 

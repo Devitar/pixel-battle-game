@@ -1,11 +1,12 @@
-import type { DungeonId, Wound } from '../data/types';
+import type { DungeonId, Item, Wound } from '../data/types';
 import { DEFAULT_WOUND_RUNS_REMAINING } from '../data/wounds';
 import { generateFloor } from '../dungeon/floor';
+import { rollLoot } from '../dungeon/loot';
 import type { Node } from '../dungeon/node';
 import type { CombatEvent, CombatResult } from '../combat/types';
 import type { Hero } from '../heroes/hero';
 import type { Rng } from '../util/rng';
-import { addGold, createPack, type Pack, totalGold } from './pack';
+import { addGold, addItem, createPack, type Pack, totalGold } from './pack';
 
 export type RunStatus = 'in_dungeon' | 'camp_screen' | 'ended';
 
@@ -23,6 +24,7 @@ export interface RunState {
 
 export interface CashoutOutcome {
   goldBanked: number;
+  itemsBanked: readonly Item[];
   heroesReturned: readonly Hero[];
   heroesLost: readonly Hero[];
 }
@@ -69,6 +71,7 @@ export function currentNode(runState: RunState): Node {
 export function completeCombat(
   runState: RunState,
   result: CombatResult,
+  rng: Rng,
 ): { runState: RunState; wipe?: WipeOutcome } {
   if (runState.status !== 'in_dungeon') {
     throw new Error(`completeCombat: status must be 'in_dungeon', got '${runState.status}'`);
@@ -116,13 +119,31 @@ export function completeCombat(
   }
 
   const completedNode = runState.currentFloorNodes[runState.currentNodeIndex];
+  const isBoss = completedNode.type === 'boss';
   const reward =
-    completedNode.type === 'boss'
+    isBoss
       ? BOSS_NODE_GOLD * runState.currentFloorNumber
       : COMBAT_NODE_GOLD * runState.currentFloorNumber;
-  const newPack = addGold(runState.pack, reward);
+  let newPack = addGold(runState.pack, reward);
 
-  if (completedNode.type === 'boss') {
+  // Loot drop.
+  const drop = rollLoot(rng, runState.currentFloorNumber, isBoss);
+  if (drop) {
+    newPack = addItem(newPack, drop);
+  }
+
+  // Fallen-hero gear transfer (gdd §8): gear of a fallen hero on victory rolls into the pack.
+  for (const fallen of newFallen) {
+    const eq = fallen.equipment;
+    const items: Item[] = [eq.weapon, eq.shield, eq.outfit, eq.hat].filter(
+      (i): i is Item => i !== undefined,
+    );
+    for (const item of items) {
+      newPack = addItem(newPack, item);
+    }
+  }
+
+  if (isBoss) {
     return {
       runState: {
         ...runState,
@@ -167,6 +188,7 @@ export function cashout(runState: RunState): { runState: RunState; outcome: Cash
   }
   const outcome: CashoutOutcome = {
     goldBanked: totalGold(runState.pack),
+    itemsBanked: runState.pack.items,
     heroesReturned: runState.party,
     heroesLost: runState.fallen,
   };

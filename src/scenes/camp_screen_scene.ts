@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { removeHero, tickRosterWounds, updateHero } from '../camp/roster';
+import { addItems } from '../camp/stash';
 import { credit } from '../camp/vault';
 import { cashout, pressOn, type RunState } from '../run/run_state';
 import { HeroCard } from '../ui/hero_card';
@@ -121,6 +122,7 @@ export class CampScreenScene extends Phaser.Scene {
 
     appState.update((s) => {
       const vault = credit(s.vault, outcome.goldBanked);
+      const stash = addItems(s.stash, outcome.itemsBanked);
       let roster = s.roster;
       for (const survivor of outcome.heroesReturned) {
         if (roster.heroes.some((h) => h.id === survivor.id)) {
@@ -136,6 +138,7 @@ export class CampScreenScene extends Phaser.Scene {
       return {
         ...s,
         vault,
+        stash,
         roster,
         runState: undefined,
         runRngState: undefined,

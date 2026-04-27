@@ -59,6 +59,20 @@ export function resolveCombat(initialState: CombatState, rng: Rng): CombatResult
     );
     events.push({ kind: 'round_start', round, order });
 
+    for (const c of state.combatants) {
+      if (c.isDead || !c.regenPerRound) continue;
+      const heal = Math.min(c.regenPerRound, c.maxHp - c.currentHp);
+      if (heal > 0) {
+        c.currentHp += heal;
+        events.push({
+          kind: 'heal_applied',
+          sourceId: c.id,
+          targetId: c.id,
+          amount: heal,
+        });
+      }
+    }
+
     let combatEndedMidRound = false;
     for (const id of order) {
       const combatant = state.combatants.find((c) => c.id === id);

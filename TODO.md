@@ -27,17 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 4 · Gear rarity tiers (common → rare)
-
-- **What:** Add rarity to gear: Common, Uncommon, Rare. Each tier is a meaningful stat bump; Rare can carry an extra property (e.g., burn-on-hit). Drop weights skew toward higher rarity at deeper floors / higher dungeon tiers.
-- **Why:** Foundation for Blacksmith upgrades, shop stock quality, and elite/boss drops. Without this, all gear is flat.
-- **Tier:** 2
-- **Acceptance:**
-  - `Item` carries `rarity: 'common' | 'uncommon' | 'rare'`; loot tables roll rarity from floor / dungeon-tier weights.
-  - Rare items roll an extra property (e.g., `{ kind: 'burn', turns: 2 }`); the property surfaces in tooltip / display.
-- **Touches:** `src/data/items.ts`, `src/items/`, `src/dungeon/loot.ts`, tests.
-- **Source:** gdd §7 + §10 Tier 2.
-
 ### 5 · Gear-modifies-abilities rule
 
 - **What:** A class's signature kit is gated by equipped weapon family. Preferred weapon → full kit; off-preferred-but-same-family → kit with one ability swapped (e.g., Knight + Greataxe: Shield Bash → Cleaving Swing); wholly-wrong-weapon → only universal basic Attack.
@@ -302,3 +291,15 @@ Art tasks that aren't blocking gameplay. Enemies, heroes, and rooms already rend
   - `spritenames.txt` updated with the new entries; `npm run generate:names` run and output committed.
   - Boss is visually distinguishable beyond just scale (unique frame or silhouette).
 - **Touches:** `public/assets/sprites/base_sprites.png`, `spritenames.txt`, `src/render/sprite_names.generated.ts` (regenerated).
+
+### 2 · Bespoke outfit + hat sprites for items system
+
+- **What:** Replace the placeholder `spriteId: '0'` entries in `BASE_ITEMS` for `outfit_cloth`, `outfit_leather`, `hat_cap`, `hat_hood` with real sprite frames. Update `spritenames.txt` and regenerate the names module.
+- **Why:** The items foundation (Cluster A task 4) shipped with `'0'` placeholder sprite IDs for outfits and hats because no bespoke frames existed yet. Heroes still render correctly because `heroToLoadout` only reads weapon + shield from equipment today, but the moment a future task wires outfit/hat sprites into the paperdoll those `'0'` values become visible bugs. Cleaning this up before that wiring lands keeps the item-display task clean.
+- **Tier:** 1 (originally part of items foundation) — non-blocking now that placeholders work.
+- **Acceptance:**
+  - `outfit_cloth`, `outfit_leather`, `hat_cap`, `hat_hood` in `src/data/items.ts` reference real frame names from `SPRITE_NAMES.outfit.*` / `SPRITE_NAMES.hat.*` (or whatever family they belong to in `spritenames.txt`).
+  - `spritenames.txt` carries the new entries; `npm run generate:names` run and output committed.
+  - The two outfit variants are visually distinguishable; the two hat variants are visually distinguishable.
+- **Touches:** `public/assets/sprites/base_sprites.png` (if new frames needed), `spritenames.txt`, `src/render/sprite_names.generated.ts` (regenerated), `src/data/items.ts` (4 spriteId fields).
+- **Source:** Cluster A task 4 HISTORY entry (2026-04-27 · Gear rarity tiers + items foundation).

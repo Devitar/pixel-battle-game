@@ -1,4 +1,5 @@
 import type { Roster } from '../camp/roster';
+import { createStash, type Stash } from '../camp/stash';
 import type { Vault } from '../camp/vault';
 import type { Unlocks } from '../data/types';
 import type { RunState } from '../run/run_state';
@@ -11,6 +12,7 @@ export interface SaveFile {
   version: number;
   roster: Roster;
   vault: Vault;
+  stash: Stash;
   unlocks: Unlocks;
   runState?: RunState;
   runRngState?: number;
@@ -64,10 +66,10 @@ export function load(storage: Storage): SaveFile | null {
 
   if ((migrated.runState === undefined) !== (migrated.runRngState === undefined)) {
     console.warn('load: runState/runRngState pairing invariant violated; discarding run');
-    return { ...migrated, runState: undefined, runRngState: undefined };
+    return normalizeSaveFile({ ...migrated, runState: undefined, runRngState: undefined });
   }
 
-  return migrated;
+  return normalizeSaveFile(migrated);
 }
 
 export function clearSave(storage: Storage): void {
@@ -85,4 +87,14 @@ function isPlausibleRawSave(parsed: unknown): parsed is { version: number } {
   if (typeof parsed !== 'object' || parsed === null) return false;
   const v = (parsed as Record<string, unknown>).version;
   return typeof v === 'number' && Number.isFinite(v) && v >= 1;
+}
+
+// Pre-launch policy: schema stays at 1 and we add new fields without bumps.
+// Old v1 saves predating a field need defaults to be loadable. This is the
+// single point of defaulting; do not scatter `?? createStash()` reads elsewhere.
+function normalizeSaveFile(file: SaveFile): SaveFile {
+  return {
+    ...file,
+    stash: file.stash ?? createStash(),
+  };
 }

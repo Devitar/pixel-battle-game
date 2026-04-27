@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createRoster } from '../../camp/roster';
+import { createStash } from '../../camp/stash';
 import { createVault, credit } from '../../camp/vault';
 import { createRng } from '../../util/rng';
 import { resolveSaveState } from '../boot';
@@ -28,6 +29,7 @@ describe('resolveSaveState', () => {
       version: CURRENT_SCHEMA_VERSION,
       roster: createRoster(),
       vault: credit(createVault(), 200),
+      stash: createStash(),
       unlocks: createDefaultUnlocks(),
     };
     save(original, storage);
@@ -44,6 +46,7 @@ describe('resolveSaveState', () => {
     expect(saveFile.version).toBe(CURRENT_SCHEMA_VERSION);
     expect(saveFile.roster.heroes).toHaveLength(3);
     expect(saveFile.vault).toEqual({ gold: 500 });
+    expect(saveFile.stash).toEqual({ items: [] });
     expect(saveFile.unlocks).toEqual(createDefaultUnlocks());
     expect(saveFile.runState).toBeUndefined();
   });

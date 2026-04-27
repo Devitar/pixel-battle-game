@@ -37,13 +37,75 @@ export type AbilityId =
   | 'frost_nova'
   | 'arc_shock';
 
-export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished' | 'slowed';
+export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished' | 'slowed' | 'burning';
 
 export type AbilityTag = 'radiant';
 
 export type CombatantTag = 'undead' | 'beast' | 'humanoid';
 
 export type WeaponType = 'sword' | 'bow' | 'holy_symbol' | 'axe' | 'daggers' | 'staff';
+
+export type ItemSlot = 'weapon' | 'shield' | 'outfit' | 'hat';
+
+export type Rarity = 'common' | 'uncommon' | 'rare';
+
+export type ItemBaseId =
+  | 'sword_basic' | 'bow_basic' | 'mace_basic'
+  | 'axe_basic' | 'daggers_basic' | 'staff_basic'
+  | 'shield_basic'
+  | 'outfit_cloth' | 'outfit_leather'
+  | 'hat_cap' | 'hat_hood';
+
+export type AffixId =
+  | 'of_power' | 'of_insight' | 'of_the_bear' | 'of_vigor'
+  | 'of_swiftness' | 'of_the_hawk' | 'of_evasion';
+
+export type RarePropertyId =
+  | 'of_burning' | 'of_vampirism'
+  | 'of_thorns'
+  | 'of_regeneration';
+
+export interface AffixDef {
+  id: AffixId;
+  name: string;
+  stat: BuffableStat;
+  baseValue: number;
+  hpMultiplier?: 3;
+}
+
+export type RarePropertyDef =
+  | { id: 'of_burning'; name: string; slots: readonly ['weapon']; kind: 'burn'; baseDamage: number; turns: 2 }
+  | { id: 'of_vampirism'; name: string; slots: readonly ['weapon']; kind: 'lifesteal'; percentOfDamage: number }
+  | { id: 'of_thorns'; name: string; slots: readonly ['shield']; kind: 'thorns'; baseDamage: number }
+  | { id: 'of_regeneration'; name: string; slots: readonly ['outfit']; kind: 'regen'; baseHeal: number };
+
+export interface RolledAffix {
+  affixId: AffixId;
+  value: number;
+}
+
+export interface RolledRareProperty {
+  propertyId: RarePropertyId;
+  value: number;
+}
+
+export interface Item {
+  readonly id: string;
+  readonly baseId: ItemBaseId;
+  readonly slot: ItemSlot;
+  readonly rarity: Rarity;
+  readonly weaponType?: WeaponType;
+  readonly affixes: readonly RolledAffix[];
+  readonly rareProperty?: RolledRareProperty;
+  readonly floorRolledAt: number;
+}
+
+export interface HeroEquipment {
+  weapon: Item;
+  shield?: Item;
+  outfit?: Item;
+  hat?: Item;
+}
 
 export type SlotIndex = 1 | 2 | 3 | 4;
 
@@ -93,8 +155,10 @@ export interface Ability {
 }
 
 export interface StarterLoadout {
-  weapon: string;
-  shield?: string;
+  weapon: ItemBaseId;
+  shield?: ItemBaseId;
+  outfit?: ItemBaseId;
+  hat?: ItemBaseId;
 }
 
 export type WoundId =

@@ -54,6 +54,53 @@ function applyDamage(
     lethal,
     wasCrit,
   });
+  if (caster.lifestealPercent !== undefined && caster.lifestealPercent > 0) {
+    const heal = Math.floor(amplified * caster.lifestealPercent / 100);
+    if (heal > 0) {
+      const actual = Math.min(heal, caster.maxHp - caster.currentHp);
+      if (actual > 0) {
+        caster.currentHp += actual;
+        events.push({
+          kind: 'heal_applied',
+          sourceId: caster.id,
+          targetId: caster.id,
+          amount: actual,
+        });
+      }
+    }
+  }
+  if (caster.burningWeaponDamage !== undefined && !lethal) {
+    target.statuses['burning'] = {
+      statusId: 'burning',
+      remainingTurns: 2,
+      effect: { kind: 'poison', damagePerTurn: caster.burningWeaponDamage, duration: 2, statusId: 'burning' },
+      sourceId: caster.id,
+    };
+    events.push({
+      kind: 'status_applied',
+      sourceId: caster.id,
+      targetId: target.id,
+      statusId: 'burning',
+      duration: 2,
+    });
+  }
+  if (target.thornsDamage !== undefined && target.thornsDamage > 0 && !caster.isDead) {
+    const thorn = target.thornsDamage;
+    caster.currentHp -= thorn;
+    const sourceLethal = caster.currentHp <= 0;
+    events.push({
+      kind: 'damage_applied',
+      sourceId: target.id,
+      targetId: caster.id,
+      amount: thorn,
+      lethal: sourceLethal,
+      wasCrit: false,
+    });
+    if (sourceLethal) {
+      caster.isDead = true;
+      events.push({ kind: 'death', combatantId: caster.id });
+    }
+  }
   if (lethal) {
     target.isDead = true;
     events.push({ kind: 'death', combatantId: target.id });

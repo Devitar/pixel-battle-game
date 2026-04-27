@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createRoster } from '../../camp/roster';
+import { createStash } from '../../camp/stash';
 import { createVault, credit } from '../../camp/vault';
 import type { RunState } from '../../run/run_state';
 import {
@@ -27,6 +28,7 @@ function makeBaseSave(): SaveFile {
     version: CURRENT_SCHEMA_VERSION,
     roster: createRoster(),
     vault: credit(createVault(), 100),
+    stash: createStash(),
     unlocks: createDefaultUnlocks(),
   };
 }
@@ -46,7 +48,7 @@ describe('save / load roundtrip', () => {
       dungeonId: 'crypt',
       seed: 1,
       party: [],
-      pack: { gold: 50 },
+      pack: { gold: 50, items: [] },
       currentFloorNumber: 1,
       currentFloorNodes: [],
       currentNodeIndex: 0,
@@ -70,7 +72,7 @@ describe('save / load roundtrip', () => {
       dungeonId: 'crypt',
       seed: 1,
       party: [],
-      pack: { gold: 0 },
+      pack: { gold: 0, items: [] },
       currentFloorNumber: 1,
       currentFloorNodes: [],
       currentNodeIndex: 0,
@@ -171,5 +173,28 @@ describe('createDefaultUnlocks', () => {
     const u = createDefaultUnlocks();
     expect([...u.classes].sort()).toEqual(['archer', 'barbarian', 'knight', 'mage', 'priest', 'rogue']);
     expect(u.dungeons).toEqual(['crypt']);
+  });
+});
+
+describe('stash persistence', () => {
+  it('round-trips an empty stash', () => {
+    const storage = new MemoryStorage();
+    save(makeBaseSave(), storage);
+    const loaded = load(storage);
+    expect(loaded?.stash).toEqual({ items: [] });
+  });
+
+  it('older v1 save without stash field defaults to empty stash on load', () => {
+    const storage = new MemoryStorage();
+    const stale = {
+      version: CURRENT_SCHEMA_VERSION,
+      roster: createRoster(),
+      vault: { gold: 0 },
+      unlocks: createDefaultUnlocks(),
+      // no stash field — pre-Task-17 save shape
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(stale));
+    const loaded = load(storage);
+    expect(loaded?.stash).toEqual({ items: [] });
   });
 });

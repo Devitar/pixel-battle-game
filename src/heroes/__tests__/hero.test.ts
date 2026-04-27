@@ -56,3 +56,32 @@ describe('createHero — HP trait baking', () => {
     }
   });
 });
+
+describe('createHero — equipment', () => {
+  it('Knight starts with sword + shield equipped', () => {
+    const h = createHero('knight', 'Eira', 'h1', 'quick', '0');
+    expect(h.equipment.weapon.baseId).toBe('sword_basic');
+    expect(h.equipment.weapon.slot).toBe('weapon');
+    expect(h.equipment.weapon.rarity).toBe('common');
+    expect(h.equipment.shield?.baseId).toBe('shield_basic');
+  });
+
+  it('Mage starts with staff and no shield', () => {
+    const h = createHero('mage', 'Lyr', 'h2', 'quick', '0');
+    expect(h.equipment.weapon.baseId).toBe('staff_basic');
+    expect(h.equipment.shield).toBeUndefined();
+  });
+
+  it('starter items have empty affixes and rarity common', () => {
+    const h = createHero('archer', 'Q', 'h3', 'quick', '0');
+    expect(h.equipment.weapon.affixes).toEqual([]);
+    expect(h.equipment.weapon.rarity).toBe('common');
+  });
+
+  it('starter item ids are deterministic from hero id + slot', () => {
+    const h1 = createHero('knight', 'A', 'abc', 'quick', '0');
+    const h2 = createHero('knight', 'B', 'abc', 'quick', '0');
+    expect(h1.equipment.weapon.id).toBe(h2.equipment.weapon.id);
+    expect(h1.equipment.weapon.id).toBe('starter_abc_weapon');
+  });
+});

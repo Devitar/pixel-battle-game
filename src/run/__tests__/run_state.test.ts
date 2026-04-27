@@ -38,7 +38,7 @@ describe('startRun', () => {
     expect(rs.status).toBe('in_dungeon');
     expect(rs.currentFloorNumber).toBe(1);
     expect(rs.currentNodeIndex).toBe(0);
-    expect(rs.pack).toEqual({ gold: 0 });
+    expect(rs.pack).toEqual({ gold: 0, items: [] });
     expect(rs.fallen).toEqual([]);
     expect(rs.currentFloorNodes).toHaveLength(4);
   });
@@ -74,7 +74,7 @@ describe('completeCombat — victory on combat node', () => {
   it('advances to the next node and awards 15 × floorNumber gold', () => {
     const rs = startRun('crypt', makeParty(), 1, createRng(1));
     const result = mockCombatResult(rs.party, [18, 10, 12], 'player_victory');
-    const { runState: rs2, wipe } = completeCombat(rs, result);
+    const { runState: rs2, wipe } = completeCombat(rs, result, createRng(99));
     expect(wipe).toBeUndefined();
     expect(rs2.status).toBe('in_dungeon');
     expect(rs2.currentNodeIndex).toBe(1);
@@ -87,7 +87,7 @@ describe('completeCombat — victory on combat node', () => {
   it('one hero dies but party survives — moves dead hero to fallen', () => {
     const rs = startRun('crypt', makeParty(), 1, createRng(1));
     const result = mockCombatResult(rs.party, [10, 0, 12], 'player_victory');
-    const { runState: rs2, wipe } = completeCombat(rs, result);
+    const { runState: rs2, wipe } = completeCombat(rs, result, createRng(99));
     expect(wipe).toBeUndefined();
     expect(rs2.party).toHaveLength(2);
     expect(rs2.party.map((h) => h.id)).toEqual(['h0', 'h2']);
@@ -104,13 +104,13 @@ describe('completeCombat — victory on boss node', () => {
     let rs = startRun('crypt', makeParty(), 1, createRng(1));
     for (let i = 0; i < 3; i++) {
       const result = mockCombatResult(rs.party, [18, 10, 12], 'player_victory');
-      rs = completeCombat(rs, result).runState;
+      rs = completeCombat(rs, result, createRng(99)).runState;
     }
     expect(rs.currentNodeIndex).toBe(3);
     expect(rs.currentFloorNodes[3].type).toBe('boss');
 
     const bossResult = mockCombatResult(rs.party, [5, 5, 5], 'player_victory');
-    const { runState: rs2, wipe } = completeCombat(rs, bossResult);
+    const { runState: rs2, wipe } = completeCombat(rs, bossResult, createRng(99));
     expect(wipe).toBeUndefined();
     expect(rs2.status).toBe('camp_screen');
     expect(rs2.pack.gold).toBe(15 * 3 + 100);
@@ -122,23 +122,23 @@ describe('completeCombat — defeat', () => {
   it('player_defeat triggers wipe', () => {
     const rs = startRun('crypt', makeParty(), 1, createRng(1));
     const result = mockCombatResult(rs.party, [0, 0, 0], 'player_defeat');
-    const { runState: rs2, wipe } = completeCombat(rs, result);
+    const { runState: rs2, wipe } = completeCombat(rs, result, createRng(99));
     expect(rs2.status).toBe('ended');
     expect(rs2.party).toEqual([]);
-    expect(rs2.pack).toEqual({ gold: 0 });
+    expect(rs2.pack).toEqual({ gold: 0, items: [] });
     expect(wipe).toBeDefined();
-    expect(wipe?.packLost).toEqual({ gold: 0 });
+    expect(wipe?.packLost).toEqual({ gold: 0, items: [] });
     expect(wipe?.heroesLost).toHaveLength(3);
   });
 
   it('wipe heroesLost includes heroes who fell in earlier combats', () => {
     let rs = startRun('crypt', makeParty(), 1, createRng(1));
-    rs = completeCombat(rs, mockCombatResult(rs.party, [10, 0, 12], 'player_victory')).runState;
+    rs = completeCombat(rs, mockCombatResult(rs.party, [10, 0, 12], 'player_victory'), createRng(99)).runState;
     expect(rs.fallen).toHaveLength(1);
     expect(rs.fallen[0].id).toBe('h1');
 
     const wipeResult = mockCombatResult(rs.party, [0, 0], 'player_defeat');
-    const { wipe } = completeCombat(rs, wipeResult);
+    const { wipe } = completeCombat(rs, wipeResult, createRng(99));
     expect(wipe).toBeDefined();
     expect(wipe?.heroesLost).toHaveLength(3);
     expect(wipe?.heroesLost.map((h) => h.id).sort()).toEqual(['h0', 'h1', 'h2']);
@@ -146,11 +146,12 @@ describe('completeCombat — defeat', () => {
 
   it('wipe zeroes the pack but carries the pre-wipe pack in the outcome', () => {
     let rs = startRun('crypt', makeParty(), 1, createRng(1));
-    rs = completeCombat(rs, mockCombatResult(rs.party, [18, 10, 12], 'player_victory')).runState;
+    rs = completeCombat(rs, mockCombatResult(rs.party, [18, 10, 12], 'player_victory'), createRng(99)).runState;
     expect(rs.pack.gold).toBe(15);
-    const { runState: rs2, wipe } = completeCombat(rs, mockCombatResult(rs.party, [0, 0, 0], 'player_defeat'));
-    expect(rs2.pack).toEqual({ gold: 0 });
-    expect(wipe?.packLost).toEqual({ gold: 15 });
+    const { runState: rs2, wipe } = completeCombat(rs, mockCombatResult(rs.party, [0, 0, 0], 'player_defeat'), createRng(99));
+    expect(rs2.pack).toEqual({ gold: 0, items: [] });
+    // Pre-wipe pack carried 15 gold + whatever loot rolled in. Both lost.
+    expect(wipe?.packLost.gold).toBe(15);
   });
 });
 
@@ -158,9 +159,9 @@ describe('pressOn', () => {
   it('generates the next floor and resets node index', () => {
     let rs = startRun('crypt', makeParty(), 1, createRng(1));
     for (let i = 0; i < 3; i++) {
-      rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory')).runState;
+      rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
     }
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory')).runState;
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
     expect(rs.status).toBe('camp_screen');
     expect(rs.currentFloorNumber).toBe(1);
 
@@ -183,9 +184,9 @@ describe('cashout', () => {
   it('returns outcome with gold and hero lists; runState goes to ended', () => {
     let rs = startRun('crypt', makeParty(), 1, createRng(1));
     for (let i = 0; i < 3; i++) {
-      rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory')).runState;
+      rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
     }
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory')).runState;
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
 
     const { runState: rs2, outcome } = cashout(rs);
     expect(rs2.status).toBe('ended');
@@ -204,7 +205,76 @@ describe('immutability', () => {
   it('startRun followed by completeCombat does not mutate the original RunState', () => {
     const rs = startRun('crypt', makeParty(), 1, createRng(1));
     const snapshot = JSON.parse(JSON.stringify(rs));
-    completeCombat(rs, mockCombatResult(rs.party, [15, 10, 10], 'player_victory'));
+    completeCombat(rs, mockCombatResult(rs.party, [15, 10, 10], 'player_victory'), createRng(99));
     expect(JSON.parse(JSON.stringify(rs))).toEqual(snapshot);
+  });
+});
+
+describe('completeCombat — loot drop', () => {
+  function advanceToBoss(rs: ReturnType<typeof startRun>): ReturnType<typeof startRun> {
+    let cur = rs;
+    while (cur.currentFloorNodes[cur.currentNodeIndex].type !== 'boss') {
+      cur = completeCombat(
+        cur,
+        mockCombatResult(cur.party, [20, 14, 15], 'player_victory'),
+        createRng(50),
+      ).runState;
+    }
+    return cur;
+  }
+
+  it('boss victory always appends one item to pack', () => {
+    const rs = advanceToBoss(startRun('crypt', makeParty(), 1, createRng(1)));
+    const before = rs.pack.items.length;
+    const next = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(7)).runState;
+    expect(next.pack.items.length).toBe(before + 1);
+  });
+
+  it('combat-node victory appends 0 or 1 items, depending on RNG', () => {
+    let drops = 0;
+    let noDrops = 0;
+    for (let seed = 1; seed <= 50; seed++) {
+      const rs = startRun('crypt', makeParty(), 1, createRng(seed));
+      const next = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(seed * 1000)).runState;
+      if (next.pack.items.length > 0) drops += 1; else noDrops += 1;
+    }
+    expect(drops).toBeGreaterThan(0);
+    expect(noDrops).toBeGreaterThan(0);
+  });
+});
+
+describe('completeCombat — fallen gear transfer', () => {
+  it('fallen hero gear transfers into the pack on victory', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    // Knight (h0) falls; archer + priest survive.
+    const result = mockCombatResult(rs.party, [0, 14, 15], 'player_victory');
+    const next = completeCombat(rs, result, createRng(99)).runState;
+    // Knight gear: weapon + shield = 2 items minimum (+ possible loot drop)
+    const ids = next.pack.items.map((i) => i.id);
+    expect(ids).toContain('starter_h0_weapon');
+    expect(ids).toContain('starter_h0_shield');
+  });
+
+  it('on wipe, all gear is lost (pack.items zeroed)', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const result = mockCombatResult(rs.party, [0, 0, 0], 'player_defeat');
+    const { runState, wipe } = completeCombat(rs, result, createRng(99));
+    expect(runState.pack.items).toEqual([]);
+    expect(wipe).toBeDefined();
+  });
+});
+
+describe('cashout — itemsBanked', () => {
+  it('returns the pack items in outcome.itemsBanked', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    // Advance through several combats so loot may drop, then to boss for camp_screen.
+    while (rs.currentFloorNodes[rs.currentNodeIndex].type !== 'boss') {
+      rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(50)).runState;
+    }
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(50)).runState;
+    expect(rs.status).toBe('camp_screen');
+    const itemsInPack = rs.pack.items;
+    const { outcome } = cashout(rs);
+    expect(outcome.itemsBanked).toEqual(itemsInPack);
   });
 });

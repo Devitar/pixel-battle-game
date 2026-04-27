@@ -7,6 +7,7 @@ import {
   completeCombat,
   type WipeOutcome,
 } from '../run/run_state';
+import { createRngFromState } from '../util/rng';
 import { appState } from './app_state';
 import { consumeCombatResult } from './combat_handoff';
 
@@ -83,12 +84,15 @@ export class DungeonScene extends Phaser.Scene {
       this.preCombatHp.set(hero.id, hero.currentHp);
     }
 
-    const { runState: nextRun, wipe } = completeCombat(run, result);
+    // Loot roll consumes RNG; thread it through completeCombat so the post-loot
+    // state is what gets persisted.
+    const rng = createRngFromState(rngStateAfter);
+    const { runState: nextRun, wipe } = completeCombat(run, result, rng);
 
     appState.update((s) => ({
       ...s,
       runState: nextRun,
-      runRngState: rngStateAfter,
+      runRngState: rng.getState(),
     }));
 
     this.partyContainer.x = this.partyXForNode(run.currentNodeIndex);
