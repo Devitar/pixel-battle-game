@@ -165,4 +165,39 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     target: { side: 'enemy', filter: { kind: 'lacksStatus', statusId: 'frailty' }, pick: 'first' },
     effects: [{ kind: 'debuff', stat: 'hp', delta: -3, duration: 2, statusId: 'frailty' }],
   },
+
+  barbarian_swing: {
+    id: 'barbarian_swing',
+    name: 'Swing',
+    canCastFrom: [1, 2],
+    target: { side: 'enemy', slots: [1] },
+    effects: [{ kind: 'damage', power: 1.0 }],
+  },
+  cleave: {
+    id: 'cleave',
+    name: 'Cleave',
+    canCastFrom: [1, 2],
+    target: { side: 'enemy', slots: [1, 2] },
+    effects: [{ kind: 'damage', power: 0.7 }],
+    aiCondition: { kind: 'minTargets', n: 2 },
+  },
+  rampage: {
+    id: 'rampage',
+    name: 'Rampage',
+    canCastFrom: [1, 2],
+    target: { side: 'enemy', slots: [1] },
+    effects: [
+      { kind: 'damage', power: 1.5 },
+      { kind: 'debuff', stat: 'defense', delta: -2, duration: 2, statusId: 'enraged', selfTarget: true },
+    ],
+    cooldown: 2,
+    aiCondition: { kind: 'casterHpBelow', ratio: 0.5 },
+  },
+  bloodthirst: {
+    id: 'bloodthirst',
+    name: 'Bloodthirst',
+    canCastFrom: [1, 2],
+    target: { side: 'enemy', slots: [1] },
+    effects: [{ kind: 'damage', power: 1.0, healOnKill: 0.5 }],
+  },
 };

@@ -336,3 +336,165 @@ describe('crit', () => {
     expect(dmg.amount).not.toBe(2);
   });
 });
+
+describe('healOnKill', () => {
+  it('heals caster on lethal hit', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 6, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 5,
+      maxHp: 20,
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 1,
+      maxHp: 100,
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'priest_strike' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0, healOnKill: 0.5 }],
+    };
+    applyAbility(ability, p0, ['e0'], state, rng, events);
+    const heal = events.find((e) => e.kind === 'heal_applied');
+    expect(heal).toMatchObject({ sourceId: 'p0', targetId: 'p0', amount: 3 });
+    expect(p0.currentHp).toBe(8);
+  });
+
+  it('does NOT heal on non-lethal hit', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 6, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 5,
+      maxHp: 20,
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 100,
+      maxHp: 100,
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'priest_strike' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0, healOnKill: 0.5 }],
+    };
+    applyAbility(ability, p0, ['e0'], state, rng, events);
+    const heal = events.find((e) => e.kind === 'heal_applied');
+    expect(heal).toBeUndefined();
+    expect(p0.currentHp).toBe(5);
+  });
+
+  it('caps healOnKill heal at caster missing HP (0 if full)', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 6, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 20,
+      maxHp: 20,
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 1,
+      maxHp: 100,
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'priest_strike' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [{ kind: 'damage' as const, power: 1.0, healOnKill: 0.5 }],
+    };
+    applyAbility(ability, p0, ['e0'], state, rng, events);
+    const heal = events.find((e) => e.kind === 'heal_applied');
+    expect(heal).toMatchObject({ amount: 0 });
+    expect(p0.currentHp).toBe(20);
+  });
+});
+
+describe('selfTarget on buff/debuff effects', () => {
+  it('applies selfTarget debuff to caster, not to ability target', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 6, defense: 4, speed: 3, mind: 0, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'knight_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [
+        { kind: 'damage' as const, power: 1.0 },
+        { kind: 'debuff' as const, stat: 'defense' as const, delta: -2, duration: 2, statusId: 'enraged' as const, selfTarget: true },
+      ],
+    };
+    applyAbility(ability, p0, ['e0'], state, rng, events);
+    expect(events.find((e) => e.kind === 'damage_applied' && e.targetId === 'e0')).toBeDefined();
+    expect(p0.statuses['enraged']).toBeDefined();
+    expect(e0.statuses['enraged']).toBeUndefined();
+    const statusEvent = events.find((e) => e.kind === 'status_applied' && e.statusId === 'enraged');
+    expect(statusEvent).toMatchObject({ sourceId: 'p0', targetId: 'p0' });
+  });
+
+  it('selfTarget effect fires even when target dodges', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 6, defense: 4, speed: 3, mind: 0, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 100 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'knight_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [
+        { kind: 'damage' as const, power: 1.0 },
+        { kind: 'debuff' as const, stat: 'defense' as const, delta: -2, duration: 2, statusId: 'enraged' as const, selfTarget: true },
+      ],
+    };
+    applyAbility(ability, p0, ['e0'], state, rng, events);
+    expect(events.find((e) => e.kind === 'attack_dodged')).toBeDefined();
+    expect(events.find((e) => e.kind === 'damage_applied')).toBeUndefined();
+    expect(p0.statuses['enraged']).toBeDefined();
+  });
+
+  it('selfTarget effect fires once per cast even on AoE (no double-apply)', () => {
+    const p0 = makeHeroCombatant('archer', 2, 'p0', {
+      baseStats: { hp: 14, attack: 5, defense: 2, speed: 5, mind: 0, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+    });
+    const e1 = makeEnemyCombatant('skeleton_warrior', 2, 'e1', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0, e1]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'volley' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: 'all' as const },
+      effects: [
+        { kind: 'damage' as const, power: 0.5 },
+        { kind: 'buff' as const, stat: 'crit' as const, delta: 5, duration: 1, statusId: 'blessed' as const, selfTarget: true },
+      ],
+    };
+    applyAbility(ability, p0, ['e0', 'e1'], state, rng, events);
+    const statusEvents = events.filter((e) => e.kind === 'status_applied' && e.statusId === 'blessed');
+    expect(statusEvents).toHaveLength(1);
+    expect(statusEvents[0]).toMatchObject({ targetId: 'p0' });
+  });
+});

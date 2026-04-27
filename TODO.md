@@ -27,20 +27,7 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 1 · Class: Barbarian
-
-- **What:** Implement the Barbarian. Kit: Cleave (enemies 1–2), Rampage (scaling damage that drops own Defense), Bloodthirst (heal-on-kill). Preferred slot 1–2, axe / greatsword.
-- **Why:** First of three Tier 2 classes; bruiser archetype broadens party composition beyond Knight/Archer/Priest.
-- **Tier:** 2
-- **Acceptance:**
-  - `data/classes.ts` adds `barbarian`; `data/abilities.ts` adds the three signature abilities + AI priority list.
-  - AI priority reflects the kit (Rampage when low HP, Cleave when 2+ targets in slots 1–2, Attack otherwise).
-  - Sprite mapping for axe / greatsword via `spritenames.txt` (placeholder reuse acceptable; bespoke art is Cluster C).
-  - Tavern roll pool includes Barbarian once unlocked (default unlocked at start of Tier 2).
-- **Touches:** `src/data/classes.ts`, `src/data/abilities.ts`, `src/combat/ability_priority.ts`, `spritenames.txt`, tests.
-- **Source:** gdd §3 + §10 Tier 2.
-
-### 2 · Class: Rogue
+### 1 · Class: Rogue
 
 - **What:** Implement the Rogue. Kit: Backstab (teleport behind + hit enemy rear, high crit), Vanish (move self to slot 3, +Dodge), Poison Strike (DoT). Preferred slot 2, daggers.
 - **Why:** Striker archetype with positional disruption — first class that mutates its own slot mid-combat. Forces the formation system to handle non-shuffle moves cleanly.
@@ -53,7 +40,7 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 - **Touches:** `src/data/classes.ts`, `src/data/abilities.ts`, `src/combat/statuses.ts`, `src/combat/ability_priority.ts`, tests.
 - **Source:** gdd §3 + §10 Tier 2.
 
-### 3 · Class: Mage
+### 2 · Class: Mage
 
 - **What:** Implement the Mage. Kit: Firebolt (single-target enemy 3–4), Frost Nova (AoE + slow), Arc Shock (chance-stun). Preferred slot 3, staff / wand. Scales primarily off Mind.
 - **Why:** First fully Mind-scaling caster; introduces the "slow" status (Speed reduction) and the chance-stun pattern.
@@ -65,7 +52,7 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 - **Touches:** `src/data/classes.ts`, `src/data/abilities.ts`, `src/combat/statuses.ts`, `src/combat/ability_priority.ts`, tests.
 - **Source:** gdd §3 + §10 Tier 2.
 
-### 4 · Wounds system
+### 3 · Wounds system
 
 - **What:** Wounds — flat stat debuffs applied on heavy combat hits (or specific events). Each wound has a category (e.g., "Bruised: −2 Speed", "Hobbled: −2 Attack") and persists between fights and runs until healed at the Hospital or passively over N runs.
 - **Why:** Tier 2 drip cost. Pushes the player toward Hospital visits and creates risk-of-cumulative-damage between cashouts.
@@ -77,7 +64,7 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 - **Touches:** `src/data/wounds.ts` (new), `src/heroes/hero.ts`, `src/combat/combatant.ts`, `src/save/save.ts` + migration, tests.
 - **Source:** gdd §7 + §10 Tier 2.
 
-### 5 · Gear rarity tiers (common → rare)
+### 4 · Gear rarity tiers (common → rare)
 
 - **What:** Add rarity to gear: Common, Uncommon, Rare. Each tier is a meaningful stat bump; Rare can carry an extra property (e.g., burn-on-hit). Drop weights skew toward higher rarity at deeper floors / higher dungeon tiers.
 - **Why:** Foundation for Blacksmith upgrades, shop stock quality, and elite/boss drops. Without this, all gear is flat.
@@ -88,7 +75,7 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 - **Touches:** `src/data/items.ts`, `src/items/`, `src/dungeon/loot.ts`, tests.
 - **Source:** gdd §7 + §10 Tier 2.
 
-### 6 · Gear-modifies-abilities rule
+### 5 · Gear-modifies-abilities rule
 
 - **What:** A class's signature kit is gated by equipped weapon family. Preferred weapon → full kit; off-preferred-but-same-family → kit with one ability swapped (e.g., Knight + Greataxe: Shield Bash → Cleaving Swing); wholly-wrong-weapon → only universal basic Attack.
 - **Why:** Lets a single class support 3–4 playstyles via gear. Without it, weapon choice is purely cosmetic + stat.
@@ -99,7 +86,7 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 - **Touches:** `src/data/classes.ts`, `src/run/combat_setup.ts`, tests.
 - **Source:** gdd §3 + §10 Tier 2.
 
-### 7 · Traits at recruitment
+### 6 · Traits at recruitment
 
 - **What:** ~12 small per-hero modifiers (Stout +10% HP, Quick +1 Speed, Cowardly −1 Speed when in slot 1, Lucky +5% Crit, etc.). One trait rolled per Tavern candidate; visible at roll time.
 - **Why:** Gives heroes individual flavor at low design cost. Foundation for Chapel (trait removal) in Tier 3.
@@ -111,7 +98,7 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 - **Touches:** `src/data/traits.ts`, `src/heroes/hero.ts`, `src/camp/tavern.ts`, `src/save/save.ts` + migration, tests.
 - **Source:** gdd §3 + §10 Tier 2.
 
-### 8 · Hero leveling + level-5 perks
+### 7 · Hero leveling + level-5 perks
 
 - **What:** Heroes gain XP from surviving combat. Levels grant small stat bumps (+HP, +primary stat). At level 5, the player picks 1 of 2 minor perks for that hero (e.g., "Precise: +5% Crit" / "Hardy: +10% HP").
 - **Why:** Visible per-hero progression. Pairs with Training Grounds (Tier 3 — benched XP).
@@ -123,7 +110,7 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 - **Touches:** `src/data/leveling.ts` (new), `src/heroes/hero.ts`, `src/run/run_state.ts` (XP-award hook), save schema + migration, tests.
 - **Source:** gdd §3 + §10 Tier 2.
 
-### 9 · Floor generation: forks
+### 8 · Floor generation: forks
 
 - **What:** Each floor has 1–2 fork nodes. At a fork the player picks one of two next-node types; they see the immediate next node on each branch but not what follows.
 - **Why:** Player agency between fights. Without forks, dungeons are linear walks.
@@ -134,7 +121,7 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 - **Touches:** `src/dungeon/floor_generator.ts`, `src/run/run_state.ts`, tests.
 - **Source:** gdd §4 + §10 Tier 2.
 
-### 10 · Shop nodes
+### 9 · Shop nodes
 
 - **What:** Shop encounter generator: rolls 3–4 gear items + 2 potions at floor-/tier-scaled prices. Player spends pack gold; purchased gear enters the pack.
 - **Why:** Adds a real "spend now or save?" decision mid-floor. Depends on gear rarity tiers.
@@ -145,7 +132,7 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 - **Touches:** `src/dungeon/shop.ts` (new), `src/run/run_state.ts`, tests. UI is Cluster B task 3.
 - **Source:** gdd §4 + §7 + §10 Tier 2.
 
-### 11 · Elite nodes
+### 10 · Elite nodes
 
 - **What:** Elite encounter generator: tougher enemy lineup (more enemies, modifiers like Armored / Enraged), guaranteed Rare drop on victory.
 - **Why:** Real reward asymmetry at forks ("Elite or Shop?"). Without elites, all combats are interchangeable.
@@ -155,7 +142,7 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 - **Touches:** `src/dungeon/elite.ts` (new), `src/dungeon/loot.ts`, tests. Visual marker is Cluster B task 10.
 - **Source:** gdd §4 + §10 Tier 2.
 
-### 12 · Mid-floor camp nodes
+### 11 · Mid-floor camp nodes
 
 - **What:** Mid-floor rest nodes. Player picks one of: heal some HP, treat one Wound, sharpen weapons (small temp Attack buff next combat). Cannot cash out.
 - **Why:** Drip recovery between fights without fully healing the party. Pairs with Wounds.
@@ -166,7 +153,7 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 - **Touches:** `src/dungeon/camp_node.ts` (new), `src/run/run_state.ts`, tests. UI is Cluster B task 4.
 - **Source:** gdd §4 + §10 Tier 2.
 
-### 13 · Floor-milestone enemy modifiers
+### 12 · Floor-milestone enemy modifiers
 
 - **What:** Modifiers introduced at milestone floors (5, 10, 15…): Armored (+Defense), Venomous (applies poison on hit), Enraged (+Attack scaling with damage taken). Floor generator stamps modifiers based on floor number.
 - **Why:** Makes deeper floors mechanically distinct, not just numerically scaled — last bullet of the Tier 2 dungeon-depth set.
@@ -177,7 +164,7 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 - **Touches:** `src/data/modifiers.ts`, `src/dungeon/floor_generator.ts`, `src/combat/combatant.ts`, tests.
 - **Source:** gdd §4 + §10 Tier 2.
 
-### 14 · Event system core
+### 13 · Event system core
 
 - **What:** Event card data structure (id, body text, 2 choice options, payload effects per option), deck shuffle, choice resolution. Effects can mutate `RunState` (HP changes, gold changes, hero "Lost", gear gain).
 - **Why:** Foundation for the event deck (next task) and "Lost"-category events.
@@ -189,18 +176,18 @@ Nothing in this cluster should import `phaser`. All of it must be unit-testable 
 - **Touches:** `src/data/events.ts` (new), `src/run/event_resolver.ts` (new), tests. UI is Cluster B task 5.
 - **Source:** gdd §7 + §10 Tier 2.
 
-### 15 · Initial event deck (~20 cards)
+### 14 · Initial event deck (~20 cards)
 
 - **What:** Author ~20 event cards. Mix of pure flavor gambles (HP-for-gold trades), party-cost cards (one hero Lost), reward cards (gear find).
 - **Why:** Without content, the event system is a feature with nothing to show.
 - **Tier:** 2
 - **Acceptance:**
   - 20 cards in `data/events.ts`, split between a shared deck and Crypt-specific cards.
-  - Each card uses payload kinds defined in task 14 — no new mechanics introduced here.
+  - Each card uses payload kinds defined in task 13 — no new mechanics introduced here.
 - **Touches:** `src/data/events.ts`.
 - **Source:** gdd §7 + §10 Tier 2.
 
-### 16 · "Lost" hero category
+### 15 · "Lost" hero category
 
 - **What:** Non-combat hero removal. The hero is gone permanently with all equipped gear, regardless of party survival. Triggered by event cards or hazard nodes.
 - **Why:** Gdd-defined design lever ("Lost" worse than "Fallen") that gives event cards real teeth.
@@ -220,7 +207,7 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 
 ### 1 · Hospital building
 
-- **What:** Hospital scene/screen on the camp hub. Lists wounded heroes; player spends gold per wound to clear it. Pairs with Cluster A task 4.
+- **What:** Hospital scene/screen on the camp hub. Lists wounded heroes; player spends gold per wound to clear it. Pairs with Cluster A task 3.
 - **Why:** Without UI, the wound system is unusable from the player's side.
 - **Tier:** 2
 - **Acceptance:**
@@ -242,7 +229,7 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 
 ### 3 · Shop UI
 
-- **What:** Shop overlay in the dungeon scene. Shows rolled inventory + prices, "Buy" buttons that draw from `pack.gold`. Pairs with Cluster A task 10.
+- **What:** Shop overlay in the dungeon scene. Shows rolled inventory + prices, "Buy" buttons that draw from `pack.gold`. Pairs with Cluster A task 9.
 - **Why:** Pairs with the shop-node data; without UI, shops can't be visited.
 - **Tier:** 2
 - **Acceptance:**
@@ -253,7 +240,7 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 
 ### 4 · Camp node UI (mid-floor)
 
-- **What:** UI for mid-floor camp nodes — three buttons: Rest (heal HP), Treat Wound (with a hero picker), Sharpen (temp Attack buff next combat). Pairs with Cluster A task 12.
+- **What:** UI for mid-floor camp nodes — three buttons: Rest (heal HP), Treat Wound (with a hero picker), Sharpen (temp Attack buff next combat). Pairs with Cluster A task 11.
 - **Why:** Pairs with camp-node data; needed for the player to interact.
 - **Tier:** 2
 - **Acceptance:**
@@ -263,7 +250,7 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 
 ### 5 · Event card UI
 
-- **What:** Event card overlay. Shows card body text and two choice buttons; on choice, payload effects apply via the core event resolver and an outcome panel summarises the result before dismissal. Pairs with Cluster A task 14.
+- **What:** Event card overlay. Shows card body text and two choice buttons; on choice, payload effects apply via the core event resolver and an outcome panel summarises the result before dismissal. Pairs with Cluster A task 13.
 - **Why:** Without UI, events are invisible to the player.
 - **Tier:** 2
 - **Acceptance:**
@@ -274,7 +261,7 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 
 ### 6 · Fork picker UI
 
-- **What:** When the dungeon scene reaches a fork, replace "advance" with a 2-button picker — each button labeled with the immediate next-node icon. Pairs with Cluster A task 9.
+- **What:** When the dungeon scene reaches a fork, replace "advance" with a 2-button picker — each button labeled with the immediate next-node icon. Pairs with Cluster A task 8.
 - **Why:** Pairs with floor-generator forks; needed for player choice.
 - **Tier:** 2
 - **Acceptance:**
@@ -284,7 +271,7 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 
 ### 7 · Trait display (Tavern + hero card)
 
-- **What:** Show a hero's trait in the Tavern candidate row and on the Barracks hero card. Pairs with Cluster A task 7.
+- **What:** Show a hero's trait in the Tavern candidate row and on the Barracks hero card. Pairs with Cluster A task 6.
 - **Why:** A trait the player can't see is a trait they can't roster around.
 - **Tier:** 2
 - **Acceptance:**
@@ -295,7 +282,7 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 
 ### 8 · Level-up perk picker UI
 
-- **What:** When a hero hits level 5, the camp scene shows a perk-pick overlay before the next run can start. Pairs with Cluster A task 8.
+- **What:** When a hero hits level 5, the camp scene shows a perk-pick overlay before the next run can start. Pairs with Cluster A task 7.
 - **Why:** Without UI, the perk choice can't be made — the hero gets stuck at "pending."
 - **Tier:** 2
 - **Acceptance:**
@@ -306,7 +293,7 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 
 ### 9 · Wound display (hero card + Barracks)
 
-- **What:** Show wounds on hero cards (icon + count) and a full breakdown in the Barracks detail view. Pairs with Cluster A task 4.
+- **What:** Show wounds on hero cards (icon + count) and a full breakdown in the Barracks detail view. Pairs with Cluster A task 3.
 - **Why:** Wounds need to be visible everywhere a hero is shown so the player can plan around them.
 - **Tier:** 2
 - **Acceptance:**
@@ -317,7 +304,7 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 
 ### 10 · Elite node visual marker
 
-- **What:** Distinguish elite nodes from regular combat nodes in the dungeon scene's icon row (e.g., 💀 vs ⚔️ + glow / outline). Pairs with Cluster A task 11.
+- **What:** Distinguish elite nodes from regular combat nodes in the dungeon scene's icon row (e.g., 💀 vs ⚔️ + glow / outline). Pairs with Cluster A task 10.
 - **Why:** Player needs to see "harder fight, better loot" before committing — especially at forks.
 - **Tier:** 2
 - **Acceptance:**
@@ -327,7 +314,7 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 
 ### 11 · "Lost" hero handling in scenes
 
-- **What:** When a hero is "Lost" mid-run (per Cluster A task 16), surface it visibly: tombstone in the party UI for the remainder of the run; cashout / wipe summary lists Fallen and Lost separately ("X was Lost" vs "X Fell").
+- **What:** When a hero is "Lost" mid-run (per Cluster A task 15), surface it visibly: tombstone in the party UI for the remainder of the run; cashout / wipe summary lists Fallen and Lost separately ("X was Lost" vs "X Fell").
 - **Why:** Without visible feedback, the design distinction between Fallen and Lost is invisible.
 - **Tier:** 2
 - **Acceptance:**

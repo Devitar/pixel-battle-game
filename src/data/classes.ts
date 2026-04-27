@@ -36,4 +36,15 @@ export const CLASSES: Record<ClassId, ClassDef> = {
       weapon: String(SPRITE_NAMES.weapon.mace_tier1),
     },
   },
+  barbarian: {
+    id: 'barbarian',
+    name: 'Barbarian',
+    baseStats: { hp: 22, attack: 6, defense: 3, speed: 3, mind: 0, crit: 10, dodge: 5 },
+    preferredWeapon: 'axe',
+    abilities: ['barbarian_swing', 'cleave', 'rampage', 'bloodthirst'],
+    aiPriority: ['rampage', 'cleave', 'bloodthirst', 'barbarian_swing'],
+    starterLoadout: {
+      weapon: String(SPRITE_NAMES.weapon.battleaxe_tier1),
+    },
+  },
 };

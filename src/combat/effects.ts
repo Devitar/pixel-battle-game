@@ -52,6 +52,17 @@ function applyDamage(
   if (lethal) {
     target.isDead = true;
     events.push({ kind: 'death', combatantId: target.id });
+    if (effect.healOnKill !== undefined) {
+      const healAmount = Math.round(effect.healOnKill * getEffectiveStat(caster, scalingStat));
+      const actual = Math.min(healAmount, caster.maxHp - caster.currentHp);
+      caster.currentHp += actual;
+      events.push({
+        kind: 'heal_applied',
+        sourceId: caster.id,
+        targetId: caster.id,
+        amount: actual,
+      });
+    }
   }
 }
 
@@ -142,6 +153,17 @@ export function applyAbility(
 ): void {
   events.push({ kind: 'ability_cast', casterId: caster.id, abilityId: ability.id, targetIds });
 
+  // Self-target effects fire once per cast, regardless of how many targets dodge.
+  // Flavor: a fully-dodged Rampage still costs the caster their defense — the
+  // over-extension happens whether or not the swing connects.
+  for (const effect of ability.effects) {
+    const isSelfTarget =
+      (effect.kind === 'buff' || effect.kind === 'debuff') && effect.selfTarget === true;
+    if (isSelfTarget && !caster.isDead) {
+      applyEffect(ability, effect, caster, caster, state, rng, events);
+    }
+  }
+
   const hasDamage = ability.effects.some((e) => e.kind === 'damage');
   const sidesWithDeaths = new Set<Combatant['side']>();
 
@@ -163,6 +185,9 @@ export function applyAbility(
     const wasAlive = !target.isDead;
     for (const effect of ability.effects) {
       if (target.isDead) break;
+      const isSelfTarget =
+        (effect.kind === 'buff' || effect.kind === 'debuff') && effect.selfTarget === true;
+      if (isSelfTarget) continue;
       applyEffect(ability, effect, caster, target, state, rng, events);
     }
     if (wasAlive && target.isDead) sidesWithDeaths.add(target.side);

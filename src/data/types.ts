@@ -1,6 +1,6 @@
 import type { Stats } from '../combat/types';
 
-export type ClassId = 'knight' | 'archer' | 'priest';
+export type ClassId = 'knight' | 'archer' | 'priest' | 'barbarian';
 
 export type AbilityId =
   | 'knight_slash'
@@ -23,15 +23,19 @@ export type AbilityId =
   | 'necrotic_wave'
   | 'lich_strike'
   | 'curse_of_frailty'
-  | 'chilling_touch';
+  | 'chilling_touch'
+  | 'barbarian_swing'
+  | 'cleave'
+  | 'rampage'
+  | 'bloodthirst';
 
-export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled';
+export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged';
 
 export type AbilityTag = 'radiant';
 
 export type CombatantTag = 'undead' | 'beast' | 'humanoid';
 
-export type WeaponType = 'sword' | 'bow' | 'holy_symbol';
+export type WeaponType = 'sword' | 'bow' | 'holy_symbol' | 'axe';
 
 export type SlotIndex = 1 | 2 | 3 | 4;
 
@@ -53,15 +57,19 @@ export interface TargetSelector {
 }
 
 export type AbilityEffect =
-  | { kind: 'damage'; power: number; scalingStat?: 'attack' | 'mind' }
+  | { kind: 'damage'; power: number; scalingStat?: 'attack' | 'mind'; healOnKill?: number }
   | { kind: 'heal'; power: number; scalingStat?: 'attack' | 'mind' }
   | { kind: 'stun'; duration: number }
   | { kind: 'shove'; slots: number }
   | { kind: 'pull'; slots: number }
-  | { kind: 'buff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId }
-  | { kind: 'debuff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId }
+  | { kind: 'buff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean }
+  | { kind: 'debuff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean }
   | { kind: 'mark'; damageBonus: number; duration: number; statusId: StatusId }
   | { kind: 'taunt'; duration: number; statusId: StatusId };
+
+export type AiCondition =
+  | { kind: 'minTargets'; n: number }
+  | { kind: 'casterHpBelow'; ratio: number };
 
 export interface Ability {
   id: AbilityId;
@@ -71,6 +79,7 @@ export interface Ability {
   effects: readonly AbilityEffect[];
   tags?: readonly AbilityTag[];
   cooldown?: number;
+  aiCondition?: AiCondition;
 }
 
 export interface StarterLoadout {
