@@ -58,4 +58,15 @@ export const CLASSES: Record<ClassId, ClassDef> = {
       weapon: String(SPRITE_NAMES.weapon.dagger_tier1),
     },
   },
+  mage: {
+    id: 'mage',
+    name: 'Mage',
+    baseStats: { hp: 12, attack: 2, defense: 1, speed: 4, mind: 8, crit: 5, dodge: 5 },
+    preferredWeapon: 'staff',
+    abilities: ['mage_zap', 'firebolt', 'frost_nova', 'arc_shock'],
+    aiPriority: ['frost_nova', 'firebolt', 'arc_shock', 'mage_zap'],
+    starterLoadout: {
+      weapon: String(SPRITE_NAMES.weapon.staff_blue_tier1),
+    },
+  },
 };

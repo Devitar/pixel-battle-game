@@ -1,6 +1,6 @@
 import type { Stats } from '../combat/types';
 
-export type ClassId = 'knight' | 'archer' | 'priest' | 'barbarian' | 'rogue';
+export type ClassId = 'knight' | 'archer' | 'priest' | 'barbarian' | 'rogue' | 'mage';
 
 export type AbilityId =
   | 'knight_slash'
@@ -31,15 +31,19 @@ export type AbilityId =
   | 'rogue_strike'
   | 'backstab'
   | 'vanish'
-  | 'poison_strike';
+  | 'poison_strike'
+  | 'mage_zap'
+  | 'firebolt'
+  | 'frost_nova'
+  | 'arc_shock';
 
-export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished';
+export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished' | 'slowed';
 
 export type AbilityTag = 'radiant';
 
 export type CombatantTag = 'undead' | 'beast' | 'humanoid';
 
-export type WeaponType = 'sword' | 'bow' | 'holy_symbol' | 'axe' | 'daggers';
+export type WeaponType = 'sword' | 'bow' | 'holy_symbol' | 'axe' | 'daggers' | 'staff';
 
 export type SlotIndex = 1 | 2 | 3 | 4;
 
@@ -61,17 +65,17 @@ export interface TargetSelector {
 }
 
 export type AbilityEffect =
-  | { kind: 'damage'; power: number; scalingStat?: 'attack' | 'mind'; healOnKill?: number; bonusCrit?: number }
-  | { kind: 'heal'; power: number; scalingStat?: 'attack' | 'mind' }
-  | { kind: 'stun'; duration: number }
-  | { kind: 'shove'; slots: number }
-  | { kind: 'pull'; slots: number }
-  | { kind: 'moveToSlot'; slot: SlotIndex }
-  | { kind: 'poison'; damagePerTurn: number; duration: number; statusId: StatusId }
-  | { kind: 'buff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean }
-  | { kind: 'debuff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean }
-  | { kind: 'mark'; damageBonus: number; duration: number; statusId: StatusId }
-  | { kind: 'taunt'; duration: number; statusId: StatusId };
+  | { kind: 'damage'; power: number; scalingStat?: 'attack' | 'mind'; healOnKill?: number; bonusCrit?: number; chance?: number }
+  | { kind: 'heal'; power: number; scalingStat?: 'attack' | 'mind'; chance?: number }
+  | { kind: 'stun'; duration: number; chance?: number }
+  | { kind: 'shove'; slots: number; chance?: number }
+  | { kind: 'pull'; slots: number; chance?: number }
+  | { kind: 'moveToSlot'; slot: SlotIndex; chance?: number }
+  | { kind: 'poison'; damagePerTurn: number; duration: number; statusId: StatusId; chance?: number }
+  | { kind: 'buff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean; chance?: number }
+  | { kind: 'debuff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean; chance?: number }
+  | { kind: 'mark'; damageBonus: number; duration: number; statusId: StatusId; chance?: number }
+  | { kind: 'taunt'; duration: number; statusId: StatusId; chance?: number };
 
 export type AiCondition =
   | { kind: 'minTargets'; n: number }

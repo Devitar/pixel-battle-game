@@ -18,6 +18,7 @@ const STATUS_GLYPHS: Partial<Record<StatusId, { letter: string; color: string }>
   enraged: { letter: 'E', color: '#ff4444' },
   vanished: { letter: 'V', color: '#aaccff' },
   poisoned: { letter: 'P', color: '#88cc44' },
+  slowed: { letter: 's', color: '#88ccff' },
 };
 const STATUS_FALLBACK = { letter: '?', color: '#888888' };
 

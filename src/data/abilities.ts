@@ -238,4 +238,43 @@ export const ABILITIES: Record<AbilityId, Ability> = {
       { kind: 'poison', damagePerTurn: 2, duration: 3, statusId: 'poisoned' },
     ],
   },
+
+  mage_zap: {
+    id: 'mage_zap',
+    name: 'Zap',
+    canCastFrom: [2, 3],
+    target: { side: 'enemy', slots: [1] },
+    effects: [{ kind: 'damage', power: 1.0, scalingStat: 'mind' }],
+  },
+  firebolt: {
+    id: 'firebolt',
+    name: 'Firebolt',
+    canCastFrom: [2, 3],
+    target: { side: 'enemy', slots: [3, 4], pick: 'first' },
+    effects: [{ kind: 'damage', power: 1.0, scalingStat: 'mind' }],
+    cooldown: 2,
+  },
+  frost_nova: {
+    id: 'frost_nova',
+    name: 'Frost Nova',
+    canCastFrom: [2, 3],
+    target: { side: 'enemy', slots: 'all' },
+    effects: [
+      { kind: 'damage', power: 0.5, scalingStat: 'mind' },
+      { kind: 'debuff', stat: 'speed', delta: -2, duration: 2, statusId: 'slowed' },
+    ],
+    cooldown: 2,
+    aiCondition: { kind: 'minTargets', n: 2 },
+  },
+  arc_shock: {
+    id: 'arc_shock',
+    name: 'Arc Shock',
+    canCastFrom: [2, 3],
+    target: { side: 'enemy', slots: [1] },
+    effects: [
+      { kind: 'damage', power: 0.8, scalingStat: 'mind' },
+      { kind: 'stun', duration: 1, chance: 40 },
+    ],
+    cooldown: 2,
+  },
 };

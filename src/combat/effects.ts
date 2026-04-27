@@ -112,6 +112,7 @@ function applyEffect(
   events: CombatEvent[],
 ): void {
   if (target.isDead) return;
+  if (effect.chance !== undefined && !rng.percent(effect.chance)) return;
   switch (effect.kind) {
     case 'damage':
       applyDamage(caster, target, effect, ability, state, rng, events);

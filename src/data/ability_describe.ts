@@ -49,6 +49,7 @@ const STATUS_LABEL: Record<StatusId, string> = {
   enraged: 'enraged',
   poisoned: 'poisoned',
   vanished: 'vanished',
+  slowed: 'slowed',
 };
 
 function describeFilter(filter: TargetSelector['filter']): string {

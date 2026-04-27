@@ -27,18 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 2 · Class: Mage
-
-- **What:** Implement the Mage. Kit: Firebolt (single-target enemy 3–4), Frost Nova (AoE + slow), Arc Shock (chance-stun). Preferred slot 3, staff / wand. Scales primarily off Mind.
-- **Why:** First fully Mind-scaling caster; introduces the "slow" status (Speed reduction) and the chance-stun pattern.
-- **Tier:** 2
-- **Acceptance:**
-  - `data/classes.ts` adds `mage`; abilities added with Mind scaling on damage.
-  - Slow status reduces Speed for N turns; Arc Shock stuns with a configurable RNG-rolled chance.
-  - AI priority reflects the kit (Frost Nova on 3+ enemies, Firebolt otherwise).
-- **Touches:** `src/data/classes.ts`, `src/data/abilities.ts`, `src/combat/statuses.ts`, `src/combat/ability_priority.ts`, tests.
-- **Source:** gdd §3 + §10 Tier 2.
-
 ### 3 · Wounds system
 
 - **What:** Wounds — flat stat debuffs applied on heavy combat hits (or specific events). Each wound has a category (e.g., "Bruised: −2 Speed", "Hobbled: −2 Attack") and persists between fights and runs until healed at the Hospital or passively over N runs.

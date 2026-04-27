@@ -32,6 +32,10 @@ const EXPECTED_IDS: readonly AbilityId[] = [
   'backstab',
   'vanish',
   'poison_strike',
+  'mage_zap',
+  'firebolt',
+  'frost_nova',
+  'arc_shock',
 ];
 
 const KEBAB_CASE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;

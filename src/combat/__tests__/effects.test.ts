@@ -623,3 +623,80 @@ describe('poison effect', () => {
     expect(statusEvent).toBeDefined();
   });
 });
+
+describe('chance field', () => {
+  it('chance: 0 always skips the effect', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'knight_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [
+        { kind: 'damage' as const, power: 1.0 },
+        { kind: 'stun' as const, duration: 1, chance: 0 },
+      ],
+    };
+    applyAbility(ability, p0, ['e0'], state, rng, events);
+    expect(events.find((e) => e.kind === 'damage_applied')).toBeDefined();
+    expect(events.find((e) => e.kind === 'status_applied' && e.statusId === 'stunned')).toBeUndefined();
+    expect(e0.statuses['stunned']).toBeUndefined();
+  });
+
+  it('chance: 100 always fires the effect', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'knight_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [
+        { kind: 'damage' as const, power: 1.0 },
+        { kind: 'stun' as const, duration: 1, chance: 100 },
+      ],
+    };
+    applyAbility(ability, p0, ['e0'], state, rng, events);
+    expect(events.find((e) => e.kind === 'status_applied' && e.statusId === 'stunned')).toBeDefined();
+    expect(e0.statuses['stunned']).toBeDefined();
+  });
+
+  it('dodge short-circuits chance — dodged target gets no rider effect even with chance: 100', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 100 },
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    const ability = {
+      id: 'knight_slash' as const,
+      name: 'Test',
+      canCastFrom: [1, 2] as const,
+      target: { side: 'enemy' as const, slots: [1] as const },
+      effects: [
+        { kind: 'damage' as const, power: 1.0 },
+        { kind: 'stun' as const, duration: 1, chance: 100 },
+      ],
+    };
+    applyAbility(ability, p0, ['e0'], state, rng, events);
+    expect(events.find((e) => e.kind === 'attack_dodged')).toBeDefined();
+    expect(events.find((e) => e.kind === 'damage_applied')).toBeUndefined();
+    expect(events.find((e) => e.kind === 'status_applied')).toBeUndefined();
+    expect(e0.statuses['stunned']).toBeUndefined();
+  });
+});

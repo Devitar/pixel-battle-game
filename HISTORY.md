@@ -29,6 +29,52 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-26 · Class: Mage + generic chance-on-effect
+
+- **What shipped:**
+  - `src/data/types.ts` — `ClassId` (+`'mage'`); `WeaponType` (+`'staff'`); `StatusId` (+`'slowed'`); `AbilityId` (+4: `'mage_zap'`, `'firebolt'`, `'frost_nova'`, `'arc_shock'`); `chance?: number` added to ALL eleven `AbilityEffect` variants.
+  - `src/data/abilities.ts` — 4 new entries. Firebolt is single-target back row (`slots: [3, 4], pick: 'first'`), mind-scaled, cooldown 2. Frost Nova is AoE damage + slow (`debuff stat: 'speed' delta: -2 duration: 2 statusId: 'slowed'`), mind-scaled, cooldown 2, `aiCondition: minTargets 2`. Arc Shock is mind-scaled damage + 40% chance stun. Mage Zap is the universal mind-scaled basic.
+  - `src/data/classes.ts` — Mage entry: `hp 12, attack 2, defense 1, speed 4, mind 8, crit 5, dodge 5`. Lowest HP/Attack, highest Mind. Starter weapon `staff_blue_tier1` (frame 96), distinct from Cultist's green staff.
+  - `src/data/ability_describe.ts` — `STATUS_LABEL` extended with `slowed: 'slowed'`.
+  - `src/combat/effects.ts` — `applyEffect` gates on `effect.chance` at the top of the function (right after the `target.isDead` check, before the kind switch). One uniform check applies to both per-target effects AND self-target effects (called from `applyAbility`'s pre-loop pass). Failed chance silently skips the effect — no event emitted.
+  - `src/render/combat_actor.ts` — `STATUS_GLYPHS` adds `slowed: { letter: 's', color: '#88ccff' }`. Lowercase 's' to differentiate from the existing 'S' (stunned).
+  - `src/save/migration.ts` — `CURRENT_SCHEMA_VERSION` bumped 4 → 5 (no migration; old saves discarded per pre-launch policy).
+  - `src/save/save.ts` — `createDefaultUnlocks` adds `'mage'`. All 6 launch classes now in the Tavern roll pool from a fresh save.
+  - `src/combat/__tests__/effects.test.ts` — 3 chance tests (chance: 0 always skips, chance: 100 always fires, dodge short-circuits chance).
+  - `src/data/__tests__/abilities.test.ts`, `src/data/__tests__/classes.test.ts`, `src/save/__tests__/save.test.ts` — `EXPECTED_IDS` / `createDefaultUnlocks` assertions extended.
+  - Tests: 624 → **657 passing**, build clean.
+  - Design spec at `docs/superpowers/specs/2026-04-26-class-mage-design.md` (no separate plan; implementation followed the spec directly per the established pattern).
+- **Why:** Third and final Tier 2 class. Closes the launch lineup (Knight, Archer, Priest, Barbarian, Rogue, Mage = 6, matching gdd §3's "MVP ships 6"). Glass-cannon caster fills the high-burst-damage role with positional and CC tools that Priest doesn't have. Frost Nova's slow + Arc Shock's chance-stun give the player meaningful tempo control, distinct from Knight's tanking and Rogue's positional play.
+- **Decisions:**
+  - *Generic `chance?: number` on every effect kind (brainstorm Q1 option C, user-chosen).* Single optional field added uniformly across all 11 `AbilityEffect` variants. Resolver gates with one `if (effect.chance !== undefined && !rng.percent(effect.chance)) return;` line at the top of `applyEffect`. Beat the narrower "extend stun only" (A) and "new chanceStun kind" (B) options — the user wanted future-proofing for chance-on-anything (chance-debuff, chance-shove, chance-mark, etc.) without requiring per-variant additions later. The implementation cost was identical to option A — adding the field everywhere is one optional column on each line of the union; the resolver check is one line.
+  - *Failed chance roll is silent (no event).* The alternative — emitting an `effect_resisted` event — would let playback show "Stun resisted!" floaters, but adds an event variant and combat-playback handler for what is currently zero use cases. YAGNI; can add later as Tier 2 polish if the silence feels confusing.
+  - *Mage's stat block: glass-cannon caster.* HP 12 (lowest, narrowly under Rogue's 13), Attack 2 (lowest), Defense 1 (ties Rogue), Speed 4 (caster pace), Mind 8 (highest, beats Priest's 5), Crit/Dodge 5. Mind 8 makes Firebolt a `8 raw` nuke and Frost Nova a `4 raw` AoE — comparable to Archer's piercing_shot raw output but the AoE is the differentiator.
+  - *Frost Nova's `aiCondition: minTargets 2` (not 3).* Standard Crypt encounters are 3 enemies; gating at 3 would mean Frost Nova fires turn 1 then never again as enemies die. At 2, it stays in rotation through most of the fight. Falls through cleanly to Firebolt/Arc Shock when only one enemy remains.
+  - *AI ordering: Frost Nova > Firebolt > Arc Shock > Zap.* Frost Nova is the high-value AoE control; Firebolt kills back-line casters/boss before they cast; Arc Shock disables front-line attackers (with stun chance). Each signature is on cooldown 2, so Zap fills the gap on T4 of every rotation cycle.
+  - *`'staff'` as a new `WeaponType`, separate from Priest's `'holy_symbol'`.* Conceptually a staff IS a magical weapon and a holy symbol is also magical, but the gdd treats them as distinct families (Priest's signature is healing/divine; Mage's is elemental/control). Setting up the distinction now avoids retrofitting later when Cluster A task 5 (Gear-modifies-abilities) adds same-family weapon swaps.
+  - *Schema bump 4 → 5 + discard old saves (per durable preference, confirmed).* Same pattern as the prior three classes.
+  - *Skipped writing a separate implementation plan file* (deviation from the prior pattern). Per emerging user pattern, when the spec is tight and the work follows established class-add patterns, the writing-plans step adds little signal. Implemented directly from the spec, task-structured the same way as Barbarian/Rogue. Worth noting: this was a one-off shortcut — for novel work with new mechanics, the plan still earns its keep.
+  - *Skipped browser smoke test* (per the new durable preference saved this session). Vitest covers the chance/slow/stun mechanics deterministically; visual verification is the user's domain.
+- **Alternatives considered:**
+  - *Hardcode chance into `stun` only (brainstorm Q1 option A).* Rejected — user preferred the generic approach for future flexibility.
+  - *New `chanceStun` effect kind (option B).* Rejected as duplicating structure.
+  - *Chance scaling with caster Mind* (chance = 40 + mind × 5). Rejected — flat 40% is the design; Mind already scales the damage component of Arc Shock. Adding it to chance too would conflate.
+  - *Multi-stack slow.* Rejected — `storeStatus` overwrites; consistent with poison's behavior. Multi-stack is post-launch tuning.
+- **Surprises / lessons:**
+  - **The `applyEffect` chance gate placement matters.** Putting the gate at the top of `applyEffect` (rather than inside each case) means it fires uniformly for both per-target effects and self-target effects (which call `applyEffect` from the pre-loop pass). One source of truth for the gate. If the gate had been inside the per-target loop in `applyAbility`, self-target effects would have skipped the chance roll — a subtle bug. The "single dispatch function" design pays off again.
+  - **Slow's interaction with turn order is automatic.** `computeInitiative` (`src/combat/turn_order.ts:8`) already reads `getEffectiveStat(c, 'speed')`, which sums base + buffs + debuffs. Frost Nova's debuff just shows up. No special-casing. Verified at spec-writing time, not implementation time — caught in the spec self-review pass.
+  - **Skipping the writing-plans skill saved a real chunk of tokens with no quality loss for this task.** The Mage spec was tight enough (every value spelled out, every code change blocked out) that the plan would have been ~80% restating the spec in checklist form. The pattern of class-additions is now well-established (Barbarian, Rogue, Mage all followed the same shape). For genuinely novel work, plans still pay; for "another class with kit X", the spec is sufficient.
+  - **The browser smoke test we ran (and shouldn't have, per the new preference) revealed a self-test bug, not a real bug.** I passed `pickAbility(...).targetIds` from a frost_nova selection into a `firebolt` cast — confused the abilities. Real implementation was correct; my JS smoke-test payload was sloppy. Lesson reinforces the new "skip browser by default" preference: the browser-driven check was costing tokens AND occasionally producing misleading "false" results from test-code typos that would never appear in vitest (which doesn't cobble payloads together at runtime).
+  - **Discriminated-union additions cascade into `describeEffect`.** Each new effect kind needs a case in `ability_describe.ts:describeEffect` or `tsc --noEmit` complains. Mage didn't add new effect kinds (just `chance` field on existing kinds, which doesn't reach the switch), so describeEffect was untouched this round — but the lesson from Rogue still holds for future kinds.
+- **Touches:**
+  - `src/data/types.ts`, `src/data/abilities.ts`, `src/data/classes.ts`, `src/data/ability_describe.ts`
+  - `src/combat/effects.ts`
+  - `src/render/combat_actor.ts`
+  - `src/save/migration.ts`, `src/save/save.ts`
+  - `src/data/__tests__/abilities.test.ts`, `src/data/__tests__/classes.test.ts`, `src/save/__tests__/save.test.ts`, `src/combat/__tests__/effects.test.ts`
+  - `docs/superpowers/specs/2026-04-26-class-mage-design.md` (new). No plan file (skipped per emerging pattern).
+- **Source:** TODO Cluster A task 2 (Mage, gdd §3 + §10 Tier 2).
+
 ### 2026-04-26 · Class: Rogue + three more reusable engine extensions
 
 - **What shipped:**
