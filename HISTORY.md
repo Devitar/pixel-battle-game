@@ -29,6 +29,54 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-26 · Class: Barbarian + three reusable engine extensions
+
+- **What shipped:**
+  - `src/data/types.ts` — `ClassId` (+`'barbarian'`); `WeaponType` (+`'axe'`); `StatusId` (+`'enraged'`); `AbilityId` (+4: `'barbarian_swing'`, `'cleave'`, `'rampage'`, `'bloodthirst'`); `AbilityEffect` damage variant (+`healOnKill?: number`); buff/debuff variants (+`selfTarget?: boolean`); new `AiCondition` type (`minTargets`/`casterHpBelow` predicates); `Ability.aiCondition?` field.
+  - `src/data/abilities.ts` — 4 new entries. Bloodthirst is a damage attack with `healOnKill: 0.5` rider. Cleave hits enemies in slots 1–2 at `power 0.7` with `aiCondition: { kind: 'minTargets', n: 2 }`. Rampage is `power 1.5` damage + a `selfTarget: true` debuff on `defense` for 2 turns (`enraged` status), `cooldown: 2`, `aiCondition: { kind: 'casterHpBelow', ratio: 0.5 }`. Barbarian Swing is the universal basic attack.
+  - `src/data/classes.ts` — Barbarian entry: `hp 22, attack 6, defense 3, speed 3, mind 0, crit 10, dodge 5`. Highest HP and Attack in the roster, one defense lower than Knight, mid Crit between Knight (5) and Archer (15). Starter weapon `battleaxe_tier1` (frame 105).
+  - `src/data/ability_describe.ts` — `STATUS_LABEL` extended with `enraged: 'enraged'`.
+  - `src/combat/effects.ts` — `applyDamage` honors `healOnKill` after lethal damage (`heal_amount = round(healOnKill × scalingStat)`, capped by caster's missing HP, emits a regular `heal_applied` event so playback renders it without new code). `applyAbility` restructured to apply `selfTarget` effects ONCE before the per-target loop (regardless of dodge); the per-target loop skips `selfTarget` effects to avoid double-apply on AoE.
+  - `src/combat/ability_priority.ts` — `pickAbility` checks `ability.aiCondition` after target-list filter; new `checkAiCondition` helper handles the two predicates.
+  - `src/render/combat_actor.ts` — `STATUS_GLYPHS` adds `enraged: { letter: 'E', color: '#ff4444' }`.
+  - `src/save/migration.ts` — `CURRENT_SCHEMA_VERSION` bumped 2 → 3 (no migration; old saves discarded per pre-launch policy).
+  - `src/save/save.ts` — `createDefaultUnlocks` adds `'barbarian'` so fresh saves see Barbarian in the Tavern roll pool. `generateStarterRoster` deliberately NOT changed; the starter roster stays Knight/Archer/Priest, players recruit Barbarians via Tavern.
+  - `src/combat/__tests__/effects.test.ts` — 3 healOnKill tests, 3 selfTarget tests.
+  - `src/data/__tests__/abilities.test.ts`, `src/data/__tests__/classes.test.ts`, `src/save/__tests__/save.test.ts` — `EXPECTED_IDS` / `createDefaultUnlocks` assertions extended.
+  - Tests: 553 → **583 passing**, build clean.
+  - Design spec at `docs/superpowers/specs/2026-04-26-class-barbarian-design.md`; implementation plan at `docs/superpowers/plans/2026-04-26-class-barbarian.md`.
+- **Why:** First Tier 2 class; bruiser archetype broadens party composition beyond Knight/Archer/Priest. The kit forced three small engine extensions (`healOnKill`, `selfTarget`, `aiCondition`) that the next two Tier 2 classes (Rogue, Mage) will reuse — so the structural cost is amortized across three tasks.
+- **Decisions:**
+  - *Bloodthirst is per-cast lifesteal, not active self-buff (brainstorm Q1 option A).* A new optional `healOnKill?: number` field on the damage effect lets the rider live as data with no new trigger machinery. Beat the active-buff variant (B) which would have required a new "status that observes kill events" system that nothing else in Tier 2 needs (YAGNI). Trade-off accepted: Bloodthirst feels more transactional than a "go berserk" buff, but the math is simpler and the implementation is one optional field.
+  - *Rampage is a single cast with fixed cost (brainstorm Q2 option A).* Damage + self-debuff in one ability. Beat stack-based "Raging" (B) which would have required new stack-decay machinery. The single-cast model fits the existing effect resolver and keeps balance predictable.
+  - *AI conditions as a discriminated union on the Ability type (brainstorm Q3 option A).* `aiCondition?: { kind: 'minTargets'; n } | { kind: 'casterHpBelow'; ratio }` reads naturally in data, is exhaustively type-checked in the resolver switch, and extensible (Mage's "Frost Nova on 3+ enemies" reuses `minTargets`; Rogue's "Vanish when low HP" reuses `casterHpBelow`). Beat hardcoding per-class branches in `pickAbility` (B — would accumulate ~6 special-cases across Tier 2) and beat function-valued predicates (C — fights the rest of the data layer's plain-typed-records pattern).
+  - *`selfTarget` as a flag on buff/debuff effects (brainstorm Q2 implementation note).* Smallest extension that supports mixed-target abilities (Rampage damages enemy + debuffs self). The alternative — splitting Rampage into two abilities chained together — would need a chaining mechanism the engine doesn't have. The flag also reuses for Rogue's Vanish (selfTarget +Dodge buff alongside slot-move) in Cluster A task 1.
+  - *selfTarget effects fire ONCE per cast, regardless of dodge or AoE target count.* On a fully-dodged Rampage, the caster STILL takes the defense debuff — flavor: "you over-extended even though the swing whiffed." On AoE volley with selfTarget +Crit, the buff applies once not N times. Implementation is pre-loop self-effect pass; per-target loop skips `selfTarget: true` effects.
+  - *AI ordering: Rampage > Cleave > Bloodthirst > Swing.* Rampage gates on low HP and would rarely fire at full HP; Cleave needs 2+ front targets so it skips when only one front-liner; Bloodthirst is opportunistic kill-finisher; Swing is the universal fallback. No ability competes with a more specific gate.
+  - *Stat block: HP 22 (highest), Attack 6 (highest), Defense 3 (one below Knight), Crit 10 (mid).* Bruiser fantasy + headroom for Rampage's defense-drop turns. Crit 10 makes Bloodthirst's heal-on-kill trigger meaningfully (not too rare).
+  - *Schema bump 2 → 3 + discard old saves (per durable preference).* The class definition itself doesn't reshape persisted data, but `createDefaultUnlocks()` returns a different `classes` list now. Existing saves carry the old list and would never see Barbarian without intervention. Per the pre-launch policy, bump + discard; user re-asked.
+  - *`battleaxe_tier1` over `axe_tier1` for the starter sprite.* Reads as two-handed and contrasts visibly with Knight's sword + shield. The catalog has no actual greatsword frame; `WeaponType: 'axe'` covers axe / battleaxe / hatchet variants.
+  - *Tests for AI conditions deferred from Task 3 to Task 5 integration.* The plan's test pattern of injecting fake abilities into ABILITIES at runtime would have been janky and required `as unknown as` casts. Instead, Task 5 wired the real Cleave and Rampage abilities with their `aiCondition` fields, and the integration smoke test (described in Surprises below) verified all three AI gates fire correctly.
+- **Alternatives considered:**
+  - *Active-buff Bloodthirst with status-driven heal-on-kill.* Rejected — see Decisions §1; required new triggers system.
+  - *Stack-based Rampage.* Rejected — see Decisions §2.
+  - *Hardcode aiCondition per class in `pickAbility`.* Rejected — Tier 2 would accumulate special-cases; the data-driven design is the right shape.
+  - *Add a `passives` field to ClassDef and treat Bloodthirst as a class trait.* Rejected — gdd lists Bloodthirst as a *signature ability slot* (one of 4); making it a passive would leave a kit slot empty and require 4 active abilities elsewhere.
+  - *Backfill old v2 saves with `'barbarian'` in unlocks instead of bumping schema.* Rejected per pre-launch policy.
+- **Surprises / lessons:**
+  - **Browser-driven smoke testing was extremely effective for verifying AI behavior.** Drove the dev server via Claude in Chrome: confirmed schema=3, unlocks include barbarian, `generateCandidate` rolls Barbarian at 28% (50 samples, expected 25%), and ran 10-seed `applyAbility` sweeps that confirmed Rampage damage = 7 raw / 16 on crit (proving "crit doubles before defense" once again), and seed 7 dodged the swing while STILL applying the enraged status to caster (proving the selfTarget-fires-on-dodge spec). End-to-end confidence in the AI without driving any UI clicks. About 10× faster than manual smoke and produced quantitative evidence the user can read.
+  - **Loop-restructure pattern emerging.** This is the second time `applyAbility` has been restructured (first: Cluster A task 1's target-major restructure for dodge; now: pre-loop self-effect pass for selfTarget). Both times the change was small and additive, but the function is starting to do a lot. If it grows further (e.g., Mage's Arc Shock chance-stun probably wants its own gate), worth considering whether it's a candidate for splitting — `applyAbilityEffects` (the for-target/for-effect kernel) versus `applyAbility` (the orchestrator). Not done here.
+  - **Vitest test-shared `rng` state remains a footgun.** Same lesson as the 7-stat model: tests that assert specific damage values need explicit `crit: 0, dodge: 0` overrides to be robust against future RNG-consuming additions. The new healOnKill/selfTarget tests all use explicit zero-stat overrides — paying the cost upfront so they don't break the next time something else consumes RNG in `applyAbility`.
+  - **`generateStarterRoster` divergence from `generateCandidate` is intentional.** Initial confusion: I assumed adding to `createDefaultUnlocks` would automatically include Barbarian in the starter roster. It doesn't — `generateStarterRoster` hardcodes `['knight', 'archer', 'priest']` and `generateCandidate` is the one that pulls from unlocks. This is by design (the starter roster is "the traditional Tier 1 trio" not "every available class") but worth noting for future class-add tasks.
+- **Touches:**
+  - `src/data/types.ts`, `src/data/abilities.ts`, `src/data/classes.ts`, `src/data/ability_describe.ts`
+  - `src/combat/effects.ts`, `src/combat/ability_priority.ts`
+  - `src/render/combat_actor.ts`
+  - `src/save/migration.ts`, `src/save/save.ts`
+  - `src/data/__tests__/abilities.test.ts`, `src/data/__tests__/classes.test.ts`, `src/save/__tests__/save.test.ts`, `src/combat/__tests__/effects.test.ts`
+  - `docs/superpowers/specs/2026-04-26-class-barbarian-design.md`, `docs/superpowers/plans/2026-04-26-class-barbarian.md` (new)
+- **Source:** TODO Cluster A task 1 (Barbarian, gdd §3 + §10 Tier 2).
+
 ### 2026-04-26 · Full 7-stat model: Mind, Crit, Dodge
 
 - **What shipped:**
