@@ -198,17 +198,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Touches:** `src/scenes/dungeon_scene.ts`.
 - **Source:** gdd §4 + §10 Tier 2.
 
-### 7 · Trait display (Tavern + hero card)
-
-- **What:** Show a hero's trait in the Tavern candidate row and on the Barracks hero card. Pairs with Cluster A task 6.
-- **Why:** A trait the player can't see is a trait they can't roster around.
-- **Tier:** 2
-- **Acceptance:**
-  - Tavern candidate row includes a trait label + tooltip (description from `data/traits.ts`).
-  - Barracks hero card surfaces the trait with the same prominence as level/class.
-- **Touches:** `src/scenes/tavern_scene.ts`, `src/ui/hero_card.ts`.
-- **Source:** gdd §3 + §10 Tier 2.
-
 ### 8 · Level-up perk picker UI
 
 - **What:** When a hero hits level 5, the camp scene shows a perk-pick overlay before the next run can start. Pairs with Cluster A task 7.

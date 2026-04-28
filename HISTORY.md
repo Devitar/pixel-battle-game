@@ -29,6 +29,19 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-28 · Trait display on hero cards (Cluster B · 7)
+
+- **Why:** With the trait pool at 12 entries (Cluster A · 6), players needed the trait readable wherever a roster is shown. Pre-task the trait *name* rendered only on the large card and the *description* only on the Barracks detail pane — so Tavern players had to memorize what each trait does, and the Barracks list pane (where you spend most of your roster-management time) showed nothing about traits at all.
+- **Decisions:**
+  - **Always-visible inline description over hover tooltip.** The codebase has no tooltip widget and tooltips behave poorly on touch (mobile-landscape is supported). Inline text is one widget change versus net-new infrastructure plus a touch-fallback question. The TODO entry's "tooltip" wording is interpreted as "description must be reachable," not as a specific UI affordance.
+  - **Required `shortDescription` field over wrapping or width-growth.** Hand-tuned short forms (≤16 chars) keep the small-card layout uniform, the Barracks 2-column grid intact, and the Noticeboard slot height unchanged. Adds 12 strings; trivial maintenance. Field is required (not optional) — there's no sensible fallback at the call site, since degrading to `description` would re-introduce the overflow problem the field exists to solve.
+  - **No color treatment by trait sign.** Bloodthirsty is "positive but conditional," which muddies any sign-based scheme. Defer until it earns the complexity.
+- **Surprises:**
+  - The small card's slot allocation was already 60 px (4 px slack over the 56 px card). Growing `SMALL_HEIGHT` 56→60 to fill the slot, plus mild internal compression (name 14→12 px, HP bar 6→5 px, top padding 8→6 px), fit the new trait line without touching `BarracksPanelScene`, `NoticeboardPanelScene`, or any panel-chrome constants.
+  - Bloodthirsty short form (`Bloodthirsty · +2 Atk <50%HP`, ~28 chars at 10 px) overflows the small-card text-row width budget by ~36 px. Acceptable: trait line is the last visual element, no right-side neighbor collides (190 px to next slot center, 248 px to its left edge). Cleaner long-term alternative would be growing the small card to 240 wide and re-tuning two scenes — out of scope here.
+  - Free bonus: the Noticeboard party picker uses the same small card via `HeroCard`, so it picked up trait display automatically with zero scene changes.
+- **Source:** TODO.md Cluster B · 7 → spec at `docs/superpowers/specs/2026-04-28-trait-display-design.md` → plan at `docs/superpowers/plans/2026-04-28-trait-display.md`. Test count delta: +24 (12 traits × 2 new shape checks); 969 → 993 passing.
+
 ### 2026-04-28 · Traits at recruitment — pool to 12 (Cluster A · 6)
 
 - **Why:** Pre-task pool was 6 entries — small enough that two Tavern visits could roll visually identical rosters. Doubled to 12 to make rolls produce distinct heroes (some with real flaws), and to land the foundation for future conditional traits without expanding the engine again. Trait scaffolding (data, types, application points) was already in place from earlier recruitment / combat work — this task was mostly content plus two narrow type widenings.

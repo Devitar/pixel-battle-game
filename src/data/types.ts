@@ -274,6 +274,7 @@ export interface TraitDef {
   id: TraitId;
   name: string;
   description: string;
+  shortDescription: string;
   hpEffect?: TraitHpEffect;
   statEffects?: readonly TraitStatEffect[];
 }

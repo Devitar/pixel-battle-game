@@ -67,5 +67,14 @@ describe('TRAITS', () => {
         }
       }
     });
+
+    it('has a non-empty shortDescription', () => {
+      expect(typeof TRAITS[id].shortDescription).toBe('string');
+      expect(TRAITS[id].shortDescription.length).toBeGreaterThan(0);
+    });
+
+    it('shortDescription is at most 16 characters', () => {
+      expect(TRAITS[id].shortDescription.length).toBeLessThanOrEqual(16);
+    });
   });
 });
