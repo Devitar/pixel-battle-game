@@ -7,6 +7,7 @@ import type {
   ItemSlot,
   RarePropertyDef,
   RarePropertyId,
+  WeaponFamily,
   WeaponType,
 } from './types';
 
@@ -61,4 +62,13 @@ export const BASE_ITEM_STATS: Record<ItemBaseId, Partial<Stats>> = {
   outfit_leather: { hp: 9 },
   hat_cap:        {},
   hat_hood:       {},
+};
+
+export const WEAPON_FAMILY: Record<WeaponType, WeaponFamily> = {
+  sword: 'melee',
+  axe: 'melee',
+  daggers: 'melee',
+  bow: 'ranged',
+  staff: 'magic',
+  holy_symbol: 'magic',
 };

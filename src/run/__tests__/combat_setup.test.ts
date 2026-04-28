@@ -240,3 +240,50 @@ describe('buildCombatState — equipment stats', () => {
     expect(state.combatants[0].regenPerRound).toBe(2);
   });
 });
+
+import type { Item } from '../../data/types';
+import { resolveCombatAbilities } from '../../items/kit';
+
+describe('buildCombatState — kit resolution', () => {
+  it('Knight wielding axe → Combatant.abilities includes knight_cleaving_swing, excludes shield_bash', () => {
+    const hero = createHero('knight', 'K', 'h0', 'quick', '0');
+    const axeWeapon: Item = {
+      id: 'w_axe', baseId: 'axe_basic', slot: 'weapon', rarity: 'common',
+      weaponType: 'axe', affixes: [], floorRolledAt: 1,
+    };
+    const heroWithAxe: typeof hero = {
+      ...hero,
+      equipment: { ...hero.equipment, weapon: axeWeapon },
+    };
+    const encounter = { enemies: [{ enemyId: 'skeleton_warrior' as const, slot: 1 as const }], scale: FLAT_SCALE };
+    const state = buildCombatState([heroWithAxe], encounter);
+    const p0 = state.combatants[0];
+    expect(p0.abilities).toContain('knight_cleaving_swing');
+    expect(p0.abilities).not.toContain('shield_bash');
+  });
+
+  it('Knight wielding bow → Combatant.abilities is [knight_slash]', () => {
+    const hero = createHero('knight', 'K', 'h0', 'quick', '0');
+    const bow: Item = {
+      id: 'w_bow', baseId: 'bow_basic', slot: 'weapon', rarity: 'common',
+      weaponType: 'bow', affixes: [], floorRolledAt: 1,
+    };
+    const heroWithBow: typeof hero = {
+      ...hero,
+      equipment: { ...hero.equipment, weapon: bow },
+    };
+    const encounter = { enemies: [{ enemyId: 'skeleton_warrior' as const, slot: 1 as const }], scale: FLAT_SCALE };
+    const state = buildCombatState([heroWithBow], encounter);
+    const p0 = state.combatants[0];
+    expect(p0.abilities).toEqual(['knight_slash']);
+  });
+
+  it('Combatant.abilities matches resolveCombatAbilities output', () => {
+    const hero = createHero('mage', 'M', 'h0', 'quick', '0');
+    const resolved = resolveCombatAbilities(hero);
+    const encounter = { enemies: [{ enemyId: 'skeleton_warrior' as const, slot: 1 as const }], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    expect(state.combatants[0].abilities).toEqual(resolved.abilities);
+    expect(state.combatants[0].aiPriority).toEqual(resolved.aiPriority);
+  });
+});

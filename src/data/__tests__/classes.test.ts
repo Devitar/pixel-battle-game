@@ -75,4 +75,69 @@ describe('CLASSES', () => {
     expect(CLASSES.archer.starterLoadout.shield).toBeUndefined();
     expect(CLASSES.priest.starterLoadout.shield).toBeUndefined();
   });
+
+  describe('weaponFamily + basicAbility', () => {
+    it('every class declares a weaponFamily', () => {
+      const valid = new Set(['melee', 'ranged', 'magic']);
+      for (const id of EXPECTED_IDS) {
+        expect(valid.has(CLASSES[id].weaponFamily), `${id}.weaponFamily`).toBe(true);
+      }
+    });
+
+    it("each class's basicAbility is in its abilities list", () => {
+      for (const id of EXPECTED_IDS) {
+        const def = CLASSES[id];
+        expect(def.abilities, `${id}.basicAbility`).toContain(def.basicAbility);
+      }
+    });
+
+    it('basicAbility resolves to a registered ability', () => {
+      for (const id of EXPECTED_IDS) {
+        expect(ABILITIES[CLASSES[id].basicAbility]).toBeDefined();
+      }
+    });
+  });
+});
+
+describe('swap mappings', () => {
+  const SWAP_CLASSES: readonly ClassId[] = ['knight', 'priest', 'barbarian', 'rogue', 'mage'];
+
+  it('Archer has no swapTarget or weaponSwaps', () => {
+    expect(CLASSES.archer.swapTarget).toBeUndefined();
+    expect(CLASSES.archer.weaponSwaps).toBeUndefined();
+  });
+
+  describe.each(SWAP_CLASSES)('class %s swap mapping', (id) => {
+    it('declares both swapTarget and weaponSwaps', () => {
+      expect(CLASSES[id].swapTarget).toBeDefined();
+      expect(CLASSES[id].weaponSwaps).toBeDefined();
+    });
+
+    it("swapTarget is in the class's abilities list", () => {
+      const def = CLASSES[id];
+      expect(def.abilities).toContain(def.swapTarget!);
+    });
+
+    it('weaponSwaps keys are same family as the class but not the preferred weapon', () => {
+      const def = CLASSES[id];
+      const family = def.weaponFamily;
+      const familyMembers: Record<typeof family, readonly string[]> = {
+        melee: ['sword', 'axe', 'daggers'],
+        ranged: ['bow'],
+        magic: ['staff', 'holy_symbol'],
+      };
+      const allowed = new Set(familyMembers[family]);
+      for (const weaponType of Object.keys(def.weaponSwaps!)) {
+        expect(allowed.has(weaponType), `${id}.weaponSwaps key '${weaponType}' must be ${family}`).toBe(true);
+        expect(weaponType, `${id}.weaponSwaps key cannot equal preferredWeapon`).not.toBe(def.preferredWeapon);
+      }
+    });
+
+    it('weaponSwaps values are valid registered abilities', () => {
+      const def = CLASSES[id];
+      for (const swapId of Object.values(def.weaponSwaps!)) {
+        expect(ABILITIES[swapId!], `${id}.weaponSwaps value '${swapId}' must be a registered ability`).toBeDefined();
+      }
+    });
+  });
 });

@@ -35,7 +35,15 @@ export type AbilityId =
   | 'mage_zap'
   | 'firebolt'
   | 'frost_nova'
-  | 'arc_shock';
+  | 'arc_shock'
+  | 'knight_cleaving_swing'
+  | 'knight_quick_slash'
+  | 'barbarian_whirl_strike'
+  | 'barbarian_frenzy'
+  | 'rogue_riposte'
+  | 'rogue_brutal_chop'
+  | 'priest_arcane_bolt'
+  | 'mage_holy_light';
 
 export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished' | 'slowed' | 'burning';
 
@@ -44,6 +52,8 @@ export type AbilityTag = 'radiant';
 export type CombatantTag = 'undead' | 'beast' | 'humanoid';
 
 export type WeaponType = 'sword' | 'bow' | 'holy_symbol' | 'axe' | 'daggers' | 'staff';
+
+export type WeaponFamily = 'melee' | 'ranged' | 'magic';
 
 export type ItemSlot = 'weapon' | 'shield' | 'outfit' | 'hat';
 
@@ -152,6 +162,7 @@ export interface Ability {
   tags?: readonly AbilityTag[];
   cooldown?: number;
   aiCondition?: AiCondition;
+  requiresShield?: boolean;
 }
 
 export interface StarterLoadout {
@@ -189,6 +200,10 @@ export interface ClassDef {
   name: string;
   baseStats: Stats;
   preferredWeapon: WeaponType;
+  weaponFamily: WeaponFamily;
+  basicAbility: AbilityId;
+  swapTarget?: AbilityId;
+  weaponSwaps?: Partial<Record<WeaponType, AbilityId>>;
   abilities: readonly AbilityId[];
   aiPriority: readonly AbilityId[];
   starterLoadout: StarterLoadout;

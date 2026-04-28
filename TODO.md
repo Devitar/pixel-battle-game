@@ -27,17 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 5 · Gear-modifies-abilities rule
-
-- **What:** A class's signature kit is gated by equipped weapon family. Preferred weapon → full kit; off-preferred-but-same-family → kit with one ability swapped (e.g., Knight + Greataxe: Shield Bash → Cleaving Swing); wholly-wrong-weapon → only universal basic Attack.
-- **Why:** Lets a single class support 3–4 playstyles via gear. Without it, weapon choice is purely cosmetic + stat.
-- **Tier:** 2
-- **Acceptance:**
-  - Each class declares preferred + same-family + swapped-ability mappings in `data/classes.ts`.
-  - `buildCombatState` resolves the active kit based on equipped weapon. Wholly-wrong-weapon resolves to the basic-attack-only fallback.
-- **Touches:** `src/data/classes.ts`, `src/run/combat_setup.ts`, tests.
-- **Source:** gdd §3 + §10 Tier 2.
-
 ### 6 · Traits at recruitment
 
 - **What:** ~12 small per-hero modifiers (Stout +10% HP, Quick +1 Speed, Cowardly −1 Speed when in slot 1, Lucky +5% Crit, etc.). One trait rolled per Tavern candidate; visible at roll time.

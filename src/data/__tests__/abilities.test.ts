@@ -36,6 +36,14 @@ const EXPECTED_IDS: readonly AbilityId[] = [
   'firebolt',
   'frost_nova',
   'arc_shock',
+  'knight_cleaving_swing',
+  'knight_quick_slash',
+  'barbarian_whirl_strike',
+  'barbarian_frenzy',
+  'rogue_riposte',
+  'rogue_brutal_chop',
+  'priest_arcane_bolt',
+  'mage_holy_light',
 ];
 
 const KEBAB_CASE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -107,5 +115,21 @@ describe('ABILITIES', () => {
         ).toBe(true);
       }
     });
+  });
+});
+
+describe('requiresShield flag', () => {
+  it('shield_bash requires a shield', () => {
+    expect(ABILITIES.shield_bash.requiresShield).toBe(true);
+  });
+
+  it('no other ability has requiresShield set', () => {
+    for (const id of EXPECTED_IDS) {
+      if (id === 'shield_bash') continue;
+      expect(
+        ABILITIES[id].requiresShield ?? false,
+        `${id}.requiresShield should not be set`,
+      ).toBe(false);
+    }
   });
 });
