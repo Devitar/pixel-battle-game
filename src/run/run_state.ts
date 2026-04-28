@@ -258,6 +258,55 @@ export function cashout(runState: RunState): { runState: RunState; outcome: Cash
   };
 }
 
+/**
+ * The player's traversal path through the current floor: from the start node
+ * to (and including) the boss, picking the branch that contains `currentNodeId`
+ * at each fork. Defaults to branch index 0 when ambiguous (player at start,
+ * at fork source awaiting pick, or downstream of multiple branches).
+ */
+export function playerPath(runState: RunState): readonly Node[] {
+  const referenced = new Set(
+    runState.currentFloorNodes.flatMap((n) => [...n.nextNodeIds]),
+  );
+  const start = runState.currentFloorNodes.find((n) => !referenced.has(n.id));
+  if (!start) return [];
+
+  const path: Node[] = [start];
+  let cur = start;
+  while (cur.nextNodeIds.length > 0) {
+    const nextId = pickBranchToward(runState, cur, runState.currentNodeId);
+    const next = runState.currentFloorNodes.find((n) => n.id === nextId);
+    if (!next) break;
+    path.push(next);
+    cur = next;
+  }
+  return path;
+}
+
+function pickBranchToward(rs: RunState, from: Node, target: string): string {
+  if (from.nextNodeIds.length === 1) return from.nextNodeIds[0];
+  // Multiple branches: pick the first one whose forward-reachable set contains target.
+  for (const branchId of from.nextNodeIds) {
+    if (reachableFrom(rs, branchId).has(target)) return branchId;
+  }
+  // Ambiguous: target isn't downstream of any branch (player at start / fork source)
+  // OR is downstream of multiple (e.g., boss after convergence). Default to branch 0.
+  return from.nextNodeIds[0];
+}
+
+function reachableFrom(rs: RunState, fromId: string): Set<string> {
+  const seen = new Set<string>();
+  const stack = [fromId];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const node = rs.currentFloorNodes.find((n) => n.id === id);
+    if (node) for (const next of node.nextNodeIds) stack.push(next);
+  }
+  return seen;
+}
+
 function woundsFromEvents(
   events: readonly CombatEvent[],
   combatantId: string,

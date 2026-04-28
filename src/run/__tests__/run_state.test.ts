@@ -10,6 +10,7 @@ import {
   completeCombat,
   currentNode,
   nextNodeChoices,
+  playerPath,
   pressOn,
   startRun,
 } from '../run_state';
@@ -350,5 +351,63 @@ describe('completeCombat — loot drop', () => {
     const before = JSON.stringify(rs);
     completeCombat(rs, mockCombatResult(rs.party, [15, 10, 10], 'player_victory'), createRng(99));
     expect(JSON.stringify(rs)).toBe(before);
+  });
+});
+
+describe('playerPath', () => {
+  it('at start node: path goes through branch A (default)', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const path = playerPath(rs);
+    expect(path.map((n) => n.id)).toEqual([
+      'crypt-f1-n0',
+      'crypt-f1-n1',
+      'crypt-f1-n2a',
+      'crypt-f1-boss',
+    ]);
+  });
+
+  it('at fork source awaiting pick: path defaults to branch A', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    expect(rs.awaitingFork).toBe(true);
+    const path = playerPath(rs);
+    expect(path[2].id).toBe('crypt-f1-n2a');
+  });
+
+  it('after picking branch A: path goes through n2a', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    rs = chooseNextNode(rs, 'crypt-f1-n2a');
+    const path = playerPath(rs);
+    expect(path[2].id).toBe('crypt-f1-n2a');
+  });
+
+  it('after picking branch B: path goes through n2b', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    rs = chooseNextNode(rs, 'crypt-f1-n2b');
+    const path = playerPath(rs);
+    expect(path[2].id).toBe('crypt-f1-n2b');
+  });
+
+  it('at boss after branch B: falls back to branch A (ambiguity)', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    rs = chooseNextNode(rs, 'crypt-f1-n2b');
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    expect(rs.currentNodeId).toBe('crypt-f1-boss');
+    const path = playerPath(rs);
+    // Both branches reach boss; defaults to A.
+    expect(path[2].id).toBe('crypt-f1-n2a');
+  });
+
+  it('returns 4-node player path for Crypt floor (not the 5-node graph)', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const path = playerPath(rs);
+    expect(path).toHaveLength(4);
   });
 });
