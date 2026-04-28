@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-28 · Traits at recruitment — pool to 12 (Cluster A · 6)
+
+- **Why:** Pre-task pool was 6 entries — small enough that two Tavern visits could roll visually identical rosters. Doubled to 12 to make rolls produce distinct heroes (some with real flaws), and to land the foundation for future conditional traits without expanding the engine again. Trait scaffolding (data, types, application points) was already in place from earlier recruitment / combat work — this task was mostly content plus two narrow type widenings.
+- **Decisions:**
+  - **Mix C** (mixed positive / negative + one new condition kind) over all-upside or "no new conditions." *Why:* matches the gdd's "individual identity, not just bonuses" framing; the new `belowHpRatio` is parameterized (`ratio: number`) so future berserker-style traits ("+X when below 25% HP") drop in without engine changes.
+  - **Bloodthirsty tuned to +2, not +1.** Conditional gating costs roughly half the uptime, so +2 ≈ unconditional +1 in expected value but with much higher variance and "comeback" feel. Easy to drop to +1 in `data/traits.ts` if playtesting shows it's swingy in a bad way — no other code changes needed.
+  - **Frail uses `hpEffect`, not `statEffects`.** Mirrors Stout exactly via the existing `computeMaxHp` arithmetic; no engine change required for negative-HP traits. The only test that broke was the Stout-vs-others tavern maxHp assertion — refactored to a 3-branch stout-up / frail-down / others-equal check.
+  - **`TraitStatEffect.stat` widened to all non-HP buffable stats.** `mind` / `crit` / `dodge` weren't allowed before; widening is zero-risk because nothing in the codebase narrows or branches on the union, and `getEffectiveStat` already loops over all `statEffects` regardless of stat.
+  - **Strict `<` semantics on `belowHpRatio`.** At exactly the boundary the condition is false. Documented with an explicit `currentHp: 10, maxHp: 20` boundary test rather than a class's natural HP, which would land off-boundary on odd values.
+- **Surprises:**
+  - The trait scaffolding was further along than the TODO entry implied — Tavern roll, save persistence, combat-build pass-through, and the `getEffectiveStat` evaluation loop all already worked. The only structural changes were two tiny type widenings and one switch case. Most of the diff is data + tests.
+  - Test count: 933 → 969 (+36, mostly parameterized `describe.each` shape checks across the 6 new IDs plus 4 behavior tests).
+- **Source:** `TODO.md` Cluster A · 6 → spec `docs/superpowers/specs/2026-04-28-traits-at-recruitment-design.md` → plan `docs/superpowers/plans/2026-04-28-traits-at-recruitment.md`. Follow-up: Cluster B · 7 (trait display in Tavern + hero card) is now unblocked — Frail / Bloodthirsty etc. roll on candidates but aren't visible in UI.
+
 ### 2026-04-27 · Barracks panel — resolved kit display
 
 - **Why:** Post-shipping fix for the gear-modifies-abilities task. The Barracks panel was reading `CLASSES[classId].abilities` directly — accurate for default-loadout heroes but misleading for any hero with a non-preferred weapon (would *display* Shield Bash while *fighting* with Cleaving Swing). With the equip-swap UI live, players can now produce that mismatch in normal play. This task makes the Barracks always show what actually fights, plus a one-line kit status indicator explaining *why* the kit is what it is.

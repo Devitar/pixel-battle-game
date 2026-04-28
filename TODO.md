@@ -27,18 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 6 · Traits at recruitment
-
-- **What:** ~12 small per-hero modifiers (Stout +10% HP, Quick +1 Speed, Cowardly −1 Speed when in slot 1, Lucky +5% Crit, etc.). One trait rolled per Tavern candidate; visible at roll time.
-- **Why:** Gives heroes individual flavor at low design cost. Foundation for Chapel (trait removal) in Tier 3.
-- **Tier:** 2
-- **Acceptance:**
-  - `data/traits.ts` (new) defines all ~12 traits as either flat stat-delta or conditional (slot-dependent, low-HP, etc.).
-  - Tavern roll picks one per candidate; trait field on `Hero`; combat-build applies trait effects to effective stats.
-  - Tests cover at least one stat-delta trait and one conditional trait.
-- **Touches:** `src/data/traits.ts`, `src/heroes/hero.ts`, `src/camp/tavern.ts`, `src/save/save.ts` + migration, tests.
-- **Source:** gdd §3 + §10 Tier 2.
-
 ### 7 · Hero leveling + level-5 perks
 
 - **What:** Heroes gain XP from surviving combat. Levels grant small stat bumps (+HP, +primary stat). At level 5, the player picks 1 of 2 minor perks for that hero (e.g., "Precise: +5% Crit" / "Hardy: +10% HP").

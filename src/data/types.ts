@@ -247,9 +247,17 @@ export type TraitId =
   | 'sturdy'
   | 'sharp_eyed'
   | 'cowardly'
-  | 'nervous';
+  | 'nervous'
+  | 'frail'
+  | 'sluggish'
+  | 'lucky'
+  | 'slippery'
+  | 'wise'
+  | 'bloodthirsty';
 
-export type TraitCondition = { kind: 'inSlot'; slot: SlotIndex };
+export type TraitCondition =
+  | { kind: 'inSlot'; slot: SlotIndex }
+  | { kind: 'belowHpRatio'; ratio: number };
 
 export interface TraitHpEffect {
   delta: number;
@@ -257,7 +265,7 @@ export interface TraitHpEffect {
 }
 
 export interface TraitStatEffect {
-  stat: 'attack' | 'defense' | 'speed';
+  stat: 'attack' | 'defense' | 'speed' | 'mind' | 'crit' | 'dodge';
   delta: number;
   condition?: TraitCondition;
 }

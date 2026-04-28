@@ -10,6 +10,8 @@ function evaluateTraitCondition(
   switch (condition.kind) {
     case 'inSlot':
       return combatant.slot === condition.slot;
+    case 'belowHpRatio':
+      return combatant.maxHp > 0 && combatant.currentHp / combatant.maxHp < condition.ratio;
   }
 }
 

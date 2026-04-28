@@ -37,4 +37,40 @@ export const TRAITS: Record<TraitId, TraitDef> = {
     description: '-1 Defense when in slot 1',
     statEffects: [{ stat: 'defense', delta: -1, condition: { kind: 'inSlot', slot: 1 } }],
   },
+  frail: {
+    id: 'frail',
+    name: 'Frail',
+    description: '-10% HP',
+    hpEffect: { delta: -10, mode: 'percent' },
+  },
+  sluggish: {
+    id: 'sluggish',
+    name: 'Sluggish',
+    description: '-1 Speed',
+    statEffects: [{ stat: 'speed', delta: -1 }],
+  },
+  lucky: {
+    id: 'lucky',
+    name: 'Lucky',
+    description: '+5% Crit',
+    statEffects: [{ stat: 'crit', delta: 5 }],
+  },
+  slippery: {
+    id: 'slippery',
+    name: 'Slippery',
+    description: '+5% Dodge',
+    statEffects: [{ stat: 'dodge', delta: 5 }],
+  },
+  wise: {
+    id: 'wise',
+    name: 'Wise',
+    description: '+1 Mind',
+    statEffects: [{ stat: 'mind', delta: 1 }],
+  },
+  bloodthirsty: {
+    id: 'bloodthirsty',
+    name: 'Bloodthirsty',
+    description: '+2 Attack when below 50% HP',
+    statEffects: [{ stat: 'attack', delta: 2, condition: { kind: 'belowHpRatio', ratio: 0.5 } }],
+  },
 };
