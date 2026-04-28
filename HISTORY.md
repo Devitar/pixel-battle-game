@@ -29,6 +29,19 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-28 · Fork picker UI (Cluster B · 6)
+
+- **Why:** Closes the loop on Cluster A · 8 (forks). Without a picker, the auto-pick stub silently chose branch A every time — the player had no agency at forks. This task ships the in-scene picker, extracts the icon-row's path-walking helper into a tested `playerPath(rs)` function so the icon row reflects the player's actual choice, and fixes a latent save-reload bug where reloading during `awaitingFork: true` would re-fight the cleared fork source.
+- **Decisions:**
+  - **In-scene picker over modal overlay.** Forks are spatial in the gdd's framing — putting the picker at NODE_X[2] preserves that. Smallest blast radius too: no new scene file, just a state addition + render method.
+  - **`playerPath` is now data-aware.** Instead of always picking branch A, walks the graph from start, picking the branch whose forward-reachable set contains `currentNodeId`. Defaults to branch index 0 when ambiguous (start, fork source pre-pick, post-convergence at boss). Pure helper in `run_state.ts` — testable, reusable.
+  - **Save-reload guards added to `walking_in` and `walking_to_next` `onComplete` callbacks.** A latent bug pre-task: a save during `awaitingFork: true` would reload, walk-in, then re-fight the cleared fork source. The auto-pick stub masked this by firing in `onResultDismiss` and never letting `awaitingFork: true` reach a save. With a real picker, both walking transitions now check `awaitingFork` and route to `awaiting_fork_pick` instead of starting combat.
+- **Surprises:**
+  - The picker render is ~70 lines (with the per-option helper); the `playerPath` extraction is ~50 lines including helpers. Most of the task code is the picker layout — concise relative to the gameplay impact.
+  - Crypt forks are combat-vs-combat — both icons show ⚔ — so the differentiation comes from the "branch A" / "branch B" subtitles. The labels become redundant once shop/elite/event content lands and the glyphs differ; could be dropped at that time.
+  - The save-reload guard had to live in two places (`walking_in` and `walking_to_next` onComplete) — DRY'ing wasn't worth it for two near-identical 4-line callbacks. Flagged in the plan; left as-is.
+- **Source:** TODO.md Cluster B · 6 → spec at `docs/superpowers/specs/2026-04-28-fork-picker-design.md` → plan at `docs/superpowers/plans/2026-04-28-fork-picker.md`. Test count delta: 1107 → 1113 (+6).
+
 ### 2026-04-28 · Floor generation: forks (Cluster A · 8)
 
 - **Why:** Foundation for the gdd's "Descend" loop — until forks exist, dungeon floors are linear walks with no player agency between fights. This task converts the Crypt floor from a 4-node list to a 5-node diamond DAG, with one fork after the first preamble combat. The decision quality is low in Tier 2 (both branches are combat with different RNG-rolled enemy comp), but the data model and traversal API now slot cleanly into shop / elite / camp / event nodes (A · 9, 10, 11, 13/14) without further structural change.

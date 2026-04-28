@@ -165,16 +165,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Touches:** `src/scenes/event_overlay.ts` (new), dungeon scene wiring.
 - **Source:** gdd §7 + §10 Tier 2.
 
-### 6 · Fork picker UI
-
-- **What:** When the dungeon scene reaches a fork, replace "advance" with a 2-button picker — each button labeled with the immediate next-node icon. Pairs with Cluster A task 8.
-- **Why:** Pairs with floor-generator forks; needed for player choice.
-- **Tier:** 2
-- **Acceptance:**
-  - At a fork, the dungeon scene shows a 2-button picker; clicking sets the chosen branch as the active path and resumes normal advance.
-- **Touches:** `src/scenes/dungeon_scene.ts`.
-- **Source:** gdd §4 + §10 Tier 2.
-
 ### 9 · Wound display (hero card + Barracks)
 
 - **What:** Show wounds on hero cards (icon + count) and a full breakdown in the Barracks detail view. Pairs with Cluster A task 3.
