@@ -3,7 +3,7 @@ import { BASE_ITEMS } from '../../data/items';
 import { CLASSES } from '../../data/classes';
 import type { ClassId, Item, ItemBaseId, ItemSlot } from '../../data/types';
 import { createHero, type Hero } from '../../heroes/hero';
-import { resolveCombatAbilities } from '../kit';
+import { describeKitStatus, resolveCombatAbilities } from '../kit';
 
 function makeItem(baseId: ItemBaseId, slot: ItemSlot, id: string): Item {
   const def = BASE_ITEMS[baseId];
@@ -245,5 +245,57 @@ describe('resolveCombatAbilities — invariants', () => {
     const a = resolveCombatAbilities(hero);
     const b = resolveCombatAbilities(hero);
     expect(a).toEqual(b);
+  });
+});
+
+describe('describeKitStatus', () => {
+  it('Knight + sword + shield → full kit', () => {
+    const hero = makeHeroWith({ classId: 'knight', weaponBaseId: 'sword_basic', shieldBaseId: 'shield_basic' });
+    expect(describeKitStatus(hero)).toBe('Sword + Shield · Full kit');
+  });
+
+  it('Knight + sword + no shield → no-shield message', () => {
+    const hero = makeHeroWith({ classId: 'knight', weaponBaseId: 'sword_basic' });
+    expect(describeKitStatus(hero)).toBe('Sword · No shield (Shield Bash unavailable)');
+  });
+
+  it('Knight + axe → off-preferred', () => {
+    const hero = makeHeroWith({ classId: 'knight', weaponBaseId: 'axe_basic' });
+    expect(describeKitStatus(hero)).toBe('Axe · Off-preferred (1 swap)');
+  });
+
+  it('Knight + bow → wrong family', () => {
+    const hero = makeHeroWith({ classId: 'knight', weaponBaseId: 'bow_basic' });
+    expect(describeKitStatus(hero)).toBe('Bow · Wrong family (basic only)');
+  });
+
+  it('Archer + bow → full kit (no "+ Shield" suffix — Archer has no shield-required ability)', () => {
+    const hero = makeHeroWith({ classId: 'archer', weaponBaseId: 'bow_basic' });
+    expect(describeKitStatus(hero)).toBe('Bow · Full kit');
+  });
+
+  it('Archer + sword → wrong family (no same-family alternative)', () => {
+    const hero = makeHeroWith({ classId: 'archer', weaponBaseId: 'sword_basic' });
+    expect(describeKitStatus(hero)).toBe('Sword · Wrong family (basic only)');
+  });
+
+  it('Mage + staff → full kit', () => {
+    const hero = makeHeroWith({ classId: 'mage', weaponBaseId: 'staff_basic' });
+    expect(describeKitStatus(hero)).toBe('Staff · Full kit');
+  });
+
+  it('Mage + holy_symbol (mace_basic) → off-preferred', () => {
+    const hero = makeHeroWith({ classId: 'mage', weaponBaseId: 'mace_basic' });
+    expect(describeKitStatus(hero)).toBe('Holy Symbol · Off-preferred (1 swap)');
+  });
+
+  it('Priest + staff → off-preferred', () => {
+    const hero = makeHeroWith({ classId: 'priest', weaponBaseId: 'staff_basic' });
+    expect(describeKitStatus(hero)).toBe('Staff · Off-preferred (1 swap)');
+  });
+
+  it('Priest + holy_symbol (mace_basic) → full kit', () => {
+    const hero = makeHeroWith({ classId: 'priest', weaponBaseId: 'mace_basic' });
+    expect(describeKitStatus(hero)).toBe('Holy Symbol · Full kit');
   });
 });

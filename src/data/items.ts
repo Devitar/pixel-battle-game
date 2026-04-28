@@ -72,3 +72,12 @@ export const WEAPON_FAMILY: Record<WeaponType, WeaponFamily> = {
   staff: 'magic',
   holy_symbol: 'magic',
 };
+
+export const WEAPON_DISPLAY_NAME: Record<WeaponType, string> = {
+  sword: 'Sword',
+  axe: 'Axe',
+  daggers: 'Daggers',
+  bow: 'Bow',
+  staff: 'Staff',
+  holy_symbol: 'Holy Symbol',
+};

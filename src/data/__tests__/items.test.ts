@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AFFIXES, BASE_ITEMS, BASE_ITEM_STATS, RARE_PROPERTIES } from '../items';
+import { AFFIXES, BASE_ITEMS, BASE_ITEM_STATS, RARE_PROPERTIES, WEAPON_DISPLAY_NAME } from '../items';
 import type { AffixId, ItemBaseId, RarePropertyId } from '../types';
 
 const EXPECTED_AFFIXES: readonly AffixId[] = [
@@ -99,5 +99,18 @@ describe('BASE_ITEM_STATS', () => {
   it('outfit bases grant hp (post-×3 baked)', () => {
     expect(BASE_ITEM_STATS.outfit_cloth).toEqual({ hp: 6 });
     expect(BASE_ITEM_STATS.outfit_leather).toEqual({ hp: 9 });
+  });
+});
+
+describe('WEAPON_DISPLAY_NAME', () => {
+  it('has an entry for every WeaponType', () => {
+    const weaponTypes = ['sword', 'axe', 'daggers', 'bow', 'staff', 'holy_symbol'] as const;
+    for (const wt of weaponTypes) {
+      expect(WEAPON_DISPLAY_NAME[wt], `missing entry for ${wt}`).toBeTruthy();
+    }
+  });
+
+  it('holy_symbol displays as "Holy Symbol"', () => {
+    expect(WEAPON_DISPLAY_NAME.holy_symbol).toBe('Holy Symbol');
   });
 });

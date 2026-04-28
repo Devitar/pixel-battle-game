@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-27 · Barracks panel — resolved kit display
+
+- **Why:** Post-shipping fix for the gear-modifies-abilities task. The Barracks panel was reading `CLASSES[classId].abilities` directly — accurate for default-loadout heroes but misleading for any hero with a non-preferred weapon (would *display* Shield Bash while *fighting* with Cleaving Swing). With the equip-swap UI live, players can now produce that mismatch in normal play. This task makes the Barracks always show what actually fights, plus a one-line kit status indicator explaining *why* the kit is what it is.
+- **Decisions:**
+  - **Dedicated `WEAPON_DISPLAY_NAME` table** in `src/data/items.ts` over reusing `BASE_ITEMS[baseId].name`. *Why:* semantic separation. `BASE_ITEMS.name` is the *item-instance* label ("Mace"); `WEAPON_DISPLAY_NAME` is the *weapon-type category* label ("Holy Symbol"). The status line describes the type, not the instance. Tiny table (6 entries), trivially extended when new weapon types arrive.
+  - **`describeKitStatus(hero)` lives in `src/items/kit.ts`** alongside `resolveCombatAbilities`. *Why:* both functions consume the same hero-state inputs and mirror the same band logic. Co-locating them avoids parallel maintenance when the rule evolves. The function deliberately does NOT call `resolveCombatAbilities` — it derives the band independently from the same inputs, keeping it returnable from a single read with no caching question.
+  - **Always render the status line**, even for the default-case `Sword + Shield · Full kit`. *Why:* consistency over noise-reduction. Player learns the shape; off-spec heroes stand out by saying something different. Hiding-when-default would create a "where did the indicator go?" moment when equipment changes.
+  - **`+ Shield` / `No shield` suffix is class-conditional** (only renders when class has a shield-required ability), not just shield-presence-conditional. Mage with no shield doesn't show "no shield" because Mage has no shield-required ability — nothing to be missing.
+  - **No color-coding by band** (green/amber/red). Considered, rejected. Text alone is sufficient; colored bands would add visual noise to a panel already using gold for accent.
+  - **Status placement: 80px right of the ABILITIES header**, same y, in muted `#aaaaaa` — no layout shift. Magic-number-ish but flagged in spec §6 with a comment in the scene.
+- **Surprises / lessons:**
+  - **Cleanest plan execution this session.** 3 tasks, zero in-flight deviations, exact predicted test count (911 → **923**, +12). Patterns that paid off: small plan (3 tasks vs 6/11/17 prior), tight spec (single behavior change), TDD-style each task (failing test → impl → green). Worth holding the "smaller-plan-better" correlation as a working hypothesis.
+  - **`describeKitStatus` is parallel to `resolveCombatAbilities`, not built on it.** Tempting to derive status from "did resolved kit equal class default?" but that gives less precise messages (can't distinguish "axe → off-preferred" from "no shield → filter dropped"). Two functions over the same inputs, each reasoning about its own concern, ended up cleaner.
+- **Source:** HISTORY 2026-04-27 (gear-modifies-abilities) follow-up — explicitly called out as the most-important next item there. Not a numbered TODO. Spec at `docs/superpowers/specs/2026-04-27-barracks-resolved-kit-design.md`. Plan at `docs/superpowers/plans/2026-04-27-barracks-resolved-kit.md`. Tests: 911 → **923 passing**. Follow-ups: equip-panel ability-swap preview (also called out in the gear-modifies-abilities HISTORY).
+
 ### 2026-04-27 · Gear modifies abilities (weapon-family rule + 8 swap abilities)
 
 - **Why:** Closes the gameplay payoff for the items system. Pre-task, equipping a different weapon was just a stat swap — Knight + axe still played as a Shield Bash tank. Per GDD §3, equipped weapon should gate each class's signature kit: preferred → full kit; same-family → one ability swapped per weapon; wholly wrong → basic only. Plus the shield sub-rule: no shield → no shield-based abilities. With this in place, the rare Sword of Burning that drops feels mechanically different from a rare Axe of Burning on the same Knight.
