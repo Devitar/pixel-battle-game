@@ -8,6 +8,7 @@ import { CombatScene } from './scenes/combat_scene';
 import { ExplorerScene } from './scenes/dev/explorer_scene';
 import { MainScene } from './scenes/dev/main_scene';
 import { DungeonScene } from './scenes/dungeon_scene';
+import { EquipPanelScene } from './scenes/equip_panel_scene';
 import { NoticeboardPanelScene } from './scenes/noticeboard_panel_scene';
 import { TavernPanelScene } from './scenes/tavern_panel_scene';
 import { installPwaPrompt } from './util/pwa_install_prompt';
@@ -32,6 +33,7 @@ new Phaser.Game({
     DungeonScene,
     CombatScene,
     CampScreenScene,
+    EquipPanelScene,
     MainScene,
     ExplorerScene,
   ],

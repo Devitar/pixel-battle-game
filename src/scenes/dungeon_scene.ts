@@ -395,7 +395,12 @@ export class DungeonScene extends Phaser.Scene {
     this.hudFloor.setText(
       `The Crypt · Floor ${run.currentFloorNumber} · Node ${displayIdx} / ${total}`,
     );
-    this.hudPack.setText(`Pack: ${run.pack.gold}g`);
+    const itemCount = run.pack.items.length;
+    const packLabel =
+      itemCount > 0
+        ? `Pack: ${run.pack.gold}g · ${itemCount} item${itemCount === 1 ? '' : 's'}`
+        : `Pack: ${run.pack.gold}g`;
+    this.hudPack.setText(packLabel);
   }
 
   private refreshNodeColors(): void {
