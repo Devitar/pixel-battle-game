@@ -27,18 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 7 · Hero leveling + level-5 perks
-
-- **What:** Heroes gain XP from surviving combat. Levels grant small stat bumps (+HP, +primary stat). At level 5, the player picks 1 of 2 minor perks for that hero (e.g., "Precise: +5% Crit" / "Hardy: +10% HP").
-- **Why:** Visible per-hero progression. Pairs with Training Grounds (Tier 3 — benched XP).
-- **Tier:** 2
-- **Acceptance:**
-  - XP awarded per surviving combat; level curve in `data/leveling.ts`; level-up applies stat bumps deterministically.
-  - At level 5, hero is flagged as `pendingPerk`; the camp scene surfaces the choice (UI in Cluster B task 8).
-  - Save schema persists XP, level, and chosen perks.
-- **Touches:** `src/data/leveling.ts` (new), `src/heroes/hero.ts`, `src/run/run_state.ts` (XP-award hook), save schema + migration, tests.
-- **Source:** gdd §3 + §10 Tier 2.
-
 ### 8 · Floor generation: forks
 
 - **What:** Each floor has 1–2 fork nodes. At a fork the player picks one of two next-node types; they see the immediate next node on each branch but not what follows.

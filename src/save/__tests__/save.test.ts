@@ -198,3 +198,48 @@ describe('stash persistence', () => {
     expect(loaded?.stash).toEqual({ items: [] });
   });
 });
+
+describe('load — normalize legacy heroes missing xp/level/pendingPerk', () => {
+  it('fills defaults on heroes from a save predating leveling', () => {
+    const storage = new MemoryStorage();
+    const legacyHero = {
+      id: 'h0',
+      classId: 'knight' as const,
+      name: 'Old Hero',
+      baseStats: { hp: 20, attack: 4, defense: 4, speed: 3, mind: 0, crit: 5, dodge: 5 },
+      currentHp: 20,
+      maxHp: 20,
+      traitId: 'stout' as const,
+      bodySpriteId: 'body1',
+      wounds: [],
+      equipment: {
+        weapon: {
+          id: 'w0',
+          baseId: 'sword_basic' as const,
+          slot: 'weapon' as const,
+          rarity: 'common' as const,
+          weaponType: 'sword' as const,
+          affixes: [],
+          floorRolledAt: 1,
+        },
+      },
+      // xp / level / pendingPerk intentionally absent
+    };
+    const legacy = {
+      version: 1,
+      roster: { heroes: [legacyHero], capacity: 12 },
+      vault: { gold: 0 },
+      stash: createStash(),
+      unlocks: createDefaultUnlocks(),
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(legacy));
+
+    const loaded = load(storage);
+    expect(loaded).not.toBeNull();
+    const hero = loaded!.roster.heroes[0];
+    expect(hero.xp).toBe(0);
+    expect(hero.level).toBe(1);
+    expect(hero.pendingPerk).toBe(false);
+    expect(hero.perkId).toBeUndefined();
+  });
+});

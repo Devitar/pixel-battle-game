@@ -29,6 +29,22 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-28 · Hero leveling + level-5 perks (Cluster A · 7)
+
+- **Why:** With traits and gear in place, heroes had no second axis of progression — every Knight played identically across runs. Adds the gdd's "rookies become legends" arc: surviving heroes earn XP per fight, level up with deterministic stat bumps, and at level 5 unlock a class-specific choice of two minor perks. Foundation only — picker UI is Cluster B · 8.
+- **Decisions:**
+  - **Class-specific perk pairs over universal pairs.** 12 hand-tuned perks (2 per class) reinforce class identity at the level-5 milestone — Mage gets Arcane Power vs Quick Cast, Rogue gets Lethal vs Evasive. Avoids the "Mage offered Heavy Plate" mismatch problem of pooled rolling. Authoring scope (12 entries) matches the trait pool.
+  - **Level cap 5 in Tier 2.** Gdd defines level-5 + level-10 perks; level 10 ships with Tier 3 alongside the Sunken Keep difficulty curve. Cap is a single constant; trivial to extend.
+  - **XP applied per-fight, mid-run.** Simpler data flow than per-run accumulation; level-up moments land as in-fight beats; no `runXp` shadow counter to keep in sync. `pendingPerk` flag persists across save-during-run; cleared by Cluster B · 8.
+  - **Crit-primary classes get +2 per level**, others +1. A level-5 Rogue with the +1 rule would gain +4 Crit (≈ negligible at integer-percent); +2 keeps progression visible for a class whose identity is built on crit.
+  - **Slow XP curve, tuned for ~15 deep clears to level 5.** First proposal (combat=10×floor, boss=50×floor) hit level 4 in a single deep run — broke the slow-burn arc. Halved per-fight XP and stretched thresholds to 200/800/2000/4000.
+  - **Perks reuse `TraitStatEffect` / `TraitHpEffect` shapes verbatim.** No new effect kinds; `getEffectiveStat` extends with one analogous loop. Future conditional perks pick up `inSlot` / `belowHpRatio` for free.
+- **Surprises:**
+  - Intentional `tsc` gap between Task 2 (`leveling.ts` references `Hero.level`/`pendingPerk`) and Task 4 (adds those fields) — vitest stays green throughout because vitest transpiles per-file rather than type-checking. Plan documented this so the executing path didn't panic at the expected red errors.
+  - The save normalizer was the riskiest piece — heroes from saves predating leveling needed `xp/level/pendingPerk` defaulted at load. A `normalizeHero` helper alongside the existing stash backfill kept the change additive; pre-launch policy meant no schema bump.
+  - `completeCombat` in `run_state.ts` already does ~5 things (HP/wound update, fallen separation, gold reward, loot, fallen-gear transfer); adding XP makes 6. If a 7th lands, splitting becomes worthwhile — flagged but not addressed here.
+- **Source:** TODO.md Cluster A · 7 → spec at `docs/superpowers/specs/2026-04-28-hero-leveling-design.md` → plan at `docs/superpowers/plans/2026-04-28-hero-leveling.md`. Test count delta: 999 → 1095 (+96).
+
 ### 2026-04-28 · Trait display on hero cards (Cluster B · 7)
 
 - **Why:** With the trait pool at 12 entries (Cluster A · 6), players needed the trait readable wherever a roster is shown. Pre-task the trait *name* rendered only on the large card and the *description* only on the Barracks detail pane — so Tavern players had to memorize what each trait does, and the Barracks list pane (where you spend most of your roster-management time) showed nothing about traits at all.

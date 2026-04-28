@@ -3,7 +3,7 @@ import { CLASSES } from '../data/classes';
 import { TRAITS } from '../data/traits';
 import type {
   ClassId, HeroEquipment, Item, ItemBaseId, ItemSlot,
-  StarterLoadout, TraitDef, TraitId, Wound,
+  PerkId, StarterLoadout, TraitDef, TraitId, Wound,
 } from '../data/types';
 import type { Stats } from '../combat/types';
 
@@ -18,6 +18,10 @@ export interface Hero {
   bodySpriteId: string;
   wounds: Wound[];
   equipment: HeroEquipment;
+  xp: number;
+  level: number;
+  pendingPerk: boolean;
+  perkId?: PerkId;
 }
 
 export function createHero(
@@ -41,6 +45,9 @@ export function createHero(
     bodySpriteId,
     wounds: [],
     equipment,
+    xp: 0,
+    level: 1,
+    pendingPerk: false,
   };
 }
 

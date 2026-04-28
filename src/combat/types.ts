@@ -4,6 +4,7 @@ import type {
   ClassId,
   CombatantTag,
   EnemyId,
+  PerkId,
   SlotIndex,
   StatusId,
   TraitId,
@@ -48,6 +49,7 @@ export interface Combatant {
   preferredSlots?: readonly SlotIndex[];
   tags?: readonly CombatantTag[];
   traitId?: TraitId;
+  perkId?: PerkId;
   damageTakenMultiplier?: number;
   // Candidates for consolidation into a `passives` bag once 3+ more land.
   lifestealPercent?: number;

@@ -1,4 +1,5 @@
 import type { DungeonId, Item, Wound } from '../data/types';
+import { applyLevelUps, levelForXp, xpForBossNode, xpForCombatNode } from '../data/leveling';
 import { DEFAULT_WOUND_RUNS_REMAINING } from '../data/wounds';
 import { generateFloor } from '../dungeon/floor';
 import { rollLoot } from '../dungeon/loot';
@@ -120,6 +121,17 @@ export function completeCombat(
 
   const completedNode = runState.currentFloorNodes[runState.currentNodeIndex];
   const isBoss = completedNode.type === 'boss';
+
+  // XP awards — only on victory, only to surviving heroes.
+  const xpReward = isBoss
+    ? xpForBossNode(runState.currentFloorNumber)
+    : xpForCombatNode(runState.currentFloorNumber);
+  const partyAfterXp = updatedPartyLiving.map((hero) => {
+    const newXp = hero.xp + xpReward;
+    const newLevel = levelForXp(newXp);
+    return applyLevelUps({ ...hero, xp: newXp }, hero.level, newLevel);
+  });
+
   const reward =
     isBoss
       ? BOSS_NODE_GOLD * runState.currentFloorNumber
@@ -147,7 +159,7 @@ export function completeCombat(
     return {
       runState: {
         ...runState,
-        party: updatedPartyLiving,
+        party: partyAfterXp,
         fallen: [...runState.fallen, ...newFallen],
         pack: newPack,
         status: 'camp_screen',
@@ -158,7 +170,7 @@ export function completeCombat(
   return {
     runState: {
       ...runState,
-      party: updatedPartyLiving,
+      party: partyAfterXp,
       fallen: [...runState.fallen, ...newFallen],
       pack: newPack,
       status: 'in_dungeon',

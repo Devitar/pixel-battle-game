@@ -199,6 +199,7 @@ export interface ClassDef {
   id: ClassId;
   name: string;
   baseStats: Stats;
+  primaryStat: BuffableStat;
   preferredWeapon: WeaponType;
   weaponFamily: WeaponFamily;
   basicAbility: AbilityId;
@@ -277,6 +278,23 @@ export interface TraitDef {
   shortDescription: string;
   hpEffect?: TraitHpEffect;
   statEffects?: readonly TraitStatEffect[];
+}
+
+export type PerkId =
+  | 'iron_will' | 'resolute'
+  | 'precise' | 'eagle_eye'
+  | 'devout' | 'steadfast'
+  | 'berserker' | 'tough_skin'
+  | 'lethal' | 'evasive'
+  | 'arcane_power' | 'quick_cast';
+
+export interface PerkDef {
+  id: PerkId;
+  name: string;
+  description: string;
+  classId: ClassId;
+  statEffects?: readonly TraitStatEffect[];
+  hpEffect?: TraitHpEffect;
 }
 
 export interface Unlocks {

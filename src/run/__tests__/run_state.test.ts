@@ -278,3 +278,84 @@ describe('cashout — itemsBanked', () => {
     expect(outcome.itemsBanked).toEqual(itemsInPack);
   });
 });
+
+describe('completeCombat — XP awards', () => {
+  it('awards 5×floor XP to survivors after a floor-1 combat-node victory', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const result = mockCombatResult(rs.party, [18, 10, 12], 'player_victory');
+    const { runState: rs2 } = completeCombat(rs, result, createRng(99));
+    for (const hero of rs2.party) {
+      expect(hero.xp).toBe(5);
+      expect(hero.level).toBe(1);
+    }
+  });
+
+  it('awards 30×floor XP after a boss victory', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    // Advance to the boss node (floor 1 has 3 combat + 1 boss).
+    for (let i = 0; i < 3; i++) {
+      rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    }
+    const bossResult = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const { runState: rs2 } = completeCombat(rs, bossResult, createRng(99));
+    // Each survivor accumulated 3 × 5 (combat) + 30 (boss) = 45 XP.
+    for (const hero of rs2.party) {
+      expect(hero.xp).toBe(45);
+    }
+  });
+
+  it('does not award XP to dead heroes (combatant isDead)', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const result = mockCombatResult(rs.party, [18, 0, 12], 'player_victory');
+    const { runState: rs2 } = completeCombat(rs, result, createRng(99));
+    for (const hero of rs2.party) {
+      expect(hero.xp).toBe(5);
+    }
+    // Dead hero went into fallen, did not receive XP.
+    expect(rs2.fallen).toHaveLength(1);
+    expect(rs2.fallen[0].xp).toBe(0);
+  });
+
+  it('does not award XP on player_defeat', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const result = mockCombatResult(rs.party, [0, 0, 0], 'player_defeat');
+    const { runState: rs2 } = completeCombat(rs, result, createRng(99));
+    expect(rs2.party).toHaveLength(0);
+    for (const hero of rs2.fallen) {
+      expect(hero.xp).toBe(0);
+    }
+  });
+
+  it('crossing the level-2 threshold applies stat bumps', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    // Pre-load each hero with 195 XP so the next 5-XP combat reward crosses 200.
+    rs = {
+      ...rs,
+      party: rs.party.map((h) => ({ ...h, xp: 195 })),
+    };
+    const result = mockCombatResult(rs.party, [18, 10, 12], 'player_victory');
+    const { runState: rs2 } = completeCombat(rs, result, createRng(99));
+    for (const hero of rs2.party) {
+      expect(hero.xp).toBe(200);
+      expect(hero.level).toBe(2);
+    }
+    // Knight got +1 defense; archer got +1 attack; priest got +1 mind.
+    const knight = rs2.party.find((h) => h.classId === 'knight')!;
+    expect(knight.baseStats.defense).toBe(5); // base 4 + 1
+  });
+
+  it('crossing to level 5 sets pendingPerk', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = {
+      ...rs,
+      party: rs.party.map((h) => ({ ...h, xp: 3995, level: 4 })),
+    };
+    const result = mockCombatResult(rs.party, [18, 10, 12], 'player_victory');
+    const { runState: rs2 } = completeCombat(rs, result, createRng(99));
+    for (const hero of rs2.party) {
+      expect(hero.xp).toBe(4000);
+      expect(hero.level).toBe(5);
+      expect(hero.pendingPerk).toBe(true);
+    }
+  });
+});

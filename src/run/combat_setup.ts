@@ -65,6 +65,7 @@ export function buildCombatState(
         traitId: hero.traitId,
         abilities,
         aiPriority,
+        ...(hero.perkId !== undefined ? { perkId: hero.perkId } : {}),
         ...(damageTakenMultiplier !== 1 ? { damageTakenMultiplier } : {}),
         ...rareFields,
       }),

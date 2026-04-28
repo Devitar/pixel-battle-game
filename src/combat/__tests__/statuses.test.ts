@@ -159,6 +159,27 @@ describe('getEffectiveStat — trait evaluation', () => {
   });
 });
 
+describe('getEffectiveStat — perk evaluation', () => {
+  it('Precise combatant adds +5 to crit', () => {
+    const c = makeHeroCombatant('archer', 1, 'p0', { perkId: 'precise' });
+    expect(getEffectiveStat(c, 'crit')).toBe(c.baseStats.crit + 5);
+  });
+
+  it('Combatant with no perkId reads base + statuses + traits only', () => {
+    const c = makeHeroCombatant('knight', 1, 'p0');
+    expect(c.perkId).toBeUndefined();
+    expect(getEffectiveStat(c, 'attack')).toBe(c.baseStats.attack);
+  });
+
+  it('Trait Sturdy + perk Iron Will stack additively on defense', () => {
+    const c = makeHeroCombatant('knight', 1, 'p0', {
+      traitId: 'sturdy',
+      perkId: 'iron_will',
+    });
+    expect(getEffectiveStat(c, 'defense')).toBe(c.baseStats.defense + 1 + 1);
+  });
+});
+
 describe('tickStatuses — poison', () => {
   it('decrements target HP by damagePerTurn each tick', () => {
     const c = makeHeroCombatant('knight', 1, 'p0', {

@@ -25,6 +25,14 @@ describe('createHero — basic shape', () => {
     const h = createHero('priest', 'Ser', 'h3', 'quick', 'body3');
     expect(h.baseStats).not.toBe(CLASSES.priest.baseStats);
   });
+
+  it('defaults xp=0, level=1, pendingPerk=false; perkId undefined', () => {
+    const h = createHero('knight', 'K', 'h1', 'quick', 'body1');
+    expect(h.xp).toBe(0);
+    expect(h.level).toBe(1);
+    expect(h.pendingPerk).toBe(false);
+    expect(h.perkId).toBeUndefined();
+  });
 });
 
 describe('createHero — HP trait baking', () => {

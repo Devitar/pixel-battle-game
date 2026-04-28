@@ -141,3 +141,16 @@ describe('swap mappings', () => {
     });
   });
 });
+
+describe('class primaryStat', () => {
+  const VALID_PRIMARIES: ReadonlyArray<string> = [
+    'attack', 'defense', 'speed', 'mind', 'crit', 'dodge',
+  ];
+
+  for (const classId of EXPECTED_IDS) {
+    it(`${classId} has a primaryStat that's a non-HP buffable stat`, () => {
+      const def = CLASSES[classId];
+      expect(VALID_PRIMARIES).toContain(def.primaryStat);
+    });
+  }
+});

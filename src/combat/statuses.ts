@@ -1,3 +1,4 @@
+import { PERKS } from '../data/perks';
 import { TRAITS } from '../data/traits';
 import type { BuffableStat, TraitCondition } from '../data/types';
 import type { Combatant, CombatantId, CombatEvent } from './types';
@@ -21,6 +22,15 @@ export function getEffectiveStat(combatant: Combatant, stat: BuffableStat): numb
   if (stat !== 'hp' && combatant.traitId) {
     const trait = TRAITS[combatant.traitId];
     for (const effect of trait.statEffects ?? []) {
+      if (effect.stat === stat && evaluateTraitCondition(effect.condition, combatant)) {
+        total += effect.delta;
+      }
+    }
+  }
+
+  if (stat !== 'hp' && combatant.perkId) {
+    const perk = PERKS[combatant.perkId];
+    for (const effect of perk.statEffects ?? []) {
       if (effect.stat === stat && evaluateTraitCondition(effect.condition, combatant)) {
         total += effect.delta;
       }

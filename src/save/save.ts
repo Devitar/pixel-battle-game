@@ -2,6 +2,7 @@ import type { Roster } from '../camp/roster';
 import { createStash, type Stash } from '../camp/stash';
 import type { Vault } from '../camp/vault';
 import type { Unlocks } from '../data/types';
+import type { Hero } from '../heroes/hero';
 import type { RunState } from '../run/run_state';
 import { CURRENT_SCHEMA_VERSION, migrate } from './migration';
 
@@ -96,5 +97,18 @@ function normalizeSaveFile(file: SaveFile): SaveFile {
   return {
     ...file,
     stash: file.stash ?? createStash(),
+    roster: {
+      ...file.roster,
+      heroes: file.roster.heroes.map(normalizeHero),
+    },
+  };
+}
+
+function normalizeHero(hero: Hero): Hero {
+  return {
+    ...hero,
+    xp: hero.xp ?? 0,
+    level: hero.level ?? 1,
+    pendingPerk: hero.pendingPerk ?? false,
   };
 }
