@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-28 · Floor generation: forks (Cluster A · 8)
+
+- **Why:** Foundation for the gdd's "Descend" loop — until forks exist, dungeon floors are linear walks with no player agency between fights. This task converts the Crypt floor from a 4-node list to a 5-node diamond DAG, with one fork after the first preamble combat. The decision quality is low in Tier 2 (both branches are combat with different RNG-rolled enemy comp), but the data model and traversal API now slot cleanly into shop / elite / camp / event nodes (A · 9, 10, 11, 13/14) without further structural change.
+- **Decisions:**
+  - **Implicit forks via `nextNodeIds[]` on every node, not an explicit `fork` node type.** Graph shape lives entirely on edges; combat/boss variants gain one new field. No new node type with no encounter to filter out of combat paths.
+  - **`currentNodeId: string` replaces `currentNodeIndex: number`.** The `awaitingFork: boolean` flag distinguishes "in combat at this node" from "completed combat at this node, awaiting fork pick." Cleaner than overloading `RunStatus` with a new value that breaks save normalizer + scene transitions.
+  - **Atomic graph migration in one task.** Splitting into smaller tasks would have left the test suite or tsc broken across multiple commits — the data shape change forces all consumers to update together. Bundling into one commit keeps each end-state coherent.
+  - **Tier 2 dungeon scene gets a stub auto-pick.** When `awaitingFork: true`, the scene calls `chooseNextNode(rs, nextNodeIds[0])` automatically. Cluster B · 6 (Fork picker UI) drops in via the same `chooseNextNode` API.
+  - **Saves predating the migration are discarded.** Pre-launch policy; loader's shape-mismatch check rejects old `currentNodeIndex` saves. Acceptable given current state.
+- **Surprises:**
+  - The dungeon scene had 8 separate `currentNodeIndex` reads spread across `processCombatReturn`, `buildResultPanel`, `refreshHud`, and `refreshNodeColors`. All replaced with a derived `pathPositionFor(run)` BFS helper plus a `defaultPlayerPath(run)` that always picks branch A. Mid-floor save restore now correctly highlights the player's position because pathPositionFor BFSes from the unique source node.
+  - `dungeon.floorLength` (= 3 in `DungeonDef`) is now obsolete; the new generator hard-codes the diamond shape. Kept the field as documentation; A · 9-11 will introduce variable shapes per floor.
+  - `buildResultPanel` had an off-by-one calculation (`currentNodeIndex - 1` for the just-completed node) that would have been broken by the fork-source case. Replaced with explicit branching: boss → unique terminal; awaitingFork → currentNode itself; linear → "the node whose nextNodeIds contains the new currentNodeId."
+- **Source:** TODO.md Cluster A · 8 → spec at `docs/superpowers/specs/2026-04-28-floor-forks-design.md` → plan at `docs/superpowers/plans/2026-04-28-floor-forks.md`. Test count delta: 1095 → 1107 (+12).
+
 ### 2026-04-28 · Level-up perk picker UI (Cluster B · 8)
 
 - **Why:** Closes the loop on the leveling foundation (Cluster A · 7). Heroes were earning XP, levelling up, and getting flagged `pendingPerk: true` — but had no way to actually pick a perk. The flag accumulated indefinitely; combat saw `perkId: undefined` and applied no effect. This task ships the picker overlay, the `applyPerk` helper, and the camp-scene auto-launch that surfaces the choice as soon as the player returns to camp.

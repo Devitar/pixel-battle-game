@@ -16,7 +16,7 @@ export interface Encounter {
 }
 
 export type Node =
-  | { id: string; type: 'combat'; encounter: Encounter }
-  | { id: string; type: 'boss'; encounter: Encounter };
+  | { id: string; type: 'combat'; encounter: Encounter; nextNodeIds: readonly string[] }
+  | { id: string; type: 'boss'; encounter: Encounter; nextNodeIds: readonly string[] };
 
 export type NodeType = Node['type'];

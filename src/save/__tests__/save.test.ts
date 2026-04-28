@@ -51,7 +51,8 @@ describe('save / load roundtrip', () => {
       pack: { gold: 50, items: [] },
       currentFloorNumber: 1,
       currentFloorNodes: [],
-      currentNodeIndex: 0,
+      currentNodeId: '',
+      awaitingFork: false,
       status: 'in_dungeon',
       fallen: [],
     };
@@ -75,7 +76,8 @@ describe('save / load roundtrip', () => {
       pack: { gold: 0, items: [] },
       currentFloorNumber: 1,
       currentFloorNodes: [],
-      currentNodeIndex: 0,
+      currentNodeId: '',
+      awaitingFork: false,
       status: 'in_dungeon',
       fallen: [],
     };

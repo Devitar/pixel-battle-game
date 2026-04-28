@@ -18,7 +18,8 @@ export interface RunState {
   readonly pack: Pack;
   readonly currentFloorNumber: number;
   readonly currentFloorNodes: readonly Node[];
-  readonly currentNodeIndex: number;
+  readonly currentNodeId: string;
+  readonly awaitingFork: boolean;
   readonly status: RunStatus;
   readonly fallen: readonly Hero[];
 }
@@ -48,7 +49,7 @@ export function startRun(
   if (party.length !== PARTY_SIZE) {
     throw new Error(`startRun: party must have ${PARTY_SIZE} heroes, got ${party.length}`);
   }
-  const nodes = generateFloor(dungeonId, 1, rng);
+  const { nodes, startNodeId } = generateFloor(dungeonId, 1, rng);
   return {
     dungeonId,
     seed,
@@ -56,7 +57,8 @@ export function startRun(
     pack: createPack(),
     currentFloorNumber: 1,
     currentFloorNodes: nodes,
-    currentNodeIndex: 0,
+    currentNodeId: startNodeId,
+    awaitingFork: false,
     status: 'in_dungeon',
     fallen: [],
   };
@@ -66,7 +68,39 @@ export function currentNode(runState: RunState): Node {
   if (runState.status !== 'in_dungeon') {
     throw new Error(`currentNode: status must be 'in_dungeon', got '${runState.status}'`);
   }
-  return runState.currentFloorNodes[runState.currentNodeIndex];
+  const node = runState.currentFloorNodes.find((n) => n.id === runState.currentNodeId);
+  if (!node) {
+    throw new Error(`currentNode: id '${runState.currentNodeId}' not in current floor`);
+  }
+  return node;
+}
+
+export function nextNodeChoices(runState: RunState): readonly Node[] {
+  const cur = currentNode(runState);
+  return cur.nextNodeIds.map((id) => {
+    const n = runState.currentFloorNodes.find((x) => x.id === id);
+    if (!n) {
+      throw new Error(`nextNodeChoices: id '${id}' not in current floor`);
+    }
+    return n;
+  });
+}
+
+export function chooseNextNode(runState: RunState, nextNodeId: string): RunState {
+  if (runState.status !== 'in_dungeon') {
+    throw new Error(`chooseNextNode: status must be 'in_dungeon', got '${runState.status}'`);
+  }
+  const cur = currentNode(runState);
+  if (!cur.nextNodeIds.includes(nextNodeId)) {
+    throw new Error(
+      `chooseNextNode: '${nextNodeId}' is not a valid next node from '${cur.id}'`,
+    );
+  }
+  return {
+    ...runState,
+    currentNodeId: nextNodeId,
+    awaitingFork: false,
+  };
 }
 
 export function completeCombat(
@@ -119,8 +153,9 @@ export function completeCombat(
     };
   }
 
-  const completedNode = runState.currentFloorNodes[runState.currentNodeIndex];
+  const completedNode = currentNode(runState);
   const isBoss = completedNode.type === 'boss';
+  const fanout = completedNode.nextNodeIds;
 
   // XP awards — only on victory, only to surviving heroes.
   const xpReward = isBoss
@@ -132,19 +167,16 @@ export function completeCombat(
     return applyLevelUps({ ...hero, xp: newXp }, hero.level, newLevel);
   });
 
-  const reward =
-    isBoss
-      ? BOSS_NODE_GOLD * runState.currentFloorNumber
-      : COMBAT_NODE_GOLD * runState.currentFloorNumber;
+  const reward = isBoss
+    ? BOSS_NODE_GOLD * runState.currentFloorNumber
+    : COMBAT_NODE_GOLD * runState.currentFloorNumber;
   let newPack = addGold(runState.pack, reward);
 
-  // Loot drop.
   const drop = rollLoot(rng, runState.currentFloorNumber, isBoss);
   if (drop) {
     newPack = addItem(newPack, drop);
   }
 
-  // Fallen-hero gear transfer (gdd §8): gear of a fallen hero on victory rolls into the pack.
   for (const fallen of newFallen) {
     const eq = fallen.equipment;
     const items: Item[] = [eq.weapon, eq.shield, eq.outfit, eq.hat].filter(
@@ -167,6 +199,21 @@ export function completeCombat(
     };
   }
 
+  // Non-boss victory — advance based on fanout.
+  if (fanout.length === 1) {
+    return {
+      runState: {
+        ...runState,
+        party: partyAfterXp,
+        fallen: [...runState.fallen, ...newFallen],
+        pack: newPack,
+        status: 'in_dungeon',
+        currentNodeId: fanout[0],
+      },
+    };
+  }
+
+  // fanout.length === 2 — fork source. Stay at this node; flag awaitingFork.
   return {
     runState: {
       ...runState,
@@ -174,7 +221,7 @@ export function completeCombat(
       fallen: [...runState.fallen, ...newFallen],
       pack: newPack,
       status: 'in_dungeon',
-      currentNodeIndex: runState.currentNodeIndex + 1,
+      awaitingFork: true,
     },
   };
 }
@@ -184,12 +231,13 @@ export function pressOn(runState: RunState, rng: Rng): RunState {
     throw new Error(`pressOn: status must be 'camp_screen', got '${runState.status}'`);
   }
   const nextFloor = runState.currentFloorNumber + 1;
-  const nodes = generateFloor(runState.dungeonId, nextFloor, rng);
+  const { nodes, startNodeId } = generateFloor(runState.dungeonId, nextFloor, rng);
   return {
     ...runState,
     currentFloorNumber: nextFloor,
     currentFloorNodes: nodes,
-    currentNodeIndex: 0,
+    currentNodeId: startNodeId,
+    awaitingFork: false,
     status: 'in_dungeon',
   };
 }

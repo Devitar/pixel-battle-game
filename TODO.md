@@ -27,17 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 8 · Floor generation: forks
-
-- **What:** Each floor has 1–2 fork nodes. At a fork the player picks one of two next-node types; they see the immediate next node on each branch but not what follows.
-- **Why:** Player agency between fights. Without forks, dungeons are linear walks.
-- **Tier:** 2
-- **Acceptance:**
-  - Floor generator produces a graph (not a flat list); each fork shows its two-branch immediate-next node types.
-  - `RunState` representation handles a graph traversal cleanly via `currentNode` / progression.
-- **Touches:** `src/dungeon/floor_generator.ts`, `src/run/run_state.ts`, tests.
-- **Source:** gdd §4 + §10 Tier 2.
-
 ### 9 · Shop nodes
 
 - **What:** Shop encounter generator: rolls 3–4 gear items + 2 potions at floor-/tier-scaled prices. Player spends pack gold; purchased gear enters the pack.

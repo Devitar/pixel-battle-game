@@ -1,10 +1,14 @@
 import * as Phaser from 'phaser';
 import { removeHero, tickRosterWounds } from '../camp/roster';
 import type { CombatResult } from '../combat/types';
+import type { Node } from '../dungeon/node';
 import { heroToLoadout } from '../render/hero_loadout';
 import { Paperdoll } from '../render/paperdoll';
 import {
+  chooseNextNode,
   completeCombat,
+  currentNode,
+  type RunState,
   type WipeOutcome,
 } from '../run/run_state';
 import { createRngFromState } from '../util/rng';
@@ -95,7 +99,7 @@ export class DungeonScene extends Phaser.Scene {
       runRngState: rng.getState(),
     }));
 
-    this.partyContainer.x = this.partyXForNode(run.currentNodeIndex);
+    this.partyContainer.x = this.partyXForNode(this.pathPositionFor(run));
 
     this.refreshHud();
     this.refreshNodeColors();
@@ -135,8 +139,9 @@ export class DungeonScene extends Phaser.Scene {
 
   private buildNodes(): void {
     const run = appState.get().runState!;
-    for (let i = 0; i < run.currentFloorNodes.length; i++) {
-      const node = run.currentFloorNodes[i];
+    const path = this.defaultPlayerPath(run);
+    for (let i = 0; i < path.length && i < NODE_X.length; i++) {
+      const node = path[i];
       const glyph = node.type === 'boss' ? '☠' : '⚔';
       const x = NODE_X[i];
       const icon = this.add
@@ -226,7 +231,63 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private currentNodeIndex(): number {
-    return appState.get().runState!.currentNodeIndex;
+    return this.pathPositionFor(appState.get().runState);
+  }
+
+  /**
+   * For the Tier 2 diamond floor (n0 → n1 → n2a/n2b → boss),
+   * returns the player's position in the 4-step icon row.
+   * Cluster B · 6 (fork picker UI) replaces this with a richer per-node renderer.
+   */
+  private pathPositionFor(run: RunState | undefined): number {
+    if (!run) return 0;
+    const referenced = new Set(
+      run.currentFloorNodes.flatMap((n) => [...n.nextNodeIds]),
+    );
+    const start = run.currentFloorNodes.find((n) => !referenced.has(n.id));
+    if (!start) return 0;
+
+    // BFS from start to currentNodeId.
+    const visited = new Set<string>();
+    let frontier: { id: string; depth: number }[] = [{ id: start.id, depth: 0 }];
+    while (frontier.length > 0) {
+      const next: typeof frontier = [];
+      for (const { id, depth } of frontier) {
+        if (id === run.currentNodeId) return depth;
+        if (visited.has(id)) continue;
+        visited.add(id);
+        const node = run.currentFloorNodes.find((n) => n.id === id);
+        if (!node) continue;
+        for (const nextId of node.nextNodeIds) next.push({ id: nextId, depth: depth + 1 });
+      }
+      frontier = next;
+    }
+    return 0;
+  }
+
+  /**
+   * Tier 2 stub: returns the default player path through the diamond
+   * (always picks branch A at forks). Cluster B · 6 replaces this with
+   * a path that reflects actual player choices.
+   */
+  private defaultPlayerPath(run: RunState | undefined): readonly Node[] {
+    if (!run) return [];
+    const referenced = new Set(
+      run.currentFloorNodes.flatMap((n) => [...n.nextNodeIds]),
+    );
+    const start = run.currentFloorNodes.find((n) => !referenced.has(n.id));
+    if (!start) return [];
+
+    const path: Node[] = [start];
+    let cur = start;
+    while (cur.nextNodeIds.length > 0) {
+      const nextId = cur.nextNodeIds[0]; // Always pick branch A.
+      const next = run.currentFloorNodes.find((n) => n.id === nextId);
+      if (!next) break;
+      path.push(next);
+      cur = next;
+    }
+    return path;
   }
 
   private startCombatAtCurrentNode(): void {
@@ -237,8 +298,20 @@ export class DungeonScene extends Phaser.Scene {
     const run = appState.get().runState!;
 
     const isBoss = run.status === 'camp_screen';
-    const justCompletedIdx = isBoss ? run.currentNodeIndex : run.currentNodeIndex - 1;
-    const completedNode = run.currentFloorNodes[justCompletedIdx];
+    let completedNode: Node;
+    if (isBoss) {
+      // Find the boss node (unique terminal).
+      completedNode = run.currentFloorNodes.find((n) => n.nextNodeIds.length === 0)!;
+    } else if (run.awaitingFork) {
+      // Just cleared the fork source — currentNodeId still points at it.
+      completedNode = currentNode(run);
+    } else {
+      // Just cleared a linear node — currentNodeId has advanced; the just-completed
+      // node is the one whose nextNodeIds contains the new current id.
+      completedNode = run.currentFloorNodes.find((n) =>
+        n.nextNodeIds.includes(run.currentNodeId),
+      )!;
+    }
     const reward =
       completedNode.type === 'boss'
         ? BOSS_NODE_REWARD * run.currentFloorNumber
@@ -308,9 +381,20 @@ export class DungeonScene extends Phaser.Scene {
     const run = appState.get().runState!;
     if (run.status === 'camp_screen') {
       this.scene.start('camp_screen');
-    } else if (run.status === 'in_dungeon') {
-      this.setState('walking_to_next');
+      return;
     }
+
+    if (run.awaitingFork) {
+      // Tier 2 stub — always pick branch A. Cluster B · 6 replaces this
+      // with a picker overlay that lets the player choose.
+      const cur = currentNode(run);
+      appState.update((s) => ({
+        ...s,
+        runState: chooseNextNode(s.runState!, cur.nextNodeIds[0]),
+      }));
+    }
+
+    this.setState('walking_to_next');
   }
 
   private buildWipePanel(): void {
@@ -389,9 +473,10 @@ export class DungeonScene extends Phaser.Scene {
 
   private refreshHud(): void {
     const run = appState.get().runState!;
-    const total = run.currentFloorNodes.length;
-    const displayIdx =
-      run.status === 'camp_screen' ? total : run.currentNodeIndex + 1;
+    const path = this.defaultPlayerPath(run);
+    const total = path.length;
+    const pos = this.pathPositionFor(run);
+    const displayIdx = run.status === 'camp_screen' ? total : pos + 1;
     this.hudFloor.setText(
       `The Crypt · Floor ${run.currentFloorNumber} · Node ${displayIdx} / ${total}`,
     );
@@ -405,15 +490,18 @@ export class DungeonScene extends Phaser.Scene {
 
   private refreshNodeColors(): void {
     const run = appState.get().runState!;
+    const path = this.defaultPlayerPath(run);
+    const pos = this.pathPositionFor(run);
     for (let i = 0; i < this.nodeIcons.length; i++) {
-      const node = run.currentFloorNodes[i];
+      const node = path[i];
+      if (!node) continue;
       const isBoss = node.type === 'boss';
       let color: string;
-      if (i < run.currentNodeIndex) color = '#444444';
-      else if (i === run.currentNodeIndex && run.status === 'in_dungeon') color = '#ffcc66';
+      if (i < pos) color = '#444444';
+      else if (i === pos && run.status === 'in_dungeon') color = '#ffcc66';
       else color = isBoss ? '#cc6666' : '#888888';
       this.nodeIcons[i].setColor(color);
-      this.nodeLabels[i].setColor(i < run.currentNodeIndex ? '#555555' : '#aaaaaa');
+      this.nodeLabels[i].setColor(i < pos ? '#555555' : '#aaaaaa');
     }
   }
 
