@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { CLASSES } from '../../data/classes';
-import { createHero } from '../hero';
+import { PERKS } from '../../data/perks';
+import { TRAITS } from '../../data/traits';
+import { applyPerk, computeMaxHp, createHero, type Hero } from '../hero';
 
 describe('createHero — basic shape', () => {
   it('builds a Knight with full HP and stored trait / body', () => {
@@ -88,8 +90,67 @@ describe('createHero — equipment', () => {
 
   it('starter item ids are deterministic from hero id + slot', () => {
     const h1 = createHero('knight', 'A', 'abc', 'quick', '0');
+
     const h2 = createHero('knight', 'B', 'abc', 'quick', '0');
     expect(h1.equipment.weapon.id).toBe(h2.equipment.weapon.id);
     expect(h1.equipment.weapon.id).toBe('starter_abc_weapon');
+  });
+});
+
+describe('applyPerk', () => {
+  it('stat-effect perk preserves HP, sets perkId, clears pendingPerk', () => {
+    const base = createHero('knight', 'K', 'h0', 'quick', 'body1');
+    const h: Hero = { ...base, pendingPerk: true };
+    const result = applyPerk(h, 'iron_will');
+    expect(result.perkId).toBe('iron_will');
+    expect(result.pendingPerk).toBe(false);
+    expect(result.maxHp).toBe(h.maxHp);
+    expect(result.currentHp).toBe(h.currentHp);
+  });
+
+  it('HP-effect perk at full HP: maxHp +10%, currentHp scales to new max', () => {
+    const base = createHero('knight', 'K', 'h0', 'quick', 'body1');
+    // Knight base 20 + Quick (no HP effect) + sword/shield (no HP gear) = 20 maxHp.
+    expect(base.maxHp).toBe(20);
+    const result = applyPerk(base, 'resolute');
+    expect(result.maxHp).toBe(22); // round(20 * 1.1)
+    expect(result.currentHp).toBe(22); // proportional from full
+  });
+
+  it('HP-effect perk at partial HP: HP percentage preserved within rounding', () => {
+    const base = createHero('knight', 'K', 'h0', 'quick', 'body1');
+    const h: Hero = { ...base, currentHp: 10 }; // 50%
+    const result = applyPerk(h, 'resolute');
+    expect(result.maxHp).toBe(22);
+    // round(10 * 22/20) = round(11) = 11
+    expect(result.currentHp).toBe(11);
+  });
+
+  it('HP-effect perk: currentHp floors at 1 (defensive)', () => {
+    const base = createHero('knight', 'K', 'h0', 'quick', 'body1');
+    const h: Hero = { ...base, currentHp: 0 };
+    const result = applyPerk(h, 'resolute');
+    expect(result.currentHp).toBeGreaterThanOrEqual(1);
+  });
+
+  it('clears pendingPerk regardless of effect kind', () => {
+    const base = createHero('knight', 'K', 'h0', 'quick', 'body1');
+    const h: Hero = { ...base, pendingPerk: true };
+    expect(applyPerk(h, 'iron_will').pendingPerk).toBe(false);
+    expect(applyPerk(h, 'resolute').pendingPerk).toBe(false);
+  });
+});
+
+describe('computeMaxHp — perk HP effect', () => {
+  it('Stout (+10% HP) + Resolute (+10% HP) Knight stacks: 20 → 22 → 24', () => {
+    const knight = createHero('knight', 'K', 'h0', 'stout', 'body1');
+    const result = computeMaxHp(
+      CLASSES.knight.baseStats.hp,
+      TRAITS.stout,
+      knight.equipment,
+      PERKS.resolute,
+    );
+    // 20 → round(20 * 1.1) = 22 → round(22 * 1.1) = 24, plus 0 gear HP.
+    expect(result).toBe(24);
   });
 });

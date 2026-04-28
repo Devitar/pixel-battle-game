@@ -186,17 +186,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Touches:** `src/scenes/dungeon_scene.ts`.
 - **Source:** gdd §4 + §10 Tier 2.
 
-### 8 · Level-up perk picker UI
-
-- **What:** When a hero hits level 5, the camp scene shows a perk-pick overlay before the next run can start. Pairs with Cluster A task 7.
-- **Why:** Without UI, the perk choice can't be made — the hero gets stuck at "pending."
-- **Tier:** 2
-- **Acceptance:**
-  - On camp entry, any heroes with `pendingPerk` show a perk-pick overlay; selection persists via `appState.update`.
-  - Camp blocks dungeon entry while a perk is pending (or surfaces it via a Barracks badge — design call at implementation).
-- **Touches:** `src/scenes/camp_scene.ts`, `src/scenes/perk_overlay.ts` (new).
-- **Source:** gdd §3 + §10 Tier 2.
-
 ### 9 · Wound display (hero card + Barracks)
 
 - **What:** Show wounds on hero cards (icon + count) and a full breakdown in the Barracks detail view. Pairs with Cluster A task 3.

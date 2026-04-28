@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-28 · Level-up perk picker UI (Cluster B · 8)
+
+- **Why:** Closes the loop on the leveling foundation (Cluster A · 7). Heroes were earning XP, levelling up, and getting flagged `pendingPerk: true` — but had no way to actually pick a perk. The flag accumulated indefinitely; combat saw `perkId: undefined` and applied no effect. This task ships the picker overlay, the `applyPerk` helper, and the camp-scene auto-launch that surfaces the choice as soon as the player returns to camp.
+- **Decisions:**
+  - **Auto-overlay on camp focus over Barracks-badge or block-Noticeboard.** Forces the level-up moment as a beat — matches the "rookies become legends" arc framing. Smallest blast radius too: one method on `CampScene` plus the new scene file. Alternatives (Barracks badge or Descend gate) would touch 2+ scenes and add a "remind me later" code path.
+  - **Sequential queue, one hero at a time.** A surviving party of 3 can hit level 5 simultaneously; rather than batch view or carousel, just keep launching the overlay until no hero has `pendingPerk`. The `RESUME` handler fires the next launch automatically — fire-and-forget, no per-fight queue state to maintain.
+  - **HP-effect perks scale current `maxHp` rather than recomputing from class base.** Per-level HP bumps from `applyLevelUps` are baked into `maxHp` and not tracked separately; recomputing from base would lose them. Trade-off: equipment HP also gets multiplied. For Tier 2 with two `+10% HP` perks this is small and reads as "Resolute = your hero is 10% beefier" overall.
+  - **No skip / cancel / ESC.** Matches the auto-overlay model — the player is forced to engage with the level-up moment.
+- **Surprises:**
+  - Extracted `applyHpEffect(value, effect)` and `gearTotal(equipment)` helpers from the inline `computeMaxHp` math. DRY-up was forced by the perk extension but improves readability of `computeMaxHp` itself too.
+  - `currentHp ≥ 1` guard handles the unlikely `currentHp: 0` edge case (living heroes always have ≥1, but a hand-edited save or future "rested at 0" feature could violate). One line, defensive.
+  - Test count delta: +6 cases (5 `applyPerk` + 1 `computeMaxHp` stacking) — small, but covers all five behaviorally-distinct paths through `applyPerk` plus the key trait+perk HP-stacking math.
+- **Source:** TODO.md Cluster B · 8 → spec at `docs/superpowers/specs/2026-04-28-perk-picker-design.md` → plan at `docs/superpowers/plans/2026-04-28-perk-picker.md`.
+
 ### 2026-04-28 · Hero leveling + level-5 perks (Cluster A · 7)
 
 - **Why:** With traits and gear in place, heroes had no second axis of progression — every Knight played identically across runs. Adds the gdd's "rookies become legends" arc: surviving heroes earn XP per fight, level up with deterministic stat bumps, and at level 5 unlock a class-specific choice of two minor perks. Foundation only — picker UI is Cluster B · 8.
