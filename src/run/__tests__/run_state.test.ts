@@ -8,6 +8,7 @@ import { createHero, type Hero } from '../../heroes/hero';
 import { createRng } from '../../util/rng';
 import {
   cashout,
+  chooseCampNodeEffect,
   chooseNextNode,
   completeCombat,
   currentNode,
@@ -57,6 +58,10 @@ function advanceToBossNode(rsArg: ReturnType<typeof startRun>): ReturnType<typeo
     if (node.type === 'boss') return rs;
     if (node.type === 'shop') {
       rs = leaveShop(rs);
+      continue;
+    }
+    if (node.type === 'camp') {
+      rs = chooseCampNodeEffect(rs, { kind: 'heal_party' }, createRng(99)).runState;
       continue;
     }
     // node.type is 'combat' or 'elite' — both go through completeCombat
@@ -374,7 +379,20 @@ describe('completeCombat — loot drop', () => {
       }
       rs = next;
       if (rs.awaitingFork) {
-        rs = chooseNextNode(rs, currentNode(rs).nextNodeIds[0]);
+        // Prefer combat-bearing branches so completeCombat doesn't throw next iteration.
+        const choices = nextNodeChoices(rs);
+        const branch =
+          choices.find((n) => n.type === 'combat') ??
+          choices.find((n) => n.type === 'elite') ??
+          choices[0];
+        rs = chooseNextNode(rs, branch.id);
+      }
+      // If the current node is non-combat (shop/camp branch), walk past it.
+      while (rs.status === 'in_dungeon' && currentNode(rs).type === 'shop') {
+        rs = leaveShop(rs);
+      }
+      while (rs.status === 'in_dungeon' && currentNode(rs).type === 'camp') {
+        rs = chooseCampNodeEffect(rs, { kind: 'heal_party' }, createRng(99)).runState;
       }
       if (rs.status !== 'in_dungeon') {
         rs = startRun('crypt', makeParty(), 1, createRng(attempt + 100));
@@ -615,5 +633,123 @@ describe('completeCombat — elite node', () => {
       createRng(99),
     );
     expect(result.runState.status).toBe('in_dungeon');
+  });
+});
+
+function makeCampRun(seed = 1): ReturnType<typeof startRun> {
+  // Hand-build a RunState whose currentNode is a camp node so we can test
+  // chooseCampNodeEffect in isolation, independent of floor-gen changes
+  // (those land in Task 4).
+  const rs = startRun('crypt', makeParty(), seed, createRng(seed));
+  const campId = 'crypt-f1-camp-test';
+  const bossId = rs.currentFloorNodes.find((n) => n.type === 'boss')!.id;
+  const campNode: Node = {
+    id: campId,
+    type: 'camp',
+    nextNodeIds: [bossId],
+  };
+  return {
+    ...rs,
+    currentFloorNodes: [...rs.currentFloorNodes, campNode],
+    currentNodeId: campId,
+  };
+}
+
+describe('chooseCampNodeEffect — heal_party', () => {
+  it('advances currentNodeId and heals every hero by 25% maxHp', () => {
+    const rs0 = makeCampRun();
+    const damaged: ReturnType<typeof startRun> = {
+      ...rs0,
+      party: rs0.party.map((h) => ({ ...h, currentHp: 1 })),
+    };
+    const result = chooseCampNodeEffect(damaged, { kind: 'heal_party' }, createRng(1));
+    expect(result.runState.currentNodeId).toBe('crypt-f1-boss');
+    for (let i = 0; i < result.runState.party.length; i++) {
+      const hero = result.runState.party[i];
+      expect(hero.currentHp).toBe(1 + Math.round(hero.maxHp * 0.25));
+    }
+  });
+
+  it('returns no outcome (only leave returns one)', () => {
+    const rs = makeCampRun();
+    const result = chooseCampNodeEffect(rs, { kind: 'heal_party' }, createRng(1));
+    expect(result.outcome).toBeUndefined();
+  });
+});
+
+describe('chooseCampNodeEffect — treat_wound', () => {
+  it('advances currentNodeId and removes the wound', () => {
+    const rs0 = makeCampRun();
+    const wounded: ReturnType<typeof startRun> = {
+      ...rs0,
+      party: rs0.party.map((h, i) =>
+        i === 0 ? { ...h, wounds: [{ id: 'bruised' as const, runsRemaining: 5 }] } : h,
+      ),
+    };
+    const result = chooseCampNodeEffect(
+      wounded,
+      { kind: 'treat_wound', heroIndex: 0, woundIndex: 0 },
+      createRng(1),
+    );
+    expect(result.runState.currentNodeId).toBe('crypt-f1-boss');
+    expect(result.runState.party[0].wounds).toEqual([]);
+  });
+});
+
+describe('chooseCampNodeEffect — leave (cashout)', () => {
+  it('returns CashoutOutcome and ends the run', () => {
+    const rs0 = makeCampRun();
+    const withGold: ReturnType<typeof startRun> = {
+      ...rs0,
+      pack: { gold: 50, items: [] },
+    };
+    const result = chooseCampNodeEffect(withGold, { kind: 'leave' }, createRng(1));
+    expect(result.outcome).toBeDefined();
+    expect(result.outcome!.goldBanked).toBe(50);
+    expect(result.outcome!.heroesReturned).toEqual(withGold.party);
+    expect(result.runState.status).toBe('ended');
+  });
+
+  it('works on floor 1 with no boss beaten (no penalty/conditions)', () => {
+    const rs = makeCampRun();
+    expect(rs.currentFloorNumber).toBe(1);
+    const result = chooseCampNodeEffect(rs, { kind: 'leave' }, createRng(1));
+    expect(result.outcome).toBeDefined();
+    expect(result.runState.status).toBe('ended');
+  });
+});
+
+describe('chooseCampNodeEffect — validation', () => {
+  it('throws if currentNode is not a camp', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(() => chooseCampNodeEffect(rs, { kind: 'heal_party' }, createRng(1))).toThrow();
+  });
+
+  it('throws if status is not in_dungeon', () => {
+    const rs = makeCampRun();
+    const ended: ReturnType<typeof startRun> = { ...rs, status: 'ended' };
+    expect(() => chooseCampNodeEffect(ended, { kind: 'heal_party' }, createRng(1))).toThrow();
+  });
+});
+
+describe('cashout — accepts camp nodes', () => {
+  it('accepts in_dungeon + camp currentNode (no throw)', () => {
+    const rs = makeCampRun();
+    expect(() => cashout(rs)).not.toThrow();
+    const { runState, outcome } = cashout(rs);
+    expect(runState.status).toBe('ended');
+    expect(outcome.heroesReturned).toEqual(rs.party);
+  });
+
+  it('still throws on in_dungeon at non-camp nodes', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    // currentNode is preamble combat, not camp.
+    expect(() => cashout(rs)).toThrow();
+  });
+
+  it('still throws on status === ended', () => {
+    const rs = makeCampRun();
+    const ended: ReturnType<typeof startRun> = { ...rs, status: 'ended' };
+    expect(() => cashout(ended)).toThrow();
   });
 });

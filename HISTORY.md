@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-29 · Mid-floor camp nodes (Cluster A · 11)
+
+- **Why:** Adds a recovery-and-decision beat between combats — a fork-branch type that lets the player heal HP (+25% of maxHp party-wide), treat one wound, or **leave the dungeon with a full cashout, no boss-kill required**. Last point overrides gdd §4's "cannot cash out from camp node" line at user direction. Pairs with Cluster B · 4 for the picker UI; the data layer ships with a stub auto-applying `heal_party` so floors with camp branches keep progressing until B · 4 lands.
+- **Decisions:**
+  - **Defer "sharpen weapons" effect.** Building a temp-buff mechanic for one use case risks an awkward shape; deferred until another feature (consumables, event cards) needs the same primitive. Two effects (heal/treat-wound) plus the cashout option already cover the design's recovery decision.
+  - **Cashout-from-camp = full cashout, always.** No floor-1 / no-boss-beaten penalty. Loosened `cashout()`'s status guard to accept `in_dungeon` + camp currentNode in addition to `camp_screen`; short-circuit AND in the `atCamp` predicate ensures `currentNode()` (which throws on non-`in_dungeon` status) is only called when safe.
+  - **Camp-node `'leave'` choice routed via `chooseCampNodeEffect` rather than `applyCampNodeEffect`.** Keeps `camp_node.ts` framework-pure (no `cashout` import); the RunState-aware op in `run_state.ts` delegates to `cashout()` directly.
+  - **6-shape uniform fork RNG.** Camp joins shop/elite/combat as the fourth fork-branch type. Each shape (4 choose 2 = 6) is uniformly weighted at 1/6. Existing shapes drop from 1/3 to 1/6 frequency — players see shops/elites about half as often per floor as before. Acceptable for Tier 2; tunable from the constants array.
+  - **`HEAL_PARTY_PERCENT = 0.25` applied to `maxHp`, not `currentHp`.** Heroes at full HP are unchanged; heroes at low HP get a meaningful bump scaled to their pool. Capped at maxHp (no overflow).
+- **Surprises:**
+  - **Two extra tsc errors after the Node union extension** that the plan didn't anticipate: `floor.test.ts:97` accessed `node.encounter` after only filtering shop/elite (now fails on camp); `run_state.ts:161` derived `kind: CombatKind = completedNode.type` after a shop-only guard (now needs camp guard too). Both small fixes, caught at the right moment by the discipline of running tsc after the type-only change.
+  - **Latent loot-drop test bug surfaced.** A test in `run_state.test.ts` did `chooseNextNode(rs, currentNode(rs).nextNodeIds[0])` unconditionally — fine when the only fork branches were shop or combat (and shop got auto-leave-tested elsewhere). With camp branches now possible, branch A could be `'camp'`, breaking the next `completeCombat` call. Updated the test to prefer combat-bearing branches and walk past non-combat branches before the next loot attempt.
+  - **`rng` parameter on `applyCampNodeEffect` is currently unused.** Reserved for a future "auto-pick wound" mode; passing it now keeps API parity with other apply-effect functions and avoids a signature break later.
+- **Source:** TODO.md Cluster A · 11 → spec at `docs/superpowers/specs/2026-04-29-mid-floor-camp-nodes-design.md` → plan at `docs/superpowers/plans/2026-04-29-mid-floor-camp-nodes.md`. Test count delta: 1159 → 1184 (+25).
+
 ### 2026-04-29 · Elite node visual marker (Cluster B · 10)
 
 - **Why:** Cluster A · 10 (Elite nodes) shipped with a placeholder `'⚔'` glyph for elite that was visually identical to regular combat in the dungeon-scene icon row. Players couldn't see the "harder fight for guaranteed Rare" trade-off before committing at a fork. This task gives elite its own glyph (`'💀'`, per gdd §4) and a future-state orange color (`#cc8844`) that slots between grey (combat/shop) and red (boss) on a threat-tier ramp.

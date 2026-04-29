@@ -1,6 +1,7 @@
 import type { DungeonId, Item, Wound } from '../data/types';
 import { applyLevelUps, levelForXp, xpForBossNode, xpForCombatNode, xpForEliteNode } from '../data/leveling';
 import { DEFAULT_WOUND_RUNS_REMAINING } from '../data/wounds';
+import { applyCampNodeEffect, type CampNodeChoice } from '../dungeon/camp_node';
 import { generateFloor } from '../dungeon/floor';
 import { rollLoot, type CombatKind } from '../dungeon/loot';
 import type { Node } from '../dungeon/node';
@@ -104,6 +105,30 @@ export function chooseNextNode(runState: RunState, nextNodeId: string): RunState
   };
 }
 
+export function chooseCampNodeEffect(
+  runState: RunState,
+  choice: CampNodeChoice,
+  rng: Rng,
+): { runState: RunState; outcome?: CashoutOutcome } {
+  if (runState.status !== 'in_dungeon') {
+    throw new Error(`chooseCampNodeEffect: status must be 'in_dungeon', got '${runState.status}'`);
+  }
+  const cur = currentNode(runState);
+  if (cur.type !== 'camp') {
+    throw new Error(`chooseCampNodeEffect: current node is type '${cur.type}', not 'camp'`);
+  }
+  if (choice.kind === 'leave') {
+    return cashout(runState);
+  }
+  const newRunState = applyCampNodeEffect(runState, choice, rng);
+  return {
+    runState: {
+      ...newRunState,
+      currentNodeId: cur.nextNodeIds[0],
+    },
+  };
+}
+
 export function completeCombat(
   runState: RunState,
   result: CombatResult,
@@ -155,8 +180,8 @@ export function completeCombat(
   }
 
   const completedNode = currentNode(runState);
-  if (completedNode.type === 'shop') {
-    throw new Error(`completeCombat: current node is type 'shop', not a combat-bearing node`);
+  if (completedNode.type === 'shop' || completedNode.type === 'camp') {
+    throw new Error(`completeCombat: current node is type '${completedNode.type}', not a combat-bearing node`);
   }
   const kind: CombatKind = completedNode.type;
   const isBoss = kind === 'boss';
@@ -250,8 +275,10 @@ export function pressOn(runState: RunState, rng: Rng): RunState {
 }
 
 export function cashout(runState: RunState): { runState: RunState; outcome: CashoutOutcome } {
-  if (runState.status !== 'camp_screen') {
-    throw new Error(`cashout: status must be 'camp_screen', got '${runState.status}'`);
+  const atCamp = runState.status === 'in_dungeon' &&
+                 currentNode(runState).type === 'camp';
+  if (runState.status !== 'camp_screen' && !atCamp) {
+    throw new Error(`cashout: must be at camp_screen or camp node, got status='${runState.status}'`);
   }
   const outcome: CashoutOutcome = {
     goldBanked: totalGold(runState.pack),

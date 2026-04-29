@@ -27,17 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 11 · Mid-floor camp nodes
-
-- **What:** Mid-floor rest nodes. Player picks one of: heal some HP, treat one Wound, sharpen weapons (small temp Attack buff next combat). Cannot cash out.
-- **Why:** Drip recovery between fights without fully healing the party. Pairs with Wounds.
-- **Tier:** 2
-- **Acceptance:**
-  - Camp-node effect resolution applied to `RunState`; one effect per visit.
-  - Distinguished from the post-boss Camp Screen (cannot cash out).
-- **Touches:** `src/dungeon/camp_node.ts` (new), `src/run/run_state.ts`, tests. UI is Cluster B task 4.
-- **Source:** gdd §4 + §10 Tier 2.
-
 ### 12 · Floor-milestone enemy modifiers
 
 - **What:** Modifiers introduced at milestone floors (5, 10, 15…): Armored (+Defense), Venomous (applies poison on hit), Enraged (+Attack scaling with damage taken). Floor generator stamps modifiers based on floor number.

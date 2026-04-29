@@ -7,12 +7,21 @@ import type { Node } from './node';
 import { floorScale } from './scaling';
 import { generateShop } from './shop';
 
-type ForkShape = 'shop_vs_combat' | 'elite_vs_combat' | 'elite_vs_shop';
+type ForkShape =
+  | 'shop_vs_combat'
+  | 'elite_vs_combat'
+  | 'elite_vs_shop'
+  | 'camp_vs_combat'
+  | 'camp_vs_shop'
+  | 'camp_vs_elite';
 
 const FORK_SHAPE_WEIGHTS: readonly WeightedOption<ForkShape>[] = [
   { value: 'shop_vs_combat',  weight: 1 },
   { value: 'elite_vs_combat', weight: 1 },
   { value: 'elite_vs_shop',   weight: 1 },
+  { value: 'camp_vs_combat',  weight: 1 },
+  { value: 'camp_vs_shop',    weight: 1 },
+  { value: 'camp_vs_elite',   weight: 1 },
 ];
 
 export function generateFloor(
@@ -39,12 +48,23 @@ export function generateFloor(
   const enc1 = composeCombatEncounter(dungeon.enemyPool, scale, rng);
 
   // Conditionally compose only the encounters/inventory the rolled shape
-  // requires. RNG order: combat-fork-branch encounter (if shape uses combat),
-  // then elite encounter (if shape uses elite), then shop inventory (if shape
-  // uses shop).
-  const usesCombatBranch = shape === 'shop_vs_combat' || shape === 'elite_vs_combat';
-  const usesEliteBranch  = shape === 'elite_vs_combat' || shape === 'elite_vs_shop';
-  const usesShopBranch   = shape === 'shop_vs_combat'  || shape === 'elite_vs_shop';
+  // requires. Camp nodes consume no RNG (pure data construction).
+  const usesCombatBranch =
+    shape === 'shop_vs_combat' ||
+    shape === 'elite_vs_combat' ||
+    shape === 'camp_vs_combat';
+  const usesEliteBranch =
+    shape === 'elite_vs_combat' ||
+    shape === 'elite_vs_shop' ||
+    shape === 'camp_vs_elite';
+  const usesShopBranch =
+    shape === 'shop_vs_combat' ||
+    shape === 'elite_vs_shop' ||
+    shape === 'camp_vs_shop';
+  const usesCampBranch =
+    shape === 'camp_vs_combat' ||
+    shape === 'camp_vs_shop' ||
+    shape === 'camp_vs_elite';
 
   const combatBranchEnc = usesCombatBranch
     ? composeCombatEncounter(dungeon.enemyPool, scale, rng)
@@ -57,10 +77,7 @@ export function generateFloor(
   const encBoss = composeBossEncounter(dungeon.bossId, dungeon.enemyPool, scale, rng);
 
   // Build the two branch nodes per shape. `specialOnBranchA` decides which
-  // side gets the more-distinguished node:
-  //   shop_vs_combat:   true → A is shop, B is combat
-  //   elite_vs_combat:  true → A is elite, B is combat
-  //   elite_vs_shop:    true → A is elite, B is shop
+  // side gets the more-distinguished node.
   const buildCombatBranch = (id: string): Node => {
     if (combatBranchEnc === undefined) {
       throw new Error(`generateFloor: combatBranchEnc undefined for shape '${shape}'`);
@@ -79,21 +96,39 @@ export function generateFloor(
     }
     return { id, type: 'shop', inventory: shopBranchInv, nextNodeIds: [idBoss] };
   };
+  const buildCampBranch = (id: string): Node => {
+    if (!usesCampBranch) {
+      throw new Error(`generateFloor: camp branch not in shape '${shape}'`);
+    }
+    return { id, type: 'camp', nextNodeIds: [idBoss] };
+  };
 
   let node2a: Node;
   let node2b: Node;
   switch (shape) {
     case 'shop_vs_combat':
-      node2a = specialOnBranchA ? buildShopBranch(id2a) : buildCombatBranch(id2a);
+      node2a = specialOnBranchA ? buildShopBranch(id2a)   : buildCombatBranch(id2a);
       node2b = specialOnBranchA ? buildCombatBranch(id2b) : buildShopBranch(id2b);
       break;
     case 'elite_vs_combat':
-      node2a = specialOnBranchA ? buildEliteBranch(id2a) : buildCombatBranch(id2a);
+      node2a = specialOnBranchA ? buildEliteBranch(id2a)  : buildCombatBranch(id2a);
       node2b = specialOnBranchA ? buildCombatBranch(id2b) : buildEliteBranch(id2b);
       break;
     case 'elite_vs_shop':
-      node2a = specialOnBranchA ? buildEliteBranch(id2a) : buildShopBranch(id2a);
-      node2b = specialOnBranchA ? buildShopBranch(id2b) : buildEliteBranch(id2b);
+      node2a = specialOnBranchA ? buildEliteBranch(id2a)  : buildShopBranch(id2a);
+      node2b = specialOnBranchA ? buildShopBranch(id2b)   : buildEliteBranch(id2b);
+      break;
+    case 'camp_vs_combat':
+      node2a = specialOnBranchA ? buildCampBranch(id2a)   : buildCombatBranch(id2a);
+      node2b = specialOnBranchA ? buildCombatBranch(id2b) : buildCampBranch(id2b);
+      break;
+    case 'camp_vs_shop':
+      node2a = specialOnBranchA ? buildCampBranch(id2a)   : buildShopBranch(id2a);
+      node2b = specialOnBranchA ? buildShopBranch(id2b)   : buildCampBranch(id2b);
+      break;
+    case 'camp_vs_elite':
+      node2a = specialOnBranchA ? buildCampBranch(id2a)   : buildEliteBranch(id2a);
+      node2b = specialOnBranchA ? buildEliteBranch(id2b)  : buildCampBranch(id2b);
       break;
   }
 
