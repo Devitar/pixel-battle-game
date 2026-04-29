@@ -27,27 +27,16 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 14 · Initial event deck (~20 cards)
+### 15 · "Lost" hero category — save-schema serialization
 
-- **What:** Author ~20 event cards. Mix of pure flavor gambles (HP-for-gold trades), party-cost cards (one hero Lost), reward cards (gear find).
-- **Why:** Without content, the event system is a feature with nothing to show.
+- **What:** Distinguish "Lost" hero outcomes from "Fallen" outcomes in `CashoutOutcome` / `WipeOutcome` and the save shape (per gdd §8). The `loseHero` operation, the `RunState.lost` array, and event cards that trigger Lost outcomes already shipped (Cluster A · 13 + 14). This task narrows to the outcome-reporting + save-schema work.
+- **Why:** Gdd-defined design lever ("Lost" worse than "Fallen") needs visible separation so cashout summaries and the future scene UI (Cluster B · 11) can distinguish the two categories.
 - **Tier:** 2
 - **Acceptance:**
-  - 20 cards in `data/events.ts`, split between a shared deck and Crypt-specific cards.
-  - Each card uses payload kinds defined in task 13 — no new mechanics introduced here.
-- **Touches:** `src/data/events.ts`.
-- **Source:** gdd §7 + §10 Tier 2.
-
-### 15 · "Lost" hero category
-
-- **What:** Non-combat hero removal. The hero is gone permanently with all equipped gear, regardless of party survival. Triggered by event cards or hazard nodes.
-- **Why:** Gdd-defined design lever ("Lost" worse than "Fallen") that gives event cards real teeth.
-- **Tier:** 2
-- **Acceptance:**
-  - `RunState` exposes a `loseHero(heroIndex)` operation that strips the hero from the party and discards their equipped gear (does NOT transfer to pack — that's the Fallen path).
-  - Save schema records "Lost" outcomes distinctly from "Fallen" (per gdd §8).
-  - At least one event card in the deck triggers a Lost outcome.
-- **Touches:** `src/run/run_state.ts`, `src/data/events.ts` (one card), save schema + migration, tests.
+  - `CashoutOutcome` and `WipeOutcome` expose Lost vs Fallen as distinct fields (rename existing `heroesLost` if useful — currently misnamed to hold fallen).
+  - Outcome-build sites in `cashout` / `completeCombat` populate the new fields.
+  - Save schema continues to load pre-Task-15 saves (no version bump; `runState.lost` already defaults to `[]` via the normalizer).
+- **Touches:** `src/run/run_state.ts`, tests. Cluster B · 11 covers the scene rendering of the distinction.
 - **Source:** gdd §8 + §10 Tier 2.
 
 ---

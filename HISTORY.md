@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-29 · Initial event deck (Cluster A · 14)
+
+- **Why:** Without authored content, the Cluster A · 13 event system was a feature with nothing to show. Ships 20 event cards (15 shared + 5 Crypt-specific) covering all four payload kinds. 4 cards trigger Lost outcomes (3 shared + 1 Crypt) — which fully satisfies one of Cluster A · 15's acceptance bullets, narrowing 15's remaining work to the save-schema / outcome-reporting / scene-UI distinction.
+- **Decisions:**
+  - **Card mix:** 7 HP-for-gold trades + 2 reverse trades (gold for heal) + 3 free-reward cards + 4 Lost-gambles + 4 Crypt-themed (one of which is a Lost-pact). Distribution favors the gdd's HP-for-gold archetype while spreading Lost cards across the deck so the mechanic surfaces ~20% of the time.
+  - **Rare-item gating:** rare items reserved for Lost-gambles or premium high-HP-cost trades — except `forgotten_traveler` (skeleton-with-satchel), which gets a rare item as a "high-tension take" with implicit narrative cost (looting a corpse). Documented in spec §1 as the lone exception.
+  - **Tonal voice:** gothic, doom-laden, 1–2 sentence narrator framing per card. Choice labels use active verbs ("Bleed and pass", "Reach inside") rather than abstract Yes/No. Aligns with gdd's Darkest Dungeon reference.
+  - **Card body apostrophe in `ghost_pact`** (`hero's eternal company`) wrapped the body in double quotes; all other cards use single quotes. Required to avoid escape-sequence noise.
+  - **No Decline label normalization.** Each "do nothing" choice has its own narrative label (`Walk away` / `Decline` / `Leave it untouched` / `Walk past` / `Browse and leave`) for tonal variety. The empty `payloads: []` array is the system-level Decline marker; the label is flavor.
+- **Surprises:**
+  - **Updated Task 15's TODO entry to narrow scope.** Two of three acceptance bullets ("loseHero op" and "event card with Lost") were already satisfied by 13 + 14, so 15 is now just the save-schema/outcome-reporting work. Adjusted in the same TODO migration.
+  - **Test count delta = +12 (15 new − 3 replaced).** The original `events.test.ts` had 3 placeholder smoke checks that the new file's structure tests subsume.
+- **Source:** TODO.md Cluster A · 14 → spec at `docs/superpowers/specs/2026-04-29-event-deck-design.md` → plan at `docs/superpowers/plans/2026-04-29-event-deck.md`. Test count delta: 1261 → 1273 (+12).
+
 ### 2026-04-29 · Event system core (Cluster A · 13)
 
 - **Why:** Foundation for the event deck (Task 14) and "Lost"-category events (Task 15). Ships the event-card data shapes (`EventPayload` union with 4 kinds, `EventChoice`, `EventCard`), a `drawEventCard` deck helper with dungeon filtering, and the `applyEventChoice` resolver that wires each payload kind against `RunState`. Pulled a slice of Task 15 forward — `RunState.lost: readonly Hero[]` field, `loseHero` op, save-normalizer default — so Task 14 can author cards using the full payload palette.
