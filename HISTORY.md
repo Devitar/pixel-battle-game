@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-29 · Hospital building UI (Cluster B · 1)
+
+- **Why:** First Cluster B task. The wound system + treatment data layer (Cluster A · 3) had been complete for some time, but players had no in-game way to spend gold on wound treatment. Ships the camp-hub Hospital scene that closes that loop. Pattern-consistent with `barracks_panel_scene.ts` (left list / right detail).
+- **Decisions:**
+  - **Layout: Barracks-style left list / right detail** (per user direction). List pane shows only wounded heroes with a wound-count subtitle; detail pane shows the selected hero's wound rows with per-wound Treat buttons. Diverges from the simpler "flat list with inline Treat" alternative because it scales better as the wounded-roster grows.
+  - **Flat per-wound cost (`HOSPITAL_TREATMENT_COST = 40`).** Existing constant from `data/wounds.ts`; kept as-is. The gdd's quota model (1-wound-cheap, 2 cheap at L2 …) lives behind Hospital level, which doesn't exist in Tier 2 — out of scope.
+  - **`describeWoundEffect` lives in `data/wounds.ts`, not the scene.** The helper renders `WoundEffect` to a player-facing string (e.g. `+20% damage taken`, `-2 Speed`, `-10 Max HP`). Pure-TS so Cluster B · 9 (Wound display on hero card + Barracks) can reuse it without a refactor.
+  - **`hp` stat → `Max HP` label.** `WoundEffect.statDelta.stat: 'hp'` (Broken Bone) describes a max-HP debuff. The capitalize helper would render this as `Hp` which is wrong — special-cased to `Max HP` for player clarity.
+  - **Hospital tile color `0x885566`** (muted rose). Reads as medical/blood without being garish. Slotted at `x = 580` between Barracks (440) and Noticeboard (720) — preserves the existing camp layout.
+- **Surprises:**
+  - **`wounds.test.ts` already existed** with table-driven assertions for `WOUNDS` shape. Plan said "Create" but it was an extension; appended the new `describeWoundEffect` describe block instead of overwriting. Total file delta: +6 tests, +1 import.
+  - **Type safety required `WoundEffect` import alongside `WoundDef` and `WoundId`.** Spec preferred this over a hacky `WOUNDS[keyof typeof WOUNDS]['effect']` indexed-access type. Plan self-review caught the rough version and led with the clean import path.
+- **Source:** TODO.md Cluster B · 1 → spec at `docs/superpowers/specs/2026-04-29-hospital-ui-design.md` → plan at `docs/superpowers/plans/2026-04-29-hospital-ui.md`. Test count delta: 1278 → 1284 (+6). Scene-layer manual-play verification per convention.
+
 ### 2026-04-29 · Lost-vs-Fallen save serialization (Cluster A · 15)
 
 - **Why:** With `RunState.lost` shipped in Task 13 and Lost-bearing event cards shipped in Task 14, the existing `heroesLost` field on `CashoutOutcome` / `WipeOutcome` (which actually held fallen heroes) became actively misleading. This task fixes the misnaming and adds a parallel field whose semantics match its name. **Closes Cluster A** — all 15 pure-TS data-layer tasks for Tier 2 are now shipped.

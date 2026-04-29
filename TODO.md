@@ -27,17 +27,6 @@ One section per task.
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
 
-### 1 · Hospital building
-
-- **What:** Hospital scene/screen on the camp hub. Lists wounded heroes; player spends gold per wound to clear it. Pairs with Cluster A task 3.
-- **Why:** Without UI, the wound system is unusable from the player's side.
-- **Tier:** 2
-- **Acceptance:**
-  - Hospital tile on camp scene opens the Hospital UI; UI lists each wounded hero, their wounds, per-wound treatment cost.
-  - "Treat" deducts vault gold and clears the wound.
-- **Touches:** `src/scenes/hospital_scene.ts` (new), camp scene wiring.
-- **Source:** gdd §6 + §10 Tier 2.
-
 ### 2 · Blacksmith building
 
 - **What:** Blacksmith scene/screen. Lists upgradeable stash items; player spends gold + materials to upgrade an item one rarity tier (capped per Blacksmith level: L1 → uncommon, L2 → rare, L3 → epic).
