@@ -534,7 +534,7 @@ export class DungeonScene extends Phaser.Scene {
 
     const lines: Phaser.GameObjects.Text[] = [];
     let y = -36;
-    for (const hero of wipe.heroesLost) {
+    for (const hero of wipe.heroesFallen) {
       lines.push(
         this.add
           .text(0, y, hero.name, {
@@ -564,11 +564,11 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private onWipeReturn(): void {
-    const lostIds = new Set(this.wipeOutcome!.heroesLost.map((h) => h.id));
+    const fallenIds = new Set(this.wipeOutcome!.heroesFallen.map((h) => h.id));
 
     appState.update((s) => {
       let roster = s.roster;
-      for (const id of lostIds) {
+      for (const id of fallenIds) {
         if (roster.heroes.some((h) => h.id === id)) {
           roster = removeHero(roster, id);
         }

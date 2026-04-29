@@ -29,6 +29,18 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-29 · Lost-vs-Fallen save serialization (Cluster A · 15)
+
+- **Why:** With `RunState.lost` shipped in Task 13 and Lost-bearing event cards shipped in Task 14, the existing `heroesLost` field on `CashoutOutcome` / `WipeOutcome` (which actually held fallen heroes) became actively misleading. This task fixes the misnaming and adds a parallel field whose semantics match its name. **Closes Cluster A** — all 15 pure-TS data-layer tasks for Tier 2 are now shipped.
+- **Decisions:**
+  - **Renamed `heroesLost` → `heroesFallen` and added new `heroesLost`** sourced from `RunState.lost`. Both `CashoutOutcome` and `WipeOutcome` gained the split. Cleanest naming end-state at the cost of one round of consumer churn (3 reads in `dungeon_scene.ts`, 1 in `camp_screen_scene.ts`).
+  - **Wipe semantic: narratively-Lost heroes stay Lost on wipe.** They were already removed from `party`/`fallen` paths when `loseHero` was called; the wiping fight only kills the *remaining* party. So `wipe.heroesFallen` = the just-killed party + prior fallen; `wipe.heroesLost` = `runState.lost` (unchanged).
+  - **Renamed local var `lostIds` → `fallenIds` in `dungeon_scene.ts`** (lines 567 + 571) to match the field rename. Spec originally hand-waved this as "Cluster B · 11 cleanup if desired" — fixed in spec self-review since it's the same edit context.
+  - **No save-schema change.** `RunState.lost` already exists from Task 13 with normalizer default; outcome shapes are transient (returned from operations, never serialized).
+- **Surprises:**
+  - **Removed the entire `## Cluster A` section from TODO.md** since the cluster is complete. The cluster header was dead weight without contents; Cluster B now becomes the natural top of the backlog.
+- **Source:** TODO.md Cluster A · 15 → spec at `docs/superpowers/specs/2026-04-29-lost-vs-fallen-design.md` → plan at `docs/superpowers/plans/2026-04-29-lost-vs-fallen.md`. Test count delta: 1273 → 1278 (+5).
+
 ### 2026-04-29 · Initial event deck (Cluster A · 14)
 
 - **Why:** Without authored content, the Cluster A · 13 event system was a feature with nothing to show. Ships 20 event cards (15 shared + 5 Crypt-specific) covering all four payload kinds. 4 cards trigger Lost outcomes (3 shared + 1 Crypt) — which fully satisfies one of Cluster A · 15's acceptance bullets, narrowing 15's remaining work to the save-schema / outcome-reporting / scene-UI distinction.

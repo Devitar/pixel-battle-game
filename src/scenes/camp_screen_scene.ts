@@ -156,7 +156,7 @@ export class CampScreenScene extends Phaser.Scene {
   private onLeave(): void {
     const run = appState.get().runState!;
     const { outcome } = cashout(run);
-    const fallenIds = new Set(outcome.heroesLost.map((h) => h.id));
+    const fallenIds = new Set(outcome.heroesFallen.map((h) => h.id));
 
     appState.update((s) => {
       const vault = credit(s.vault, outcome.goldBanked);

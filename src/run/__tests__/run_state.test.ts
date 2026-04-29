@@ -799,3 +799,71 @@ describe('loseHero', () => {
     expect(after2.lost).toHaveLength(2);
   });
 });
+
+describe('cashout — Lost vs Fallen separation', () => {
+  it('with one Lost hero and no fallen: heroesLost has 1, heroesFallen empty', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = loseHero(rs, 1);
+    const atCamp: ReturnType<typeof startRun> = { ...rs, status: 'camp_screen' };
+    const { outcome } = cashout(atCamp);
+    expect(outcome.heroesLost).toHaveLength(1);
+    expect(outcome.heroesLost[0].id).toBe('h1');
+    expect(outcome.heroesFallen).toHaveLength(0);
+    expect(outcome.heroesReturned).toHaveLength(2);
+  });
+
+  it('with both Lost and Fallen: each outcome field carries the right hero', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const fallenHero = rs.party[0];
+    rs = {
+      ...rs,
+      party: rs.party.filter((_, i) => i !== 0),
+      fallen: [fallenHero],
+    };
+    rs = loseHero(rs, 0);
+    const atCamp: ReturnType<typeof startRun> = { ...rs, status: 'camp_screen' };
+    const { outcome } = cashout(atCamp);
+    expect(outcome.heroesFallen).toHaveLength(1);
+    expect(outcome.heroesFallen[0].id).toBe('h0');
+    expect(outcome.heroesLost).toHaveLength(1);
+    expect(outcome.heroesLost[0].id).toBe('h1');
+    expect(outcome.heroesReturned).toHaveLength(1);
+    expect(outcome.heroesReturned[0].id).toBe('h2');
+  });
+
+  it('with no losses: both heroesFallen and heroesLost are empty', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const atCamp: ReturnType<typeof startRun> = { ...rs, status: 'camp_screen' };
+    const { outcome } = cashout(atCamp);
+    expect(outcome.heroesFallen).toEqual([]);
+    expect(outcome.heroesLost).toEqual([]);
+    expect(outcome.heroesReturned).toHaveLength(3);
+  });
+});
+
+describe('completeCombat wipe — Lost vs Fallen separation', () => {
+  it('with a pre-Lost hero, the wipe carries them in heroesLost (not heroesFallen)', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = loseHero(rs, 1);
+    expect(rs.party).toHaveLength(2);
+    expect(rs.lost).toHaveLength(1);
+    const wipeResult = mockCombatResult(rs.party, rs.party.map(() => 0), 'player_defeat');
+    const { wipe } = completeCombat(rs, wipeResult, createRng(99));
+    expect(wipe).toBeDefined();
+    expect(wipe!.heroesLost).toHaveLength(1);
+    expect(wipe!.heroesLost[0].id).toBe('h1');
+    const fallenIds = wipe!.heroesFallen.map((h) => h.id);
+    expect(fallenIds).toContain('h0');
+    expect(fallenIds).toContain('h2');
+    expect(fallenIds).not.toContain('h1');
+  });
+
+  it('with no Lost heroes: wipe.heroesLost is empty array', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const wipeResult = mockCombatResult(rs.party, [0, 0, 0], 'player_defeat');
+    const { wipe } = completeCombat(rs, wipeResult, createRng(99));
+    expect(wipe).toBeDefined();
+    expect(wipe!.heroesLost).toEqual([]);
+    expect(wipe!.heroesFallen).toHaveLength(3);
+  });
+});

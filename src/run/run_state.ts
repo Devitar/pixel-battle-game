@@ -30,12 +30,14 @@ export interface CashoutOutcome {
   goldBanked: number;
   itemsBanked: readonly Item[];
   heroesReturned: readonly Hero[];
-  heroesLost: readonly Hero[];
+  heroesFallen: readonly Hero[];   // died in combat this run
+  heroesLost: readonly Hero[];     // narratively Lost via event/hazard during this run
 }
 
 export interface WipeOutcome {
   packLost: Pack;
-  heroesLost: readonly Hero[];
+  heroesFallen: readonly Hero[];   // died in combat (including the wiping fight)
+  heroesLost: readonly Hero[];     // narratively Lost prior to the wipe
 }
 
 const PARTY_SIZE = 3;
@@ -184,7 +186,11 @@ export function completeCombat(
       ...newFallen,
       ...updatedPartyLiving,
     ];
-    const wipe: WipeOutcome = { packLost: runState.pack, heroesLost: allLost };
+    const wipe: WipeOutcome = {
+      packLost: runState.pack,
+      heroesFallen: allLost,
+      heroesLost: runState.lost,
+    };
     return {
       runState: {
         ...runState,
@@ -302,7 +308,8 @@ export function cashout(runState: RunState): { runState: RunState; outcome: Cash
     goldBanked: totalGold(runState.pack),
     itemsBanked: runState.pack.items,
     heroesReturned: runState.party,
-    heroesLost: runState.fallen,
+    heroesFallen: runState.fallen,
+    heroesLost: runState.lost,
   };
   return {
     runState: { ...runState, status: 'ended' },

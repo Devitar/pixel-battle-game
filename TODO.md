@@ -23,24 +23,6 @@ One section per task.
 
 <!-- Add tasks below this line. Highest priority at the top. -->
 
-## Cluster A — Foundation (pure TypeScript, no Phaser)
-
-Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
-
-### 15 · "Lost" hero category — save-schema serialization
-
-- **What:** Distinguish "Lost" hero outcomes from "Fallen" outcomes in `CashoutOutcome` / `WipeOutcome` and the save shape (per gdd §8). The `loseHero` operation, the `RunState.lost` array, and event cards that trigger Lost outcomes already shipped (Cluster A · 13 + 14). This task narrows to the outcome-reporting + save-schema work.
-- **Why:** Gdd-defined design lever ("Lost" worse than "Fallen") needs visible separation so cashout summaries and the future scene UI (Cluster B · 11) can distinguish the two categories.
-- **Tier:** 2
-- **Acceptance:**
-  - `CashoutOutcome` and `WipeOutcome` expose Lost vs Fallen as distinct fields (rename existing `heroesLost` if useful — currently misnamed to hold fallen).
-  - Outcome-build sites in `cashout` / `completeCombat` populate the new fields.
-  - Save schema continues to load pre-Task-15 saves (no version bump; `runState.lost` already defaults to `[]` via the normalizer).
-- **Touches:** `src/run/run_state.ts`, tests. Cluster B · 11 covers the scene rendering of the distinction.
-- **Source:** gdd §8 + §10 Tier 2.
-
----
-
 ## Cluster B — Scenes & UI (Phaser)
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
