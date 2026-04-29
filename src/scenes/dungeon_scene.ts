@@ -156,7 +156,7 @@ export class DungeonScene extends Phaser.Scene {
       const glyph =
         node.type === 'boss' ? '☠' :
         node.type === 'shop' ? '🛒' :
-        node.type === 'elite' ? '⚔' :
+        node.type === 'elite' ? '💀' :
         '⚔';
       const x = NODE_X[i];
       const icon = this.add
@@ -587,10 +587,11 @@ export class DungeonScene extends Phaser.Scene {
       const node = path[i];
       if (!node) continue;
       const isBoss = node.type === 'boss';
+      const isElite = node.type === 'elite';
       let color: string;
       if (i < pos) color = '#444444';
       else if (i === pos && run.status === 'in_dungeon') color = '#ffcc66';
-      else color = isBoss ? '#cc6666' : '#888888';
+      else color = isBoss ? '#cc6666' : isElite ? '#cc8844' : '#888888';
       this.nodeIcons[i].setColor(color);
       this.nodeLabels[i].setColor(i < pos ? '#555555' : '#aaaaaa');
     }

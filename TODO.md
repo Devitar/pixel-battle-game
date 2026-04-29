@@ -144,16 +144,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Touches:** `src/ui/hero_card.ts`, `src/scenes/barracks_scene.ts`.
 - **Source:** gdd §7 + §10 Tier 2.
 
-### 10 · Elite node visual marker
-
-- **What:** Distinguish elite nodes from regular combat nodes in the dungeon scene's icon row (e.g., 💀 vs ⚔️ + glow / outline). Pairs with Cluster A task 10.
-- **Why:** Player needs to see "harder fight, better loot" before committing — especially at forks.
-- **Tier:** 2
-- **Acceptance:**
-  - Elite nodes render with a distinct icon and colour from regular combat nodes.
-- **Touches:** `src/scenes/dungeon_scene.ts`.
-- **Source:** gdd §4 + §10 Tier 2.
-
 ### 11 · "Lost" hero handling in scenes
 
 - **What:** When a hero is "Lost" mid-run (per Cluster A task 15), surface it visibly: tombstone in the party UI for the remainder of the run; cashout / wipe summary lists Fallen and Lost separately ("X was Lost" vs "X Fell").

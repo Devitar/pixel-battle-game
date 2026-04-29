@@ -29,6 +29,17 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-29 · Elite node visual marker (Cluster B · 10)
+
+- **Why:** Cluster A · 10 (Elite nodes) shipped with a placeholder `'⚔'` glyph for elite that was visually identical to regular combat in the dungeon-scene icon row. Players couldn't see the "harder fight for guaranteed Rare" trade-off before committing at a fork. This task gives elite its own glyph (`'💀'`, per gdd §4) and a future-state orange color (`#cc8844`) that slots between grey (combat/shop) and red (boss) on a threat-tier ramp.
+- **Decisions:**
+  - **Pulled both knobs (glyph + color), not just one.** `'💀'` vs boss's `'☠'` is a known confusable at small font sizes; the orange-vs-red color contrast disambiguates at any zoom level. Position helps too — boss is always slot 4, elite always on a fork branch (slot 2).
+  - **Color reserved for future-state only.** Past nodes stay dim grey, current-node stays gold — uniform across all node types. Only the future-state branch in `refreshNodeColors` gains the elite tier. Keeps the "you are here" / "you've been here" reads consistent.
+  - **No helper extraction.** A pure `glyphForNode(node)` / `futureColorForNode(node)` would be testable but is over-engineering for a 5-line change. Convention is no Phaser-side unit tests for scenes (per prior scene-task HISTORY entries); the ternary chains stay inline.
+- **Surprises:**
+  - None. The placeholder line at `dungeon_scene.ts:159` was specifically anticipated for this task; the change was the one-line glyph edit it expected, plus a 2-line color-tier addition.
+- **Source:** TODO.md Cluster B · 10. No spec or plan docs — design fit in a single brainstorming-skill exchange.
+
 ### 2026-04-29 · Elite nodes (Cluster A · 10)
 
 - **Why:** Without elites, all fork branches were combat-vs-shop or combat-vs-combat, so the "harder fight for guaranteed loot" trade-off the gdd promised at forks didn't exist. This task ships the data layer: a new `'elite'` Node variant with a 4-enemy encounter at +50% HP / +25% Attack on top of `floorScale`, a guaranteed Rare drop and 2× combat gold/XP on victory, and a triangular fork-shape RNG so each floor's fork is uniformly one of `shop_vs_combat` / `elite_vs_combat` / `elite_vs_shop`. Visual marker (Cluster B · 10) and modifier stamping (Cluster A · 12) deferred.
