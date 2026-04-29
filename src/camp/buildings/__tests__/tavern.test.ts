@@ -62,13 +62,15 @@ describe('generateCandidates', () => {
     expect(a).toEqual(b);
   });
 
-  it('Stout candidates have maxHp > classBaseHp; others equal class base', () => {
+  it('maxHp matches trait HP effect for stout / frail / others', () => {
     for (let seed = 1; seed <= 50; seed++) {
       const list = generateCandidates(createRng(seed), TIER1_CLASSES);
       for (const h of list) {
         const classBase = CLASSES[h.classId].baseStats.hp;
         if (h.traitId === 'stout') {
           expect(h.maxHp, `seed ${seed} hero ${h.id}`).toBeGreaterThan(classBase);
+        } else if (h.traitId === 'frail') {
+          expect(h.maxHp, `seed ${seed} hero ${h.id}`).toBeLessThan(classBase);
         } else {
           expect(h.maxHp, `seed ${seed} hero ${h.id}`).toBe(classBase);
         }

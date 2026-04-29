@@ -27,74 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 4 · Gear rarity tiers (common → rare)
-
-- **What:** Add rarity to gear: Common, Uncommon, Rare. Each tier is a meaningful stat bump; Rare can carry an extra property (e.g., burn-on-hit). Drop weights skew toward higher rarity at deeper floors / higher dungeon tiers.
-- **Why:** Foundation for Blacksmith upgrades, shop stock quality, and elite/boss drops. Without this, all gear is flat.
-- **Tier:** 2
-- **Acceptance:**
-  - `Item` carries `rarity: 'common' | 'uncommon' | 'rare'`; loot tables roll rarity from floor / dungeon-tier weights.
-  - Rare items roll an extra property (e.g., `{ kind: 'burn', turns: 2 }`); the property surfaces in tooltip / display.
-- **Touches:** `src/data/items.ts`, `src/items/`, `src/dungeon/loot.ts`, tests.
-- **Source:** gdd §7 + §10 Tier 2.
-
-### 5 · Gear-modifies-abilities rule
-
-- **What:** A class's signature kit is gated by equipped weapon family. Preferred weapon → full kit; off-preferred-but-same-family → kit with one ability swapped (e.g., Knight + Greataxe: Shield Bash → Cleaving Swing); wholly-wrong-weapon → only universal basic Attack.
-- **Why:** Lets a single class support 3–4 playstyles via gear. Without it, weapon choice is purely cosmetic + stat.
-- **Tier:** 2
-- **Acceptance:**
-  - Each class declares preferred + same-family + swapped-ability mappings in `data/classes.ts`.
-  - `buildCombatState` resolves the active kit based on equipped weapon. Wholly-wrong-weapon resolves to the basic-attack-only fallback.
-- **Touches:** `src/data/classes.ts`, `src/run/combat_setup.ts`, tests.
-- **Source:** gdd §3 + §10 Tier 2.
-
-### 6 · Traits at recruitment
-
-- **What:** ~12 small per-hero modifiers (Stout +10% HP, Quick +1 Speed, Cowardly −1 Speed when in slot 1, Lucky +5% Crit, etc.). One trait rolled per Tavern candidate; visible at roll time.
-- **Why:** Gives heroes individual flavor at low design cost. Foundation for Chapel (trait removal) in Tier 3.
-- **Tier:** 2
-- **Acceptance:**
-  - `data/traits.ts` (new) defines all ~12 traits as either flat stat-delta or conditional (slot-dependent, low-HP, etc.).
-  - Tavern roll picks one per candidate; trait field on `Hero`; combat-build applies trait effects to effective stats.
-  - Tests cover at least one stat-delta trait and one conditional trait.
-- **Touches:** `src/data/traits.ts`, `src/heroes/hero.ts`, `src/camp/tavern.ts`, `src/save/save.ts` + migration, tests.
-- **Source:** gdd §3 + §10 Tier 2.
-
-### 7 · Hero leveling + level-5 perks
-
-- **What:** Heroes gain XP from surviving combat. Levels grant small stat bumps (+HP, +primary stat). At level 5, the player picks 1 of 2 minor perks for that hero (e.g., "Precise: +5% Crit" / "Hardy: +10% HP").
-- **Why:** Visible per-hero progression. Pairs with Training Grounds (Tier 3 — benched XP).
-- **Tier:** 2
-- **Acceptance:**
-  - XP awarded per surviving combat; level curve in `data/leveling.ts`; level-up applies stat bumps deterministically.
-  - At level 5, hero is flagged as `pendingPerk`; the camp scene surfaces the choice (UI in Cluster B task 8).
-  - Save schema persists XP, level, and chosen perks.
-- **Touches:** `src/data/leveling.ts` (new), `src/heroes/hero.ts`, `src/run/run_state.ts` (XP-award hook), save schema + migration, tests.
-- **Source:** gdd §3 + §10 Tier 2.
-
-### 8 · Floor generation: forks
-
-- **What:** Each floor has 1–2 fork nodes. At a fork the player picks one of two next-node types; they see the immediate next node on each branch but not what follows.
-- **Why:** Player agency between fights. Without forks, dungeons are linear walks.
-- **Tier:** 2
-- **Acceptance:**
-  - Floor generator produces a graph (not a flat list); each fork shows its two-branch immediate-next node types.
-  - `RunState` representation handles a graph traversal cleanly via `currentNode` / progression.
-- **Touches:** `src/dungeon/floor_generator.ts`, `src/run/run_state.ts`, tests.
-- **Source:** gdd §4 + §10 Tier 2.
-
-### 9 · Shop nodes
-
-- **What:** Shop encounter generator: rolls 3–4 gear items + 2 potions at floor-/tier-scaled prices. Player spends pack gold; purchased gear enters the pack.
-- **Why:** Adds a real "spend now or save?" decision mid-floor. Depends on gear rarity tiers.
-- **Tier:** 2
-- **Acceptance:**
-  - Shop generator rolls fresh inventory at floor entry (deterministic from run RNG); stock weights live in data.
-  - Purchase resolves against `RunState.pack.gold` and adds to `pack.unequipped`.
-- **Touches:** `src/dungeon/shop.ts` (new), `src/run/run_state.ts`, tests. UI is Cluster B task 3.
-- **Source:** gdd §4 + §7 + §10 Tier 2.
-
 ### 10 · Elite nodes
 
 - **What:** Elite encounter generator: tougher enemy lineup (more enemies, modifiers like Armored / Enraged), guaranteed Rare drop on victory.
@@ -190,17 +122,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Touches:** `src/scenes/blacksmith_scene.ts` (new), camp scene wiring.
 - **Source:** gdd §6 + §10 Tier 2.
 
-### 3 · Shop UI
-
-- **What:** Shop overlay in the dungeon scene. Shows rolled inventory + prices, "Buy" buttons that draw from `pack.gold`. Pairs with Cluster A task 9.
-- **Why:** Pairs with the shop-node data; without UI, shops can't be visited.
-- **Tier:** 2
-- **Acceptance:**
-  - Shop-node entry overlays the Shop UI with current stock.
-  - Purchases mutate `RunState.pack` via `appState.update`; sold-out items disable.
-- **Touches:** `src/scenes/dungeon_scene.ts`, `src/scenes/shop_overlay.ts` (new).
-- **Source:** gdd §7 + §10 Tier 2.
-
 ### 4 · Camp node UI (mid-floor)
 
 - **What:** UI for mid-floor camp nodes — three buttons: Rest (heal HP), Treat Wound (with a hero picker), Sharpen (temp Attack buff next combat). Pairs with Cluster A task 11.
@@ -221,38 +142,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
   - Outcome panel describes what changed (HP, gold, gear, hero loss) before the player advances.
 - **Touches:** `src/scenes/event_overlay.ts` (new), dungeon scene wiring.
 - **Source:** gdd §7 + §10 Tier 2.
-
-### 6 · Fork picker UI
-
-- **What:** When the dungeon scene reaches a fork, replace "advance" with a 2-button picker — each button labeled with the immediate next-node icon. Pairs with Cluster A task 8.
-- **Why:** Pairs with floor-generator forks; needed for player choice.
-- **Tier:** 2
-- **Acceptance:**
-  - At a fork, the dungeon scene shows a 2-button picker; clicking sets the chosen branch as the active path and resumes normal advance.
-- **Touches:** `src/scenes/dungeon_scene.ts`.
-- **Source:** gdd §4 + §10 Tier 2.
-
-### 7 · Trait display (Tavern + hero card)
-
-- **What:** Show a hero's trait in the Tavern candidate row and on the Barracks hero card. Pairs with Cluster A task 6.
-- **Why:** A trait the player can't see is a trait they can't roster around.
-- **Tier:** 2
-- **Acceptance:**
-  - Tavern candidate row includes a trait label + tooltip (description from `data/traits.ts`).
-  - Barracks hero card surfaces the trait with the same prominence as level/class.
-- **Touches:** `src/scenes/tavern_scene.ts`, `src/ui/hero_card.ts`.
-- **Source:** gdd §3 + §10 Tier 2.
-
-### 8 · Level-up perk picker UI
-
-- **What:** When a hero hits level 5, the camp scene shows a perk-pick overlay before the next run can start. Pairs with Cluster A task 7.
-- **Why:** Without UI, the perk choice can't be made — the hero gets stuck at "pending."
-- **Tier:** 2
-- **Acceptance:**
-  - On camp entry, any heroes with `pendingPerk` show a perk-pick overlay; selection persists via `appState.update`.
-  - Camp blocks dungeon entry while a perk is pending (or surfaces it via a Barracks badge — design call at implementation).
-- **Touches:** `src/scenes/camp_scene.ts`, `src/scenes/perk_overlay.ts` (new).
-- **Source:** gdd §3 + §10 Tier 2.
 
 ### 9 · Wound display (hero card + Barracks)
 
@@ -302,3 +191,15 @@ Art tasks that aren't blocking gameplay. Enemies, heroes, and rooms already rend
   - `spritenames.txt` updated with the new entries; `npm run generate:names` run and output committed.
   - Boss is visually distinguishable beyond just scale (unique frame or silhouette).
 - **Touches:** `public/assets/sprites/base_sprites.png`, `spritenames.txt`, `src/render/sprite_names.generated.ts` (regenerated).
+
+### 2 · Bespoke outfit + hat sprites for items system
+
+- **What:** Replace the placeholder `spriteId: '0'` entries in `BASE_ITEMS` for `outfit_cloth`, `outfit_leather`, `hat_cap`, `hat_hood` with real sprite frames. Update `spritenames.txt` and regenerate the names module.
+- **Why:** The items foundation (Cluster A task 4) shipped with `'0'` placeholder sprite IDs for outfits and hats because no bespoke frames existed yet. Heroes still render correctly because `heroToLoadout` only reads weapon + shield from equipment today, but the moment a future task wires outfit/hat sprites into the paperdoll those `'0'` values become visible bugs. Cleaning this up before that wiring lands keeps the item-display task clean.
+- **Tier:** 1 (originally part of items foundation) — non-blocking now that placeholders work.
+- **Acceptance:**
+  - `outfit_cloth`, `outfit_leather`, `hat_cap`, `hat_hood` in `src/data/items.ts` reference real frame names from `SPRITE_NAMES.outfit.*` / `SPRITE_NAMES.hat.*` (or whatever family they belong to in `spritenames.txt`).
+  - `spritenames.txt` carries the new entries; `npm run generate:names` run and output committed.
+  - The two outfit variants are visually distinguishable; the two hat variants are visually distinguishable.
+- **Touches:** `public/assets/sprites/base_sprites.png` (if new frames needed), `spritenames.txt`, `src/render/sprite_names.generated.ts` (regenerated), `src/data/items.ts` (4 spriteId fields).
+- **Source:** Cluster A task 4 HISTORY entry (2026-04-27 · Gear rarity tiers + items foundation).

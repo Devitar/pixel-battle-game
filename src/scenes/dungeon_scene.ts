@@ -1,12 +1,18 @@
 import * as Phaser from 'phaser';
 import { removeHero, tickRosterWounds } from '../camp/roster';
 import type { CombatResult } from '../combat/types';
+import type { Node } from '../dungeon/node';
 import { heroToLoadout } from '../render/hero_loadout';
 import { Paperdoll } from '../render/paperdoll';
 import {
+  chooseNextNode,
   completeCombat,
+  currentNode,
+  playerPath,
+  type RunState,
   type WipeOutcome,
 } from '../run/run_state';
+import { createRngFromState } from '../util/rng';
 import { appState } from './app_state';
 import { consumeCombatResult } from './combat_handoff';
 
@@ -14,6 +20,7 @@ type DungeonSceneState =
   | 'walking_in'
   | 'walking_to_next'
   | 'showing_result'
+  | 'awaiting_fork_pick'
   | 'showing_wipe';
 
 const NODE_X = [180, 360, 540, 720] as const;
@@ -37,6 +44,7 @@ export class DungeonScene extends Phaser.Scene {
   private hudPack!: Phaser.GameObjects.Text;
   private statusText!: Phaser.GameObjects.Text;
   private resultPanel?: Phaser.GameObjects.Container;
+  private forkPicker?: Phaser.GameObjects.Container;
   private preCombatHp = new Map<string, number>();
   private wipeOutcome?: WipeOutcome;
 
@@ -49,6 +57,7 @@ export class DungeonScene extends Phaser.Scene {
     this.nodeLabels = [];
     this.preCombatHp.clear();
     this.resultPanel = undefined;
+    this.forkPicker = undefined;
     this.wipeOutcome = undefined;
 
     const state = appState.get();
@@ -63,6 +72,13 @@ export class DungeonScene extends Phaser.Scene {
     this.buildNodes();
     this.buildParty();
     this.buildStatusBar();
+
+    this.events.on(Phaser.Scenes.Events.RESUME, () => {
+      this.refreshHud();
+      this.refreshNodeColors();
+      this.refreshStatusBar();
+      this.setState('walking_to_next');
+    });
 
     const handoff = consumeCombatResult();
     if (handoff) {
@@ -83,15 +99,18 @@ export class DungeonScene extends Phaser.Scene {
       this.preCombatHp.set(hero.id, hero.currentHp);
     }
 
-    const { runState: nextRun, wipe } = completeCombat(run, result);
+    // Loot roll consumes RNG; thread it through completeCombat so the post-loot
+    // state is what gets persisted.
+    const rng = createRngFromState(rngStateAfter);
+    const { runState: nextRun, wipe } = completeCombat(run, result, rng);
 
     appState.update((s) => ({
       ...s,
       runState: nextRun,
-      runRngState: rngStateAfter,
+      runRngState: rng.getState(),
     }));
 
-    this.partyContainer.x = this.partyXForNode(run.currentNodeIndex);
+    this.partyContainer.x = this.partyXForNode(this.pathPositionFor(run));
 
     this.refreshHud();
     this.refreshNodeColors();
@@ -131,9 +150,10 @@ export class DungeonScene extends Phaser.Scene {
 
   private buildNodes(): void {
     const run = appState.get().runState!;
-    for (let i = 0; i < run.currentFloorNodes.length; i++) {
-      const node = run.currentFloorNodes[i];
-      const glyph = node.type === 'boss' ? '☠' : '⚔';
+    const path = playerPath(run);
+    for (let i = 0; i < path.length && i < NODE_X.length; i++) {
+      const node = path[i];
+      const glyph = node.type === 'boss' ? '☠' : node.type === 'shop' ? '🛒' : '⚔';
       const x = NODE_X[i];
       const icon = this.add
         .text(x, NODE_Y, glyph, {
@@ -182,7 +202,7 @@ export class DungeonScene extends Phaser.Scene {
           this.partyXForNode(this.currentNodeIndex()),
           WALK_IN_DURATION,
           'Cubic.easeOut',
-          () => this.startCombatAtCurrentNode(),
+          () => this.handleArrival(),
         );
         break;
       case 'walking_to_next':
@@ -190,16 +210,38 @@ export class DungeonScene extends Phaser.Scene {
           this.partyXForNode(this.currentNodeIndex()),
           WALK_NEXT_DURATION,
           'Cubic.easeInOut',
-          () => this.startCombatAtCurrentNode(),
+          () => this.handleArrival(),
         );
         break;
       case 'showing_result':
         this.buildResultPanel();
         break;
+      case 'awaiting_fork_pick':
+        this.buildForkPicker();
+        break;
       case 'showing_wipe':
         this.buildWipePanel();
         break;
     }
+  }
+
+  private handleArrival(): void {
+    const run = appState.get().runState;
+    if (!run) return;
+
+    if (run.awaitingFork) {
+      this.setState('awaiting_fork_pick');
+      return;
+    }
+
+    const node = currentNode(run);
+    if (node.type === 'shop') {
+      this.scene.launch('shop_overlay');
+      this.scene.pause();
+      return;
+    }
+
+    this.startCombatAtCurrentNode();
   }
 
   private tweenPartyTo(
@@ -222,7 +264,38 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private currentNodeIndex(): number {
-    return appState.get().runState!.currentNodeIndex;
+    return this.pathPositionFor(appState.get().runState);
+  }
+
+  /**
+   * For the Tier 2 diamond floor (n0 → n1 → n2a/n2b → boss),
+   * returns the player's position in the 4-step icon row.
+   * Cluster B · 6 (fork picker UI) replaces this with a richer per-node renderer.
+   */
+  private pathPositionFor(run: RunState | undefined): number {
+    if (!run) return 0;
+    const referenced = new Set(
+      run.currentFloorNodes.flatMap((n) => [...n.nextNodeIds]),
+    );
+    const start = run.currentFloorNodes.find((n) => !referenced.has(n.id));
+    if (!start) return 0;
+
+    // BFS from start to currentNodeId.
+    const visited = new Set<string>();
+    let frontier: { id: string; depth: number }[] = [{ id: start.id, depth: 0 }];
+    while (frontier.length > 0) {
+      const next: typeof frontier = [];
+      for (const { id, depth } of frontier) {
+        if (id === run.currentNodeId) return depth;
+        if (visited.has(id)) continue;
+        visited.add(id);
+        const node = run.currentFloorNodes.find((n) => n.id === id);
+        if (!node) continue;
+        for (const nextId of node.nextNodeIds) next.push({ id: nextId, depth: depth + 1 });
+      }
+      frontier = next;
+    }
+    return 0;
   }
 
   private startCombatAtCurrentNode(): void {
@@ -233,8 +306,20 @@ export class DungeonScene extends Phaser.Scene {
     const run = appState.get().runState!;
 
     const isBoss = run.status === 'camp_screen';
-    const justCompletedIdx = isBoss ? run.currentNodeIndex : run.currentNodeIndex - 1;
-    const completedNode = run.currentFloorNodes[justCompletedIdx];
+    let completedNode: Node;
+    if (isBoss) {
+      // Find the boss node (unique terminal).
+      completedNode = run.currentFloorNodes.find((n) => n.nextNodeIds.length === 0)!;
+    } else if (run.awaitingFork) {
+      // Just cleared the fork source — currentNodeId still points at it.
+      completedNode = currentNode(run);
+    } else {
+      // Just cleared a linear node — currentNodeId has advanced; the just-completed
+      // node is the one whose nextNodeIds contains the new current id.
+      completedNode = run.currentFloorNodes.find((n) =>
+        n.nextNodeIds.includes(run.currentNodeId),
+      )!;
+    }
     const reward =
       completedNode.type === 'boss'
         ? BOSS_NODE_REWARD * run.currentFloorNumber
@@ -294,6 +379,90 @@ export class DungeonScene extends Phaser.Scene {
     bg.on('pointerdown', () => this.onResultDismiss());
   }
 
+  private buildForkPicker(): void {
+    const run = appState.get().runState!;
+    const cur = currentNode(run);
+    const branchIds = cur.nextNodeIds;
+    if (branchIds.length !== 2) return; // defensive — only render for actual forks
+
+    const forkX = NODE_X[2]; // 540 for Crypt's diamond
+    const upperY = 420;
+    const lowerY = 500;
+    const promptY = 380;
+
+    const prompt = this.add
+      .text(forkX, promptY, 'Choose a path:', {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#ffcc66',
+      })
+      .setOrigin(0.5);
+
+    const upper = this.buildForkOption(forkX, upperY, branchIds[0], 'branch A', run);
+    const lower = this.buildForkOption(forkX, lowerY, branchIds[1], 'branch B', run);
+
+    this.forkPicker = this.add.container(0, 0, [prompt, upper, lower]);
+  }
+
+  private buildForkOption(
+    x: number,
+    y: number,
+    branchId: string,
+    subtitle: string,
+    run: RunState,
+  ): Phaser.GameObjects.Container {
+    const branchNode = run.currentFloorNodes.find((n) => n.id === branchId)!;
+    const glyph = branchNode.type === 'boss' ? '☠' : branchNode.type === 'shop' ? '🛒' : '⚔';
+    const typeLabel = branchNode.type;
+
+    const bg = this.add
+      .rectangle(0, 0, 36, 36, 0x1a1a1a)
+      .setStrokeStyle(1, 0x444444);
+    const glyphText = this.add
+      .text(0, -2, glyph, {
+        fontFamily: 'monospace',
+        fontSize: '20px',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5);
+    const subtitleText = this.add
+      .text(0, 24, subtitle, {
+        fontFamily: 'monospace',
+        fontSize: '9px',
+        color: '#aaaaaa',
+      })
+      .setOrigin(0.5);
+    const labelText = this.add
+      .text(0, 36, typeLabel, {
+        fontFamily: 'monospace',
+        fontSize: '9px',
+        color: '#aaaaaa',
+      })
+      .setOrigin(0.5);
+
+    bg.setInteractive({ useHandCursor: true });
+    bg.on('pointerover', () => bg.setStrokeStyle(2, 0xffcc66));
+    bg.on('pointerout', () => bg.setStrokeStyle(1, 0x444444));
+    bg.on('pointerdown', () => this.onForkPick(branchId));
+
+    return this.add.container(x, y, [bg, glyphText, subtitleText, labelText]);
+  }
+
+  private onForkPick(branchId: string): void {
+    appState.update((s) => ({
+      ...s,
+      runState: chooseNextNode(s.runState!, branchId),
+    }));
+    this.destroyForkPicker();
+    this.refreshNodeColors();
+    this.setState('walking_to_next');
+  }
+
+  private destroyForkPicker(): void {
+    this.forkPicker?.destroy(true);
+    this.forkPicker = undefined;
+  }
+
   private onResultDismiss(): void {
     this.resultPanel?.destroy(true);
     this.resultPanel = undefined;
@@ -304,9 +473,15 @@ export class DungeonScene extends Phaser.Scene {
     const run = appState.get().runState!;
     if (run.status === 'camp_screen') {
       this.scene.start('camp_screen');
-    } else if (run.status === 'in_dungeon') {
-      this.setState('walking_to_next');
+      return;
     }
+
+    if (run.awaitingFork) {
+      this.setState('awaiting_fork_pick');
+      return;
+    }
+
+    this.setState('walking_to_next');
   }
 
   private buildWipePanel(): void {
@@ -385,26 +560,35 @@ export class DungeonScene extends Phaser.Scene {
 
   private refreshHud(): void {
     const run = appState.get().runState!;
-    const total = run.currentFloorNodes.length;
-    const displayIdx =
-      run.status === 'camp_screen' ? total : run.currentNodeIndex + 1;
+    const path = playerPath(run);
+    const total = path.length;
+    const pos = this.pathPositionFor(run);
+    const displayIdx = run.status === 'camp_screen' ? total : pos + 1;
     this.hudFloor.setText(
       `The Crypt · Floor ${run.currentFloorNumber} · Node ${displayIdx} / ${total}`,
     );
-    this.hudPack.setText(`Pack: ${run.pack.gold}g`);
+    const itemCount = run.pack.items.length;
+    const packLabel =
+      itemCount > 0
+        ? `Pack: ${run.pack.gold}g · ${itemCount} item${itemCount === 1 ? '' : 's'}`
+        : `Pack: ${run.pack.gold}g`;
+    this.hudPack.setText(packLabel);
   }
 
   private refreshNodeColors(): void {
     const run = appState.get().runState!;
+    const path = playerPath(run);
+    const pos = this.pathPositionFor(run);
     for (let i = 0; i < this.nodeIcons.length; i++) {
-      const node = run.currentFloorNodes[i];
+      const node = path[i];
+      if (!node) continue;
       const isBoss = node.type === 'boss';
       let color: string;
-      if (i < run.currentNodeIndex) color = '#444444';
-      else if (i === run.currentNodeIndex && run.status === 'in_dungeon') color = '#ffcc66';
+      if (i < pos) color = '#444444';
+      else if (i === pos && run.status === 'in_dungeon') color = '#ffcc66';
       else color = isBoss ? '#cc6666' : '#888888';
       this.nodeIcons[i].setColor(color);
-      this.nodeLabels[i].setColor(i < run.currentNodeIndex ? '#555555' : '#aaaaaa');
+      this.nodeLabels[i].setColor(i < pos ? '#555555' : '#aaaaaa');
     }
   }
 

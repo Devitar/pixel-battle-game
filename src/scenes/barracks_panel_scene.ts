@@ -5,6 +5,7 @@ import { describeAbility } from '../data/ability_describe';
 import { CLASSES } from '../data/classes';
 import { TRAITS } from '../data/traits';
 import type { Hero } from '../heroes/hero';
+import { describeKitStatus, resolveCombatAbilities } from '../items/kit';
 import { heroToLoadout } from '../render/hero_loadout';
 import { Paperdoll } from '../render/paperdoll';
 import { HeroCard } from '../ui/hero_card';
@@ -251,9 +252,19 @@ export class BarracksPanelScene extends Phaser.Scene {
         color: '#ffcc66',
       }),
     );
+    // Kit status — shown to the right of the ABILITIES header in muted color.
+    // 80px offset clears the "ABILITIES" label at 12px monospace.
+    this.detailContainer.add(
+      this.add.text(ABILITY_X + 80, ABILITY_HEADER_Y, `· ${describeKitStatus(hero)}`, {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#aaaaaa',
+      }),
+    );
 
+    const { abilities: resolvedAbilities } = resolveCombatAbilities(hero);
     let yCursor = ABILITY_BLOCK_START_Y;
-    for (const abilityId of classDef.abilities) {
+    for (const abilityId of resolvedAbilities) {
       const ability = ABILITIES[abilityId];
       const desc = describeAbility(ability);
 

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createRoster } from '../../camp/roster';
+import { createStash } from '../../camp/stash';
 import { createVault, credit } from '../../camp/vault';
 import type { RunState } from '../../run/run_state';
 import {
@@ -27,6 +28,7 @@ function makeBaseSave(): SaveFile {
     version: CURRENT_SCHEMA_VERSION,
     roster: createRoster(),
     vault: credit(createVault(), 100),
+    stash: createStash(),
     unlocks: createDefaultUnlocks(),
   };
 }
@@ -46,10 +48,11 @@ describe('save / load roundtrip', () => {
       dungeonId: 'crypt',
       seed: 1,
       party: [],
-      pack: { gold: 50 },
+      pack: { gold: 50, items: [] },
       currentFloorNumber: 1,
       currentFloorNodes: [],
-      currentNodeIndex: 0,
+      currentNodeId: '',
+      awaitingFork: false,
       status: 'in_dungeon',
       fallen: [],
     };
@@ -70,10 +73,11 @@ describe('save / load roundtrip', () => {
       dungeonId: 'crypt',
       seed: 1,
       party: [],
-      pack: { gold: 0 },
+      pack: { gold: 0, items: [] },
       currentFloorNumber: 1,
       currentFloorNodes: [],
-      currentNodeIndex: 0,
+      currentNodeId: '',
+      awaitingFork: false,
       status: 'in_dungeon',
       fallen: [],
     };
@@ -171,5 +175,73 @@ describe('createDefaultUnlocks', () => {
     const u = createDefaultUnlocks();
     expect([...u.classes].sort()).toEqual(['archer', 'barbarian', 'knight', 'mage', 'priest', 'rogue']);
     expect(u.dungeons).toEqual(['crypt']);
+  });
+});
+
+describe('stash persistence', () => {
+  it('round-trips an empty stash', () => {
+    const storage = new MemoryStorage();
+    save(makeBaseSave(), storage);
+    const loaded = load(storage);
+    expect(loaded?.stash).toEqual({ items: [] });
+  });
+
+  it('older v1 save without stash field defaults to empty stash on load', () => {
+    const storage = new MemoryStorage();
+    const stale = {
+      version: CURRENT_SCHEMA_VERSION,
+      roster: createRoster(),
+      vault: { gold: 0 },
+      unlocks: createDefaultUnlocks(),
+      // no stash field — pre-Task-17 save shape
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(stale));
+    const loaded = load(storage);
+    expect(loaded?.stash).toEqual({ items: [] });
+  });
+});
+
+describe('load — normalize legacy heroes missing xp/level/pendingPerk', () => {
+  it('fills defaults on heroes from a save predating leveling', () => {
+    const storage = new MemoryStorage();
+    const legacyHero = {
+      id: 'h0',
+      classId: 'knight' as const,
+      name: 'Old Hero',
+      baseStats: { hp: 20, attack: 4, defense: 4, speed: 3, mind: 0, crit: 5, dodge: 5 },
+      currentHp: 20,
+      maxHp: 20,
+      traitId: 'stout' as const,
+      bodySpriteId: 'body1',
+      wounds: [],
+      equipment: {
+        weapon: {
+          id: 'w0',
+          baseId: 'sword_basic' as const,
+          slot: 'weapon' as const,
+          rarity: 'common' as const,
+          weaponType: 'sword' as const,
+          affixes: [],
+          floorRolledAt: 1,
+        },
+      },
+      // xp / level / pendingPerk intentionally absent
+    };
+    const legacy = {
+      version: 1,
+      roster: { heroes: [legacyHero], capacity: 12 },
+      vault: { gold: 0 },
+      stash: createStash(),
+      unlocks: createDefaultUnlocks(),
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(legacy));
+
+    const loaded = load(storage);
+    expect(loaded).not.toBeNull();
+    const hero = loaded!.roster.heroes[0];
+    expect(hero.xp).toBe(0);
+    expect(hero.level).toBe(1);
+    expect(hero.pendingPerk).toBe(false);
+    expect(hero.perkId).toBeUndefined();
   });
 });

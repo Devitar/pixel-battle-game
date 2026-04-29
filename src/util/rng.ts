@@ -72,3 +72,10 @@ export function createRng(seed: number): Rng {
 export function createRngFromState(state: number): Rng {
   return createRngInternal(state);
 }
+
+export function generateItemId(rng: Rng): string {
+  // 16 base36 chars from two 32-bit chunks of the rng stream.
+  const hi = Math.floor(rng.next() * 0xffffffff).toString(36).padStart(8, '0').slice(0, 8);
+  const lo = Math.floor(rng.next() * 0xffffffff).toString(36).padStart(8, '0').slice(0, 8);
+  return (hi + lo).slice(0, 16);
+}

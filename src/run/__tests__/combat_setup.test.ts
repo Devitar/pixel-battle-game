@@ -106,7 +106,8 @@ describe('buildCombatState — trait propagation', () => {
     hero.wounds = [{ id: 'winded', runsRemaining: 5 }];
     const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
     const state = buildCombatState([hero], encounter);
-    expect(state.combatants[0].baseStats.attack).toBe(hero.baseStats.attack - 2);
+    // hero.baseStats.attack (4) - winded (-2) + sword_basic base (+1) = 3
+    expect(state.combatants[0].baseStats.attack).toBe(hero.baseStats.attack - 2 + 1);
   });
 
   it('applies a damageTakenMult wound (bruised) to combatant.damageTakenMultiplier', () => {
@@ -144,5 +145,145 @@ describe('buildCombatState — trait propagation', () => {
     const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
     const state = buildCombatState([hero], encounter);
     expect(state.combatants[0].damageTakenMultiplier).toBeUndefined();
+  });
+});
+
+describe('buildCombatState — equipment stats', () => {
+  it('weapon affix +1 attack adds to combatant attack', () => {
+    const hero = createHero('knight', 'K', 'h1', 'quick', '0');
+    hero.equipment = {
+      ...hero.equipment,
+      weapon: { ...hero.equipment.weapon, affixes: [{ affixId: 'of_power', value: 1 }] },
+    };
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    const p0 = state.combatants[0];
+    // hero.baseStats.attack (4) + sword_basic base (+1) + of_power affix (+1) = 6
+    expect(p0.baseStats.attack).toBe(hero.baseStats.attack + 1 + 1);
+  });
+
+  it('outfit base hp + of_vigor affix flow into both baseStats.hp and maxHp', () => {
+    const hero = createHero('archer', 'A', 'h1', 'quick', '0');
+    hero.equipment = {
+      ...hero.equipment,
+      outfit: {
+        id: 'o1', baseId: 'outfit_cloth', slot: 'outfit', rarity: 'uncommon',
+        affixes: [{ affixId: 'of_vigor', value: 6 }],
+        floorRolledAt: 1,
+      },
+    };
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    const p0 = state.combatants[0];
+    // archer baseStats.hp (14) + outfit_cloth base (+6) + of_vigor (+6) = 26
+    expect(p0.baseStats.hp).toBe(hero.baseStats.hp + 6 + 6);
+    expect(p0.maxHp).toBe(p0.baseStats.hp);
+  });
+
+  it('rare weapon with of_burning sets Combatant.burningWeaponDamage', () => {
+    const hero = createHero('knight', 'K', 'h1', 'quick', '0');
+    hero.equipment = {
+      ...hero.equipment,
+      weapon: {
+        id: 'w', baseId: 'sword_basic', slot: 'weapon', rarity: 'rare', weaponType: 'sword',
+        affixes: [], rareProperty: { propertyId: 'of_burning', value: 3 }, floorRolledAt: 1,
+      },
+    };
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    const p0 = state.combatants[0];
+    expect(p0.burningWeaponDamage).toBe(3);
+    expect(p0.lifestealPercent).toBeUndefined();
+    expect(p0.thornsDamage).toBeUndefined();
+    expect(p0.regenPerRound).toBeUndefined();
+  });
+
+  it('of_vampirism on weapon sets Combatant.lifestealPercent', () => {
+    const hero = createHero('knight', 'K', 'h1', 'quick', '0');
+    hero.equipment = {
+      ...hero.equipment,
+      weapon: {
+        id: 'w', baseId: 'sword_basic', slot: 'weapon', rarity: 'rare', weaponType: 'sword',
+        affixes: [], rareProperty: { propertyId: 'of_vampirism', value: 25 }, floorRolledAt: 1,
+      },
+    };
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    expect(state.combatants[0].lifestealPercent).toBe(25);
+  });
+
+  it('of_thorns on shield sets Combatant.thornsDamage', () => {
+    const hero = createHero('knight', 'K', 'h1', 'quick', '0');
+    hero.equipment = {
+      ...hero.equipment,
+      shield: {
+        id: 's', baseId: 'shield_basic', slot: 'shield', rarity: 'rare',
+        affixes: [], rareProperty: { propertyId: 'of_thorns', value: 1 }, floorRolledAt: 1,
+      },
+    };
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    expect(state.combatants[0].thornsDamage).toBe(1);
+  });
+
+  it('of_regeneration on outfit sets Combatant.regenPerRound', () => {
+    const hero = createHero('archer', 'A', 'h1', 'quick', '0');
+    hero.equipment = {
+      ...hero.equipment,
+      outfit: {
+        id: 'o', baseId: 'outfit_cloth', slot: 'outfit', rarity: 'rare',
+        affixes: [], rareProperty: { propertyId: 'of_regeneration', value: 2 }, floorRolledAt: 1,
+      },
+    };
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    expect(state.combatants[0].regenPerRound).toBe(2);
+  });
+});
+
+import type { Item } from '../../data/types';
+import { resolveCombatAbilities } from '../../items/kit';
+
+describe('buildCombatState — kit resolution', () => {
+  it('Knight wielding axe → Combatant.abilities includes knight_cleaving_swing, excludes shield_bash', () => {
+    const hero = createHero('knight', 'K', 'h0', 'quick', '0');
+    const axeWeapon: Item = {
+      id: 'w_axe', baseId: 'axe_basic', slot: 'weapon', rarity: 'common',
+      weaponType: 'axe', affixes: [], floorRolledAt: 1,
+    };
+    const heroWithAxe: typeof hero = {
+      ...hero,
+      equipment: { ...hero.equipment, weapon: axeWeapon },
+    };
+    const encounter = { enemies: [{ enemyId: 'skeleton_warrior' as const, slot: 1 as const }], scale: FLAT_SCALE };
+    const state = buildCombatState([heroWithAxe], encounter);
+    const p0 = state.combatants[0];
+    expect(p0.abilities).toContain('knight_cleaving_swing');
+    expect(p0.abilities).not.toContain('shield_bash');
+  });
+
+  it('Knight wielding bow → Combatant.abilities is [knight_slash]', () => {
+    const hero = createHero('knight', 'K', 'h0', 'quick', '0');
+    const bow: Item = {
+      id: 'w_bow', baseId: 'bow_basic', slot: 'weapon', rarity: 'common',
+      weaponType: 'bow', affixes: [], floorRolledAt: 1,
+    };
+    const heroWithBow: typeof hero = {
+      ...hero,
+      equipment: { ...hero.equipment, weapon: bow },
+    };
+    const encounter = { enemies: [{ enemyId: 'skeleton_warrior' as const, slot: 1 as const }], scale: FLAT_SCALE };
+    const state = buildCombatState([heroWithBow], encounter);
+    const p0 = state.combatants[0];
+    expect(p0.abilities).toEqual(['knight_slash']);
+  });
+
+  it('Combatant.abilities matches resolveCombatAbilities output', () => {
+    const hero = createHero('mage', 'M', 'h0', 'quick', '0');
+    const resolved = resolveCombatAbilities(hero);
+    const encounter = { enemies: [{ enemyId: 'skeleton_warrior' as const, slot: 1 as const }], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    expect(state.combatants[0].abilities).toEqual(resolved.abilities);
+    expect(state.combatants[0].aiPriority).toEqual(resolved.aiPriority);
   });
 });

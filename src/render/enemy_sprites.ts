@@ -24,17 +24,11 @@ export interface EnemyVisual {
 export const ENEMY_VISUALS: Record<EnemyId, EnemyVisual> = {
   skeleton_warrior: {
     bodyFrame: ENEMY_BODY.skeleton,
-    legs: SPRITE_NAMES.legs.brown,
-    feet: SPRITE_NAMES.feet.brown,
-    outfit: SPRITE_NAMES.torso.leatherarmor_tier1,
     weapon: SPRITE_NAMES.weapon.sword_tier1,
     shield: SPRITE_NAMES.shield.wood_buckler_tier1,
   },
   skeleton_archer: {
     bodyFrame: ENEMY_BODY.skeleton,
-    legs: SPRITE_NAMES.legs.brown,
-    feet: SPRITE_NAMES.feet.brown,
-    outfit: SPRITE_NAMES.torso.shirt_orange_tattered,
     weapon: SPRITE_NAMES.weapon.bow_wood_tier1,
   },
   ghost: {

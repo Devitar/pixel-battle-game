@@ -1,0 +1,97 @@
+import type { ClassId, PerkDef, PerkId } from './types';
+
+export const PERKS: Record<PerkId, PerkDef> = {
+  iron_will: {
+    id: 'iron_will',
+    name: 'Iron Will',
+    description: '+1 Defense',
+    classId: 'knight',
+    statEffects: [{ stat: 'defense', delta: 1 }],
+  },
+  resolute: {
+    id: 'resolute',
+    name: 'Resolute',
+    description: '+10% HP',
+    classId: 'knight',
+    hpEffect: { delta: 10, mode: 'percent' },
+  },
+  precise: {
+    id: 'precise',
+    name: 'Precise',
+    description: '+5% Crit',
+    classId: 'archer',
+    statEffects: [{ stat: 'crit', delta: 5 }],
+  },
+  eagle_eye: {
+    id: 'eagle_eye',
+    name: 'Eagle Eye',
+    description: '+1 Attack',
+    classId: 'archer',
+    statEffects: [{ stat: 'attack', delta: 1 }],
+  },
+  devout: {
+    id: 'devout',
+    name: 'Devout',
+    description: '+1 Mind',
+    classId: 'priest',
+    statEffects: [{ stat: 'mind', delta: 1 }],
+  },
+  steadfast: {
+    id: 'steadfast',
+    name: 'Steadfast',
+    description: '+10% HP',
+    classId: 'priest',
+    hpEffect: { delta: 10, mode: 'percent' },
+  },
+  berserker: {
+    id: 'berserker',
+    name: 'Berserker',
+    description: '+2 Attack',
+    classId: 'barbarian',
+    statEffects: [{ stat: 'attack', delta: 2 }],
+  },
+  tough_skin: {
+    id: 'tough_skin',
+    name: 'Tough Skin',
+    description: '+1 Defense',
+    classId: 'barbarian',
+    statEffects: [{ stat: 'defense', delta: 1 }],
+  },
+  lethal: {
+    id: 'lethal',
+    name: 'Lethal',
+    description: '+5% Crit',
+    classId: 'rogue',
+    statEffects: [{ stat: 'crit', delta: 5 }],
+  },
+  evasive: {
+    id: 'evasive',
+    name: 'Evasive',
+    description: '+5% Dodge',
+    classId: 'rogue',
+    statEffects: [{ stat: 'dodge', delta: 5 }],
+  },
+  arcane_power: {
+    id: 'arcane_power',
+    name: 'Arcane Power',
+    description: '+1 Mind',
+    classId: 'mage',
+    statEffects: [{ stat: 'mind', delta: 1 }],
+  },
+  quick_cast: {
+    id: 'quick_cast',
+    name: 'Quick Cast',
+    description: '+1 Speed',
+    classId: 'mage',
+    statEffects: [{ stat: 'speed', delta: 1 }],
+  },
+};
+
+export const CLASS_PERK_PAIRS: Record<ClassId, readonly [PerkId, PerkId]> = {
+  knight:    ['iron_will',    'resolute'],
+  archer:    ['precise',      'eagle_eye'],
+  priest:    ['devout',       'steadfast'],
+  barbarian: ['berserker',    'tough_skin'],
+  rogue:     ['lethal',       'evasive'],
+  mage:      ['arcane_power', 'quick_cast'],
+};

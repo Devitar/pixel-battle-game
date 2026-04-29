@@ -204,3 +204,23 @@ describe('resolveCombat — poison kills mid-turn', () => {
     expect(heroCastsAfterDeath).toBe(false);
   });
 });
+
+describe('of_regeneration round-start heal', () => {
+  it('a hero with regenPerRound heals at the start of each round, capped at maxHp', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 4, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 5,
+      regenPerRound: 3,
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 1, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 100, maxHp: 100,
+    });
+    const state = makeTestState([p0], [e0]);
+    const result = resolveCombat(state, createRng(1));
+    const heals = result.events.filter(
+      (ev) => ev.kind === 'heal_applied' && ev.targetId === 'p0' && ev.sourceId === 'p0',
+    );
+    expect(heals.length).toBeGreaterThan(0);
+  });
+});

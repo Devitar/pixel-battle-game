@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createRoster } from '../../camp/roster';
+import { createStash } from '../../camp/stash';
 import { createVault, credit } from '../../camp/vault';
 import {
   CURRENT_SCHEMA_VERSION,
@@ -24,6 +25,7 @@ function makeBaseSave(): SaveFile {
     version: CURRENT_SCHEMA_VERSION,
     roster: createRoster(),
     vault: createVault(),
+    stash: createStash(),
     unlocks: createDefaultUnlocks(),
   };
 }

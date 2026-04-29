@@ -1,4 +1,5 @@
 import { addHero, createRoster } from '../camp/roster';
+import { createStash } from '../camp/stash';
 import { createVault, credit } from '../camp/vault';
 import { generateStarterRoster } from '../camp/buildings/tavern';
 import type { Rng } from '../util/rng';
@@ -35,6 +36,7 @@ function createFreshSave(rng: Rng): SaveFile {
     version: CURRENT_SCHEMA_VERSION,
     roster,
     vault: credit(createVault(), STARTER_GOLD),
+    stash: createStash(),
     unlocks: createDefaultUnlocks(),
   };
 }

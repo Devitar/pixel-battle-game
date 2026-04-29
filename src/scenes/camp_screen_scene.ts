@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { removeHero, tickRosterWounds, updateHero } from '../camp/roster';
+import { addItems } from '../camp/stash';
 import { credit } from '../camp/vault';
 import { cashout, pressOn, type RunState } from '../run/run_state';
 import { HeroCard } from '../ui/hero_card';
@@ -29,6 +30,8 @@ export class CampScreenScene extends Phaser.Scene {
     this.buildPartyRow(run);
     this.buildFallenLine(run);
     this.buildButtons(run);
+
+    this.events.on(Phaser.Scenes.Events.RESUME, () => this.scene.restart());
   }
 
   private buildBackground(): void {
@@ -56,11 +59,17 @@ export class CampScreenScene extends Phaser.Scene {
   }
 
   private buildPackPill(run: RunState): void {
+    const itemCount = run.pack.items.length;
+    const label =
+      itemCount > 0
+        ? `Pack: ${run.pack.gold}g · ${itemCount} item${itemCount === 1 ? '' : 's'}`
+        : `Pack: ${run.pack.gold}g`;
+    const width = itemCount > 0 ? 280 : 200;
     this.add
-      .rectangle(480, 130, 200, 40, 0x2a2418)
+      .rectangle(480, 130, width, 40, 0x2a2418)
       .setStrokeStyle(2, 0xaa8844);
     this.add
-      .text(480, 130, `Pack: ${run.pack.gold}g`, {
+      .text(480, 130, label, {
         fontFamily: 'monospace',
         fontSize: '16px',
         color: '#ffcc66',
@@ -87,11 +96,31 @@ export class CampScreenScene extends Phaser.Scene {
   }
 
   private buildButtons(run: RunState): void {
+    // Three-button row: Equip · Leave · Press On
+    const equipEnabled = this.equipButtonEnabled(run);
+    const equipBg = this.add
+      .rectangle(160, 470, 220, 44, equipEnabled ? 0x2a2a4a : 0x222222)
+      .setStrokeStyle(2, equipEnabled ? 0x6688cc : 0x444444);
+    this.add
+      .text(160, 470, 'Equip', {
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        color: equipEnabled ? '#ffffff' : '#666666',
+      })
+      .setOrigin(0.5);
+    if (equipEnabled) {
+      equipBg.setInteractive({ useHandCursor: true });
+      equipBg.on('pointerdown', () => {
+        this.scene.launch('equip_panel');
+        this.scene.pause();
+      });
+    }
+
     const leaveBg = this.add
-      .rectangle(300, 470, 220, 44, 0x2a4a2a)
+      .rectangle(460, 470, 220, 44, 0x2a4a2a)
       .setStrokeStyle(2, 0x44cc44);
     this.add
-      .text(300, 470, `Leave (+${run.pack.gold}g to vault)`, {
+      .text(460, 470, `Leave (+${run.pack.gold}g to vault)`, {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#ffffff',
@@ -101,10 +130,10 @@ export class CampScreenScene extends Phaser.Scene {
     leaveBg.on('pointerdown', () => this.onLeave());
 
     const pressOnBg = this.add
-      .rectangle(660, 470, 220, 44, 0x3a2a1a)
+      .rectangle(760, 470, 220, 44, 0x3a2a1a)
       .setStrokeStyle(2, 0xcc8844);
     this.add
-      .text(660, 470, `Press On → Floor ${run.currentFloorNumber + 1}`, {
+      .text(760, 470, `Press On → Floor ${run.currentFloorNumber + 1}`, {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#ffffff',
@@ -114,6 +143,16 @@ export class CampScreenScene extends Phaser.Scene {
     pressOnBg.on('pointerdown', () => this.onPressOn());
   }
 
+  private equipButtonEnabled(run: RunState): boolean {
+    if (run.pack.items.length > 0) return true;
+    for (const hero of run.party) {
+      if (hero.equipment.shield || hero.equipment.outfit || hero.equipment.hat) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private onLeave(): void {
     const run = appState.get().runState!;
     const { outcome } = cashout(run);
@@ -121,6 +160,7 @@ export class CampScreenScene extends Phaser.Scene {
 
     appState.update((s) => {
       const vault = credit(s.vault, outcome.goldBanked);
+      const stash = addItems(s.stash, outcome.itemsBanked);
       let roster = s.roster;
       for (const survivor of outcome.heroesReturned) {
         if (roster.heroes.some((h) => h.id === survivor.id)) {
@@ -136,6 +176,7 @@ export class CampScreenScene extends Phaser.Scene {
       return {
         ...s,
         vault,
+        stash,
         roster,
         runState: undefined,
         runRngState: undefined,

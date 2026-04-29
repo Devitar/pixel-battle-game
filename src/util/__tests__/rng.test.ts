@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createRng, createRngFromState } from '../rng';
+import { createRng, createRngFromState, generateItemId } from '../rng';
 
 describe('rng.int', () => {
   it('returns integers within [min, max] inclusive', () => {
@@ -266,5 +266,24 @@ describe('rng.percent', () => {
     const a = createRng(7);
     const b = createRng(7);
     for (let i = 0; i < 50; i++) expect(a.percent(37)).toBe(b.percent(37));
+  });
+});
+
+describe('generateItemId', () => {
+  it('produces a 16-char base36 string', () => {
+    const rng = createRng(1);
+    const id = generateItemId(rng);
+    expect(id).toMatch(/^[0-9a-z]{16}$/);
+  });
+
+  it('is deterministic from rng seed', () => {
+    expect(generateItemId(createRng(42))).toBe(generateItemId(createRng(42)));
+  });
+
+  it('produces distinct ids on successive calls', () => {
+    const rng = createRng(1);
+    const a = generateItemId(rng);
+    const b = generateItemId(rng);
+    expect(a).not.toBe(b);
   });
 });

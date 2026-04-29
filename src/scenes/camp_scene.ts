@@ -1,4 +1,5 @@
 import * as Phaser from 'phaser';
+import { listHeroes } from '../camp/roster';
 import { balance } from '../camp/vault';
 import { appState } from './app_state';
 
@@ -17,10 +18,22 @@ export class CampScene extends Phaser.Scene {
     this.buildBuilding('Noticeboard', 720, 0x998866, 80, 60, 'noticeboard_panel');
     this.buildDevHints();
 
-    this.events.on(Phaser.Scenes.Events.RESUME, () => this.refreshHud());
+    this.events.on(Phaser.Scenes.Events.RESUME, () => {
+      this.refreshHud();
+      this.maybeLaunchPerkPicker();
+    });
 
     this.input.keyboard?.on('keydown-NINE', () => this.scene.start('main'));
     this.input.keyboard?.on('keydown-ZERO', () => this.scene.start('explorer'));
+
+    this.maybeLaunchPerkPicker();
+  }
+
+  private maybeLaunchPerkPicker(): void {
+    const pending = listHeroes(appState.get().roster).find((h) => h.pendingPerk);
+    if (!pending) return;
+    this.scene.launch('perk_overlay', { heroId: pending.id });
+    this.scene.pause();
   }
 
   private buildHud(): void {

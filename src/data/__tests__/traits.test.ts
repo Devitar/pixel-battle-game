@@ -9,6 +9,12 @@ const EXPECTED_IDS: readonly TraitId[] = [
   'sharp_eyed',
   'cowardly',
   'nervous',
+  'frail',
+  'sluggish',
+  'lucky',
+  'slippery',
+  'wise',
+  'bloodthirsty',
 ];
 
 describe('TRAITS', () => {
@@ -46,11 +52,29 @@ describe('TRAITS', () => {
       }
     });
 
-    it('every statEffect targets attack/defense/speed only', () => {
+    it('every statEffect targets a non-HP buffable stat', () => {
       const stats = TRAITS[id].statEffects ?? [];
       for (const e of stats) {
-        expect(['attack', 'defense', 'speed']).toContain(e.stat);
+        expect(['attack', 'defense', 'speed', 'mind', 'crit', 'dodge']).toContain(e.stat);
       }
+    });
+
+    it('every statEffect condition has a recognized kind', () => {
+      const stats = TRAITS[id].statEffects ?? [];
+      for (const e of stats) {
+        if (e.condition) {
+          expect(['inSlot', 'belowHpRatio']).toContain(e.condition.kind);
+        }
+      }
+    });
+
+    it('has a non-empty shortDescription', () => {
+      expect(typeof TRAITS[id].shortDescription).toBe('string');
+      expect(TRAITS[id].shortDescription.length).toBeGreaterThan(0);
+    });
+
+    it('shortDescription is at most 16 characters', () => {
+      expect(TRAITS[id].shortDescription.length).toBeLessThanOrEqual(16);
     });
   });
 });

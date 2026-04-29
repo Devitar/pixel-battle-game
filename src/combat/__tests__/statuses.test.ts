@@ -120,10 +120,63 @@ describe('getEffectiveStat — trait evaluation', () => {
     expect(getEffectiveStat(c, 'defense')).toBe(c.baseStats.defense + 1 + 3);
   });
 
+  it('Lucky combatant adds +5 to crit', () => {
+    const c = makeHeroCombatant('knight', 1, 'p0', { traitId: 'lucky' });
+    expect(getEffectiveStat(c, 'crit')).toBe(c.baseStats.crit + 5);
+  });
+
+  it('Bloodthirsty active: +2 attack when below 50% HP', () => {
+    const c = makeHeroCombatant('knight', 1, 'p0', {
+      traitId: 'bloodthirsty',
+      maxHp: 20,
+      currentHp: 9,
+    });
+    expect(getEffectiveStat(c, 'attack')).toBe(c.baseStats.attack + 2);
+  });
+
+  it('Bloodthirsty inactive: no bonus at full HP', () => {
+    const c = makeHeroCombatant('knight', 1, 'p0', {
+      traitId: 'bloodthirsty',
+      maxHp: 20,
+      currentHp: 20,
+    });
+    expect(getEffectiveStat(c, 'attack')).toBe(c.baseStats.attack);
+  });
+
+  it('Bloodthirsty boundary: no bonus at exactly 50% HP', () => {
+    const c = makeHeroCombatant('knight', 1, 'p0', {
+      traitId: 'bloodthirsty',
+      maxHp: 20,
+      currentHp: 10,
+    });
+    expect(getEffectiveStat(c, 'attack')).toBe(c.baseStats.attack);
+  });
+
   it('Combatant with no traitId reads base + statuses only', () => {
     const c = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
     expect(c.traitId).toBeUndefined();
     expect(getEffectiveStat(c, 'attack')).toBe(c.baseStats.attack);
+  });
+});
+
+describe('getEffectiveStat — perk evaluation', () => {
+  it('Precise combatant adds +5 to crit', () => {
+    const c = makeHeroCombatant('archer', 1, 'p0', { perkId: 'precise' });
+    expect(getEffectiveStat(c, 'crit')).toBe(c.baseStats.crit + 5);
+  });
+
+  it('Combatant with no perkId reads base + statuses + traits only', () => {
+    const c = makeHeroCombatant('knight', 1, 'p0');
+    expect(c.perkId).toBeUndefined();
+    expect(getEffectiveStat(c, 'attack')).toBe(c.baseStats.attack);
+  });
+
+  it('Trait Sturdy + perk Iron Will stack additively on defense', () => {
+    const c = makeHeroCombatant('knight', 1, 'p0', {
+      traitId: 'sturdy',
+      perkId: 'iron_will',
+    });
+    expect(getEffectiveStat(c, 'defense')).toBe(c.baseStats.defense + 1 + 1);
   });
 });
 

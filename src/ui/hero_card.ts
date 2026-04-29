@@ -17,7 +17,7 @@ const PAPERDOLL_SCALE_SMALL = 2;
 const PAPERDOLL_SCALE_LARGE = 4;
 
 const SMALL_WIDTH = 180;
-const SMALL_HEIGHT = 56;
+const SMALL_HEIGHT = 60;
 const LARGE_WIDTH = 280;
 const LARGE_HEIGHT = 120;
 
@@ -70,11 +70,11 @@ export class HeroCard extends Phaser.GameObjects.Container {
 
     const nameText = this.scene.add.text(
       textX,
-      -h / 2 + 8,
+      -h / 2 + (size === 'small' ? 6 : 8),
       isDead ? `${this.hero.name} (Fallen)` : this.hero.name,
       {
         fontFamily: 'monospace',
-        fontSize: size === 'small' ? '14px' : '18px',
+        fontSize: size === 'small' ? '12px' : '18px',
         color: '#ffffff',
       },
     );
@@ -101,17 +101,33 @@ export class HeroCard extends Phaser.GameObjects.Container {
     if (!isDead) {
       const barY = lastY + 4;
       const barW = size === 'small' ? 100 : 140;
+      const barH = size === 'small' ? 5 : 6;
       const hpRatio = Math.max(0, this.hero.currentHp / this.hero.maxHp);
       const hpBarBg = this.scene.add
-        .rectangle(textX, barY, barW, 6, 0x333333)
+        .rectangle(textX, barY, barW, barH, 0x333333)
         .setOrigin(0, 0)
         .setStrokeStyle(1, 0x555555);
       const hpBarFill = this.scene.add
-        .rectangle(textX, barY, barW * hpRatio, 6, this.hpColor(hpRatio))
+        .rectangle(textX, barY, barW * hpRatio, barH, this.hpColor(hpRatio))
         .setOrigin(0, 0);
       this.add(hpBarBg);
       this.add(hpBarFill);
-      lastY = barY + 6;
+      lastY = barY + barH;
+    }
+
+    if (size === 'small' && !isDead) {
+      const traitY = lastY + 2;
+      const traitText = this.scene.add.text(
+        textX,
+        traitY,
+        `${traitDef.name} · ${traitDef.shortDescription}`,
+        {
+          fontFamily: 'monospace',
+          fontSize: '10px',
+          color: '#ccbbaa',
+        },
+      );
+      this.add(traitText);
     }
 
     if (size === 'large' && !isDead) {
@@ -124,11 +140,16 @@ export class HeroCard extends Phaser.GameObjects.Container {
       });
       this.add(statsText);
 
-      const traitText = this.scene.add.text(textX, statsY + 14, `trait: ${traitDef.name}`, {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#888888',
-      });
+      const traitText = this.scene.add.text(
+        textX,
+        statsY + 14,
+        `trait: ${traitDef.name} — ${traitDef.description}`,
+        {
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          color: '#888888',
+        },
+      );
       this.add(traitText);
     }
 

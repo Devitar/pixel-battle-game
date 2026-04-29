@@ -889,3 +889,116 @@ describe('damageTakenMultiplier', () => {
     expect(dmg.amount).toBe(4);
   });
 });
+
+import { tickStatuses } from '../statuses';
+
+describe('of_burning rare property', () => {
+  it('a hero with burningWeaponDamage applies burning status to the target', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 4, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      burningWeaponDamage: 3,
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.knight_slash, p0, ['e0'], state, rng, events);
+    expect(e0.statuses['burning']).toBeDefined();
+    expect(e0.statuses['burning'].remainingTurns).toBe(2);
+  });
+
+  it('burning status ticks damage at the target turn before decrement', () => {
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', { currentHp: 10 });
+    e0.statuses['burning'] = {
+      statusId: 'burning',
+      remainingTurns: 2,
+      effect: { kind: 'poison', damagePerTurn: 3, duration: 2, statusId: 'burning' },
+      sourceId: 'p0',
+    };
+    const events: CombatEvent[] = [];
+    tickStatuses(e0, events);
+    expect(e0.currentHp).toBe(7);
+    expect(events.some((ev) => ev.kind === 'damage_applied' && ev.amount === 3)).toBe(true);
+  });
+});
+
+describe('of_vampirism rare property', () => {
+  it('source heals on a strong landed hit (heal > 0)', () => {
+    const p0 = makeHeroCombatant('barbarian', 1, 'p0', {
+      baseStats: { hp: 22, attack: 10, defense: 3, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 5,
+      lifestealPercent: 25,
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 100, attack: 1, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 100, maxHp: 100,
+    });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.barbarian_swing, p0, ['e0'], state, rng, events);
+    const heal = events.find(
+      (ev) => ev.kind === 'heal_applied' && ev.sourceId === 'p0' && ev.targetId === 'p0',
+    );
+    expect(heal).toBeDefined();
+    expect(p0.currentHp).toBeGreaterThan(5);
+  });
+
+  it('lifesteal fires on lethal hits too', () => {
+    const p0 = makeHeroCombatant('barbarian', 1, 'p0', {
+      baseStats: { hp: 22, attack: 20, defense: 3, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 5,
+      lifestealPercent: 50,
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', { currentHp: 4 });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.barbarian_swing, p0, ['e0'], state, rng, events);
+    expect(e0.isDead).toBe(true);
+    const heal = events.find((ev) => ev.kind === 'heal_applied');
+    expect(heal).toBeDefined();
+  });
+});
+
+describe('of_thorns rare property', () => {
+  it('attacker takes thorn damage on a landed hit', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 4, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      thornsDamage: 1,
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', { currentHp: 10 });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.bone_slash, e0, ['p0'], state, rng, events);
+    expect(e0.currentHp).toBe(9);
+    const reflect = events.find(
+      (ev) => ev.kind === 'damage_applied' && ev.sourceId === 'p0' && ev.targetId === 'e0',
+    );
+    expect(reflect).toBeDefined();
+    expect(reflect).toMatchObject({ amount: 1 });
+  });
+
+  it('thorns does not fire on dodged attacks', () => {
+    const p0 = makeHeroCombatant('rogue', 1, 'p0', {
+      baseStats: { hp: 13, attack: 5, defense: 1, speed: 6, mind: 0, crit: 0, dodge: 100 },
+      thornsDamage: 5,
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.bone_slash, e0, ['p0'], state, rng, events);
+    expect(events.find((ev) => ev.kind === 'attack_dodged')).toBeDefined();
+    expect(e0.currentHp).toBe(e0.maxHp);
+  });
+
+  it('thorns can kill the source on a low-HP attacker', () => {
+    const p0 = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 20, attack: 4, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      thornsDamage: 5,
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', { currentHp: 1 });
+    const state = makeTestState([p0], [e0]);
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.bone_slash, e0, ['p0'], state, rng, events);
+    expect(e0.isDead).toBe(true);
+    expect(events.some((ev) => ev.kind === 'death' && ev.combatantId === 'e0')).toBe(true);
+  });
+});

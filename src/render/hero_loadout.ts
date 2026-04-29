@@ -1,13 +1,12 @@
-import { CLASSES } from '../data/classes';
+import { BASE_ITEMS } from '../data/items';
 import type { Hero } from '../heroes/hero';
 import type { Loadout } from './paperdoll';
 
 export function heroToLoadout(hero: Hero): Loadout {
-  const classDef = CLASSES[hero.classId];
-  const starter = classDef.starterLoadout;
+  const eq = hero.equipment;
   return {
     body: parseInt(hero.bodySpriteId, 10),
-    weapon: parseInt(starter.weapon, 10),
-    shield: starter.shield !== undefined ? parseInt(starter.shield, 10) : undefined,
+    weapon: parseInt(BASE_ITEMS[eq.weapon.baseId].spriteId, 10),
+    shield: eq.shield ? parseInt(BASE_ITEMS[eq.shield.baseId].spriteId, 10) : undefined,
   };
 }

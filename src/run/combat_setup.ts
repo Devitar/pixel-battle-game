@@ -1,4 +1,6 @@
 import { ENEMIES } from '../data/enemies';
+import { resolveCombatAbilities } from '../items/kit';
+import { applyEquipmentStats, rarePropertyFields } from '../items/stats';
 import type { EnemyId, SlotIndex, Wound } from '../data/types';
 import { WOUNDS } from '../data/wounds';
 import { createEnemyCombatant, createHeroCombatant } from '../combat/combatant';
@@ -50,15 +52,22 @@ export function buildCombatState(
   for (let i = 0; i < party.length; i++) {
     const hero = party[i];
     const woundedStats = applyWoundsToStats(hero.baseStats, hero.wounds);
+    const fullStats = applyEquipmentStats(woundedStats, hero.equipment);
     const damageTakenMultiplier = computeDamageTakenMultiplier(hero.wounds);
-    const woundedMaxHp = woundedStats.hp;
+    const rareFields = rarePropertyFields(hero.equipment);
+    const { abilities, aiPriority } = resolveCombatAbilities(hero);
+    const woundedMaxHp = fullStats.hp;
     combatants.push(
       createHeroCombatant(hero.classId, (i + 1) as SlotIndex, `p${i}`, {
-        baseStats: woundedStats,
+        baseStats: fullStats,
         currentHp: Math.min(hero.currentHp, woundedMaxHp),
         maxHp: woundedMaxHp,
         traitId: hero.traitId,
+        abilities,
+        aiPriority,
+        ...(hero.perkId !== undefined ? { perkId: hero.perkId } : {}),
         ...(damageTakenMultiplier !== 1 ? { damageTakenMultiplier } : {}),
+        ...rareFields,
       }),
     );
   }
