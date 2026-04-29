@@ -13,6 +13,7 @@ import {
   completeCombat,
   currentNode,
   leaveShop,
+  loseHero,
   nextNodeChoices,
   playerPath,
   pressOn,
@@ -751,5 +752,50 @@ describe('cashout — accepts camp nodes', () => {
     const rs = makeCampRun();
     const ended: ReturnType<typeof startRun> = { ...rs, status: 'ended' };
     expect(() => cashout(ended)).toThrow();
+  });
+});
+
+describe('startRun — lost field', () => {
+  it('initializes lost as empty array', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(rs.lost).toEqual([]);
+  });
+});
+
+describe('loseHero', () => {
+  it('removes hero at index from party and appends to lost', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(rs.party).toHaveLength(3);
+    expect(rs.lost).toHaveLength(0);
+    const after = loseHero(rs, 1);
+    expect(after.party).toHaveLength(2);
+    expect(after.party[0].id).toBe('h0');
+    expect(after.party[1].id).toBe('h2');
+    expect(after.lost).toHaveLength(1);
+    expect(after.lost[0].id).toBe('h1');
+  });
+
+  it('does not transfer the lost hero gear to the pack (distinct from Fallen)', () => {
+    const rs0 = startRun('crypt', makeParty(), 1, createRng(1));
+    // Verify the hero has at least one equipped item (starter weapon).
+    expect(rs0.party[0].equipment.weapon).toBeDefined();
+    const packItemsBefore = rs0.pack.items.length;
+    const after = loseHero(rs0, 0);
+    expect(after.pack.items.length).toBe(packItemsBefore);  // pack unchanged
+    expect(after.lost[0].id).toBe('h0');                     // hero in lost
+  });
+
+  it('throws on heroIndex out of range', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(() => loseHero(rs, 99)).toThrow();
+    expect(() => loseHero(rs, -1)).toThrow();
+  });
+
+  it('multiple loseHero calls accumulate in lost', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const after1 = loseHero(rs, 0);
+    const after2 = loseHero(after1, 0);
+    expect(after2.party).toHaveLength(1);
+    expect(after2.lost).toHaveLength(2);
   });
 });

@@ -27,18 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 13 · Event system core
-
-- **What:** Event card data structure (id, body text, 2 choice options, payload effects per option), deck shuffle, choice resolution. Effects can mutate `RunState` (HP changes, gold changes, hero "Lost", gear gain).
-- **Why:** Foundation for the event deck (next task) and "Lost"-category events.
-- **Tier:** 2
-- **Acceptance:**
-  - `data/events.ts` defines the card type and payload kinds.
-  - `applyEventChoice(runState, card, choice, rng)` mutates run state for all payload kinds in scope.
-  - Tests cover each payload kind (HP delta, gold, hero "Lost", gear add).
-- **Touches:** `src/data/events.ts` (new), `src/run/event_resolver.ts` (new), tests. UI is Cluster B task 5.
-- **Source:** gdd §7 + §10 Tier 2.
-
 ### 14 · Initial event deck (~20 cards)
 
 - **What:** Author ~20 event cards. Mix of pure flavor gambles (HP-for-gold trades), party-cost cards (one hero Lost), reward cards (gear find).

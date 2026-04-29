@@ -23,6 +23,7 @@ export interface RunState {
   readonly awaitingFork: boolean;
   readonly status: RunStatus;
   readonly fallen: readonly Hero[];
+  readonly lost: readonly Hero[];
 }
 
 export interface CashoutOutcome {
@@ -63,6 +64,7 @@ export function startRun(
     awaitingFork: false,
     status: 'in_dungeon',
     fallen: [],
+    lost: [],
   };
 }
 
@@ -126,6 +128,22 @@ export function chooseCampNodeEffect(
       ...newRunState,
       currentNodeId: cur.nextNodeIds[0],
     },
+  };
+}
+
+export function loseHero(runState: RunState, heroIndex: number): RunState {
+  if (heroIndex < 0 || heroIndex >= runState.party.length) {
+    throw new Error(`loseHero: index ${heroIndex} out of range [0, ${runState.party.length})`);
+  }
+  const hero = runState.party[heroIndex];
+  // Per gdd §8 — gear is gone with the Lost hero (NOT transferred to pack like Fallen).
+  // The hero record retains its equipment fields, but since the hero is moved to `lost`
+  // (not `party`), the gear is unreachable in gameplay. The behavioral distinction from
+  // Fallen is that completeCombat's pack-transfer loop is never invoked on this hero.
+  return {
+    ...runState,
+    party: runState.party.filter((_, i) => i !== heroIndex),
+    lost: [...runState.lost, hero],
   };
 }
 

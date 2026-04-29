@@ -127,6 +127,30 @@ function pickBaseId(rng: Rng, slot: ItemSlot): { baseId: ItemBaseId; weaponType?
   }
 }
 
+export function rollEventItem(rng: Rng, floorNumber: number, rarity: Rarity): Item {
+  // Always-drop, forced-rarity item. Slot picked uniformly. Affixes / rare-property
+  // scaled at current floor. Used by the event-resolver's add_item payload.
+  const slot = rng.pick(ALL_SLOTS);
+  const base = pickBaseId(rng, slot);
+  const affixIds = pickAffixes(rng, affixCount(rarity, slot));
+  const affixes: RolledAffix[] = affixIds.map((id) => ({
+    affixId: id,
+    value: rollAffixValue(id, floorNumber),
+  }));
+  const rareProperty = rarity === 'rare' ? pickRareProperty(rng, slot, floorNumber) : undefined;
+  const id = generateItemId(rng);
+  return {
+    id,
+    baseId: base.baseId,
+    slot,
+    rarity,
+    ...(base.weaponType !== undefined ? { weaponType: base.weaponType } : {}),
+    affixes,
+    ...(rareProperty !== undefined ? { rareProperty } : {}),
+    floorRolledAt: floorNumber,
+  };
+}
+
 export function rollShopItem(rng: Rng, slot: ItemSlot, floor: number): Item {
   // Used by shops: uses `floor` uniformly for rarity weights, affix values,
   // rare property values, and `floorRolledAt`. (Boss loot uses a different

@@ -55,6 +55,7 @@ describe('save / load roundtrip', () => {
       awaitingFork: false,
       status: 'in_dungeon',
       fallen: [],
+      lost: [],
     };
     const original: SaveFile = {
       ...makeBaseSave(),
@@ -80,6 +81,7 @@ describe('save / load roundtrip', () => {
       awaitingFork: false,
       status: 'in_dungeon',
       fallen: [],
+      lost: [],
     };
     const data: SaveFile = { ...makeBaseSave(), runState: fakeRunState };
     expect(() => save(data, storage)).toThrow();
@@ -243,5 +245,72 @@ describe('load — normalize legacy heroes missing xp/level/pendingPerk', () => 
     expect(hero.level).toBe(1);
     expect(hero.pendingPerk).toBe(false);
     expect(hero.perkId).toBeUndefined();
+  });
+});
+
+describe('save normalizer — runState.lost default', () => {
+  it('defaults missing runState.lost to []', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({
+      version: CURRENT_SCHEMA_VERSION,
+      roster: { heroes: [], slots: 12 },
+      vault: { gold: 0 },
+      stash: createStash(),
+      unlocks: { classes: [], dungeons: [] },
+      runState: {
+        dungeonId: 'crypt',
+        seed: 1,
+        party: [],
+        pack: { gold: 0, items: [] },
+        currentFloorNumber: 1,
+        currentFloorNodes: [],
+        currentNodeId: '',
+        awaitingFork: false,
+        status: 'in_dungeon',
+        fallen: [],
+        // NOTE: lost intentionally omitted to simulate a pre-Task-13 save
+      },
+      runRngState: 12345,
+    }));
+    const loaded = load(storage);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.runState).toBeDefined();
+    expect(loaded!.runState!.lost).toEqual([]);
+  });
+
+  it('preserves an explicit runState.lost array', () => {
+    const fakeHero = {
+      id: 'h0', classId: 'knight', name: 'K',
+      baseStats: { hp: 20, attack: 4, defense: 4, speed: 3, mind: 0, crit: 5, dodge: 5 },
+      currentHp: 0, maxHp: 20,
+      traitId: 'quick', bodySpriteId: 'body1',
+      wounds: [], equipment: {},
+      xp: 0, level: 1, pendingPerk: false,
+    };
+    const storage = new MemoryStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({
+      version: CURRENT_SCHEMA_VERSION,
+      roster: { heroes: [], slots: 12 },
+      vault: { gold: 0 },
+      stash: createStash(),
+      unlocks: { classes: [], dungeons: [] },
+      runState: {
+        dungeonId: 'crypt',
+        seed: 1,
+        party: [],
+        pack: { gold: 0, items: [] },
+        currentFloorNumber: 1,
+        currentFloorNodes: [],
+        currentNodeId: '',
+        awaitingFork: false,
+        status: 'in_dungeon',
+        fallen: [],
+        lost: [fakeHero],
+      },
+      runRngState: 12345,
+    }));
+    const loaded = load(storage);
+    expect(loaded!.runState!.lost).toHaveLength(1);
+    expect(loaded!.runState!.lost[0].id).toBe('h0');
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '../../util/rng';
-import { rollLoot } from '../loot';
+import { rollEventItem, rollLoot } from '../loot';
 
 describe('rollLoot — drop gate', () => {
   it('returns null roughly half the time at a non-boss combat node', () => {
@@ -246,5 +246,48 @@ describe('rollLoot — elite kind', () => {
     const r2 = rollLoot(createRng(1), 1, 'elite');
     const r3 = rollLoot(createRng(1), 1, 'boss');
     expect([r1, r2, r3].every((r) => r === null || typeof r === 'object')).toBe(true);
+  });
+});
+
+describe('rollEventItem', () => {
+  it('always returns an item (never null)', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const item = rollEventItem(createRng(seed), 1, 'common');
+      expect(item).not.toBeNull();
+    }
+  });
+
+  it('item rarity equals the requested rarity (common)', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const item = rollEventItem(createRng(seed), 5, 'common');
+      expect(item.rarity).toBe('common');
+    }
+  });
+
+  it('item rarity equals the requested rarity (uncommon)', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const item = rollEventItem(createRng(seed), 5, 'uncommon');
+      expect(item.rarity).toBe('uncommon');
+    }
+  });
+
+  it('item rarity equals the requested rarity (rare)', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const item = rollEventItem(createRng(seed), 5, 'rare');
+      expect(item.rarity).toBe('rare');
+    }
+  });
+
+  it('floorRolledAt equals the floor passed in', () => {
+    for (const floor of [1, 7, 12]) {
+      const item = rollEventItem(createRng(1), floor, 'rare');
+      expect(item.floorRolledAt).toBe(floor);
+    }
+  });
+
+  it('determinism: same seed + floor + rarity → identical item', () => {
+    const a = rollEventItem(createRng(123), 7, 'rare');
+    const b = rollEventItem(createRng(123), 7, 'rare');
+    expect(a).toEqual(b);
   });
 });
