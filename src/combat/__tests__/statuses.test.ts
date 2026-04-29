@@ -36,6 +36,62 @@ describe('getEffectiveStat', () => {
   });
 });
 
+describe('getEffectiveStat — enraged threshold', () => {
+  it('returns base attack when combatant is at full HP (threshold not crossed)', () => {
+    const c = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 20, attack: 5, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 20,
+      maxHp: 20,
+      enragedThreshold: 0.5,
+      enragedAttackDelta: 3,
+    });
+    expect(getEffectiveStat(c, 'attack')).toBe(5);
+  });
+
+  it('returns base + enragedAttackDelta when below threshold', () => {
+    const c = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 20, attack: 5, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 9,  // 9/20 = 0.45 < 0.5
+      maxHp: 20,
+      enragedThreshold: 0.5,
+      enragedAttackDelta: 3,
+    });
+    expect(getEffectiveStat(c, 'attack')).toBe(8);
+  });
+
+  it('returns base attack when at exactly 50% HP (strict less-than)', () => {
+    const c = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 20, attack: 5, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 10,  // 10/20 = 0.5, not < 0.5
+      maxHp: 20,
+      enragedThreshold: 0.5,
+      enragedAttackDelta: 3,
+    });
+    expect(getEffectiveStat(c, 'attack')).toBe(5);
+  });
+
+  it('does not apply enraged bonus to non-attack stats', () => {
+    const c = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 20, attack: 5, defense: 4, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 1,
+      maxHp: 20,
+      enragedThreshold: 0.5,
+      enragedAttackDelta: 3,
+    });
+    expect(getEffectiveStat(c, 'defense')).toBe(4);
+    expect(getEffectiveStat(c, 'speed')).toBe(3);
+  });
+
+  it('does not apply when enragedThreshold is undefined', () => {
+    const c = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 20, attack: 5, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 1,
+      maxHp: 20,
+    });
+    expect(getEffectiveStat(c, 'attack')).toBe(5);
+  });
+});
+
 describe('tickStatuses', () => {
   it('decrements durations by 1', () => {
     const c = makeHeroCombatant('knight', 1, 'p0');

@@ -101,6 +101,9 @@ function normalizeSaveFile(file: SaveFile): SaveFile {
       ...file.roster,
       heroes: file.roster.heroes.map(normalizeHero),
     },
+    runState: file.runState === undefined
+      ? undefined
+      : { ...file.runState, lost: file.runState.lost ?? [] },
   };
 }
 

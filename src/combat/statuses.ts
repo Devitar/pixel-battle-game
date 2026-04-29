@@ -37,6 +37,16 @@ export function getEffectiveStat(combatant: Combatant, stat: BuffableStat): numb
     }
   }
 
+  if (
+    stat === 'attack' &&
+    combatant.enragedThreshold !== undefined &&
+    combatant.enragedAttackDelta !== undefined &&
+    combatant.maxHp > 0 &&
+    combatant.currentHp / combatant.maxHp < combatant.enragedThreshold
+  ) {
+    total += combatant.enragedAttackDelta;
+  }
+
   for (const status of Object.values(combatant.statuses)) {
     const e = status.effect;
     if ((e.kind === 'buff' || e.kind === 'debuff') && e.stat === stat) {

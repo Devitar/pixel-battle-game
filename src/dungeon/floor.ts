@@ -1,10 +1,29 @@
 import { DUNGEONS } from '../data/dungeons';
 import type { DungeonId } from '../data/types';
-import type { Rng } from '../util/rng';
+import type { Rng, WeightedOption } from '../util/rng';
 import { composeBossEncounter, composeCombatEncounter } from './encounter';
+import { composeEliteEncounter } from './elite';
+import { stampCombatModifiers, stampEliteModifiers } from './modifier_stamp';
 import type { Node } from './node';
 import { floorScale } from './scaling';
 import { generateShop } from './shop';
+
+type ForkShape =
+  | 'shop_vs_combat'
+  | 'elite_vs_combat'
+  | 'elite_vs_shop'
+  | 'camp_vs_combat'
+  | 'camp_vs_shop'
+  | 'camp_vs_elite';
+
+const FORK_SHAPE_WEIGHTS: readonly WeightedOption<ForkShape>[] = [
+  { value: 'shop_vs_combat',  weight: 1 },
+  { value: 'elite_vs_combat', weight: 1 },
+  { value: 'elite_vs_shop',   weight: 1 },
+  { value: 'camp_vs_combat',  weight: 1 },
+  { value: 'camp_vs_shop',    weight: 1 },
+  { value: 'camp_vs_elite',   weight: 1 },
+];
 
 export function generateFloor(
   dungeonId: DungeonId,
@@ -21,22 +40,113 @@ export function generateFloor(
   const id2b = `${idPrefix}-n2b`;
   const idBoss = `${idPrefix}-boss`;
 
-  // Roll which fork branch becomes a shop. Drawn first so RNG consumption
-  // for downstream encounters/inventory stays deterministic per seed.
-  const shopOnBranchA = rng.next() < 0.5;
+  // Roll fork shape and which branch (A or B) gets the more-distinguished
+  // node. Drawn first so RNG consumption order downstream stays deterministic.
+  const shape: ForkShape = rng.weighted(FORK_SHAPE_WEIGHTS);
+  const specialOnBranchA = rng.next() < 0.5;
 
-  const enc0 = composeCombatEncounter(dungeon.enemyPool, scale, rng);
-  const enc1 = composeCombatEncounter(dungeon.enemyPool, scale, rng);
-  const enc2Combat = composeCombatEncounter(dungeon.enemyPool, scale, rng);
-  const shop = generateShop(floorNumber, rng);
+  const enc0Raw = composeCombatEncounter(dungeon.enemyPool, scale, rng);
+  const enc0: typeof enc0Raw = {
+    ...enc0Raw,
+    enemies: stampCombatModifiers(enc0Raw.enemies, floorNumber, rng),
+  };
+  const enc1Raw = composeCombatEncounter(dungeon.enemyPool, scale, rng);
+  const enc1: typeof enc1Raw = {
+    ...enc1Raw,
+    enemies: stampCombatModifiers(enc1Raw.enemies, floorNumber, rng),
+  };
+
+  // Conditionally compose only the encounters/inventory the rolled shape
+  // requires. Camp nodes consume no RNG (pure data construction).
+  const usesCombatBranch =
+    shape === 'shop_vs_combat' ||
+    shape === 'elite_vs_combat' ||
+    shape === 'camp_vs_combat';
+  const usesEliteBranch =
+    shape === 'elite_vs_combat' ||
+    shape === 'elite_vs_shop' ||
+    shape === 'camp_vs_elite';
+  const usesShopBranch =
+    shape === 'shop_vs_combat' ||
+    shape === 'elite_vs_shop' ||
+    shape === 'camp_vs_shop';
+  const usesCampBranch =
+    shape === 'camp_vs_combat' ||
+    shape === 'camp_vs_shop' ||
+    shape === 'camp_vs_elite';
+
+  const combatBranchEncRaw = usesCombatBranch
+    ? composeCombatEncounter(dungeon.enemyPool, scale, rng)
+    : undefined;
+  const combatBranchEnc = combatBranchEncRaw === undefined
+    ? undefined
+    : { ...combatBranchEncRaw, enemies: stampCombatModifiers(combatBranchEncRaw.enemies, floorNumber, rng) };
+
+  const eliteBranchEncRaw = usesEliteBranch
+    ? composeEliteEncounter(dungeon.enemyPool, scale, rng)
+    : undefined;
+  const eliteBranchEnc = eliteBranchEncRaw === undefined
+    ? undefined
+    : { ...eliteBranchEncRaw, enemies: stampEliteModifiers(eliteBranchEncRaw.enemies, rng) };
+  const shopBranchInv = usesShopBranch ? generateShop(floorNumber, rng).inventory : undefined;
+
   const encBoss = composeBossEncounter(dungeon.bossId, dungeon.enemyPool, scale, rng);
 
-  const node2a: Node = shopOnBranchA
-    ? { id: id2a, type: 'shop', inventory: shop.inventory, nextNodeIds: [idBoss] }
-    : { id: id2a, type: 'combat', encounter: enc2Combat, nextNodeIds: [idBoss] };
-  const node2b: Node = shopOnBranchA
-    ? { id: id2b, type: 'combat', encounter: enc2Combat, nextNodeIds: [idBoss] }
-    : { id: id2b, type: 'shop', inventory: shop.inventory, nextNodeIds: [idBoss] };
+  // Build the two branch nodes per shape. `specialOnBranchA` decides which
+  // side gets the more-distinguished node.
+  const buildCombatBranch = (id: string): Node => {
+    if (combatBranchEnc === undefined) {
+      throw new Error(`generateFloor: combatBranchEnc undefined for shape '${shape}'`);
+    }
+    return { id, type: 'combat', encounter: combatBranchEnc, nextNodeIds: [idBoss] };
+  };
+  const buildEliteBranch = (id: string): Node => {
+    if (eliteBranchEnc === undefined) {
+      throw new Error(`generateFloor: eliteBranchEnc undefined for shape '${shape}'`);
+    }
+    return { id, type: 'elite', encounter: eliteBranchEnc, nextNodeIds: [idBoss] };
+  };
+  const buildShopBranch = (id: string): Node => {
+    if (shopBranchInv === undefined) {
+      throw new Error(`generateFloor: shopBranchInv undefined for shape '${shape}'`);
+    }
+    return { id, type: 'shop', inventory: shopBranchInv, nextNodeIds: [idBoss] };
+  };
+  const buildCampBranch = (id: string): Node => {
+    if (!usesCampBranch) {
+      throw new Error(`generateFloor: camp branch not in shape '${shape}'`);
+    }
+    return { id, type: 'camp', nextNodeIds: [idBoss] };
+  };
+
+  let node2a: Node;
+  let node2b: Node;
+  switch (shape) {
+    case 'shop_vs_combat':
+      node2a = specialOnBranchA ? buildShopBranch(id2a)   : buildCombatBranch(id2a);
+      node2b = specialOnBranchA ? buildCombatBranch(id2b) : buildShopBranch(id2b);
+      break;
+    case 'elite_vs_combat':
+      node2a = specialOnBranchA ? buildEliteBranch(id2a)  : buildCombatBranch(id2a);
+      node2b = specialOnBranchA ? buildCombatBranch(id2b) : buildEliteBranch(id2b);
+      break;
+    case 'elite_vs_shop':
+      node2a = specialOnBranchA ? buildEliteBranch(id2a)  : buildShopBranch(id2a);
+      node2b = specialOnBranchA ? buildShopBranch(id2b)   : buildEliteBranch(id2b);
+      break;
+    case 'camp_vs_combat':
+      node2a = specialOnBranchA ? buildCampBranch(id2a)   : buildCombatBranch(id2a);
+      node2b = specialOnBranchA ? buildCombatBranch(id2b) : buildCampBranch(id2b);
+      break;
+    case 'camp_vs_shop':
+      node2a = specialOnBranchA ? buildCampBranch(id2a)   : buildShopBranch(id2a);
+      node2b = specialOnBranchA ? buildShopBranch(id2b)   : buildCampBranch(id2b);
+      break;
+    case 'camp_vs_elite':
+      node2a = specialOnBranchA ? buildCampBranch(id2a)   : buildEliteBranch(id2a);
+      node2b = specialOnBranchA ? buildEliteBranch(id2b)  : buildCampBranch(id2b);
+      break;
+  }
 
   const nodes: Node[] = [
     { id: id0, type: 'combat', encounter: enc0, nextNodeIds: [id1] },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WOUNDS, WOUND_IDS } from '../wounds';
+import { WOUNDS, WOUND_IDS, describeWoundEffect } from '../wounds';
 import type { WoundId } from '../types';
 
 const EXPECTED_IDS: readonly WoundId[] = [
@@ -52,5 +52,31 @@ describe('WOUNDS', () => {
 
   it('broken_bone reduces hp by 10', () => {
     expect(WOUNDS.broken_bone.effect).toEqual({ kind: 'statDelta', stat: 'hp', delta: -10 });
+  });
+});
+
+describe('describeWoundEffect', () => {
+  it('describes bruised as +20% damage taken', () => {
+    expect(describeWoundEffect(WOUNDS.bruised.effect)).toBe('+20% damage taken');
+  });
+
+  it('describes hobbled as -2 Speed', () => {
+    expect(describeWoundEffect(WOUNDS.hobbled.effect)).toBe('-2 Speed');
+  });
+
+  it('describes concussed as -2 Mind', () => {
+    expect(describeWoundEffect(WOUNDS.concussed.effect)).toBe('-2 Mind');
+  });
+
+  it('describes winded as -2 Attack', () => {
+    expect(describeWoundEffect(WOUNDS.winded.effect)).toBe('-2 Attack');
+  });
+
+  it('describes unsteady as -5 Crit', () => {
+    expect(describeWoundEffect(WOUNDS.unsteady.effect)).toBe('-5 Crit');
+  });
+
+  it('describes broken_bone as -10 Max HP', () => {
+    expect(describeWoundEffect(WOUNDS.broken_bone.effect)).toBe('-10 Max HP');
   });
 });

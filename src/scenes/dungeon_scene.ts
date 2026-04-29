@@ -5,6 +5,7 @@ import type { Node } from '../dungeon/node';
 import { heroToLoadout } from '../render/hero_loadout';
 import { Paperdoll } from '../render/paperdoll';
 import {
+  chooseCampNodeEffect,
   chooseNextNode,
   completeCombat,
   currentNode,
@@ -153,7 +154,12 @@ export class DungeonScene extends Phaser.Scene {
     const path = playerPath(run);
     for (let i = 0; i < path.length && i < NODE_X.length; i++) {
       const node = path[i];
-      const glyph = node.type === 'boss' ? '☠' : node.type === 'shop' ? '🛒' : '⚔';
+      const glyph =
+        node.type === 'boss'  ? '☠' :
+        node.type === 'shop'  ? '🛒' :
+        node.type === 'elite' ? '💀' :
+        node.type === 'camp'  ? '🏕' :
+        '⚔';
       const x = NODE_X[i];
       const icon = this.add
         .text(x, NODE_Y, glyph, {
@@ -238,6 +244,27 @@ export class DungeonScene extends Phaser.Scene {
     if (node.type === 'shop') {
       this.scene.launch('shop_overlay');
       this.scene.pause();
+      return;
+    }
+    if (node.type === 'camp') {
+      // Stub: auto-apply heal_party and advance. Cluster B · 4 replaces this
+      // with a picker overlay launch (matching the shop_overlay pattern).
+      const rngState = appState.get().runRngState;
+      if (rngState === undefined) {
+        console.warn('handleArrival: camp node reached without runRngState');
+        return;
+      }
+      const rng = createRngFromState(rngState);
+      const result = chooseCampNodeEffect(run, { kind: 'heal_party' }, rng);
+      appState.update((s) => ({
+        ...s,
+        runState: result.runState,
+        runRngState: rng.getState(),
+      }));
+      this.refreshHud();
+      this.refreshNodeColors();
+      this.refreshStatusBar();
+      this.setState('walking_to_next');
       return;
     }
 
@@ -507,7 +534,7 @@ export class DungeonScene extends Phaser.Scene {
 
     const lines: Phaser.GameObjects.Text[] = [];
     let y = -36;
-    for (const hero of wipe.heroesLost) {
+    for (const hero of wipe.heroesFallen) {
       lines.push(
         this.add
           .text(0, y, hero.name, {
@@ -537,11 +564,11 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private onWipeReturn(): void {
-    const lostIds = new Set(this.wipeOutcome!.heroesLost.map((h) => h.id));
+    const fallenIds = new Set(this.wipeOutcome!.heroesFallen.map((h) => h.id));
 
     appState.update((s) => {
       let roster = s.roster;
-      for (const id of lostIds) {
+      for (const id of fallenIds) {
         if (roster.heroes.some((h) => h.id === id)) {
           roster = removeHero(roster, id);
         }
@@ -583,10 +610,11 @@ export class DungeonScene extends Phaser.Scene {
       const node = path[i];
       if (!node) continue;
       const isBoss = node.type === 'boss';
+      const isElite = node.type === 'elite';
       let color: string;
       if (i < pos) color = '#444444';
       else if (i === pos && run.status === 'in_dungeon') color = '#ffcc66';
-      else color = isBoss ? '#cc6666' : '#888888';
+      else color = isBoss ? '#cc6666' : isElite ? '#cc8844' : '#888888';
       this.nodeIcons[i].setColor(color);
       this.nodeLabels[i].setColor(i < pos ? '#555555' : '#aaaaaa');
     }

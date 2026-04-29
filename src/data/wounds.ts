@@ -1,4 +1,4 @@
-import type { WoundDef, WoundId } from './types';
+import type { WoundDef, WoundEffect, WoundId } from './types';
 
 export const WOUNDS: Record<WoundId, WoundDef> = {
   bruised: {
@@ -39,3 +39,18 @@ export const HOSPITAL_TREATMENT_COST = 40;
 export const DEFAULT_WOUND_RUNS_REMAINING = 5;
 export const HEAVY_HIT_WOUND_THRESHOLD = 0.30;
 export const WOUND_CHANCE_PERCENT = 30;
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export function describeWoundEffect(effect: WoundEffect): string {
+  if (effect.kind === 'statDelta') {
+    const sign = effect.delta >= 0 ? '+' : '';
+    const statName = effect.stat === 'hp' ? 'Max HP' : capitalize(effect.stat);
+    return `${sign}${effect.delta} ${statName}`;
+  }
+  // damageTakenMult
+  const pct = Math.round((effect.multiplier - 1) * 100);
+  return `+${pct}% damage taken`;
+}

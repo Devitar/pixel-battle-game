@@ -23,93 +23,9 @@ One section per task.
 
 <!-- Add tasks below this line. Highest priority at the top. -->
 
-## Cluster A — Foundation (pure TypeScript, no Phaser)
-
-Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
-
-### 10 · Elite nodes
-
-- **What:** Elite encounter generator: tougher enemy lineup (more enemies, modifiers like Armored / Enraged), guaranteed Rare drop on victory.
-- **Why:** Real reward asymmetry at forks ("Elite or Shop?"). Without elites, all combats are interchangeable.
-- **Tier:** 2
-- **Acceptance:**
-  - Elite generator boosts HP/damage and stamps a modifier; victory loot roll forces ≥ 1 Rare-rarity drop.
-- **Touches:** `src/dungeon/elite.ts` (new), `src/dungeon/loot.ts`, tests. Visual marker is Cluster B task 10.
-- **Source:** gdd §4 + §10 Tier 2.
-
-### 11 · Mid-floor camp nodes
-
-- **What:** Mid-floor rest nodes. Player picks one of: heal some HP, treat one Wound, sharpen weapons (small temp Attack buff next combat). Cannot cash out.
-- **Why:** Drip recovery between fights without fully healing the party. Pairs with Wounds.
-- **Tier:** 2
-- **Acceptance:**
-  - Camp-node effect resolution applied to `RunState`; one effect per visit.
-  - Distinguished from the post-boss Camp Screen (cannot cash out).
-- **Touches:** `src/dungeon/camp_node.ts` (new), `src/run/run_state.ts`, tests. UI is Cluster B task 4.
-- **Source:** gdd §4 + §10 Tier 2.
-
-### 12 · Floor-milestone enemy modifiers
-
-- **What:** Modifiers introduced at milestone floors (5, 10, 15…): Armored (+Defense), Venomous (applies poison on hit), Enraged (+Attack scaling with damage taken). Floor generator stamps modifiers based on floor number.
-- **Why:** Makes deeper floors mechanically distinct, not just numerically scaled — last bullet of the Tier 2 dungeon-depth set.
-- **Tier:** 2
-- **Acceptance:**
-  - `data/modifiers.ts` (new) defines the modifier set; floor generator applies modifiers to enemy combatants based on floor number.
-  - Tests cover at least 3 modifiers (Armored, Venomous, Enraged) and confirm their effects on combat resolution.
-- **Touches:** `src/data/modifiers.ts`, `src/dungeon/floor_generator.ts`, `src/combat/combatant.ts`, tests.
-- **Source:** gdd §4 + §10 Tier 2.
-
-### 13 · Event system core
-
-- **What:** Event card data structure (id, body text, 2 choice options, payload effects per option), deck shuffle, choice resolution. Effects can mutate `RunState` (HP changes, gold changes, hero "Lost", gear gain).
-- **Why:** Foundation for the event deck (next task) and "Lost"-category events.
-- **Tier:** 2
-- **Acceptance:**
-  - `data/events.ts` defines the card type and payload kinds.
-  - `applyEventChoice(runState, card, choice, rng)` mutates run state for all payload kinds in scope.
-  - Tests cover each payload kind (HP delta, gold, hero "Lost", gear add).
-- **Touches:** `src/data/events.ts` (new), `src/run/event_resolver.ts` (new), tests. UI is Cluster B task 5.
-- **Source:** gdd §7 + §10 Tier 2.
-
-### 14 · Initial event deck (~20 cards)
-
-- **What:** Author ~20 event cards. Mix of pure flavor gambles (HP-for-gold trades), party-cost cards (one hero Lost), reward cards (gear find).
-- **Why:** Without content, the event system is a feature with nothing to show.
-- **Tier:** 2
-- **Acceptance:**
-  - 20 cards in `data/events.ts`, split between a shared deck and Crypt-specific cards.
-  - Each card uses payload kinds defined in task 13 — no new mechanics introduced here.
-- **Touches:** `src/data/events.ts`.
-- **Source:** gdd §7 + §10 Tier 2.
-
-### 15 · "Lost" hero category
-
-- **What:** Non-combat hero removal. The hero is gone permanently with all equipped gear, regardless of party survival. Triggered by event cards or hazard nodes.
-- **Why:** Gdd-defined design lever ("Lost" worse than "Fallen") that gives event cards real teeth.
-- **Tier:** 2
-- **Acceptance:**
-  - `RunState` exposes a `loseHero(heroIndex)` operation that strips the hero from the party and discards their equipped gear (does NOT transfer to pack — that's the Fallen path).
-  - Save schema records "Lost" outcomes distinctly from "Fallen" (per gdd §8).
-  - At least one event card in the deck triggers a Lost outcome.
-- **Touches:** `src/run/run_state.ts`, `src/data/events.ts` (one card), save schema + migration, tests.
-- **Source:** gdd §8 + §10 Tier 2.
-
----
-
 ## Cluster B — Scenes & UI (Phaser)
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
-
-### 1 · Hospital building
-
-- **What:** Hospital scene/screen on the camp hub. Lists wounded heroes; player spends gold per wound to clear it. Pairs with Cluster A task 3.
-- **Why:** Without UI, the wound system is unusable from the player's side.
-- **Tier:** 2
-- **Acceptance:**
-  - Hospital tile on camp scene opens the Hospital UI; UI lists each wounded hero, their wounds, per-wound treatment cost.
-  - "Treat" deducts vault gold and clears the wound.
-- **Touches:** `src/scenes/hospital_scene.ts` (new), camp scene wiring.
-- **Source:** gdd §6 + §10 Tier 2.
 
 ### 2 · Blacksmith building
 
@@ -153,16 +69,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
   - Barracks hero detail lists each active wound with its stat deltas.
 - **Touches:** `src/ui/hero_card.ts`, `src/scenes/barracks_scene.ts`.
 - **Source:** gdd §7 + §10 Tier 2.
-
-### 10 · Elite node visual marker
-
-- **What:** Distinguish elite nodes from regular combat nodes in the dungeon scene's icon row (e.g., 💀 vs ⚔️ + glow / outline). Pairs with Cluster A task 10.
-- **Why:** Player needs to see "harder fight, better loot" before committing — especially at forks.
-- **Tier:** 2
-- **Acceptance:**
-  - Elite nodes render with a distinct icon and colour from regular combat nodes.
-- **Touches:** `src/scenes/dungeon_scene.ts`.
-- **Source:** gdd §4 + §10 Tier 2.
 
 ### 11 · "Lost" hero handling in scenes
 

@@ -14,7 +14,7 @@ function isFrontLiner(enemyId: EnemyId): boolean {
   return preferred.some((s) => s === 1 || s === 2);
 }
 
-function assignSlots(enemies: readonly EnemyId[]): EnemyPlacement[] {
+export function assignSlots(enemies: readonly EnemyId[]): EnemyPlacement[] {
   const frontIds = enemies.filter(isFrontLiner);
   const backIds = enemies.filter((id) => !isFrontLiner(id));
   const placements: EnemyPlacement[] = [];

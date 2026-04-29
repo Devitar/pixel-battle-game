@@ -1002,3 +1002,64 @@ describe('of_thorns rare property', () => {
     expect(events.some((ev) => ev.kind === 'death' && ev.combatantId === 'e0')).toBe(true);
   });
 });
+
+describe('venomous on-hit', () => {
+  it('applies poisoned status on non-lethal hit', () => {
+    const venomousAttacker = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 10, attack: 4, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      venomousDamage: 2,
+      venomousDuration: 2,
+    });
+    const target = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 30, attack: 4, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 30,
+      maxHp: 30,
+    });
+    const state = makeTestState([target], [venomousAttacker]);
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.bone_slash, venomousAttacker, ['p0'], state, rng, events);
+    expect(target.statuses['poisoned']).toBeDefined();
+    expect(target.statuses['poisoned'].effect).toMatchObject({
+      kind: 'poison',
+      damagePerTurn: 2,
+      duration: 2,
+      statusId: 'poisoned',
+    });
+    expect(target.statuses['poisoned'].remainingTurns).toBe(2);
+    const statusEvent = events.find((e) => e.kind === 'status_applied' && e.statusId === 'poisoned');
+    expect(statusEvent).toBeDefined();
+  });
+
+  it('does NOT apply poisoned status on a lethal hit', () => {
+    const venomousAttacker = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 10, attack: 100, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      venomousDamage: 2,
+      venomousDuration: 2,
+    });
+    const target = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 1, attack: 4, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 1,
+      maxHp: 1,
+    });
+    const state = makeTestState([target], [venomousAttacker]);
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.bone_slash, venomousAttacker, ['p0'], state, rng, events);
+    expect(target.statuses['poisoned']).toBeUndefined();
+    expect(target.isDead).toBe(true);
+  });
+
+  it('does NOT apply when venomousDamage is undefined', () => {
+    const normalAttacker = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 10, attack: 4, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+    });
+    const target = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 30, attack: 4, defense: 0, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 30,
+      maxHp: 30,
+    });
+    const state = makeTestState([target], [normalAttacker]);
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.bone_slash, normalAttacker, ['p0'], state, rng, events);
+    expect(target.statuses['poisoned']).toBeUndefined();
+  });
+});

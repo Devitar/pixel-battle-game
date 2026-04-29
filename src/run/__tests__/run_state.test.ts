@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { createHeroCombatant } from '../../combat/combatant';
 import type { CombatResult, CombatState } from '../../combat/types';
+import { xpForEliteNode } from '../../data/leveling';
 import type { SlotIndex } from '../../data/types';
+import type { Encounter, Node } from '../../dungeon/node';
 import { createHero, type Hero } from '../../heroes/hero';
 import { createRng } from '../../util/rng';
 import {
   cashout,
+  chooseCampNodeEffect,
   chooseNextNode,
   completeCombat,
   currentNode,
   leaveShop,
+  loseHero,
   nextNodeChoices,
   playerPath,
   pressOn,
@@ -57,13 +61,36 @@ function advanceToBossNode(rsArg: ReturnType<typeof startRun>): ReturnType<typeo
       rs = leaveShop(rs);
       continue;
     }
+    if (node.type === 'camp') {
+      rs = chooseCampNodeEffect(rs, { kind: 'heal_party' }, createRng(99)).runState;
+      continue;
+    }
+    // node.type is 'combat' or 'elite' — both go through completeCombat
     rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
     if (rs.awaitingFork) {
       const choices = nextNodeChoices(rs);
-      const combatBranch = choices.find((n) => n.type === 'combat') ?? choices[0];
+      const combatBranch =
+        choices.find((n) => n.type === 'combat') ??
+        choices.find((n) => n.type === 'elite') ??
+        choices[0];
       rs = chooseNextNode(rs, combatBranch.id);
     }
   }
+}
+
+/**
+ * Returns a RunState started from a seed whose floor 1 includes a shop on
+ * one of the fork branches. After Task 5, fork shape is RNG-rolled per seed,
+ * so callers needing a shop must search for a shop-bearing seed.
+ */
+function startRunWithShop(): ReturnType<typeof startRun> {
+  for (let seed = 1; seed <= 50; seed++) {
+    const rs = startRun('crypt', makeParty(), seed, createRng(seed));
+    if (rs.currentFloorNodes.some((n) => n.type === 'shop')) {
+      return rs;
+    }
+  }
+  throw new Error('no shop-bearing seed in [1..50]');
 }
 
 /**
@@ -353,7 +380,20 @@ describe('completeCombat — loot drop', () => {
       }
       rs = next;
       if (rs.awaitingFork) {
-        rs = chooseNextNode(rs, currentNode(rs).nextNodeIds[0]);
+        // Prefer combat-bearing branches so completeCombat doesn't throw next iteration.
+        const choices = nextNodeChoices(rs);
+        const branch =
+          choices.find((n) => n.type === 'combat') ??
+          choices.find((n) => n.type === 'elite') ??
+          choices[0];
+        rs = chooseNextNode(rs, branch.id);
+      }
+      // If the current node is non-combat (shop/camp branch), walk past it.
+      while (rs.status === 'in_dungeon' && currentNode(rs).type === 'shop') {
+        rs = leaveShop(rs);
+      }
+      while (rs.status === 'in_dungeon' && currentNode(rs).type === 'camp') {
+        rs = chooseCampNodeEffect(rs, { kind: 'heal_party' }, createRng(99)).runState;
       }
       if (rs.status !== 'in_dungeon') {
         rs = startRun('crypt', makeParty(), 1, createRng(attempt + 100));
@@ -422,7 +462,13 @@ describe('playerPath', () => {
     rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
     rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
     rs = chooseNextNode(rs, 'crypt-f1-n2b');
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    // n2b's type is seed-dependent — handle both shop and combat cases.
+    const node2b = currentNode(rs);
+    if (node2b.type === 'shop') {
+      rs = leaveShop(rs);
+    } else {
+      rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    }
     expect(rs.currentNodeId).toBe('crypt-f1-boss');
     const path = playerPath(rs);
     // Both branches reach boss; defaults to A.
@@ -438,7 +484,7 @@ describe('playerPath', () => {
 
 describe('purchaseItem', () => {
   it('decreases pack.gold by price, adds item to pack.items, marks slot sold', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     rs = { ...rs, pack: { ...rs.pack, gold: 1000 } };
     const shop = currentNode(rs);
@@ -460,14 +506,14 @@ describe('purchaseItem', () => {
   });
 
   it('throws on unknown item id', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     rs = { ...rs, pack: { ...rs.pack, gold: 1000 } };
     expect(() => purchaseItem(rs, 'bogus-item-id')).toThrow();
   });
 
   it('throws when item already sold', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     rs = { ...rs, pack: { ...rs.pack, gold: 1000 } };
     const shop = currentNode(rs);
@@ -478,7 +524,7 @@ describe('purchaseItem', () => {
   });
 
   it('throws on insufficient gold', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     rs = { ...rs, pack: { ...rs.pack, gold: 0 } };
     const shop = currentNode(rs);
@@ -488,7 +534,7 @@ describe('purchaseItem', () => {
   });
 
   it('throws when status is not in_dungeon', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     const synthetic = { ...rs, status: 'camp_screen' as const };
     expect(() => purchaseItem(synthetic, 'any')).toThrow();
@@ -497,7 +543,7 @@ describe('purchaseItem', () => {
 
 describe('leaveShop', () => {
   it('advances currentNodeId to next', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     const shop = currentNode(rs);
     const before = rs.currentNodeId;
@@ -512,9 +558,312 @@ describe('leaveShop', () => {
   });
 
   it('throws when status is not in_dungeon', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     const synthetic = { ...rs, status: 'camp_screen' as const };
     expect(() => leaveShop(synthetic)).toThrow();
+  });
+});
+
+function makeEliteRun(seed = 1): ReturnType<typeof startRun> {
+  // Hand-build a RunState whose currentNode is an elite node so we can test
+  // completeCombat's elite branch in isolation, independent of floor-gen
+  // changes (those land in Task 5).
+  const rs = startRun('crypt', makeParty(), seed, createRng(seed));
+  const eliteEncounter: Encounter = {
+    enemies: [{ enemyId: 'skeleton_warrior', slot: 1 }],
+    scale: { hp: 1, attack: 1 },
+  };
+  const eliteId = 'crypt-f1-elite-test';
+  const bossId = rs.currentFloorNodes.find((n) => n.type === 'boss')!.id;
+  const eliteNode: Node = {
+    id: eliteId,
+    type: 'elite',
+    encounter: eliteEncounter,
+    nextNodeIds: [bossId],
+  };
+  return {
+    ...rs,
+    currentFloorNodes: [...rs.currentFloorNodes, eliteNode],
+    currentNodeId: eliteId,
+  };
+}
+
+describe('completeCombat — elite node', () => {
+  it('grants 30 × floor gold to the pack', () => {
+    const rs = makeEliteRun();
+    const result = completeCombat(
+      rs,
+      mockCombatResult(rs.party, [20, 14, 15], 'player_victory'),
+      createRng(99),
+    );
+    expect(result.runState.pack.gold).toBe(30 * rs.currentFloorNumber);
+  });
+
+  it('grants xpForEliteNode XP to surviving heroes', () => {
+    const rs = makeEliteRun();
+    const expectedXp = xpForEliteNode(rs.currentFloorNumber);
+    const result = completeCombat(
+      rs,
+      mockCombatResult(rs.party, [20, 14, 15], 'player_victory'),
+      createRng(99),
+    );
+    for (const hero of result.runState.party) {
+      expect(hero.xp).toBe(expectedXp);
+    }
+  });
+
+  it('always adds a Rare item to the pack', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const rs = makeEliteRun(seed);
+      const result = completeCombat(
+        rs,
+        mockCombatResult(rs.party, [20, 14, 15], 'player_victory'),
+        createRng(seed),
+      );
+      expect(result.runState.pack.items).toHaveLength(1);
+      expect(result.runState.pack.items[0].rarity).toBe('rare');
+    }
+  });
+
+  it('advances to the next node (in_dungeon, not camp_screen)', () => {
+    const rs = makeEliteRun();
+    const result = completeCombat(
+      rs,
+      mockCombatResult(rs.party, [20, 14, 15], 'player_victory'),
+      createRng(99),
+    );
+    expect(result.runState.status).toBe('in_dungeon');
+  });
+});
+
+function makeCampRun(seed = 1): ReturnType<typeof startRun> {
+  // Hand-build a RunState whose currentNode is a camp node so we can test
+  // chooseCampNodeEffect in isolation, independent of floor-gen changes
+  // (those land in Task 4).
+  const rs = startRun('crypt', makeParty(), seed, createRng(seed));
+  const campId = 'crypt-f1-camp-test';
+  const bossId = rs.currentFloorNodes.find((n) => n.type === 'boss')!.id;
+  const campNode: Node = {
+    id: campId,
+    type: 'camp',
+    nextNodeIds: [bossId],
+  };
+  return {
+    ...rs,
+    currentFloorNodes: [...rs.currentFloorNodes, campNode],
+    currentNodeId: campId,
+  };
+}
+
+describe('chooseCampNodeEffect — heal_party', () => {
+  it('advances currentNodeId and heals every hero by 25% maxHp', () => {
+    const rs0 = makeCampRun();
+    const damaged: ReturnType<typeof startRun> = {
+      ...rs0,
+      party: rs0.party.map((h) => ({ ...h, currentHp: 1 })),
+    };
+    const result = chooseCampNodeEffect(damaged, { kind: 'heal_party' }, createRng(1));
+    expect(result.runState.currentNodeId).toBe('crypt-f1-boss');
+    for (let i = 0; i < result.runState.party.length; i++) {
+      const hero = result.runState.party[i];
+      expect(hero.currentHp).toBe(1 + Math.round(hero.maxHp * 0.25));
+    }
+  });
+
+  it('returns no outcome (only leave returns one)', () => {
+    const rs = makeCampRun();
+    const result = chooseCampNodeEffect(rs, { kind: 'heal_party' }, createRng(1));
+    expect(result.outcome).toBeUndefined();
+  });
+});
+
+describe('chooseCampNodeEffect — treat_wound', () => {
+  it('advances currentNodeId and removes the wound', () => {
+    const rs0 = makeCampRun();
+    const wounded: ReturnType<typeof startRun> = {
+      ...rs0,
+      party: rs0.party.map((h, i) =>
+        i === 0 ? { ...h, wounds: [{ id: 'bruised' as const, runsRemaining: 5 }] } : h,
+      ),
+    };
+    const result = chooseCampNodeEffect(
+      wounded,
+      { kind: 'treat_wound', heroIndex: 0, woundIndex: 0 },
+      createRng(1),
+    );
+    expect(result.runState.currentNodeId).toBe('crypt-f1-boss');
+    expect(result.runState.party[0].wounds).toEqual([]);
+  });
+});
+
+describe('chooseCampNodeEffect — leave (cashout)', () => {
+  it('returns CashoutOutcome and ends the run', () => {
+    const rs0 = makeCampRun();
+    const withGold: ReturnType<typeof startRun> = {
+      ...rs0,
+      pack: { gold: 50, items: [] },
+    };
+    const result = chooseCampNodeEffect(withGold, { kind: 'leave' }, createRng(1));
+    expect(result.outcome).toBeDefined();
+    expect(result.outcome!.goldBanked).toBe(50);
+    expect(result.outcome!.heroesReturned).toEqual(withGold.party);
+    expect(result.runState.status).toBe('ended');
+  });
+
+  it('works on floor 1 with no boss beaten (no penalty/conditions)', () => {
+    const rs = makeCampRun();
+    expect(rs.currentFloorNumber).toBe(1);
+    const result = chooseCampNodeEffect(rs, { kind: 'leave' }, createRng(1));
+    expect(result.outcome).toBeDefined();
+    expect(result.runState.status).toBe('ended');
+  });
+});
+
+describe('chooseCampNodeEffect — validation', () => {
+  it('throws if currentNode is not a camp', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(() => chooseCampNodeEffect(rs, { kind: 'heal_party' }, createRng(1))).toThrow();
+  });
+
+  it('throws if status is not in_dungeon', () => {
+    const rs = makeCampRun();
+    const ended: ReturnType<typeof startRun> = { ...rs, status: 'ended' };
+    expect(() => chooseCampNodeEffect(ended, { kind: 'heal_party' }, createRng(1))).toThrow();
+  });
+});
+
+describe('cashout — accepts camp nodes', () => {
+  it('accepts in_dungeon + camp currentNode (no throw)', () => {
+    const rs = makeCampRun();
+    expect(() => cashout(rs)).not.toThrow();
+    const { runState, outcome } = cashout(rs);
+    expect(runState.status).toBe('ended');
+    expect(outcome.heroesReturned).toEqual(rs.party);
+  });
+
+  it('still throws on in_dungeon at non-camp nodes', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    // currentNode is preamble combat, not camp.
+    expect(() => cashout(rs)).toThrow();
+  });
+
+  it('still throws on status === ended', () => {
+    const rs = makeCampRun();
+    const ended: ReturnType<typeof startRun> = { ...rs, status: 'ended' };
+    expect(() => cashout(ended)).toThrow();
+  });
+});
+
+describe('startRun — lost field', () => {
+  it('initializes lost as empty array', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(rs.lost).toEqual([]);
+  });
+});
+
+describe('loseHero', () => {
+  it('removes hero at index from party and appends to lost', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(rs.party).toHaveLength(3);
+    expect(rs.lost).toHaveLength(0);
+    const after = loseHero(rs, 1);
+    expect(after.party).toHaveLength(2);
+    expect(after.party[0].id).toBe('h0');
+    expect(after.party[1].id).toBe('h2');
+    expect(after.lost).toHaveLength(1);
+    expect(after.lost[0].id).toBe('h1');
+  });
+
+  it('does not transfer the lost hero gear to the pack (distinct from Fallen)', () => {
+    const rs0 = startRun('crypt', makeParty(), 1, createRng(1));
+    // Verify the hero has at least one equipped item (starter weapon).
+    expect(rs0.party[0].equipment.weapon).toBeDefined();
+    const packItemsBefore = rs0.pack.items.length;
+    const after = loseHero(rs0, 0);
+    expect(after.pack.items.length).toBe(packItemsBefore);  // pack unchanged
+    expect(after.lost[0].id).toBe('h0');                     // hero in lost
+  });
+
+  it('throws on heroIndex out of range', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(() => loseHero(rs, 99)).toThrow();
+    expect(() => loseHero(rs, -1)).toThrow();
+  });
+
+  it('multiple loseHero calls accumulate in lost', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const after1 = loseHero(rs, 0);
+    const after2 = loseHero(after1, 0);
+    expect(after2.party).toHaveLength(1);
+    expect(after2.lost).toHaveLength(2);
+  });
+});
+
+describe('cashout — Lost vs Fallen separation', () => {
+  it('with one Lost hero and no fallen: heroesLost has 1, heroesFallen empty', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = loseHero(rs, 1);
+    const atCamp: ReturnType<typeof startRun> = { ...rs, status: 'camp_screen' };
+    const { outcome } = cashout(atCamp);
+    expect(outcome.heroesLost).toHaveLength(1);
+    expect(outcome.heroesLost[0].id).toBe('h1');
+    expect(outcome.heroesFallen).toHaveLength(0);
+    expect(outcome.heroesReturned).toHaveLength(2);
+  });
+
+  it('with both Lost and Fallen: each outcome field carries the right hero', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const fallenHero = rs.party[0];
+    rs = {
+      ...rs,
+      party: rs.party.filter((_, i) => i !== 0),
+      fallen: [fallenHero],
+    };
+    rs = loseHero(rs, 0);
+    const atCamp: ReturnType<typeof startRun> = { ...rs, status: 'camp_screen' };
+    const { outcome } = cashout(atCamp);
+    expect(outcome.heroesFallen).toHaveLength(1);
+    expect(outcome.heroesFallen[0].id).toBe('h0');
+    expect(outcome.heroesLost).toHaveLength(1);
+    expect(outcome.heroesLost[0].id).toBe('h1');
+    expect(outcome.heroesReturned).toHaveLength(1);
+    expect(outcome.heroesReturned[0].id).toBe('h2');
+  });
+
+  it('with no losses: both heroesFallen and heroesLost are empty', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const atCamp: ReturnType<typeof startRun> = { ...rs, status: 'camp_screen' };
+    const { outcome } = cashout(atCamp);
+    expect(outcome.heroesFallen).toEqual([]);
+    expect(outcome.heroesLost).toEqual([]);
+    expect(outcome.heroesReturned).toHaveLength(3);
+  });
+});
+
+describe('completeCombat wipe — Lost vs Fallen separation', () => {
+  it('with a pre-Lost hero, the wipe carries them in heroesLost (not heroesFallen)', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = loseHero(rs, 1);
+    expect(rs.party).toHaveLength(2);
+    expect(rs.lost).toHaveLength(1);
+    const wipeResult = mockCombatResult(rs.party, rs.party.map(() => 0), 'player_defeat');
+    const { wipe } = completeCombat(rs, wipeResult, createRng(99));
+    expect(wipe).toBeDefined();
+    expect(wipe!.heroesLost).toHaveLength(1);
+    expect(wipe!.heroesLost[0].id).toBe('h1');
+    const fallenIds = wipe!.heroesFallen.map((h) => h.id);
+    expect(fallenIds).toContain('h0');
+    expect(fallenIds).toContain('h2');
+    expect(fallenIds).not.toContain('h1');
+  });
+
+  it('with no Lost heroes: wipe.heroesLost is empty array', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const wipeResult = mockCombatResult(rs.party, [0, 0, 0], 'player_defeat');
+    const { wipe } = completeCombat(rs, wipeResult, createRng(99));
+    expect(wipe).toBeDefined();
+    expect(wipe!.heroesLost).toEqual([]);
+    expect(wipe!.heroesFallen).toHaveLength(3);
   });
 });

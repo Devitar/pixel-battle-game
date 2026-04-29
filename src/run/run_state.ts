@@ -1,8 +1,9 @@
 import type { DungeonId, Item, Wound } from '../data/types';
-import { applyLevelUps, levelForXp, xpForBossNode, xpForCombatNode } from '../data/leveling';
+import { applyLevelUps, levelForXp, xpForBossNode, xpForCombatNode, xpForEliteNode } from '../data/leveling';
 import { DEFAULT_WOUND_RUNS_REMAINING } from '../data/wounds';
+import { applyCampNodeEffect, type CampNodeChoice } from '../dungeon/camp_node';
 import { generateFloor } from '../dungeon/floor';
-import { rollLoot } from '../dungeon/loot';
+import { rollLoot, type CombatKind } from '../dungeon/loot';
 import type { Node } from '../dungeon/node';
 import type { CombatEvent, CombatResult } from '../combat/types';
 import type { Hero } from '../heroes/hero';
@@ -22,22 +23,26 @@ export interface RunState {
   readonly awaitingFork: boolean;
   readonly status: RunStatus;
   readonly fallen: readonly Hero[];
+  readonly lost: readonly Hero[];
 }
 
 export interface CashoutOutcome {
   goldBanked: number;
   itemsBanked: readonly Item[];
   heroesReturned: readonly Hero[];
-  heroesLost: readonly Hero[];
+  heroesFallen: readonly Hero[];   // died in combat this run
+  heroesLost: readonly Hero[];     // narratively Lost via event/hazard during this run
 }
 
 export interface WipeOutcome {
   packLost: Pack;
-  heroesLost: readonly Hero[];
+  heroesFallen: readonly Hero[];   // died in combat (including the wiping fight)
+  heroesLost: readonly Hero[];     // narratively Lost prior to the wipe
 }
 
 const PARTY_SIZE = 3;
 const COMBAT_NODE_GOLD = 15;
+const ELITE_NODE_GOLD = 30;
 const BOSS_NODE_GOLD = 100;
 
 export function startRun(
@@ -61,6 +66,7 @@ export function startRun(
     awaitingFork: false,
     status: 'in_dungeon',
     fallen: [],
+    lost: [],
   };
 }
 
@@ -103,6 +109,46 @@ export function chooseNextNode(runState: RunState, nextNodeId: string): RunState
   };
 }
 
+export function chooseCampNodeEffect(
+  runState: RunState,
+  choice: CampNodeChoice,
+  rng: Rng,
+): { runState: RunState; outcome?: CashoutOutcome } {
+  if (runState.status !== 'in_dungeon') {
+    throw new Error(`chooseCampNodeEffect: status must be 'in_dungeon', got '${runState.status}'`);
+  }
+  const cur = currentNode(runState);
+  if (cur.type !== 'camp') {
+    throw new Error(`chooseCampNodeEffect: current node is type '${cur.type}', not 'camp'`);
+  }
+  if (choice.kind === 'leave') {
+    return cashout(runState);
+  }
+  const newRunState = applyCampNodeEffect(runState, choice, rng);
+  return {
+    runState: {
+      ...newRunState,
+      currentNodeId: cur.nextNodeIds[0],
+    },
+  };
+}
+
+export function loseHero(runState: RunState, heroIndex: number): RunState {
+  if (heroIndex < 0 || heroIndex >= runState.party.length) {
+    throw new Error(`loseHero: index ${heroIndex} out of range [0, ${runState.party.length})`);
+  }
+  const hero = runState.party[heroIndex];
+  // Per gdd §8 — gear is gone with the Lost hero (NOT transferred to pack like Fallen).
+  // The hero record retains its equipment fields, but since the hero is moved to `lost`
+  // (not `party`), the gear is unreachable in gameplay. The behavioral distinction from
+  // Fallen is that completeCombat's pack-transfer loop is never invoked on this hero.
+  return {
+    ...runState,
+    party: runState.party.filter((_, i) => i !== heroIndex),
+    lost: [...runState.lost, hero],
+  };
+}
+
 export function completeCombat(
   runState: RunState,
   result: CombatResult,
@@ -140,7 +186,11 @@ export function completeCombat(
       ...newFallen,
       ...updatedPartyLiving,
     ];
-    const wipe: WipeOutcome = { packLost: runState.pack, heroesLost: allLost };
+    const wipe: WipeOutcome = {
+      packLost: runState.pack,
+      heroesFallen: allLost,
+      heroesLost: runState.lost,
+    };
     return {
       runState: {
         ...runState,
@@ -154,25 +204,31 @@ export function completeCombat(
   }
 
   const completedNode = currentNode(runState);
-  const isBoss = completedNode.type === 'boss';
+  if (completedNode.type === 'shop' || completedNode.type === 'camp') {
+    throw new Error(`completeCombat: current node is type '${completedNode.type}', not a combat-bearing node`);
+  }
+  const kind: CombatKind = completedNode.type;
+  const isBoss = kind === 'boss';
   const fanout = completedNode.nextNodeIds;
 
   // XP awards — only on victory, only to surviving heroes.
-  const xpReward = isBoss
-    ? xpForBossNode(runState.currentFloorNumber)
-    : xpForCombatNode(runState.currentFloorNumber);
+  const xpReward =
+    kind === 'boss'  ? xpForBossNode(runState.currentFloorNumber) :
+    kind === 'elite' ? xpForEliteNode(runState.currentFloorNumber) :
+                       xpForCombatNode(runState.currentFloorNumber);
   const partyAfterXp = updatedPartyLiving.map((hero) => {
     const newXp = hero.xp + xpReward;
     const newLevel = levelForXp(newXp);
     return applyLevelUps({ ...hero, xp: newXp }, hero.level, newLevel);
   });
 
-  const reward = isBoss
-    ? BOSS_NODE_GOLD * runState.currentFloorNumber
-    : COMBAT_NODE_GOLD * runState.currentFloorNumber;
+  const reward =
+    kind === 'boss'  ? BOSS_NODE_GOLD  * runState.currentFloorNumber :
+    kind === 'elite' ? ELITE_NODE_GOLD * runState.currentFloorNumber :
+                       COMBAT_NODE_GOLD * runState.currentFloorNumber;
   let newPack = addGold(runState.pack, reward);
 
-  const drop = rollLoot(rng, runState.currentFloorNumber, isBoss);
+  const drop = rollLoot(rng, runState.currentFloorNumber, kind);
   if (drop) {
     newPack = addItem(newPack, drop);
   }
@@ -243,14 +299,17 @@ export function pressOn(runState: RunState, rng: Rng): RunState {
 }
 
 export function cashout(runState: RunState): { runState: RunState; outcome: CashoutOutcome } {
-  if (runState.status !== 'camp_screen') {
-    throw new Error(`cashout: status must be 'camp_screen', got '${runState.status}'`);
+  const atCamp = runState.status === 'in_dungeon' &&
+                 currentNode(runState).type === 'camp';
+  if (runState.status !== 'camp_screen' && !atCamp) {
+    throw new Error(`cashout: must be at camp_screen or camp node, got status='${runState.status}'`);
   }
   const outcome: CashoutOutcome = {
     goldBanked: totalGold(runState.pack),
     itemsBanked: runState.pack.items,
     heroesReturned: runState.party,
-    heroesLost: runState.fallen,
+    heroesFallen: runState.fallen,
+    heroesLost: runState.lost,
   };
   return {
     runState: { ...runState, status: 'ended' },

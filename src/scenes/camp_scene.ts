@@ -15,6 +15,7 @@ export class CampScene extends Phaser.Scene {
     this.buildGround();
     this.buildBuilding('Tavern', 180, 0x664433, 100, 110, 'tavern_panel');
     this.buildBuilding('Barracks', 440, 0x555555, 100, 130, 'barracks_panel');
+    this.buildBuilding('Hospital', 580, 0x885566, 100, 100, 'hospital_panel');
     this.buildBuilding('Noticeboard', 720, 0x998866, 80, 60, 'noticeboard_panel');
     this.buildDevHints();
 

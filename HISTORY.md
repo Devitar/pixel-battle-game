@@ -29,6 +29,120 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-29 · Hospital building UI (Cluster B · 1)
+
+- **Why:** First Cluster B task. The wound system + treatment data layer (Cluster A · 3) had been complete for some time, but players had no in-game way to spend gold on wound treatment. Ships the camp-hub Hospital scene that closes that loop. Pattern-consistent with `barracks_panel_scene.ts` (left list / right detail).
+- **Decisions:**
+  - **Layout: Barracks-style left list / right detail** (per user direction). List pane shows only wounded heroes with a wound-count subtitle; detail pane shows the selected hero's wound rows with per-wound Treat buttons. Diverges from the simpler "flat list with inline Treat" alternative because it scales better as the wounded-roster grows.
+  - **Flat per-wound cost (`HOSPITAL_TREATMENT_COST = 40`).** Existing constant from `data/wounds.ts`; kept as-is. The gdd's quota model (1-wound-cheap, 2 cheap at L2 …) lives behind Hospital level, which doesn't exist in Tier 2 — out of scope.
+  - **`describeWoundEffect` lives in `data/wounds.ts`, not the scene.** The helper renders `WoundEffect` to a player-facing string (e.g. `+20% damage taken`, `-2 Speed`, `-10 Max HP`). Pure-TS so Cluster B · 9 (Wound display on hero card + Barracks) can reuse it without a refactor.
+  - **`hp` stat → `Max HP` label.** `WoundEffect.statDelta.stat: 'hp'` (Broken Bone) describes a max-HP debuff. The capitalize helper would render this as `Hp` which is wrong — special-cased to `Max HP` for player clarity.
+  - **Hospital tile color `0x885566`** (muted rose). Reads as medical/blood without being garish. Slotted at `x = 580` between Barracks (440) and Noticeboard (720) — preserves the existing camp layout.
+- **Surprises:**
+  - **`wounds.test.ts` already existed** with table-driven assertions for `WOUNDS` shape. Plan said "Create" but it was an extension; appended the new `describeWoundEffect` describe block instead of overwriting. Total file delta: +6 tests, +1 import.
+  - **Type safety required `WoundEffect` import alongside `WoundDef` and `WoundId`.** Spec preferred this over a hacky `WOUNDS[keyof typeof WOUNDS]['effect']` indexed-access type. Plan self-review caught the rough version and led with the clean import path.
+- **Source:** TODO.md Cluster B · 1 → spec at `docs/superpowers/specs/2026-04-29-hospital-ui-design.md` → plan at `docs/superpowers/plans/2026-04-29-hospital-ui.md`. Test count delta: 1278 → 1284 (+6). Scene-layer manual-play verification per convention.
+
+### 2026-04-29 · Lost-vs-Fallen save serialization (Cluster A · 15)
+
+- **Why:** With `RunState.lost` shipped in Task 13 and Lost-bearing event cards shipped in Task 14, the existing `heroesLost` field on `CashoutOutcome` / `WipeOutcome` (which actually held fallen heroes) became actively misleading. This task fixes the misnaming and adds a parallel field whose semantics match its name. **Closes Cluster A** — all 15 pure-TS data-layer tasks for Tier 2 are now shipped.
+- **Decisions:**
+  - **Renamed `heroesLost` → `heroesFallen` and added new `heroesLost`** sourced from `RunState.lost`. Both `CashoutOutcome` and `WipeOutcome` gained the split. Cleanest naming end-state at the cost of one round of consumer churn (3 reads in `dungeon_scene.ts`, 1 in `camp_screen_scene.ts`).
+  - **Wipe semantic: narratively-Lost heroes stay Lost on wipe.** They were already removed from `party`/`fallen` paths when `loseHero` was called; the wiping fight only kills the *remaining* party. So `wipe.heroesFallen` = the just-killed party + prior fallen; `wipe.heroesLost` = `runState.lost` (unchanged).
+  - **Renamed local var `lostIds` → `fallenIds` in `dungeon_scene.ts`** (lines 567 + 571) to match the field rename. Spec originally hand-waved this as "Cluster B · 11 cleanup if desired" — fixed in spec self-review since it's the same edit context.
+  - **No save-schema change.** `RunState.lost` already exists from Task 13 with normalizer default; outcome shapes are transient (returned from operations, never serialized).
+- **Surprises:**
+  - **Removed the entire `## Cluster A` section from TODO.md** since the cluster is complete. The cluster header was dead weight without contents; Cluster B now becomes the natural top of the backlog.
+- **Source:** TODO.md Cluster A · 15 → spec at `docs/superpowers/specs/2026-04-29-lost-vs-fallen-design.md` → plan at `docs/superpowers/plans/2026-04-29-lost-vs-fallen.md`. Test count delta: 1273 → 1278 (+5).
+
+### 2026-04-29 · Initial event deck (Cluster A · 14)
+
+- **Why:** Without authored content, the Cluster A · 13 event system was a feature with nothing to show. Ships 20 event cards (15 shared + 5 Crypt-specific) covering all four payload kinds. 4 cards trigger Lost outcomes (3 shared + 1 Crypt) — which fully satisfies one of Cluster A · 15's acceptance bullets, narrowing 15's remaining work to the save-schema / outcome-reporting / scene-UI distinction.
+- **Decisions:**
+  - **Card mix:** 7 HP-for-gold trades + 2 reverse trades (gold for heal) + 3 free-reward cards + 4 Lost-gambles + 4 Crypt-themed (one of which is a Lost-pact). Distribution favors the gdd's HP-for-gold archetype while spreading Lost cards across the deck so the mechanic surfaces ~20% of the time.
+  - **Rare-item gating:** rare items reserved for Lost-gambles or premium high-HP-cost trades — except `forgotten_traveler` (skeleton-with-satchel), which gets a rare item as a "high-tension take" with implicit narrative cost (looting a corpse). Documented in spec §1 as the lone exception.
+  - **Tonal voice:** gothic, doom-laden, 1–2 sentence narrator framing per card. Choice labels use active verbs ("Bleed and pass", "Reach inside") rather than abstract Yes/No. Aligns with gdd's Darkest Dungeon reference.
+  - **Card body apostrophe in `ghost_pact`** (`hero's eternal company`) wrapped the body in double quotes; all other cards use single quotes. Required to avoid escape-sequence noise.
+  - **No Decline label normalization.** Each "do nothing" choice has its own narrative label (`Walk away` / `Decline` / `Leave it untouched` / `Walk past` / `Browse and leave`) for tonal variety. The empty `payloads: []` array is the system-level Decline marker; the label is flavor.
+- **Surprises:**
+  - **Updated Task 15's TODO entry to narrow scope.** Two of three acceptance bullets ("loseHero op" and "event card with Lost") were already satisfied by 13 + 14, so 15 is now just the save-schema/outcome-reporting work. Adjusted in the same TODO migration.
+  - **Test count delta = +12 (15 new − 3 replaced).** The original `events.test.ts` had 3 placeholder smoke checks that the new file's structure tests subsume.
+- **Source:** TODO.md Cluster A · 14 → spec at `docs/superpowers/specs/2026-04-29-event-deck-design.md` → plan at `docs/superpowers/plans/2026-04-29-event-deck.md`. Test count delta: 1261 → 1273 (+12).
+
+### 2026-04-29 · Event system core (Cluster A · 13)
+
+- **Why:** Foundation for the event deck (Task 14) and "Lost"-category events (Task 15). Ships the event-card data shapes (`EventPayload` union with 4 kinds, `EventChoice`, `EventCard`), a `drawEventCard` deck helper with dungeon filtering, and the `applyEventChoice` resolver that wires each payload kind against `RunState`. Pulled a slice of Task 15 forward — `RunState.lost: readonly Hero[]` field, `loseHero` op, save-normalizer default — so Task 14 can author cards using the full payload palette.
+- **Decisions:**
+  - **Pulled `loseHero` slice from Task 15 into this task.** Rather than ship a 3/4 payload set with a stub for `lose_hero`, the small `loseHero` op (~20 lines) plus the new `RunState.lost` field land here. Task 15 narrows to the save-schema "Lost vs Fallen" serialization distinction, scene wiring (Cluster B · 11), and at least one event card using the payload (could be authored in Task 14 since the resolver supports it).
+  - **Structured `EventOutcome` over RunState-diff.** Mirrors the `chooseCampNodeEffect` `{ runState; outcome }` precedent. UI overlay (Cluster B · 5) reads `outcome` directly to render the result panel — no diff inspection, no surprises when items also change HP.
+  - **HP delta from events clamps at min 1 HP per hero.** Events don't kill — the Lost path is the narrative-removal path; HP-loss is just damage. Heroes already at 1 HP stay at 1 even under `-100%` damage.
+  - **Gold delta clamps at 0.** Negative deltas exceeding pack gold cap to current gold via `spendGold(min(have, want))`. Outcome reports the actual delta applied (may be smaller magnitude than the payload's `amount`).
+  - **With-replacement deck draw.** Independent draws per event-node — no `drawnEventCardIds` save-state. Tier 2 ships ~20 cards; collisions are rare even on long press-on chains. Tunable later.
+  - **`drawEventCard` lives in `dungeon/event_deck.ts`, not `data/events.ts`.** `data/` is "pure content tables"; `dungeon/` is "content-aware logic that runs against state." The draw consumes RNG, so it's logic, not data.
+  - **`rollEventItem` as a separate helper alongside `rollLoot` / `rollShopItem`.** Forced-rarity item roll. The three loot helpers now diverge cleanly by use case: combat-drop (50% gate, weighted rarity), boss (100%, next-floor weights), elite (100%, forced rare), event (100%, payload-specified rarity).
+- **Surprises:**
+  - **Spec called for stripping equipment to `undefined` on Lost; TS rejected because `HeroEquipment.weapon` is non-optional.** Making weapon optional would force null-checks across 6 read sites. Pragmatic adjustment: `loseHero` doesn't strip — the hero record retains its equipment, but since the hero moves from `party` to `lost`, the gear is unreachable in gameplay. The actual behavioral requirement (gear NOT transferred to pack) is preserved because `loseHero` doesn't call `addItem`. Test rewritten to assert the behavior ("gear not added to pack") instead of the field shape.
+  - **Two pre-existing save tests had inline `RunState` literals** that broke after adding the required `lost` field. Both fixed in the same commit. The pattern (typed RunState literals in tests outliving schema changes) is something to watch for as we add more fields.
+  - **`Object.assign(outcome, result.outcomeDelta)` accumulates same-key entries** by overwriting. This means a multi-`add_item` choice (two items in one branch) would only report the second one in `outcome.itemAdded`. No Tier 2 cards stack same-kind payloads; Task 14 cards should respect this. Flagged in the spec.
+- **Source:** TODO.md Cluster A · 13 → spec at `docs/superpowers/specs/2026-04-29-event-system-core-design.md` → plan at `docs/superpowers/plans/2026-04-29-event-system-core.md`. Test count delta: 1220 → 1261 (+41).
+
+### 2026-04-29 · Floor-milestone enemy modifiers (Cluster A · 12)
+
+- **Why:** Makes deeper floors mechanically distinct, not just numerically scaled — closes the last bullet of the Tier 2 dungeon-depth set. Adds three modifiers: Armored (+2 defense), Venomous (poison-on-hit, 2 dmg × 2 turns), Enraged (+3 attack at <50% HP). Combat encounters get one rolled modifier on milestone floors (5/10/15 unlock the pool); elites always carry one from the full pool regardless of floor — fulfilling the "stamps a modifier" piece deferred from Cluster A · 10.
+- **Decisions:**
+  - **Pool unlocks at milestones (5/10/15), not at floor 1.** Each new modifier appears at a milestone, giving the player a learning curve. Below floor 5 combat encounters are unmodified; at floor 5+ every enemy gets one rolled modifier. Elites bypass the milestone gating because they're already a "premium fight" — they preview deeper mechanics.
+  - **Enraged is flat `+3 attack`, not the gdd's "scaling with damage taken."** Continuous percentage scaling would have required a multi-step compute that doesn't fit the existing statDelta-style architecture. Threshold trigger (at <50% HP, +3 flat) hits the same "wounded enemy is dangerous" beat with a simple state-flip mechanic — readable to the player and trivial to implement via a single check in `getEffectiveStat`. Strict less-than: at exactly 50% HP the bonus is **not** active.
+  - **Bosses are never modified.** Bosses are bespoke encounters; mixing in modifiers would require careful per-boss balance. Out of scope for Tier 2; trivial to flip later by adding `stampBossModifiers` if wanted.
+  - **Combatant gains 4 more optional fields, not a `passives` bag refactor.** The in-code comment on `Combatant` flagged "consolidation candidates once 3+ more land" — this task lands 4. The refactor is reasonable future work but not load-bearing for shipping the user-visible feature. Flagged in the spec, deferred.
+  - **`'enraged'` overlaps with the existing `StatusId`** (Barbarian's Rampage applies an `enraged` self-debuff). The new modifier shares the string but lives in a different namespace (`ModifierId`) and never writes to `combatant.statuses` — so no collision at runtime. Documented in the plan; no rename needed.
+- **Surprises:**
+  - **Stamping consumed less RNG than expected for the no-pool case.** Floor 1–4 combat encounters call `stampCombatModifiers` but the helper short-circuits when `poolForFloor` returns `[]` — no RNG draws happen, so floor-1 seed-stable tests stayed byte-identical. Only floor 5+ tests shifted (expected, documented in the plan).
+  - **The `?? 2` fallback on `venomousDuration`** in `combat/effects.ts` is defensive — `combat_setup` always sets both `venomousDamage` and `venomousDuration` together, so the fallback never fires in practice. Left in for parity with how the existing burning code handles its hard-coded 2-turn duration.
+  - **`Partial<Combatant>` for the modifier-fields object** in `combat_setup.ts` worked cleanly — TS narrowed each modifier's effect kind correctly, and spreading `...modifierFields` into `createEnemyCombatant` only wrote the keys actually set. No need for explicit conditional spreads.
+- **Source:** TODO.md Cluster A · 12 → spec at `docs/superpowers/specs/2026-04-29-floor-milestone-modifiers-design.md` → plan at `docs/superpowers/plans/2026-04-29-floor-milestone-modifiers.md`. Test count delta: 1184 → 1220 (+36).
+
+### 2026-04-29 · Mid-floor camp nodes (Cluster A · 11)
+
+- **Why:** Adds a recovery-and-decision beat between combats — a fork-branch type that lets the player heal HP (+25% of maxHp party-wide), treat one wound, or **leave the dungeon with a full cashout, no boss-kill required**. Last point overrides gdd §4's "cannot cash out from camp node" line at user direction. Pairs with Cluster B · 4 for the picker UI; the data layer ships with a stub auto-applying `heal_party` so floors with camp branches keep progressing until B · 4 lands.
+- **Decisions:**
+  - **Defer "sharpen weapons" effect.** Building a temp-buff mechanic for one use case risks an awkward shape; deferred until another feature (consumables, event cards) needs the same primitive. Two effects (heal/treat-wound) plus the cashout option already cover the design's recovery decision.
+  - **Cashout-from-camp = full cashout, always.** No floor-1 / no-boss-beaten penalty. Loosened `cashout()`'s status guard to accept `in_dungeon` + camp currentNode in addition to `camp_screen`; short-circuit AND in the `atCamp` predicate ensures `currentNode()` (which throws on non-`in_dungeon` status) is only called when safe.
+  - **Camp-node `'leave'` choice routed via `chooseCampNodeEffect` rather than `applyCampNodeEffect`.** Keeps `camp_node.ts` framework-pure (no `cashout` import); the RunState-aware op in `run_state.ts` delegates to `cashout()` directly.
+  - **6-shape uniform fork RNG.** Camp joins shop/elite/combat as the fourth fork-branch type. Each shape (4 choose 2 = 6) is uniformly weighted at 1/6. Existing shapes drop from 1/3 to 1/6 frequency — players see shops/elites about half as often per floor as before. Acceptable for Tier 2; tunable from the constants array.
+  - **`HEAL_PARTY_PERCENT = 0.25` applied to `maxHp`, not `currentHp`.** Heroes at full HP are unchanged; heroes at low HP get a meaningful bump scaled to their pool. Capped at maxHp (no overflow).
+- **Surprises:**
+  - **Two extra tsc errors after the Node union extension** that the plan didn't anticipate: `floor.test.ts:97` accessed `node.encounter` after only filtering shop/elite (now fails on camp); `run_state.ts:161` derived `kind: CombatKind = completedNode.type` after a shop-only guard (now needs camp guard too). Both small fixes, caught at the right moment by the discipline of running tsc after the type-only change.
+  - **Latent loot-drop test bug surfaced.** A test in `run_state.test.ts` did `chooseNextNode(rs, currentNode(rs).nextNodeIds[0])` unconditionally — fine when the only fork branches were shop or combat (and shop got auto-leave-tested elsewhere). With camp branches now possible, branch A could be `'camp'`, breaking the next `completeCombat` call. Updated the test to prefer combat-bearing branches and walk past non-combat branches before the next loot attempt.
+  - **`rng` parameter on `applyCampNodeEffect` is currently unused.** Reserved for a future "auto-pick wound" mode; passing it now keeps API parity with other apply-effect functions and avoids a signature break later.
+- **Source:** TODO.md Cluster A · 11 → spec at `docs/superpowers/specs/2026-04-29-mid-floor-camp-nodes-design.md` → plan at `docs/superpowers/plans/2026-04-29-mid-floor-camp-nodes.md`. Test count delta: 1159 → 1184 (+25).
+
+### 2026-04-29 · Elite node visual marker (Cluster B · 10)
+
+- **Why:** Cluster A · 10 (Elite nodes) shipped with a placeholder `'⚔'` glyph for elite that was visually identical to regular combat in the dungeon-scene icon row. Players couldn't see the "harder fight for guaranteed Rare" trade-off before committing at a fork. This task gives elite its own glyph (`'💀'`, per gdd §4) and a future-state orange color (`#cc8844`) that slots between grey (combat/shop) and red (boss) on a threat-tier ramp.
+- **Decisions:**
+  - **Pulled both knobs (glyph + color), not just one.** `'💀'` vs boss's `'☠'` is a known confusable at small font sizes; the orange-vs-red color contrast disambiguates at any zoom level. Position helps too — boss is always slot 4, elite always on a fork branch (slot 2).
+  - **Color reserved for future-state only.** Past nodes stay dim grey, current-node stays gold — uniform across all node types. Only the future-state branch in `refreshNodeColors` gains the elite tier. Keeps the "you are here" / "you've been here" reads consistent.
+  - **No helper extraction.** A pure `glyphForNode(node)` / `futureColorForNode(node)` would be testable but is over-engineering for a 5-line change. Convention is no Phaser-side unit tests for scenes (per prior scene-task HISTORY entries); the ternary chains stay inline.
+- **Surprises:**
+  - None. The placeholder line at `dungeon_scene.ts:159` was specifically anticipated for this task; the change was the one-line glyph edit it expected, plus a 2-line color-tier addition.
+- **Source:** TODO.md Cluster B · 10. No spec or plan docs — design fit in a single brainstorming-skill exchange.
+
+### 2026-04-29 · Elite nodes (Cluster A · 10)
+
+- **Why:** Without elites, all fork branches were combat-vs-shop or combat-vs-combat, so the "harder fight for guaranteed loot" trade-off the gdd promised at forks didn't exist. This task ships the data layer: a new `'elite'` Node variant with a 4-enemy encounter at +50% HP / +25% Attack on top of `floorScale`, a guaranteed Rare drop and 2× combat gold/XP on victory, and a triangular fork-shape RNG so each floor's fork is uniformly one of `shop_vs_combat` / `elite_vs_combat` / `elite_vs_shop`. Visual marker (Cluster B · 10) and modifier stamping (Cluster A · 12) deferred.
+- **Decisions:**
+  - **Defer "stamps a modifier" piece.** The TODO acceptance referenced Armored / Enraged but Cluster A · 12 hasn't shipped — building a minimal modifier scaffold inline would have ballooned scope. Elites without modifiers (more enemies + scale boost + forced Rare) already deliver the asymmetric trade-off; modifiers slot in cleanly when 12 lands.
+  - **`rollLoot` API: `isBoss: boolean` → `kind: 'combat' | 'elite' | 'boss'` enum.** Boolean wouldn't extend cleanly to a third bucket. Replaces every call site uniformly. Elite branch hard-codes `rarity = 'rare'` and skips the rarity-roll RNG draw; affixes/rare-property scale at current floor.
+  - **Single 100% Rare drop, not 1+rolled or 2 drops.** Maps the "guaranteed rare drop" gdd phrase verbatim. Boss still out-pays elite (boss can roll Epic-equivalent via next-floor weights at depth; elite is fixed at Rare).
+  - **3-shape uniform RNG over alternative fork models.** Independent rolls per branch could produce combat-vs-combat (eliminated when shops shipped) or shop-vs-shop (degenerate). Shape-first roll preserves "every floor's fork has at least one differentiated node," with `'elite_vs_shop'` floors carrying both.
+  - **`specialOnBranchA = true` pinned to elite-on-A for `'elite_vs_shop'`.** Symmetric in principle, arbitrary in practice; pinning a single rule keeps tests simple.
+  - **Defensive shop guard inside `completeCombat`.** The new `kind` derivation throws if `node.type === 'shop'` — surfaced a pre-existing latent bug where the `playerPath` ambiguity test was calling `completeCombat` on n2b without checking if the seed produced a shop branch (silently awarded combat-tier rewards on a shop pre-task).
+- **Surprises:**
+  - **`navigateToShop` helper assumed seed-1 produces a shop branch.** True under the boolean fork rule (every floor had exactly one shop); false under the 3-shape RNG (~1/3 of floors are `'elite_vs_combat'` with no shop). Replaced with `startRunWithShop()` that searches for a shop-bearing seed across [1..50]. Touched 7 test call sites.
+  - **`tsc` was already green after the `Node` union extension** without any consumer edits — the existing pattern-matches in `combat_scene.ts`, `dungeon_scene.ts`, the test helpers, and the `'shop'`-guarded code paths all narrow `combat | elite | boss` correctly because they share the `encounter` field. Added the explicit elite glyph mapping in `dungeon_scene.ts` proactively so Cluster B · 10 has one line to change.
+  - **Elite branch consumes one fewer RNG draw than boss** (no `pickRarity` call). Means seed-equivalent boss vs elite items diverge after the rarity-pick step. Tests for elite stand alone — no expectation of seed parity with boss.
+- **Source:** TODO.md Cluster A · 10 → spec at `docs/superpowers/specs/2026-04-29-elite-nodes-design.md` → plan at `docs/superpowers/plans/2026-04-29-elite-nodes.md`. Test count delta: 1135 → 1159 (+24).
+
 ### 2026-04-28 · Shop UI (Cluster B · 3)
 
 - **Why:** Shop nodes shipped in Cluster A · 9 with an auto-leave stub — players walked through shops without ever seeing inventory or being able to buy. This task ships the modal overlay, closing the loop. Bonus: a "Manage Gear" button launches the existing `EquipPanelScene` mid-shop so players can equip just-bought gear before fighting the boss — closing a UX gap where bought-but-not-equipped gear was useless until camp_screen post-boss.
