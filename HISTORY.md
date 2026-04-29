@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-28 · Shop nodes (Cluster A · 9)
+
+- **Why:** Adds the gdd's "spend gold for gear vs fight for XP/gold" decision. Without shops, all fork branches were combat-vs-combat and the Crypt had no real economy beyond "save gold for the camp Vault." This task ships the data + traversal foundation: every Crypt floor's fork now has a shop on one branch (deterministic from RNG), 4 gear items at floor-scaled prices. Cluster B · 3 replaces the auto-leave stub with a real shop overlay later.
+- **Decisions:**
+  - **Gear-only Tier 2 ship.** Potions deferred — no consumable system exists yet, so building potions alongside shops would balloon scope. Shop is gear-only; potions land with their own design pass.
+  - **One shop per floor on a random fork branch.** Predictable cadence (you always see one shop per floor) + variable placement (RNG decides which branch) keeps the choice meaningful without making shops avoidable. Replaces the combat-vs-combat fork with combat-vs-shop, which is the asymmetric trade-off the gdd called for.
+  - **Prices: `BASE × floor × (1 ± 0.15)`** with bases 30/80/200 for common/uncommon/rare. ±15% RNG variance per item adds "hunt for deals" flavor. Linear floor scaling matches gold income (15g/floor combat, 100g/floor boss).
+  - **Inventory slot order is fixed: weapon, shield, outfit, hat.** One item per slot guarantees coverage; rarity / weapon-family / affixes carry the variety. RNG variance lives in the rolls, not the slot composition.
+  - **`rollShopItem` extracted from `rollLoot`** — *but* `rollLoot` keeps its inline body, not delegating, because boss loot uses asymmetric floor scaling (next-floor rarity weights, same-floor affix values). Two functions over shared private helpers; cleaner than parameterizing the asymmetry.
+- **Surprises:**
+  - The plan-warned ripple from `advanceToBossNode` after Task 2 didn't materialize — `completeCombat` reads `node.type` and `nextNodeIds` but never `node.encounter`, so existing tests that walk the diamond progressed correctly even when the chosen branch was a shop. The helper update in Task 3 still landed (skips shops via `leaveShop`) but it was prophylactic, not corrective.
+  - Type-narrowing fixes surfaced two latent issues: combat_scene's `node.encounter` access and floor.test.ts's "scale per encounter" loop. Both got defensive-narrowing treatment in Task 1 to keep tsc clean throughout.
+- **Source:** TODO.md Cluster A · 9 → spec at `docs/superpowers/specs/2026-04-28-shop-nodes-design.md` → plan at `docs/superpowers/plans/2026-04-28-shop-nodes.md`. Test count delta: 1113 → 1135 (+22).
+
 ### 2026-04-28 · Fork picker UI (Cluster B · 6)
 
 - **Why:** Closes the loop on Cluster A · 8 (forks). Without a picker, the auto-pick stub silently chose branch A every time — the player had no agency at forks. This task ships the in-scene picker, extracts the icon-row's path-walking helper into a tested `playerPath(rs)` function so the icon row reflects the player's actual choice, and fixes a latent save-reload bug where reloading during `awaitingFork: true` would re-fight the cleared fork source.

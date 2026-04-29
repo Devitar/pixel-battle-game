@@ -7,7 +7,7 @@ import type { Node } from '../dungeon/node';
 import type { CombatEvent, CombatResult } from '../combat/types';
 import type { Hero } from '../heroes/hero';
 import type { Rng } from '../util/rng';
-import { addGold, addItem, createPack, type Pack, totalGold } from './pack';
+import { addGold, addItem, createPack, spendGold, type Pack, totalGold } from './pack';
 
 export type RunStatus = 'in_dungeon' | 'camp_screen' | 'ended';
 
@@ -255,6 +255,56 @@ export function cashout(runState: RunState): { runState: RunState; outcome: Cash
   return {
     runState: { ...runState, status: 'ended' },
     outcome,
+  };
+}
+
+export function purchaseItem(runState: RunState, itemId: string): RunState {
+  if (runState.status !== 'in_dungeon') {
+    throw new Error(`purchaseItem: status must be 'in_dungeon', got '${runState.status}'`);
+  }
+  const cur = currentNode(runState);
+  if (cur.type !== 'shop') {
+    throw new Error(`purchaseItem: current node is type '${cur.type}', not 'shop'`);
+  }
+  const idx = cur.inventory.findIndex((s) => s.item.id === itemId);
+  if (idx < 0) {
+    throw new Error(`purchaseItem: item id '${itemId}' not in shop inventory`);
+  }
+  const slot = cur.inventory[idx];
+  if (slot.sold) {
+    throw new Error(`purchaseItem: item id '${itemId}' already sold`);
+  }
+  if (runState.pack.gold < slot.price) {
+    throw new Error(
+      `purchaseItem: insufficient gold (have ${runState.pack.gold}, need ${slot.price})`,
+    );
+  }
+
+  const newInventory = cur.inventory.map((s, i) =>
+    i === idx ? { ...s, sold: true } : s,
+  );
+  const newNodes = runState.currentFloorNodes.map((n) =>
+    n.id === cur.id ? { ...cur, inventory: newInventory } : n,
+  );
+
+  return {
+    ...runState,
+    currentFloorNodes: newNodes,
+    pack: addItem(spendGold(runState.pack, slot.price), slot.item),
+  };
+}
+
+export function leaveShop(runState: RunState): RunState {
+  if (runState.status !== 'in_dungeon') {
+    throw new Error(`leaveShop: status must be 'in_dungeon', got '${runState.status}'`);
+  }
+  const cur = currentNode(runState);
+  if (cur.type !== 'shop') {
+    throw new Error(`leaveShop: current node is type '${cur.type}', not 'shop'`);
+  }
+  return {
+    ...runState,
+    currentNodeId: cur.nextNodeIds[0],
   };
 }
 

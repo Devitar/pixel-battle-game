@@ -127,10 +127,41 @@ function pickBaseId(rng: Rng, slot: ItemSlot): { baseId: ItemBaseId; weaponType?
   }
 }
 
+export function rollShopItem(rng: Rng, slot: ItemSlot, floor: number): Item {
+  // Used by shops: uses `floor` uniformly for rarity weights, affix values,
+  // rare property values, and `floorRolledAt`. (Boss loot uses a different
+  // policy — see rollLoot — so it doesn't delegate here.)
+  const base = pickBaseId(rng, slot);
+  const rarity = pickRarity(rng, floor);
+
+  const affixIds = pickAffixes(rng, affixCount(rarity, slot));
+  const affixes: RolledAffix[] = affixIds.map((id) => ({
+    affixId: id,
+    value: rollAffixValue(id, floor),
+  }));
+
+  const rareProperty = rarity === 'rare' ? pickRareProperty(rng, slot, floor) : undefined;
+
+  const id = generateItemId(rng);
+  return {
+    id,
+    baseId: base.baseId,
+    slot,
+    rarity,
+    ...(base.weaponType !== undefined ? { weaponType: base.weaponType } : {}),
+    affixes,
+    ...(rareProperty !== undefined ? { rareProperty } : {}),
+    floorRolledAt: floor,
+  };
+}
+
 export function rollLoot(rng: Rng, floorNumber: number, isBoss: boolean): Item | null {
   if (!isBoss) {
     if (rng.next() >= 0.5) return null;
   }
+  // Boss loot uses next-floor rarity weights but same-floor scaling for affix
+  // values + rare-property values + the floorRolledAt stamp. This asymmetry
+  // is why rollLoot doesn't delegate to rollShopItem.
   const effectiveFloor = isBoss ? floorNumber + 1 : floorNumber;
 
   const slot = rng.pick(ALL_SLOTS);

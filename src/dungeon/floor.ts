@@ -4,6 +4,7 @@ import type { Rng } from '../util/rng';
 import { composeBossEncounter, composeCombatEncounter } from './encounter';
 import type { Node } from './node';
 import { floorScale } from './scaling';
+import { generateShop } from './shop';
 
 export function generateFloor(
   dungeonId: DungeonId,
@@ -20,19 +21,28 @@ export function generateFloor(
   const id2b = `${idPrefix}-n2b`;
   const idBoss = `${idPrefix}-boss`;
 
-  // Encounters composed in graph order so the run's RNG produces
-  // a deterministic graph for a given seed (including unchosen branches).
+  // Roll which fork branch becomes a shop. Drawn first so RNG consumption
+  // for downstream encounters/inventory stays deterministic per seed.
+  const shopOnBranchA = rng.next() < 0.5;
+
   const enc0 = composeCombatEncounter(dungeon.enemyPool, scale, rng);
   const enc1 = composeCombatEncounter(dungeon.enemyPool, scale, rng);
-  const enc2a = composeCombatEncounter(dungeon.enemyPool, scale, rng);
-  const enc2b = composeCombatEncounter(dungeon.enemyPool, scale, rng);
+  const enc2Combat = composeCombatEncounter(dungeon.enemyPool, scale, rng);
+  const shop = generateShop(floorNumber, rng);
   const encBoss = composeBossEncounter(dungeon.bossId, dungeon.enemyPool, scale, rng);
+
+  const node2a: Node = shopOnBranchA
+    ? { id: id2a, type: 'shop', inventory: shop.inventory, nextNodeIds: [idBoss] }
+    : { id: id2a, type: 'combat', encounter: enc2Combat, nextNodeIds: [idBoss] };
+  const node2b: Node = shopOnBranchA
+    ? { id: id2b, type: 'combat', encounter: enc2Combat, nextNodeIds: [idBoss] }
+    : { id: id2b, type: 'shop', inventory: shop.inventory, nextNodeIds: [idBoss] };
 
   const nodes: Node[] = [
     { id: id0, type: 'combat', encounter: enc0, nextNodeIds: [id1] },
     { id: id1, type: 'combat', encounter: enc1, nextNodeIds: [id2a, id2b] },
-    { id: id2a, type: 'combat', encounter: enc2a, nextNodeIds: [idBoss] },
-    { id: id2b, type: 'combat', encounter: enc2b, nextNodeIds: [idBoss] },
+    node2a,
+    node2b,
     { id: idBoss, type: 'boss', encounter: encBoss, nextNodeIds: [] },
   ];
 

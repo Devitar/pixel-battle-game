@@ -9,9 +9,11 @@ import {
   chooseNextNode,
   completeCombat,
   currentNode,
+  leaveShop,
   nextNodeChoices,
   playerPath,
   pressOn,
+  purchaseItem,
   startRun,
 } from '../run_state';
 
@@ -43,18 +45,40 @@ function mockCombatResult(
 
 /**
  * Walks the run from the current node to (but not entering) the boss,
- * bridging the fork by always choosing the first branch.
+ * skipping shops via leaveShop and picking the combat branch at forks
+ * so the path always traverses combat-only.
  */
 function advanceToBossNode(rsArg: ReturnType<typeof startRun>): ReturnType<typeof startRun> {
   let rs = rsArg;
   while (true) {
     const node = currentNode(rs);
     if (node.type === 'boss') return rs;
+    if (node.type === 'shop') {
+      rs = leaveShop(rs);
+      continue;
+    }
     rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
     if (rs.awaitingFork) {
-      rs = chooseNextNode(rs, currentNode(rs).nextNodeIds[0]);
+      const choices = nextNodeChoices(rs);
+      const combatBranch = choices.find((n) => n.type === 'combat') ?? choices[0];
+      rs = chooseNextNode(rs, combatBranch.id);
     }
   }
+}
+
+/**
+ * Walks to the shop node (whichever fork branch it's on for the seed).
+ */
+function navigateToShop(rsArg: ReturnType<typeof startRun>): ReturnType<typeof startRun> {
+  let rs = rsArg;
+  // Clear n0.
+  rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+  // Clear n1, hit fork.
+  rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+  // Pick the shop branch.
+  const shopBranch = nextNodeChoices(rs).find((n) => n.type === 'shop')!;
+  rs = chooseNextNode(rs, shopBranch.id);
+  return rs;
 }
 
 describe('startRun', () => {
@@ -409,5 +433,88 @@ describe('playerPath', () => {
     const rs = startRun('crypt', makeParty(), 1, createRng(1));
     const path = playerPath(rs);
     expect(path).toHaveLength(4);
+  });
+});
+
+describe('purchaseItem', () => {
+  it('decreases pack.gold by price, adds item to pack.items, marks slot sold', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = navigateToShop(rs);
+    rs = { ...rs, pack: { ...rs.pack, gold: 1000 } };
+    const shop = currentNode(rs);
+    if (shop.type !== 'shop') throw new Error('expected shop');
+    const targetItem = shop.inventory[0].item;
+    const targetPrice = shop.inventory[0].price;
+
+    const after = purchaseItem(rs, targetItem.id);
+    expect(after.pack.gold).toBe(1000 - targetPrice);
+    expect(after.pack.items.find((i) => i.id === targetItem.id)).toBeDefined();
+    const updatedShop = after.currentFloorNodes.find((n) => n.id === shop.id)!;
+    if (updatedShop.type !== 'shop') throw new Error('expected shop');
+    expect(updatedShop.inventory[0].sold).toBe(true);
+  });
+
+  it('throws when current node is not a shop', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(() => purchaseItem(rs, 'any-id')).toThrow();
+  });
+
+  it('throws on unknown item id', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = navigateToShop(rs);
+    rs = { ...rs, pack: { ...rs.pack, gold: 1000 } };
+    expect(() => purchaseItem(rs, 'bogus-item-id')).toThrow();
+  });
+
+  it('throws when item already sold', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = navigateToShop(rs);
+    rs = { ...rs, pack: { ...rs.pack, gold: 1000 } };
+    const shop = currentNode(rs);
+    if (shop.type !== 'shop') throw new Error('expected shop');
+    const itemId = shop.inventory[0].item.id;
+    rs = purchaseItem(rs, itemId);
+    expect(() => purchaseItem(rs, itemId)).toThrow();
+  });
+
+  it('throws on insufficient gold', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = navigateToShop(rs);
+    rs = { ...rs, pack: { ...rs.pack, gold: 0 } };
+    const shop = currentNode(rs);
+    if (shop.type !== 'shop') throw new Error('expected shop');
+    const itemId = shop.inventory[0].item.id;
+    expect(() => purchaseItem(rs, itemId)).toThrow();
+  });
+
+  it('throws when status is not in_dungeon', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = navigateToShop(rs);
+    const synthetic = { ...rs, status: 'camp_screen' as const };
+    expect(() => purchaseItem(synthetic, 'any')).toThrow();
+  });
+});
+
+describe('leaveShop', () => {
+  it('advances currentNodeId to next', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = navigateToShop(rs);
+    const shop = currentNode(rs);
+    const before = rs.currentNodeId;
+    const after = leaveShop(rs);
+    expect(after.currentNodeId).not.toBe(before);
+    expect(after.currentNodeId).toBe(shop.nextNodeIds[0]);
+  });
+
+  it('throws when current node is not a shop', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(() => leaveShop(rs)).toThrow();
+  });
+
+  it('throws when status is not in_dungeon', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = navigateToShop(rs);
+    const synthetic = { ...rs, status: 'camp_screen' as const };
+    expect(() => leaveShop(synthetic)).toThrow();
   });
 });

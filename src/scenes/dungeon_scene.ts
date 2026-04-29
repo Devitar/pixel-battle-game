@@ -8,6 +8,7 @@ import {
   chooseNextNode,
   completeCombat,
   currentNode,
+  leaveShop,
   playerPath,
   type RunState,
   type WipeOutcome,
@@ -146,7 +147,7 @@ export class DungeonScene extends Phaser.Scene {
     const path = playerPath(run);
     for (let i = 0; i < path.length && i < NODE_X.length; i++) {
       const node = path[i];
-      const glyph = node.type === 'boss' ? '☠' : '⚔';
+      const glyph = node.type === 'boss' ? '☠' : node.type === 'shop' ? '🛒' : '⚔';
       const x = NODE_X[i];
       const icon = this.add
         .text(x, NODE_Y, glyph, {
@@ -195,14 +196,7 @@ export class DungeonScene extends Phaser.Scene {
           this.partyXForNode(this.currentNodeIndex()),
           WALK_IN_DURATION,
           'Cubic.easeOut',
-          () => {
-            const run = appState.get().runState;
-            if (run?.awaitingFork) {
-              this.setState('awaiting_fork_pick');
-            } else {
-              this.startCombatAtCurrentNode();
-            }
-          },
+          () => this.handleArrival(),
         );
         break;
       case 'walking_to_next':
@@ -210,14 +204,7 @@ export class DungeonScene extends Phaser.Scene {
           this.partyXForNode(this.currentNodeIndex()),
           WALK_NEXT_DURATION,
           'Cubic.easeInOut',
-          () => {
-            const run = appState.get().runState;
-            if (run?.awaitingFork) {
-              this.setState('awaiting_fork_pick');
-            } else {
-              this.startCombatAtCurrentNode();
-            }
-          },
+          () => this.handleArrival(),
         );
         break;
       case 'showing_result':
@@ -230,6 +217,26 @@ export class DungeonScene extends Phaser.Scene {
         this.buildWipePanel();
         break;
     }
+  }
+
+  private handleArrival(): void {
+    const run = appState.get().runState;
+    if (!run) return;
+
+    if (run.awaitingFork) {
+      this.setState('awaiting_fork_pick');
+      return;
+    }
+
+    const node = currentNode(run);
+    if (node.type === 'shop') {
+      // Tier 2 stub: auto-leave. Cluster B · 3 replaces with a shop overlay.
+      appState.update((s) => ({ ...s, runState: leaveShop(s.runState!) }));
+      this.setState('walking_to_next');
+      return;
+    }
+
+    this.startCombatAtCurrentNode();
   }
 
   private tweenPartyTo(
@@ -400,7 +407,7 @@ export class DungeonScene extends Phaser.Scene {
     run: RunState,
   ): Phaser.GameObjects.Container {
     const branchNode = run.currentFloorNodes.find((n) => n.id === branchId)!;
-    const glyph = branchNode.type === 'boss' ? '☠' : '⚔';
+    const glyph = branchNode.type === 'boss' ? '☠' : branchNode.type === 'shop' ? '🛒' : '⚔';
     const typeLabel = branchNode.type;
 
     const bg = this.add

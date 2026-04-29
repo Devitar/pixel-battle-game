@@ -16,6 +16,16 @@ export function addGold(pack: Pack, amount: number): Pack {
   return { ...pack, gold: pack.gold + amount };
 }
 
+export function spendGold(pack: Pack, amount: number): Pack {
+  if (amount < 0) {
+    throw new Error(`spendGold: amount must be non-negative, got ${amount}`);
+  }
+  if (amount > pack.gold) {
+    throw new Error(`spendGold: amount ${amount} exceeds available gold ${pack.gold}`);
+  }
+  return { ...pack, gold: pack.gold - amount };
+}
+
 export function totalGold(pack: Pack): number {
   return pack.gold;
 }

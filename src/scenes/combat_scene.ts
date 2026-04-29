@@ -56,6 +56,14 @@ export class CombatScene extends Phaser.Scene {
 
     const run = state.runState;
     const node = currentNode(run);
+    if (node.type === 'shop') {
+      // Shouldn't happen — the dungeon scene's handleArrival auto-leaves
+      // shops before they reach combat. Defensive guard keeps the type
+      // system happy.
+      console.warn('CombatScene entered with shop currentNode; returning to dungeon');
+      this.scene.start('dungeon');
+      return;
+    }
     const rng = createRngFromState(state.runRngState);
     const combatState = buildCombatState(run.party, node.encounter);
     const result = resolveCombat(combatState, rng);

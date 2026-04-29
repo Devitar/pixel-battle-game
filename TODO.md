@@ -27,17 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 9 · Shop nodes
-
-- **What:** Shop encounter generator: rolls 3–4 gear items + 2 potions at floor-/tier-scaled prices. Player spends pack gold; purchased gear enters the pack.
-- **Why:** Adds a real "spend now or save?" decision mid-floor. Depends on gear rarity tiers.
-- **Tier:** 2
-- **Acceptance:**
-  - Shop generator rolls fresh inventory at floor entry (deterministic from run RNG); stock weights live in data.
-  - Purchase resolves against `RunState.pack.gold` and adds to `pack.unequipped`.
-- **Touches:** `src/dungeon/shop.ts` (new), `src/run/run_state.ts`, tests. UI is Cluster B task 3.
-- **Source:** gdd §4 + §7 + §10 Tier 2.
-
 ### 10 · Elite nodes
 
 - **What:** Elite encounter generator: tougher enemy lineup (more enemies, modifiers like Armored / Enraged), guaranteed Rare drop on victory.

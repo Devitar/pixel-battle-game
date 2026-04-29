@@ -18,12 +18,14 @@ describe('generateFloor — Crypt', () => {
     expect(result.startNodeId.length).toBeGreaterThan(0);
   });
 
-  it('floor 1 has 5 nodes: 4 combat + 1 boss (diamond)', () => {
+  it('floor 1 has 5 nodes: 3 combat + 1 shop + 1 boss (diamond)', () => {
     const { nodes } = generateFloor('crypt', 1, createRng(1));
     expect(nodes).toHaveLength(5);
     const combatCount = nodes.filter((n) => n.type === 'combat').length;
+    const shopCount = nodes.filter((n) => n.type === 'shop').length;
     const bossCount = nodes.filter((n) => n.type === 'boss').length;
-    expect(combatCount).toBe(4);
+    expect(combatCount).toBe(3);
+    expect(shopCount).toBe(1);
     expect(bossCount).toBe(1);
   });
 
@@ -37,25 +39,19 @@ describe('generateFloor — Crypt', () => {
     expect(referenced.has(startNodeId)).toBe(false);
   });
 
-  it('fork structure: one node has 2 nextNodeIds, both branches converge at boss', () => {
+  it('fork structure: one branch is combat, one is shop, both converge at boss', () => {
     const { nodes } = generateFloor('crypt', 1, createRng(1));
-    const forkSources = nodes.filter((n) => n.nextNodeIds.length === 2);
-    expect(forkSources).toHaveLength(1);
+    const fork = nodes.find((n) => n.nextNodeIds.length === 2)!;
+    const branches = fork.nextNodeIds.map((id) => nodes.find((n) => n.id === id)!);
+    const types = branches.map((b) => b.type).sort();
+    expect(types).toEqual(['combat', 'shop']);
 
-    const fork = forkSources[0];
-    expect(fork.type).toBe('combat');
-
-    const bothBranches = fork.nextNodeIds.map((id) => nodes.find((n) => n.id === id)!);
-    expect(bothBranches.every((b) => b.type === 'combat')).toBe(true);
-
-    // Both branches' nextNodeIds point at the same single id (the boss).
-    const branchNexts = bothBranches.map((b) => b.nextNodeIds);
-    expect(branchNexts[0]).toHaveLength(1);
-    expect(branchNexts[1]).toHaveLength(1);
-    expect(branchNexts[0][0]).toBe(branchNexts[1][0]);
-
-    const convergence = nodes.find((n) => n.id === branchNexts[0][0])!;
-    expect(convergence.type).toBe('boss');
+    // Both branches' nextNodeIds point at the same boss.
+    for (const b of branches) {
+      expect(b.nextNodeIds).toHaveLength(1);
+      const target = nodes.find((n) => n.id === b.nextNodeIds[0])!;
+      expect(target.type).toBe('boss');
+    }
   });
 
   it('boss is the unique terminal (nextNodeIds.length === 0)', () => {
@@ -85,6 +81,7 @@ describe('generateFloor — Crypt', () => {
       const expected = floorScale(floorNumber);
       const { nodes } = generateFloor('crypt', floorNumber, createRng(1));
       for (const node of nodes) {
+        if (node.type === 'shop') continue;
         expect(node.encounter.scale).toEqual(expected);
       }
     }
@@ -116,5 +113,20 @@ describe('generateFloor — Crypt', () => {
     for (const id of f1Ids) {
       expect(f2Ids.has(id)).toBe(false);
     }
+  });
+
+  it('shop branch placement is deterministic per seed', () => {
+    const a = generateFloor('crypt', 1, createRng(7));
+    const b = generateFloor('crypt', 1, createRng(7));
+    const aShop = a.nodes.find((n) => n.type === 'shop')!.id;
+    const bShop = b.nodes.find((n) => n.type === 'shop')!.id;
+    expect(aShop).toBe(bShop);
+  });
+
+  it('shop has 4 inventory items', () => {
+    const { nodes } = generateFloor('crypt', 1, createRng(1));
+    const shop = nodes.find((n) => n.type === 'shop')!;
+    if (shop.type !== 'shop') throw new Error('expected shop');
+    expect(shop.inventory).toHaveLength(4);
   });
 });

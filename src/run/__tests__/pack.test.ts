@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Item } from '../../data/types';
-import { addGold, addItem, createPack, emptyPack, removeItem, totalGold } from '../pack';
+import { addGold, addItem, createPack, emptyPack, removeItem, spendGold, totalGold } from '../pack';
 
 describe('Pack — gold', () => {
   it('createPack starts empty', () => {
@@ -75,5 +75,22 @@ describe('Pack — items', () => {
   it('removeItem throws on a missing id', () => {
     const p0 = addItem(createPack(), fakeItem('a'));
     expect(() => removeItem(p0, 'nope')).toThrow(/removeItem/);
+  });
+});
+
+describe('Pack — spendGold', () => {
+  it('decreases gold by amount', () => {
+    const pack = addGold(createPack(), 50);
+    const result = spendGold(pack, 10);
+    expect(result.gold).toBe(40);
+  });
+
+  it('throws on negative amount', () => {
+    expect(() => spendGold(createPack(), -5)).toThrow();
+  });
+
+  it('throws when amount exceeds gold', () => {
+    const pack = addGold(createPack(), 50);
+    expect(() => spendGold(pack, 100)).toThrow();
   });
 });
