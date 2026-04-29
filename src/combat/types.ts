@@ -56,6 +56,10 @@ export interface Combatant {
   thornsDamage?: number;
   regenPerRound?: number;
   burningWeaponDamage?: number;
+  venomousDamage?: number;
+  venomousDuration?: number;
+  enragedThreshold?: number;
+  enragedAttackDelta?: number;
   isDead: boolean;
 }
 

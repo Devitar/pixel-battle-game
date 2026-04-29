@@ -287,3 +287,69 @@ describe('buildCombatState — kit resolution', () => {
     expect(state.combatants[0].aiPriority).toEqual(resolved.aiPriority);
   });
 });
+
+describe('buildCombatState — modifierIds', () => {
+  it('Armored: enemy gets baseStats.defense = scaled defense + 2', () => {
+    const party = [createHero('knight', 'K', 'h0', 'quick', 'body1')];
+    const enemyDef = ENEMIES.skeleton_warrior;
+    const encounter: Encounter = {
+      enemies: [{ enemyId: 'skeleton_warrior', slot: 1, modifierIds: ['armored'] }],
+      scale: FLAT_SCALE,
+    };
+    const state = buildCombatState(party, encounter);
+    const enemy = state.combatants.find((c) => c.id === 'e0')!;
+    expect(enemy.baseStats.defense).toBe(enemyDef.baseStats.defense + 2);
+  });
+
+  it('Venomous: enemy gets venomousDamage 2 and venomousDuration 2', () => {
+    const party = [createHero('knight', 'K', 'h0', 'quick', 'body1')];
+    const encounter: Encounter = {
+      enemies: [{ enemyId: 'skeleton_warrior', slot: 1, modifierIds: ['venomous'] }],
+      scale: FLAT_SCALE,
+    };
+    const state = buildCombatState(party, encounter);
+    const enemy = state.combatants.find((c) => c.id === 'e0')!;
+    expect(enemy.venomousDamage).toBe(2);
+    expect(enemy.venomousDuration).toBe(2);
+  });
+
+  it('Enraged: enemy gets enragedThreshold 0.5 and enragedAttackDelta 3', () => {
+    const party = [createHero('knight', 'K', 'h0', 'quick', 'body1')];
+    const encounter: Encounter = {
+      enemies: [{ enemyId: 'skeleton_warrior', slot: 1, modifierIds: ['enraged'] }],
+      scale: FLAT_SCALE,
+    };
+    const state = buildCombatState(party, encounter);
+    const enemy = state.combatants.find((c) => c.id === 'e0')!;
+    expect(enemy.enragedThreshold).toBe(0.5);
+    expect(enemy.enragedAttackDelta).toBe(3);
+  });
+
+  it('No modifierIds: enemy has none of the modifier-derived fields set', () => {
+    const party = [createHero('knight', 'K', 'h0', 'quick', 'body1')];
+    const encounter: Encounter = {
+      enemies: [{ enemyId: 'skeleton_warrior', slot: 1 }],
+      scale: FLAT_SCALE,
+    };
+    const state = buildCombatState(party, encounter);
+    const enemy = state.combatants.find((c) => c.id === 'e0')!;
+    expect(enemy.venomousDamage).toBeUndefined();
+    expect(enemy.venomousDuration).toBeUndefined();
+    expect(enemy.enragedThreshold).toBeUndefined();
+    expect(enemy.enragedAttackDelta).toBeUndefined();
+    expect(enemy.baseStats.defense).toBe(ENEMIES.skeleton_warrior.baseStats.defense);
+  });
+
+  it('Empty modifierIds: enemy has none of the modifier-derived fields set', () => {
+    const party = [createHero('knight', 'K', 'h0', 'quick', 'body1')];
+    const encounter: Encounter = {
+      enemies: [{ enemyId: 'skeleton_warrior', slot: 1, modifierIds: [] }],
+      scale: FLAT_SCALE,
+    };
+    const state = buildCombatState(party, encounter);
+    const enemy = state.combatants.find((c) => c.id === 'e0')!;
+    expect(enemy.venomousDamage).toBeUndefined();
+    expect(enemy.enragedThreshold).toBeUndefined();
+    expect(enemy.baseStats.defense).toBe(ENEMIES.skeleton_warrior.baseStats.defense);
+  });
+});

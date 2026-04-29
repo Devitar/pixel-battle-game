@@ -233,6 +233,69 @@ describe('generateFloor — Crypt', () => {
     expect(counts.camp_vs_shop).toBeGreaterThanOrEqual(60);
     expect(counts.camp_vs_elite).toBeGreaterThanOrEqual(60);
   });
+
+  it('floor 1: combat encounters carry no modifierIds', () => {
+    const { nodes } = generateFloor('crypt', 1, createRng(1));
+    for (const node of nodes) {
+      if (node.type !== 'combat') continue;
+      for (const placement of node.encounter.enemies) {
+        expect(placement.modifierIds).toBeUndefined();
+      }
+    }
+  });
+
+  it('floor 5: every combat-encounter enemy has exactly one modifierIds entry from [armored]', () => {
+    const { nodes } = generateFloor('crypt', 5, createRng(1));
+    for (const node of nodes) {
+      if (node.type !== 'combat') continue;
+      for (const placement of node.encounter.enemies) {
+        expect(placement.modifierIds).toHaveLength(1);
+        expect(placement.modifierIds![0]).toBe('armored');
+      }
+    }
+  });
+
+  it('floor 15: every combat-encounter enemy has one modifierIds from the full pool (across seeds, all three appear)', () => {
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 50; seed++) {
+      const { nodes } = generateFloor('crypt', 15, createRng(seed));
+      for (const node of nodes) {
+        if (node.type !== 'combat') continue;
+        for (const placement of node.encounter.enemies) {
+          expect(placement.modifierIds).toHaveLength(1);
+          seen.add(placement.modifierIds![0]);
+        }
+      }
+    }
+    expect(seen).toEqual(new Set(['armored', 'venomous', 'enraged']));
+  });
+
+  it('elite encounter on floor 1: every enemy has one modifierIds from the full pool', () => {
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 100; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      const elite = nodes.find((n) => n.type === 'elite');
+      if (!elite || elite.type !== 'elite') continue;
+      for (const placement of elite.encounter.enemies) {
+        expect(placement.modifierIds).toHaveLength(1);
+        seen.add(placement.modifierIds![0]);
+      }
+    }
+    expect(seen).toEqual(new Set(['armored', 'venomous', 'enraged']));
+  });
+
+  it('boss encounter has no modifierIds (any floor)', () => {
+    for (const floorNumber of [1, 5, 15]) {
+      const { nodes } = generateFloor('crypt', floorNumber, createRng(1));
+      const boss = nodes.find((n) => n.type === 'boss');
+      expect(boss).toBeDefined();
+      if (boss?.type === 'boss') {
+        for (const placement of boss.encounter.enemies) {
+          expect(placement.modifierIds).toBeUndefined();
+        }
+      }
+    }
+  });
 });
 
 function findFloorWithShape(

@@ -27,17 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 12 · Floor-milestone enemy modifiers
-
-- **What:** Modifiers introduced at milestone floors (5, 10, 15…): Armored (+Defense), Venomous (applies poison on hit), Enraged (+Attack scaling with damage taken). Floor generator stamps modifiers based on floor number.
-- **Why:** Makes deeper floors mechanically distinct, not just numerically scaled — last bullet of the Tier 2 dungeon-depth set.
-- **Tier:** 2
-- **Acceptance:**
-  - `data/modifiers.ts` (new) defines the modifier set; floor generator applies modifiers to enemy combatants based on floor number.
-  - Tests cover at least 3 modifiers (Armored, Venomous, Enraged) and confirm their effects on combat resolution.
-- **Touches:** `src/data/modifiers.ts`, `src/dungeon/floor_generator.ts`, `src/combat/combatant.ts`, tests.
-- **Source:** gdd §4 + §10 Tier 2.
-
 ### 13 · Event system core
 
 - **What:** Event card data structure (id, body text, 2 choice options, payload effects per option), deck shuffle, choice resolution. Effects can mutate `RunState` (HP changes, gold changes, hero "Lost", gear gain).

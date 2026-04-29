@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-29 · Floor-milestone enemy modifiers (Cluster A · 12)
+
+- **Why:** Makes deeper floors mechanically distinct, not just numerically scaled — closes the last bullet of the Tier 2 dungeon-depth set. Adds three modifiers: Armored (+2 defense), Venomous (poison-on-hit, 2 dmg × 2 turns), Enraged (+3 attack at <50% HP). Combat encounters get one rolled modifier on milestone floors (5/10/15 unlock the pool); elites always carry one from the full pool regardless of floor — fulfilling the "stamps a modifier" piece deferred from Cluster A · 10.
+- **Decisions:**
+  - **Pool unlocks at milestones (5/10/15), not at floor 1.** Each new modifier appears at a milestone, giving the player a learning curve. Below floor 5 combat encounters are unmodified; at floor 5+ every enemy gets one rolled modifier. Elites bypass the milestone gating because they're already a "premium fight" — they preview deeper mechanics.
+  - **Enraged is flat `+3 attack`, not the gdd's "scaling with damage taken."** Continuous percentage scaling would have required a multi-step compute that doesn't fit the existing statDelta-style architecture. Threshold trigger (at <50% HP, +3 flat) hits the same "wounded enemy is dangerous" beat with a simple state-flip mechanic — readable to the player and trivial to implement via a single check in `getEffectiveStat`. Strict less-than: at exactly 50% HP the bonus is **not** active.
+  - **Bosses are never modified.** Bosses are bespoke encounters; mixing in modifiers would require careful per-boss balance. Out of scope for Tier 2; trivial to flip later by adding `stampBossModifiers` if wanted.
+  - **Combatant gains 4 more optional fields, not a `passives` bag refactor.** The in-code comment on `Combatant` flagged "consolidation candidates once 3+ more land" — this task lands 4. The refactor is reasonable future work but not load-bearing for shipping the user-visible feature. Flagged in the spec, deferred.
+  - **`'enraged'` overlaps with the existing `StatusId`** (Barbarian's Rampage applies an `enraged` self-debuff). The new modifier shares the string but lives in a different namespace (`ModifierId`) and never writes to `combatant.statuses` — so no collision at runtime. Documented in the plan; no rename needed.
+- **Surprises:**
+  - **Stamping consumed less RNG than expected for the no-pool case.** Floor 1–4 combat encounters call `stampCombatModifiers` but the helper short-circuits when `poolForFloor` returns `[]` — no RNG draws happen, so floor-1 seed-stable tests stayed byte-identical. Only floor 5+ tests shifted (expected, documented in the plan).
+  - **The `?? 2` fallback on `venomousDuration`** in `combat/effects.ts` is defensive — `combat_setup` always sets both `venomousDamage` and `venomousDuration` together, so the fallback never fires in practice. Left in for parity with how the existing burning code handles its hard-coded 2-turn duration.
+  - **`Partial<Combatant>` for the modifier-fields object** in `combat_setup.ts` worked cleanly — TS narrowed each modifier's effect kind correctly, and spreading `...modifierFields` into `createEnemyCombatant` only wrote the keys actually set. No need for explicit conditional spreads.
+- **Source:** TODO.md Cluster A · 12 → spec at `docs/superpowers/specs/2026-04-29-floor-milestone-modifiers-design.md` → plan at `docs/superpowers/plans/2026-04-29-floor-milestone-modifiers.md`. Test count delta: 1184 → 1220 (+36).
+
 ### 2026-04-29 · Mid-floor camp nodes (Cluster A · 11)
 
 - **Why:** Adds a recovery-and-decision beat between combats — a fork-branch type that lets the player heal HP (+25% of maxHp party-wide), treat one wound, or **leave the dungeon with a full cashout, no boss-kill required**. Last point overrides gdd §4's "cannot cash out from camp node" line at user direction. Pairs with Cluster B · 4 for the picker UI; the data layer ships with a stub auto-applying `heal_party` so floors with camp branches keep progressing until B · 4 lands.

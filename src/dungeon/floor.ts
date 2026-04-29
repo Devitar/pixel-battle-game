@@ -3,6 +3,7 @@ import type { DungeonId } from '../data/types';
 import type { Rng, WeightedOption } from '../util/rng';
 import { composeBossEncounter, composeCombatEncounter } from './encounter';
 import { composeEliteEncounter } from './elite';
+import { stampCombatModifiers, stampEliteModifiers } from './modifier_stamp';
 import type { Node } from './node';
 import { floorScale } from './scaling';
 import { generateShop } from './shop';
@@ -44,8 +45,16 @@ export function generateFloor(
   const shape: ForkShape = rng.weighted(FORK_SHAPE_WEIGHTS);
   const specialOnBranchA = rng.next() < 0.5;
 
-  const enc0 = composeCombatEncounter(dungeon.enemyPool, scale, rng);
-  const enc1 = composeCombatEncounter(dungeon.enemyPool, scale, rng);
+  const enc0Raw = composeCombatEncounter(dungeon.enemyPool, scale, rng);
+  const enc0: typeof enc0Raw = {
+    ...enc0Raw,
+    enemies: stampCombatModifiers(enc0Raw.enemies, floorNumber, rng),
+  };
+  const enc1Raw = composeCombatEncounter(dungeon.enemyPool, scale, rng);
+  const enc1: typeof enc1Raw = {
+    ...enc1Raw,
+    enemies: stampCombatModifiers(enc1Raw.enemies, floorNumber, rng),
+  };
 
   // Conditionally compose only the encounters/inventory the rolled shape
   // requires. Camp nodes consume no RNG (pure data construction).
@@ -66,12 +75,19 @@ export function generateFloor(
     shape === 'camp_vs_shop' ||
     shape === 'camp_vs_elite';
 
-  const combatBranchEnc = usesCombatBranch
+  const combatBranchEncRaw = usesCombatBranch
     ? composeCombatEncounter(dungeon.enemyPool, scale, rng)
     : undefined;
-  const eliteBranchEnc = usesEliteBranch
+  const combatBranchEnc = combatBranchEncRaw === undefined
+    ? undefined
+    : { ...combatBranchEncRaw, enemies: stampCombatModifiers(combatBranchEncRaw.enemies, floorNumber, rng) };
+
+  const eliteBranchEncRaw = usesEliteBranch
     ? composeEliteEncounter(dungeon.enemyPool, scale, rng)
     : undefined;
+  const eliteBranchEnc = eliteBranchEncRaw === undefined
+    ? undefined
+    : { ...eliteBranchEncRaw, enemies: stampEliteModifiers(eliteBranchEncRaw.enemies, rng) };
   const shopBranchInv = usesShopBranch ? generateShop(floorNumber, rng).inventory : undefined;
 
   const encBoss = composeBossEncounter(dungeon.bossId, dungeon.enemyPool, scale, rng);

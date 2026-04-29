@@ -84,6 +84,22 @@ function applyDamage(
       duration: 2,
     });
   }
+  if (caster.venomousDamage !== undefined && !lethal) {
+    const duration = caster.venomousDuration ?? 2;
+    target.statuses['poisoned'] = {
+      statusId: 'poisoned',
+      remainingTurns: duration,
+      effect: { kind: 'poison', damagePerTurn: caster.venomousDamage, duration, statusId: 'poisoned' },
+      sourceId: caster.id,
+    };
+    events.push({
+      kind: 'status_applied',
+      sourceId: caster.id,
+      targetId: target.id,
+      statusId: 'poisoned',
+      duration,
+    });
+  }
   if (target.thornsDamage !== undefined && target.thornsDamage > 0 && !caster.isDead) {
     const thorn = target.thornsDamage;
     caster.currentHp -= thorn;

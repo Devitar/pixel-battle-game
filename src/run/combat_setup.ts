@@ -1,4 +1,5 @@
 import { ENEMIES } from '../data/enemies';
+import { MODIFIERS, type ModifierId } from '../data/modifiers';
 import { resolveCombatAbilities } from '../items/kit';
 import { applyEquipmentStats, rarePropertyFields } from '../items/stats';
 import type { EnemyId, SlotIndex, Wound } from '../data/types';
@@ -12,6 +13,18 @@ function applyWoundsToStats(base: Stats, wounds: readonly Wound[]): Stats {
   const result: Stats = { ...base };
   for (const wound of wounds) {
     const effect = WOUNDS[wound.id].effect;
+    if (effect.kind === 'statDelta') {
+      result[effect.stat] += effect.delta;
+    }
+  }
+  return result;
+}
+
+function applyModifiersToStats(base: Stats, modifierIds: readonly ModifierId[] | undefined): Stats {
+  if (!modifierIds || modifierIds.length === 0) return base;
+  const result: Stats = { ...base };
+  for (const id of modifierIds) {
+    const effect = MODIFIERS[id].effect;
     if (effect.kind === 'statDelta') {
       result[effect.stat] += effect.delta;
     }
@@ -75,11 +88,24 @@ export function buildCombatState(
   for (let i = 0; i < encounter.enemies.length; i++) {
     const placement = encounter.enemies[i];
     const scaled = scaleEnemyStats(placement.enemyId, encounter.scale);
+    const withModifierStats = applyModifiersToStats(scaled, placement.modifierIds);
+    const modifierFields: Partial<Combatant> = {};
+    for (const id of placement.modifierIds ?? []) {
+      const effect = MODIFIERS[id].effect;
+      if (effect.kind === 'venomous_on_hit') {
+        modifierFields.venomousDamage = effect.damagePerTurn;
+        modifierFields.venomousDuration = effect.duration;
+      } else if (effect.kind === 'enraged_threshold') {
+        modifierFields.enragedThreshold = effect.hpRatio;
+        modifierFields.enragedAttackDelta = effect.attackDelta;
+      }
+    }
     combatants.push(
       createEnemyCombatant(placement.enemyId, placement.slot, `e${i}`, {
-        baseStats: scaled,
-        currentHp: scaled.hp,
-        maxHp: scaled.hp,
+        baseStats: withModifierStats,
+        currentHp: withModifierStats.hp,
+        maxHp: withModifierStats.hp,
+        ...modifierFields,
       }),
     );
   }

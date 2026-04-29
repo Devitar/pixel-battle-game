@@ -1,3 +1,4 @@
+import type { ModifierId } from '../data/modifiers';
 import type { EnemyId, Item, SlotIndex } from '../data/types';
 
 export interface ScaleFactors {
@@ -8,6 +9,7 @@ export interface ScaleFactors {
 export interface EnemyPlacement {
   enemyId: EnemyId;
   slot: SlotIndex;
+  modifierIds?: readonly ModifierId[];
 }
 
 export interface Encounter {
