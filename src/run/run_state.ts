@@ -1,8 +1,8 @@
 import type { DungeonId, Item, Wound } from '../data/types';
-import { applyLevelUps, levelForXp, xpForBossNode, xpForCombatNode } from '../data/leveling';
+import { applyLevelUps, levelForXp, xpForBossNode, xpForCombatNode, xpForEliteNode } from '../data/leveling';
 import { DEFAULT_WOUND_RUNS_REMAINING } from '../data/wounds';
 import { generateFloor } from '../dungeon/floor';
-import { rollLoot } from '../dungeon/loot';
+import { rollLoot, type CombatKind } from '../dungeon/loot';
 import type { Node } from '../dungeon/node';
 import type { CombatEvent, CombatResult } from '../combat/types';
 import type { Hero } from '../heroes/hero';
@@ -38,6 +38,7 @@ export interface WipeOutcome {
 
 const PARTY_SIZE = 3;
 const COMBAT_NODE_GOLD = 15;
+const ELITE_NODE_GOLD = 30;
 const BOSS_NODE_GOLD = 100;
 
 export function startRun(
@@ -154,25 +155,31 @@ export function completeCombat(
   }
 
   const completedNode = currentNode(runState);
-  const isBoss = completedNode.type === 'boss';
+  if (completedNode.type === 'shop') {
+    throw new Error(`completeCombat: current node is type 'shop', not a combat-bearing node`);
+  }
+  const kind: CombatKind = completedNode.type;
+  const isBoss = kind === 'boss';
   const fanout = completedNode.nextNodeIds;
 
   // XP awards — only on victory, only to surviving heroes.
-  const xpReward = isBoss
-    ? xpForBossNode(runState.currentFloorNumber)
-    : xpForCombatNode(runState.currentFloorNumber);
+  const xpReward =
+    kind === 'boss'  ? xpForBossNode(runState.currentFloorNumber) :
+    kind === 'elite' ? xpForEliteNode(runState.currentFloorNumber) :
+                       xpForCombatNode(runState.currentFloorNumber);
   const partyAfterXp = updatedPartyLiving.map((hero) => {
     const newXp = hero.xp + xpReward;
     const newLevel = levelForXp(newXp);
     return applyLevelUps({ ...hero, xp: newXp }, hero.level, newLevel);
   });
 
-  const reward = isBoss
-    ? BOSS_NODE_GOLD * runState.currentFloorNumber
-    : COMBAT_NODE_GOLD * runState.currentFloorNumber;
+  const reward =
+    kind === 'boss'  ? BOSS_NODE_GOLD  * runState.currentFloorNumber :
+    kind === 'elite' ? ELITE_NODE_GOLD * runState.currentFloorNumber :
+                       COMBAT_NODE_GOLD * runState.currentFloorNumber;
   let newPack = addGold(runState.pack, reward);
 
-  const drop = rollLoot(rng, runState.currentFloorNumber, isBoss);
+  const drop = rollLoot(rng, runState.currentFloorNumber, kind);
   if (drop) {
     newPack = addItem(newPack, drop);
   }

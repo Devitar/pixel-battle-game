@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createHeroCombatant } from '../../combat/combatant';
 import type { CombatResult, CombatState } from '../../combat/types';
+import { xpForEliteNode } from '../../data/leveling';
 import type { SlotIndex } from '../../data/types';
+import type { Encounter, Node } from '../../dungeon/node';
 import { createHero, type Hero } from '../../heroes/hero';
 import { createRng } from '../../util/rng';
 import {
@@ -57,13 +59,32 @@ function advanceToBossNode(rsArg: ReturnType<typeof startRun>): ReturnType<typeo
       rs = leaveShop(rs);
       continue;
     }
+    // node.type is 'combat' or 'elite' — both go through completeCombat
     rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
     if (rs.awaitingFork) {
       const choices = nextNodeChoices(rs);
-      const combatBranch = choices.find((n) => n.type === 'combat') ?? choices[0];
+      const combatBranch =
+        choices.find((n) => n.type === 'combat') ??
+        choices.find((n) => n.type === 'elite') ??
+        choices[0];
       rs = chooseNextNode(rs, combatBranch.id);
     }
   }
+}
+
+/**
+ * Returns a RunState started from a seed whose floor 1 includes a shop on
+ * one of the fork branches. After Task 5, fork shape is RNG-rolled per seed,
+ * so callers needing a shop must search for a shop-bearing seed.
+ */
+function startRunWithShop(): ReturnType<typeof startRun> {
+  for (let seed = 1; seed <= 50; seed++) {
+    const rs = startRun('crypt', makeParty(), seed, createRng(seed));
+    if (rs.currentFloorNodes.some((n) => n.type === 'shop')) {
+      return rs;
+    }
+  }
+  throw new Error('no shop-bearing seed in [1..50]');
 }
 
 /**
@@ -422,7 +443,13 @@ describe('playerPath', () => {
     rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
     rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
     rs = chooseNextNode(rs, 'crypt-f1-n2b');
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    // n2b's type is seed-dependent — handle both shop and combat cases.
+    const node2b = currentNode(rs);
+    if (node2b.type === 'shop') {
+      rs = leaveShop(rs);
+    } else {
+      rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    }
     expect(rs.currentNodeId).toBe('crypt-f1-boss');
     const path = playerPath(rs);
     // Both branches reach boss; defaults to A.
@@ -438,7 +465,7 @@ describe('playerPath', () => {
 
 describe('purchaseItem', () => {
   it('decreases pack.gold by price, adds item to pack.items, marks slot sold', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     rs = { ...rs, pack: { ...rs.pack, gold: 1000 } };
     const shop = currentNode(rs);
@@ -460,14 +487,14 @@ describe('purchaseItem', () => {
   });
 
   it('throws on unknown item id', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     rs = { ...rs, pack: { ...rs.pack, gold: 1000 } };
     expect(() => purchaseItem(rs, 'bogus-item-id')).toThrow();
   });
 
   it('throws when item already sold', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     rs = { ...rs, pack: { ...rs.pack, gold: 1000 } };
     const shop = currentNode(rs);
@@ -478,7 +505,7 @@ describe('purchaseItem', () => {
   });
 
   it('throws on insufficient gold', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     rs = { ...rs, pack: { ...rs.pack, gold: 0 } };
     const shop = currentNode(rs);
@@ -488,7 +515,7 @@ describe('purchaseItem', () => {
   });
 
   it('throws when status is not in_dungeon', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     const synthetic = { ...rs, status: 'camp_screen' as const };
     expect(() => purchaseItem(synthetic, 'any')).toThrow();
@@ -497,7 +524,7 @@ describe('purchaseItem', () => {
 
 describe('leaveShop', () => {
   it('advances currentNodeId to next', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     const shop = currentNode(rs);
     const before = rs.currentNodeId;
@@ -512,9 +539,81 @@ describe('leaveShop', () => {
   });
 
   it('throws when status is not in_dungeon', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    let rs = startRunWithShop();
     rs = navigateToShop(rs);
     const synthetic = { ...rs, status: 'camp_screen' as const };
     expect(() => leaveShop(synthetic)).toThrow();
+  });
+});
+
+function makeEliteRun(seed = 1): ReturnType<typeof startRun> {
+  // Hand-build a RunState whose currentNode is an elite node so we can test
+  // completeCombat's elite branch in isolation, independent of floor-gen
+  // changes (those land in Task 5).
+  const rs = startRun('crypt', makeParty(), seed, createRng(seed));
+  const eliteEncounter: Encounter = {
+    enemies: [{ enemyId: 'skeleton_warrior', slot: 1 }],
+    scale: { hp: 1, attack: 1 },
+  };
+  const eliteId = 'crypt-f1-elite-test';
+  const bossId = rs.currentFloorNodes.find((n) => n.type === 'boss')!.id;
+  const eliteNode: Node = {
+    id: eliteId,
+    type: 'elite',
+    encounter: eliteEncounter,
+    nextNodeIds: [bossId],
+  };
+  return {
+    ...rs,
+    currentFloorNodes: [...rs.currentFloorNodes, eliteNode],
+    currentNodeId: eliteId,
+  };
+}
+
+describe('completeCombat — elite node', () => {
+  it('grants 30 × floor gold to the pack', () => {
+    const rs = makeEliteRun();
+    const result = completeCombat(
+      rs,
+      mockCombatResult(rs.party, [20, 14, 15], 'player_victory'),
+      createRng(99),
+    );
+    expect(result.runState.pack.gold).toBe(30 * rs.currentFloorNumber);
+  });
+
+  it('grants xpForEliteNode XP to surviving heroes', () => {
+    const rs = makeEliteRun();
+    const expectedXp = xpForEliteNode(rs.currentFloorNumber);
+    const result = completeCombat(
+      rs,
+      mockCombatResult(rs.party, [20, 14, 15], 'player_victory'),
+      createRng(99),
+    );
+    for (const hero of result.runState.party) {
+      expect(hero.xp).toBe(expectedXp);
+    }
+  });
+
+  it('always adds a Rare item to the pack', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const rs = makeEliteRun(seed);
+      const result = completeCombat(
+        rs,
+        mockCombatResult(rs.party, [20, 14, 15], 'player_victory'),
+        createRng(seed),
+      );
+      expect(result.runState.pack.items).toHaveLength(1);
+      expect(result.runState.pack.items[0].rarity).toBe('rare');
+    }
+  });
+
+  it('advances to the next node (in_dungeon, not camp_screen)', () => {
+    const rs = makeEliteRun();
+    const result = completeCombat(
+      rs,
+      mockCombatResult(rs.party, [20, 14, 15], 'player_victory'),
+      createRng(99),
+    );
+    expect(result.runState.status).toBe('in_dungeon');
   });
 });

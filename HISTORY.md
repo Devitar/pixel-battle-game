@@ -29,6 +29,22 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-29 · Elite nodes (Cluster A · 10)
+
+- **Why:** Without elites, all fork branches were combat-vs-shop or combat-vs-combat, so the "harder fight for guaranteed loot" trade-off the gdd promised at forks didn't exist. This task ships the data layer: a new `'elite'` Node variant with a 4-enemy encounter at +50% HP / +25% Attack on top of `floorScale`, a guaranteed Rare drop and 2× combat gold/XP on victory, and a triangular fork-shape RNG so each floor's fork is uniformly one of `shop_vs_combat` / `elite_vs_combat` / `elite_vs_shop`. Visual marker (Cluster B · 10) and modifier stamping (Cluster A · 12) deferred.
+- **Decisions:**
+  - **Defer "stamps a modifier" piece.** The TODO acceptance referenced Armored / Enraged but Cluster A · 12 hasn't shipped — building a minimal modifier scaffold inline would have ballooned scope. Elites without modifiers (more enemies + scale boost + forced Rare) already deliver the asymmetric trade-off; modifiers slot in cleanly when 12 lands.
+  - **`rollLoot` API: `isBoss: boolean` → `kind: 'combat' | 'elite' | 'boss'` enum.** Boolean wouldn't extend cleanly to a third bucket. Replaces every call site uniformly. Elite branch hard-codes `rarity = 'rare'` and skips the rarity-roll RNG draw; affixes/rare-property scale at current floor.
+  - **Single 100% Rare drop, not 1+rolled or 2 drops.** Maps the "guaranteed rare drop" gdd phrase verbatim. Boss still out-pays elite (boss can roll Epic-equivalent via next-floor weights at depth; elite is fixed at Rare).
+  - **3-shape uniform RNG over alternative fork models.** Independent rolls per branch could produce combat-vs-combat (eliminated when shops shipped) or shop-vs-shop (degenerate). Shape-first roll preserves "every floor's fork has at least one differentiated node," with `'elite_vs_shop'` floors carrying both.
+  - **`specialOnBranchA = true` pinned to elite-on-A for `'elite_vs_shop'`.** Symmetric in principle, arbitrary in practice; pinning a single rule keeps tests simple.
+  - **Defensive shop guard inside `completeCombat`.** The new `kind` derivation throws if `node.type === 'shop'` — surfaced a pre-existing latent bug where the `playerPath` ambiguity test was calling `completeCombat` on n2b without checking if the seed produced a shop branch (silently awarded combat-tier rewards on a shop pre-task).
+- **Surprises:**
+  - **`navigateToShop` helper assumed seed-1 produces a shop branch.** True under the boolean fork rule (every floor had exactly one shop); false under the 3-shape RNG (~1/3 of floors are `'elite_vs_combat'` with no shop). Replaced with `startRunWithShop()` that searches for a shop-bearing seed across [1..50]. Touched 7 test call sites.
+  - **`tsc` was already green after the `Node` union extension** without any consumer edits — the existing pattern-matches in `combat_scene.ts`, `dungeon_scene.ts`, the test helpers, and the `'shop'`-guarded code paths all narrow `combat | elite | boss` correctly because they share the `encounter` field. Added the explicit elite glyph mapping in `dungeon_scene.ts` proactively so Cluster B · 10 has one line to change.
+  - **Elite branch consumes one fewer RNG draw than boss** (no `pickRarity` call). Means seed-equivalent boss vs elite items diverge after the rarity-pick step. Tests for elite stand alone — no expectation of seed parity with boss.
+- **Source:** TODO.md Cluster A · 10 → spec at `docs/superpowers/specs/2026-04-29-elite-nodes-design.md` → plan at `docs/superpowers/plans/2026-04-29-elite-nodes.md`. Test count delta: 1135 → 1159 (+24).
+
 ### 2026-04-28 · Shop UI (Cluster B · 3)
 
 - **Why:** Shop nodes shipped in Cluster A · 9 with an auto-leave stub — players walked through shops without ever seeing inventory or being able to buy. This task ships the modal overlay, closing the loop. Bonus: a "Manage Gear" button launches the existing `EquipPanelScene` mid-shop so players can equip just-bought gear before fighting the boss — closing a UX gap where bought-but-not-equipped gear was useless until camp_screen post-boss.

@@ -155,18 +155,21 @@ export function rollShopItem(rng: Rng, slot: ItemSlot, floor: number): Item {
   };
 }
 
-export function rollLoot(rng: Rng, floorNumber: number, isBoss: boolean): Item | null {
-  if (!isBoss) {
+export type CombatKind = 'combat' | 'elite' | 'boss';
+
+export function rollLoot(rng: Rng, floorNumber: number, kind: CombatKind): Item | null {
+  if (kind === 'combat') {
     if (rng.next() >= 0.5) return null;
   }
   // Boss loot uses next-floor rarity weights but same-floor scaling for affix
-  // values + rare-property values + the floorRolledAt stamp. This asymmetry
-  // is why rollLoot doesn't delegate to rollShopItem.
-  const effectiveFloor = isBoss ? floorNumber + 1 : floorNumber;
+  // values + rare-property values + the floorRolledAt stamp. Elite loot uses
+  // current-floor scaling everywhere and forces rarity = rare. Combat loot
+  // (when it drops) uses current-floor scaling and the per-floor rarity table.
+  const effectiveFloor = kind === 'boss' ? floorNumber + 1 : floorNumber;
 
   const slot = rng.pick(ALL_SLOTS);
   const base = pickBaseId(rng, slot);
-  const rarity = pickRarity(rng, effectiveFloor);
+  const rarity: Rarity = kind === 'elite' ? 'rare' : pickRarity(rng, effectiveFloor);
 
   const affixIds = pickAffixes(rng, affixCount(rarity, slot));
   const affixes: RolledAffix[] = affixIds.map((id) => ({

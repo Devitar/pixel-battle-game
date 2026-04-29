@@ -153,7 +153,11 @@ export class DungeonScene extends Phaser.Scene {
     const path = playerPath(run);
     for (let i = 0; i < path.length && i < NODE_X.length; i++) {
       const node = path[i];
-      const glyph = node.type === 'boss' ? '☠' : node.type === 'shop' ? '🛒' : '⚔';
+      const glyph =
+        node.type === 'boss' ? '☠' :
+        node.type === 'shop' ? '🛒' :
+        node.type === 'elite' ? '⚔' :
+        '⚔';
       const x = NODE_X[i];
       const icon = this.add
         .text(x, NODE_Y, glyph, {

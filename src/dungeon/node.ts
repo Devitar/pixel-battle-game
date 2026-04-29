@@ -23,7 +23,8 @@ export interface ShopItem {
 
 export type Node =
   | { id: string; type: 'combat'; encounter: Encounter; nextNodeIds: readonly string[] }
-  | { id: string; type: 'boss'; encounter: Encounter; nextNodeIds: readonly string[] }
-  | { id: string; type: 'shop'; inventory: readonly ShopItem[]; nextNodeIds: readonly string[] };
+  | { id: string; type: 'elite';  encounter: Encounter; nextNodeIds: readonly string[] }
+  | { id: string; type: 'boss';   encounter: Encounter; nextNodeIds: readonly string[] }
+  | { id: string; type: 'shop';   inventory: readonly ShopItem[]; nextNodeIds: readonly string[] };
 
 export type NodeType = Node['type'];

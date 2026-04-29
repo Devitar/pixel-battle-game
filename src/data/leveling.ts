@@ -17,6 +17,10 @@ export function xpForCombatNode(floor: number): number {
   return 5 * floor;
 }
 
+export function xpForEliteNode(floor: number): number {
+  return 10 * floor;
+}
+
 export function xpForBossNode(floor: number): number {
   return 30 * floor;
 }

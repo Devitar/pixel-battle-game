@@ -27,16 +27,6 @@ One section per task.
 
 Nothing in this cluster should import `phaser`. All of it must be unit-testable via Vitest.
 
-### 10 · Elite nodes
-
-- **What:** Elite encounter generator: tougher enemy lineup (more enemies, modifiers like Armored / Enraged), guaranteed Rare drop on victory.
-- **Why:** Real reward asymmetry at forks ("Elite or Shop?"). Without elites, all combats are interchangeable.
-- **Tier:** 2
-- **Acceptance:**
-  - Elite generator boosts HP/damage and stamps a modifier; victory loot roll forces ≥ 1 Rare-rarity drop.
-- **Touches:** `src/dungeon/elite.ts` (new), `src/dungeon/loot.ts`, tests. Visual marker is Cluster B task 10.
-- **Source:** gdd §4 + §10 Tier 2.
-
 ### 11 · Mid-floor camp nodes
 
 - **What:** Mid-floor rest nodes. Player picks one of: heal some HP, treat one Wound, sharpen weapons (small temp Attack buff next combat). Cannot cash out.
