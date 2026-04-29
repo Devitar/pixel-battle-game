@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-28 · Shop UI (Cluster B · 3)
+
+- **Why:** Shop nodes shipped in Cluster A · 9 with an auto-leave stub — players walked through shops without ever seeing inventory or being able to buy. This task ships the modal overlay, closing the loop. Bonus: a "Manage Gear" button launches the existing `EquipPanelScene` mid-shop so players can equip just-bought gear before fighting the boss — closing a UX gap where bought-but-not-equipped gear was useless until camp_screen post-boss.
+- **Decisions:**
+  - **Modal overlay over inline at icon row.** Item rows have substantial text content (display name, affixes, price); inline at the icon row's 24 px-glyph slot wouldn't scale. Modal pattern matches Tavern, Barracks, perk picker.
+  - **Whole row clickable, no separate Buy button.** Matches the perk-picker convention. Hover stroke = gold for affordable items; non-interactive (no hover) for sold or can't-afford. Sold rows show "SOLD" in grey; can't-afford rows show price in red.
+  - **`EquipPanelScene` returnTo refactor over inline equip widget.** Reuses 100% of the existing equip-panel UI; ~5-line change to make it launchable from any pausing scene. Default `'camp_screen'` preserves the existing call site (no migration of the camp-screen call site needed).
+  - **No close-X / ESC.** The Leave button is the only exit, matching the perk-picker pattern. Prevents accidental dismissal.
+- **Surprises:**
+  - The dungeon's RESUME handler is generic — fires for any overlay closing. For shop, it correctly walks to the next node (boss) since `leaveShop` already advanced `currentNodeId`. Future overlays (event UI, mid-floor camp UI) will need this same exit-then-walk-on flow or different gating.
+  - Removing the unused `leaveShop` import from `dungeon_scene.ts` was caught by `tsc --noEmit` (TS6133) — the auto-leave stub had it imported, but with the overlay handling `leaveShop` itself the dungeon doesn't need it anymore.
+  - Test count unchanged (Phaser-side). The data-side surface (`purchaseItem`, `leaveShop`) is already covered by Cluster A · 9's tests.
+- **Source:** TODO.md Cluster B · 3 → spec at `docs/superpowers/specs/2026-04-28-shop-ui-design.md` → plan at `docs/superpowers/plans/2026-04-28-shop-ui.md`.
+
 ### 2026-04-28 · Shop nodes (Cluster A · 9)
 
 - **Why:** Adds the gdd's "spend gold for gear vs fight for XP/gold" decision. Without shops, all fork branches were combat-vs-combat and the Crypt had no real economy beyond "save gold for the camp Vault." This task ships the data + traversal foundation: every Crypt floor's fork now has a shop on one branch (deterministic from RNG), 4 gear items at floor-scaled prices. Cluster B · 3 replaces the auto-leave stub with a real shop overlay later.

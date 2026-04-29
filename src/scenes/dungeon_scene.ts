@@ -8,7 +8,6 @@ import {
   chooseNextNode,
   completeCombat,
   currentNode,
-  leaveShop,
   playerPath,
   type RunState,
   type WipeOutcome,
@@ -73,6 +72,13 @@ export class DungeonScene extends Phaser.Scene {
     this.buildNodes();
     this.buildParty();
     this.buildStatusBar();
+
+    this.events.on(Phaser.Scenes.Events.RESUME, () => {
+      this.refreshHud();
+      this.refreshNodeColors();
+      this.refreshStatusBar();
+      this.setState('walking_to_next');
+    });
 
     const handoff = consumeCombatResult();
     if (handoff) {
@@ -230,9 +236,8 @@ export class DungeonScene extends Phaser.Scene {
 
     const node = currentNode(run);
     if (node.type === 'shop') {
-      // Tier 2 stub: auto-leave. Cluster B · 3 replaces with a shop overlay.
-      appState.update((s) => ({ ...s, runState: leaveShop(s.runState!) }));
-      this.setState('walking_to_next');
+      this.scene.launch('shop_overlay');
+      this.scene.pause();
       return;
     }
 

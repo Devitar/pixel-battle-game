@@ -122,17 +122,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Touches:** `src/scenes/blacksmith_scene.ts` (new), camp scene wiring.
 - **Source:** gdd §6 + §10 Tier 2.
 
-### 3 · Shop UI
-
-- **What:** Shop overlay in the dungeon scene. Shows rolled inventory + prices, "Buy" buttons that draw from `pack.gold`. Pairs with Cluster A task 9.
-- **Why:** Pairs with the shop-node data; without UI, shops can't be visited.
-- **Tier:** 2
-- **Acceptance:**
-  - Shop-node entry overlays the Shop UI with current stock.
-  - Purchases mutate `RunState.pack` via `appState.update`; sold-out items disable.
-- **Touches:** `src/scenes/dungeon_scene.ts`, `src/scenes/shop_overlay.ts` (new).
-- **Source:** gdd §7 + §10 Tier 2.
-
 ### 4 · Camp node UI (mid-floor)
 
 - **What:** UI for mid-floor camp nodes — three buttons: Rest (heal HP), Treat Wound (with a hero picker), Sharpen (temp Attack buff next combat). Pairs with Cluster A task 11.

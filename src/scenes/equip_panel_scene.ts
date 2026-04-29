@@ -72,8 +72,14 @@ export class EquipPanelScene extends Phaser.Scene {
   private packPageStart: number = 0;
   private contentContainer!: Phaser.GameObjects.Container;
 
+  private returnTo: string = 'camp_screen';
+
   constructor() {
     super('equip_panel');
+  }
+
+  init(data: { returnTo?: string } = {}): void {
+    this.returnTo = data.returnTo ?? 'camp_screen';
   }
 
   create(): void {
@@ -557,6 +563,6 @@ export class EquipPanelScene extends Phaser.Scene {
 
   private close(): void {
     this.scene.stop();
-    this.scene.resume('camp_screen');
+    this.scene.resume(this.returnTo);
   }
 }
