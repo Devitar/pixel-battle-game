@@ -5,7 +5,6 @@ import type { Node } from '../dungeon/node';
 import { heroToLoadout } from '../render/hero_loadout';
 import { Paperdoll } from '../render/paperdoll';
 import {
-  chooseCampNodeEffect,
   chooseNextNode,
   completeCombat,
   currentNode,
@@ -159,6 +158,7 @@ export class DungeonScene extends Phaser.Scene {
         node.type === 'shop'  ? '🛒' :
         node.type === 'elite' ? '💀' :
         node.type === 'camp'  ? '🏕' :
+        node.type === 'event' ? '❓' :
         '⚔';
       const x = NODE_X[i];
       const icon = this.add
@@ -188,6 +188,16 @@ export class DungeonScene extends Phaser.Scene {
       const doll = new Paperdoll(this, SLOT_X_OFFSETS[i], 0, heroToLoadout(hero));
       doll.setScale(2);
       this.partyContainer.add(doll);
+    }
+    // Tombstones for Lost heroes — appended after surviving heroes in the row.
+    for (let i = 0; i < run.lost.length; i++) {
+      const slotIndex = run.party.length + i;
+      if (slotIndex >= SLOT_X_OFFSETS.length) break;
+      const tombstone = this.add.text(SLOT_X_OFFSETS[slotIndex], 0, '🪦', {
+        fontFamily: 'monospace',
+        fontSize: '32px',
+      }).setOrigin(0.5);
+      this.partyContainer.add(tombstone);
     }
   }
 
@@ -247,19 +257,17 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (node.type === 'camp') {
-      // Stub: auto-apply heal_party and advance. Cluster B · 4 replaces this
-      // with a picker overlay launch (matching the shop_overlay pattern).
-      const rngState = appState.get().runRngState;
-      if (rngState === undefined) {
-        console.warn('handleArrival: camp node reached without runRngState');
-        return;
-      }
-      const rng = createRngFromState(rngState);
-      const result = chooseCampNodeEffect(run, { kind: 'heal_party' }, rng);
+      this.scene.launch('camp_node_overlay');
+      this.scene.pause();
+      return;
+    }
+    if (node.type === 'event') {
+      // Stub: auto-skip until Cluster B · 5 ships the event overlay.
+      // Player sees event nodes in the icon row but doesn't engage with them.
+      // Equivalent to a "Decline" choice — no payload applied.
       appState.update((s) => ({
         ...s,
-        runState: result.runState,
-        runRngState: rng.getState(),
+        runState: chooseNextNode(s.runState!, node.nextNodeIds[0]),
       }));
       this.refreshHud();
       this.refreshNodeColors();
@@ -513,45 +521,87 @@ export class DungeonScene extends Phaser.Scene {
 
   private buildWipePanel(): void {
     const wipe = this.wipeOutcome!;
+    const fallenCount = wipe.heroesFallen.length;
+    const lostCount = wipe.heroesLost.length;
+    const totalLines =
+      fallenCount + lostCount +
+      (fallenCount > 0 ? 1 : 0) +
+      (lostCount > 0 ? 1 : 0);
+
+    const baseHeight = 220;
+    const extraLines = Math.max(0, totalLines - 4);
+    const panelHeight = baseHeight + extraLines * 14;
 
     const bg = this.add
-      .rectangle(0, 0, 400, 220, 0x1a1a1a)
+      .rectangle(0, 0, 400, panelHeight, 0x1a1a1a)
       .setStrokeStyle(2, 0xcc6666);
     const title = this.add
-      .text(0, -85, 'Wipe!', {
+      .text(0, -panelHeight / 2 + 20, 'Wipe!', {
         fontFamily: 'monospace',
         fontSize: '16px',
         color: '#cc6666',
       })
       .setOrigin(0.5);
-    const subtitle = this.add
-      .text(0, -60, 'Heroes lost:', {
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: '#aaaaaa',
-      })
-      .setOrigin(0.5);
 
     const lines: Phaser.GameObjects.Text[] = [];
-    let y = -36;
-    for (const hero of wipe.heroesFallen) {
+    let y = -panelHeight / 2 + 50;
+
+    if (fallenCount > 0) {
       lines.push(
         this.add
-          .text(0, y, hero.name, {
+          .text(0, y, 'Heroes Fallen:', {
             fontFamily: 'monospace',
-            fontSize: '11px',
-            color: '#ffffff',
+            fontSize: '12px',
+            color: '#cc8888',
           })
           .setOrigin(0.5),
       );
-      y += 14;
+      y += 16;
+      for (const hero of wipe.heroesFallen) {
+        lines.push(
+          this.add
+            .text(0, y, hero.name, {
+              fontFamily: 'monospace',
+              fontSize: '11px',
+              color: '#ffffff',
+            })
+            .setOrigin(0.5),
+        );
+        y += 14;
+      }
     }
 
+    if (lostCount > 0) {
+      lines.push(
+        this.add
+          .text(0, y, 'Heroes Lost:', {
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            color: '#aa66aa',
+          })
+          .setOrigin(0.5),
+      );
+      y += 16;
+      for (const hero of wipe.heroesLost) {
+        lines.push(
+          this.add
+            .text(0, y, hero.name, {
+              fontFamily: 'monospace',
+              fontSize: '11px',
+              color: '#ffffff',
+            })
+            .setOrigin(0.5),
+        );
+        y += 14;
+      }
+    }
+
+    const btnY = panelHeight / 2 - 30;
     const btnBg = this.add
-      .rectangle(0, 80, 180, 34, 0x2a4a2a)
+      .rectangle(0, btnY, 180, 34, 0x2a4a2a)
       .setStrokeStyle(2, 0x44cc44);
     const btnLabel = this.add
-      .text(0, 80, 'Return to Camp', {
+      .text(0, btnY, 'Return to Camp', {
         fontFamily: 'monospace',
         fontSize: '13px',
         color: '#ffffff',
@@ -560,15 +610,21 @@ export class DungeonScene extends Phaser.Scene {
     btnBg.setInteractive({ useHandCursor: true });
     btnBg.on('pointerdown', () => this.onWipeReturn());
 
-    this.add.container(480, 270, [bg, title, subtitle, ...lines, btnBg, btnLabel]);
+    this.add.container(480, 270, [bg, title, ...lines, btnBg, btnLabel]);
   }
 
   private onWipeReturn(): void {
     const fallenIds = new Set(this.wipeOutcome!.heroesFallen.map((h) => h.id));
+    const lostIds = new Set(this.wipeOutcome!.heroesLost.map((h) => h.id));
 
     appState.update((s) => {
       let roster = s.roster;
       for (const id of fallenIds) {
+        if (roster.heroes.some((h) => h.id === id)) {
+          roster = removeHero(roster, id);
+        }
+      }
+      for (const id of lostIds) {
         if (roster.heroes.some((h) => h.id === id)) {
           roster = removeHero(roster, id);
         }

@@ -84,15 +84,28 @@ export class CampScreenScene extends Phaser.Scene {
   }
 
   private buildFallenLine(run: RunState): void {
-    if (run.fallen.length === 0) return;
-    const names = run.fallen.map((h) => h.name).join(', ');
-    this.add
-      .text(480, 360, `Fallen: ${names}`, {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#cc8888',
-      })
-      .setOrigin(0.5);
+    let y = 360;
+    if (run.fallen.length > 0) {
+      const names = run.fallen.map((h) => h.name).join(', ');
+      this.add
+        .text(480, y, `Fallen: ${names}`, {
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          color: '#cc8888',
+        })
+        .setOrigin(0.5);
+      y += 14;
+    }
+    if (run.lost.length > 0) {
+      const names = run.lost.map((h) => h.name).join(', ');
+      this.add
+        .text(480, y, `Lost: ${names}`, {
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          color: '#aa66aa',
+        })
+        .setOrigin(0.5);
+    }
   }
 
   private buildButtons(run: RunState): void {
@@ -157,6 +170,7 @@ export class CampScreenScene extends Phaser.Scene {
     const run = appState.get().runState!;
     const { outcome } = cashout(run);
     const fallenIds = new Set(outcome.heroesFallen.map((h) => h.id));
+    const lostIds = new Set(outcome.heroesLost.map((h) => h.id));
 
     appState.update((s) => {
       const vault = credit(s.vault, outcome.goldBanked);
@@ -168,6 +182,11 @@ export class CampScreenScene extends Phaser.Scene {
         }
       }
       for (const id of fallenIds) {
+        if (roster.heroes.some((h) => h.id === id)) {
+          roster = removeHero(roster, id);
+        }
+      }
+      for (const id of lostIds) {
         if (roster.heroes.some((h) => h.id === id)) {
           roster = removeHero(roster, id);
         }

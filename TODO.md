@@ -38,16 +38,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Touches:** `src/scenes/blacksmith_scene.ts` (new), camp scene wiring.
 - **Source:** gdd §6 + §10 Tier 2.
 
-### 4 · Camp node UI (mid-floor)
-
-- **What:** UI for mid-floor camp nodes — three buttons: Rest (heal HP), Treat Wound (with a hero picker), Sharpen (temp Attack buff next combat). Pairs with Cluster A task 11.
-- **Why:** Pairs with camp-node data; needed for the player to interact.
-- **Tier:** 2
-- **Acceptance:**
-  - Camp-node entry overlays a 3-option picker; selecting an option resolves the effect and advances.
-- **Touches:** `src/scenes/dungeon_scene.ts`, `src/scenes/camp_node_overlay.ts` (new).
-- **Source:** gdd §4 + §10 Tier 2.
-
 ### 5 · Event card UI
 
 - **What:** Event card overlay. Shows card body text and two choice buttons; on choice, payload effects apply via the core event resolver and an outcome panel summarises the result before dismissal. Pairs with Cluster A task 13.
@@ -58,28 +48,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
   - Outcome panel describes what changed (HP, gold, gear, hero loss) before the player advances.
 - **Touches:** `src/scenes/event_overlay.ts` (new), dungeon scene wiring.
 - **Source:** gdd §7 + §10 Tier 2.
-
-### 9 · Wound display (hero card + Barracks)
-
-- **What:** Show wounds on hero cards (icon + count) and a full breakdown in the Barracks detail view. Pairs with Cluster A task 3.
-- **Why:** Wounds need to be visible everywhere a hero is shown so the player can plan around them.
-- **Tier:** 2
-- **Acceptance:**
-  - Hero-card icon shows wound count when > 0.
-  - Barracks hero detail lists each active wound with its stat deltas.
-- **Touches:** `src/ui/hero_card.ts`, `src/scenes/barracks_scene.ts`.
-- **Source:** gdd §7 + §10 Tier 2.
-
-### 11 · "Lost" hero handling in scenes
-
-- **What:** When a hero is "Lost" mid-run (per Cluster A task 15), surface it visibly: tombstone in the party UI for the remainder of the run; cashout / wipe summary lists Fallen and Lost separately ("X was Lost" vs "X Fell").
-- **Why:** Without visible feedback, the design distinction between Fallen and Lost is invisible.
-- **Tier:** 2
-- **Acceptance:**
-  - Party UI shows a tombstone slot for Lost heroes.
-  - Cashout / wipe summary differentiates Fallen and Lost in the death list.
-- **Touches:** `src/scenes/dungeon_scene.ts`, `src/scenes/camp_screen_scene.ts`, summary widget.
-- **Source:** gdd §8 + §10 Tier 2.
 
 ---
 

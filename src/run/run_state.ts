@@ -204,7 +204,11 @@ export function completeCombat(
   }
 
   const completedNode = currentNode(runState);
-  if (completedNode.type === 'shop' || completedNode.type === 'camp') {
+  if (
+    completedNode.type === 'shop' ||
+    completedNode.type === 'camp' ||
+    completedNode.type === 'event'
+  ) {
     throw new Error(`completeCombat: current node is type '${completedNode.type}', not a combat-bearing node`);
   }
   const kind: CombatKind = completedNode.type;

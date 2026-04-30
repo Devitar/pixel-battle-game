@@ -29,6 +29,66 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-29 · Event floor integration (strategic precursor)
+
+- **Why:** The Cluster A · 13 spec deferred adding `'event'` to the Node union and the floor generator, leaving events as inert content reachable only through hand-crafted state. This task wires events into actual gameplay — they now appear at forks in ~40% of floors. Unblocks Cluster B · 5 (Event card UI), which can replace this task's auto-skip stub. No TODO entry — added as a strategic precursor outside the existing list.
+- **Decisions:**
+  - **`cardId: EventCardId` stored on the Node**, not the full card object. Single-source-of-truth in `EVENTS` table; UI does `EVENTS[node.cardId]` at render time. Pre-launch save policy already rejects stale shapes, so the rare future "card removed" case is handled by the loader.
+  - **10-shape fork RNG** (was 6). Adding event as a 5th branch type means `C(5,2) = 10` shapes; uniform 1/10 weighting keeps every branch type at 4/10 = 40% per fork. Existing shapes drop from 1/6 to 1/10 — same rebalance pattern used when camp was added.
+  - **`specialOnBranchA = true → event` for all four event pairings.** Pinning a single rule (event always lands on A when "true") keeps test coverage simple. Arbitrary for event-vs-elite and event-vs-camp; consistent everywhere else.
+  - **Auto-skip stub at arrival**, not auto-pick-choice-0. The deck includes `lose_hero` cards; auto-picking choice 0 on those would silently lose a random hero (no `selectedHeroIndex` could be supplied anyway — the resolver throws). Auto-skip applies no payload, equivalent to a Decline; once Cluster B · 5 ships the overlay, this becomes `scene.launch('event_overlay')`.
+- **Surprises:**
+  - **Three additional shim sites tsc flagged** beyond the spec's listed two:
+    - `floor.test.ts` — an existing test loop accessing `node.encounter` after filtering shop/camp/elite needed `'event'` added too.
+    - `run_state.ts` `completeCombat` — the existing shop/camp guard preventing combat on non-combat nodes needed `'event'` added so the `kind: CombatKind` derivation stays type-safe.
+    - All four pre-existing `uses*Branch` flags in `floor.ts` needed extending to include their `event_vs_*` counterparts (initially I only updated `usesCampBranch` for `event_vs_camp`; tsc was silent because the flag is only used for the `composeXEncounter` call, not for type narrowing — but the flag's semantic correctness still matters for "did we draw the resources we'll need").
+  - **Test count delta = +5** (4 shape coverage + 1 cardId sanity). The two existing 6-shape tests were replaced in-place with 10-shape versions, so net new is just the additions.
+- **Source:** spec at `docs/superpowers/specs/2026-04-29-event-floor-integration-design.md` → plan at `docs/superpowers/plans/2026-04-29-event-floor-integration.md`. Test count delta: 1284 → 1289 (+5).
+
+### 2026-04-29 · Wound display on HeroCard + Barracks (Cluster B · 9)
+
+- **Why:** Wounds existed in the data layer (Cluster A · 3) and were treatable at the Hospital (Cluster B · 1), but heroes carrying wounds gave no visible indicator anywhere a roster was shown — a player browsing the Tavern or Barracks couldn't see which heroes needed treatment without clicking through. Closes that visibility gap.
+- **Decisions:**
+  - **`🩸 N` badge in HeroCard top-right** when `wounds.length > 0` and `!isDead`. Glyph + count is at-a-glance scannable across a roster of cards. Color `#ff6666` reads against the dark card background. Hidden on Fallen heroes — wound state isn't meaningful for the visual "this hero is gone" framing in death-list rendering.
+  - **`describeWoundEffect` reused, not duplicated.** The helper shipped with Hospital UI was always intended for Cluster B · 9 reuse. Imported into the Barracks scene; same output formatting as Hospital ("+20% damage taken", "-2 Speed", etc.).
+  - **`Math.max(ABILITY_HEADER_Y, woundsCursor)` for the ABILITIES shift.** Heroes with no wounds keep the existing layout exactly (`woundsCursor` stays at 192, `Math.max` returns the constant 215). Only wounded heroes push abilities down — and they push by `15 + 14*wounds + 6` ≈ 35–110 pixels. The Barracks panel's 460px height absorbs even the 6-wound theoretical maximum without overflow.
+  - **`abilityBlockStartY` derived from the offset constants** rather than hard-coded. `(ABILITY_BLOCK_START_Y - ABILITY_HEADER_Y)` = 20px gap, preserved relative to wherever the header lands.
+- **Surprises:**
+  - **Test count delta = 0** as expected (UI/scene convention). Acceptance was tsc/build/manual play.
+  - The `WOUNDS` header color `#ff6666` matches the HeroCard badge color — same red across both surfaces — but I didn't extract it to a shared constant. Repeating the literal kept blast radius tight; cleanup if a third site lands.
+- **Source:** TODO.md Cluster B · 9 → spec at `docs/superpowers/specs/2026-04-29-wound-display-design.md` → plan at `docs/superpowers/plans/2026-04-29-wound-display.md`. Test count delta: 0 (UI convention).
+
+### 2026-04-29 · Lost-hero scene rendering + roster bugfix (Cluster B · 11)
+
+- **Why:** Closes the gdd §8 distinction between Fallen (combat death) and Lost (narrative removal) at the visual layer, and fixes the latent bug discovered when shipping Camp Node UI: Lost heroes were left in the roster after cashout/wipe, appearing "alive" in Tavern/Barracks. Three rendering touchpoints (dungeon party row, post-boss cashout summary, wipe panel) plus three roster-cleanup call sites.
+- **Decisions:**
+  - **Slot-agnostic tombstone append.** `runState.lost` doesn't carry slot info; rather than introduce one mid-task, the dungeon party row just appends `🪦` glyphs after surviving heroes. Combat is unaffected — `buildCombatState` reads `runState.party` directly, which already excludes Lost heroes from the loseHero op. The "this slot used to have someone" beat is faint; the count is what matters visually.
+  - **`🪦` gravestone glyph at 32px** matches the paperdoll height when scaled. Keeps tonal weight without bespoke art.
+  - **Distinct colors for Fallen vs Lost:** `#cc8888` (existing pinkish-red) for Fallen, `#aa66aa` (muted purple) for Lost. Used consistently in cashout summary line + wipe panel section headers.
+  - **Wipe panel gets dynamic height.** Adding a Lost section can take the panel over its old fixed 220px. Compute `panelHeight = baseHeight + extraLines * 14` so 0–6 hero entries all render cleanly.
+  - **`buildFallenLine` keeps its name** despite now also rendering the Lost line. Renaming would propagate beyond the task's scope. Future cleanup if it bothers.
+  - **Three roster-cleanup sites in lockstep.** `camp_screen_scene.onLeave`, `camp_node_overlay_scene.applyLeave`, and `dungeon_scene.onWipeReturn` each got a parallel Lost-id removeHero loop alongside the existing Fallen-id one. Pattern is mechanical; verifying all three at once keeps them consistent.
+- **Surprises:**
+  - **Wipe path also had the bug,** not just the cashout paths. Spec self-review flagged the wipe path as "verify in implementation"; quick grep confirmed and the spec was promoted to a definitive third site rather than a "maybe."
+  - **No data-layer changes.** Cluster A · 15 had already done the heavy lifting (split `heroesLost` → `heroesFallen` + new `heroesLost` semantically; populated both from `runState.fallen` / `runState.lost`). This task is purely scenes consuming the already-correct data.
+  - **Manual play verification** is hand-crafted-state-only because events aren't yet in the floor generator (Cluster A · 13 explicitly deferred floor integration). The Lost-hero path can't be reached through normal gameplay yet — making this somewhat speculative UI. Documented in plan; will become organically testable when event-floor integration ships.
+- **Source:** TODO.md Cluster B · 11 → spec at `docs/superpowers/specs/2026-04-29-lost-hero-scene-rendering-design.md` → plan at `docs/superpowers/plans/2026-04-29-lost-hero-scene-rendering.md`. Test count delta: 0 (Phaser scene convention).
+
+### 2026-04-29 · Camp node UI (Cluster B · 4)
+
+- **Why:** Closes the auto-leave stub from Cluster A · 11. Players hitting a mid-floor camp node now see a 3-button picker (Heal Party / Treat Wound / Leave Dungeon) instead of silently auto-applying heal_party. The Leave path matches the post-boss cashout precisely — full bank to vault, run ends.
+- **Decisions:**
+  - **Single overlay scene with state-machine, content-swap pattern** rather than separate scenes per state. Pattern-consistent with `shop_overlay_scene` (one scene file, one panel, content rebuilds on state changes). Three states: `'main' | 'treat_picker' | 'leave_confirm'`.
+  - **Treat Wound shows a flat (hero, wound) list** rather than a 2-step hero→wound picker. With party of 3 and typically 0–2 wounds per hero, the flat list reads cleanly. Reuses `describeWoundEffect` shipped in Hospital UI.
+  - **Leave confirmation shows a banking preview** (gold, items, surviving heroes, Lost hero count if any) so the player understands what they're locking in. Single Confirm button. Back button on confirm + treat sub-states returns to main.
+  - **Persistence on Leave mirrors `camp_screen_scene.onLeave` exactly** — same `credit/addItems/updateHero/removeHero/tickRosterWounds` sequence. Avoids divergence when the two paths should produce identical post-cashout state.
+- **Surprises:**
+  - **Plan self-review caught a type-quality issue:** initial spec used `woundId: string` in the picker pair type, requiring a cast in `buildWoundRow`. Fixed to `WoundId` upfront — no cast needed.
+  - **Spec self-review caught an incomplete cashout-persistence example.** First draft missed `updateHero` for survivors and `tickRosterWounds`. Fixed by reading `camp_screen_scene.onLeave` and copying the pattern verbatim.
+  - **Pre-existing latent bug surfaced:** `camp_screen_scene.onLeave` doesn't remove Lost heroes from the roster, so a Lost hero stays "alive" in Tavern/Barracks. Both `camp_screen_scene.onLeave` and the new `camp_node_overlay_scene.applyLeave` carry the bug uniformly today. Cluster B · 11's TODO entry was updated to capture the fix-both-call-sites scope.
+  - **`tsc TS6133` flagged the unused `chooseCampNodeEffect` import** in `dungeon_scene.ts` after the auto-leave stub was removed. Cleaned up.
+- **Source:** TODO.md Cluster B · 4 → spec at `docs/superpowers/specs/2026-04-29-camp-node-ui-design.md` → plan at `docs/superpowers/plans/2026-04-29-camp-node-ui.md`. Test count delta: 0 (Phaser scene convention; manual play verification).
+
 ### 2026-04-29 · Hospital building UI (Cluster B · 1)
 
 - **Why:** First Cluster B task. The wound system + treatment data layer (Cluster A · 3) had been complete for some time, but players had no in-game way to spend gold on wound treatment. Ships the camp-hub Hospital scene that closes that loop. Pattern-consistent with `barracks_panel_scene.ts` (left list / right detail).
