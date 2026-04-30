@@ -4,6 +4,7 @@ import { ABILITIES } from '../data/abilities';
 import { describeAbility } from '../data/ability_describe';
 import { CLASSES } from '../data/classes';
 import { TRAITS } from '../data/traits';
+import { WOUNDS, describeWoundEffect } from '../data/wounds';
 import type { Hero } from '../heroes/hero';
 import { describeKitStatus, resolveCombatAbilities } from '../items/kit';
 import { heroToLoadout } from '../render/hero_loadout';
@@ -245,8 +246,39 @@ export class BarracksPanelScene extends Phaser.Scene {
       ),
     );
 
+    let woundsCursor = 192;
+
+    if (hero.wounds.length > 0) {
+      this.detailContainer.add(
+        this.add.text(DETAIL_TEXT_X, woundsCursor, 'WOUNDS', {
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          color: '#ff6666',
+        }),
+      );
+      woundsCursor += 18;
+
+      for (const wound of hero.wounds) {
+        const def = WOUNDS[wound.id];
+        const desc = describeWoundEffect(def.effect);
+        this.detailContainer.add(
+          this.add.text(DETAIL_TEXT_X, woundsCursor, `${def.name} — ${desc}`, {
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            color: '#dddddd',
+          }),
+        );
+        woundsCursor += 14;
+      }
+
+      woundsCursor += 6;
+    }
+
+    const abilityHeaderY = Math.max(ABILITY_HEADER_Y, woundsCursor);
+    const abilityBlockStartY = abilityHeaderY + (ABILITY_BLOCK_START_Y - ABILITY_HEADER_Y);
+
     this.detailContainer.add(
-      this.add.text(ABILITY_X, ABILITY_HEADER_Y, 'ABILITIES', {
+      this.add.text(ABILITY_X, abilityHeaderY, 'ABILITIES', {
         fontFamily: 'monospace',
         fontSize: '12px',
         color: '#ffcc66',
@@ -255,7 +287,7 @@ export class BarracksPanelScene extends Phaser.Scene {
     // Kit status — shown to the right of the ABILITIES header in muted color.
     // 80px offset clears the "ABILITIES" label at 12px monospace.
     this.detailContainer.add(
-      this.add.text(ABILITY_X + 80, ABILITY_HEADER_Y, `· ${describeKitStatus(hero)}`, {
+      this.add.text(ABILITY_X + 80, abilityHeaderY, `· ${describeKitStatus(hero)}`, {
         fontFamily: 'monospace',
         fontSize: '11px',
         color: '#aaaaaa',
@@ -263,7 +295,7 @@ export class BarracksPanelScene extends Phaser.Scene {
     );
 
     const { abilities: resolvedAbilities } = resolveCombatAbilities(hero);
-    let yCursor = ABILITY_BLOCK_START_Y;
+    let yCursor = abilityBlockStartY;
     for (const abilityId of resolvedAbilities) {
       const ability = ABILITIES[abilityId];
       const desc = describeAbility(ability);

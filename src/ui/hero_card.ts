@@ -153,6 +153,22 @@ export class HeroCard extends Phaser.GameObjects.Container {
       this.add(traitText);
     }
 
+    if (this.hero.wounds.length > 0 && !isDead) {
+      const badgeX = size === 'small' ? 75 : 125;
+      const badgeY = size === 'small' ? -22 : -48;
+      const badgeText = this.scene.add.text(
+        badgeX,
+        badgeY,
+        `🩸 ${this.hero.wounds.length}`,
+        {
+          fontFamily: 'monospace',
+          fontSize: size === 'small' ? '11px' : '13px',
+          color: '#ff6666',
+        },
+      ).setOrigin(1, 0.5);
+      this.add(badgeText);
+    }
+
     if (this.opts.onClick) {
       background.setInteractive({ useHandCursor: true });
       background.on('pointerdown', this.opts.onClick);

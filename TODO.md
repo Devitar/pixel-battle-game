@@ -49,17 +49,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Touches:** `src/scenes/event_overlay.ts` (new), dungeon scene wiring.
 - **Source:** gdd §7 + §10 Tier 2.
 
-### 9 · Wound display (hero card + Barracks)
-
-- **What:** Show wounds on hero cards (icon + count) and a full breakdown in the Barracks detail view. Pairs with Cluster A task 3.
-- **Why:** Wounds need to be visible everywhere a hero is shown so the player can plan around them.
-- **Tier:** 2
-- **Acceptance:**
-  - Hero-card icon shows wound count when > 0.
-  - Barracks hero detail lists each active wound with its stat deltas.
-- **Touches:** `src/ui/hero_card.ts`, `src/scenes/barracks_scene.ts`.
-- **Source:** gdd §7 + §10 Tier 2.
-
 ---
 
 ## Cluster C — Art polish (non-blocking)

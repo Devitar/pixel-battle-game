@@ -29,6 +29,19 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-29 · Wound display on HeroCard + Barracks (Cluster B · 9)
+
+- **Why:** Wounds existed in the data layer (Cluster A · 3) and were treatable at the Hospital (Cluster B · 1), but heroes carrying wounds gave no visible indicator anywhere a roster was shown — a player browsing the Tavern or Barracks couldn't see which heroes needed treatment without clicking through. Closes that visibility gap.
+- **Decisions:**
+  - **`🩸 N` badge in HeroCard top-right** when `wounds.length > 0` and `!isDead`. Glyph + count is at-a-glance scannable across a roster of cards. Color `#ff6666` reads against the dark card background. Hidden on Fallen heroes — wound state isn't meaningful for the visual "this hero is gone" framing in death-list rendering.
+  - **`describeWoundEffect` reused, not duplicated.** The helper shipped with Hospital UI was always intended for Cluster B · 9 reuse. Imported into the Barracks scene; same output formatting as Hospital ("+20% damage taken", "-2 Speed", etc.).
+  - **`Math.max(ABILITY_HEADER_Y, woundsCursor)` for the ABILITIES shift.** Heroes with no wounds keep the existing layout exactly (`woundsCursor` stays at 192, `Math.max` returns the constant 215). Only wounded heroes push abilities down — and they push by `15 + 14*wounds + 6` ≈ 35–110 pixels. The Barracks panel's 460px height absorbs even the 6-wound theoretical maximum without overflow.
+  - **`abilityBlockStartY` derived from the offset constants** rather than hard-coded. `(ABILITY_BLOCK_START_Y - ABILITY_HEADER_Y)` = 20px gap, preserved relative to wherever the header lands.
+- **Surprises:**
+  - **Test count delta = 0** as expected (UI/scene convention). Acceptance was tsc/build/manual play.
+  - The `WOUNDS` header color `#ff6666` matches the HeroCard badge color — same red across both surfaces — but I didn't extract it to a shared constant. Repeating the literal kept blast radius tight; cleanup if a third site lands.
+- **Source:** TODO.md Cluster B · 9 → spec at `docs/superpowers/specs/2026-04-29-wound-display-design.md` → plan at `docs/superpowers/plans/2026-04-29-wound-display.md`. Test count delta: 0 (UI convention).
+
 ### 2026-04-29 · Lost-hero scene rendering + roster bugfix (Cluster B · 11)
 
 - **Why:** Closes the gdd §8 distinction between Fallen (combat death) and Lost (narrative removal) at the visual layer, and fixes the latent bug discovered when shipping Camp Node UI: Lost heroes were left in the roster after cashout/wipe, appearing "alive" in Tavern/Barracks. Three rendering touchpoints (dungeon party row, post-boss cashout summary, wipe panel) plus three roster-cleanup call sites.
