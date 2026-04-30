@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-30 · Blacksmith building (Cluster B · 2)
+
+- **Why:** Closes the only remaining "you have stash items and nothing to spend gold on between Tavern/Hospital" gap. Pairs with gear rarity tiers — gives the player a path from common gear to rare and a long-term sink for vault gold.
+- **Decisions:**
+  - **Gold-only, no materials, no building level.** TODO entry mentioned all three. Materials don't exist anywhere in the save schema; building levels don't either (Hospital and Tavern have the same gap and ship at conceptual L1). Both upgrade tiers (common→uncommon, uncommon→rare) available from day one. `epic` rarity is a separate balance feature with its own blast radius and stays out of scope.
+  - **Random affix + random rare property.** No player-pick crafting UI. Matches the rest of the game's "outcomes are rolled, your skill is in deciding what to upgrade" identity. New affix excluded from existing affixes on the item; rare property only rolled when reaching `rare` and slot supports it (hats keep `rareProperty: undefined` even at rare).
+  - **Value-scaling at item's `floorRolledAt`.** New affix value and rare-property value use the existing `rollAffixValue`/`pickRareProperty` functions at the item's `floorRolledAt`. Keeps the upgrade in-tier with the item's existing values and preserves the item's tier provenance.
+  - **Hat-at-rare deliberate divergence.** A freshly-rolled rare hat has 3 affixes (per `affixCount`); an upgraded uncommon→rare hat has 2 (uncommon's 1 + the +1 from upgrade). Blacksmith adds one affix per tier bump, not "fill to target tier's count." Documented in test 3.
+  - **Stash + equipped in one list** (TODO said stash-only). Avoids the "go to Barracks → unequip → Blacksmith → re-equip" friction. Equipped rows label the hero name; upgrade path uses `equip(hero, upgraded, slot)` and drops the displaced (old) item on the floor — Blacksmith consumed it.
+  - **Costs:** flat 100g/300g, keyed by target rarity in `BLACKSMITH_UPGRADE_COST`. Single tunable site.
+- **Surprises:**
+  - **Two tsc fixes during execution.** (1) `nextRarity` returning `Rarity | null` was too loose for `BLACKSMITH_UPGRADE_COST`'s key type; tightened to `Exclude<Rarity, 'common'> | null` (semantically correct — `nextRarity` never returns 'common'). (2) Discriminated-union narrowing on `entry.location` was lost inside a `.find()` callback; captured `location` into a local before the closure. Both caught by tsc, not at runtime.
+  - **`pickAffixes` stayed private** in `loot.ts` — the spec originally promoted it too as "future-proofing." Spec self-review caught that nothing imports it (the upgrade core has its own `rollNewAffix` with affix-uniqueness logic). Promoted only `rollAffixValue` and `pickRareProperty`.
+- **Source:** TODO.md Cluster B · 2 → spec at `docs/superpowers/specs/2026-04-30-blacksmith-ui-design.md` → plan at `docs/superpowers/plans/2026-04-30-blacksmith-ui.md`. Test count delta: 1289 → 1301 (+12).
+
 ### 2026-04-29 · Event floor integration (strategic precursor)
 
 - **Why:** The Cluster A · 13 spec deferred adding `'event'` to the Node union and the floor generator, leaving events as inert content reachable only through hand-crafted state. This task wires events into actual gameplay — they now appear at forks in ~40% of floors. Unblocks Cluster B · 5 (Event card UI), which can replace this task's auto-skip stub. No TODO entry — added as a strategic precursor outside the existing list.

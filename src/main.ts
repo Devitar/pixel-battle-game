@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import './style.css';
 import { BarracksPanelScene } from './scenes/barracks_panel_scene';
+import { BlacksmithPanelScene } from './scenes/blacksmith_panel_scene';
 import { BootScene } from './scenes/boot_scene';
 import { CampNodeOverlayScene } from './scenes/camp_node_overlay_scene';
 import { CampScene } from './scenes/camp_scene';
@@ -33,6 +34,7 @@ new Phaser.Game({
     CampScene,
     TavernPanelScene,
     BarracksPanelScene,
+    BlacksmithPanelScene,
     HospitalPanelScene,
     NoticeboardPanelScene,
     DungeonScene,
