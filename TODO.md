@@ -60,18 +60,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Touches:** `src/ui/hero_card.ts`, `src/scenes/barracks_scene.ts`.
 - **Source:** gdd §7 + §10 Tier 2.
 
-### 11 · "Lost" hero handling in scenes
-
-- **What:** When a hero is "Lost" mid-run (per Cluster A task 15), surface it visibly: tombstone in the party UI for the remainder of the run; cashout / wipe summary lists Fallen and Lost separately ("X was Lost" vs "X Fell"). Also fix the latent bug where Lost heroes stay in the roster after cashout (both `camp_screen_scene.onLeave` and `camp_node_overlay_scene.applyLeave` need `removeHero` calls for `outcome.heroesLost` to mirror what's already done for `heroesFallen`).
-- **Why:** Without visible feedback, the design distinction between Fallen and Lost is invisible. The roster-removal bug means a Lost hero appears alive in the Tavern/Barracks after the run, contradicting gdd §8.
-- **Tier:** 2
-- **Acceptance:**
-  - Party UI shows a tombstone slot for Lost heroes.
-  - Cashout / wipe summary differentiates Fallen and Lost in the death list.
-  - Lost heroes are removed from the roster on cashout (both call sites).
-- **Touches:** `src/scenes/dungeon_scene.ts`, `src/scenes/camp_screen_scene.ts`, `src/scenes/camp_node_overlay_scene.ts`, summary widget.
-- **Source:** gdd §8 + §10 Tier 2.
-
 ---
 
 ## Cluster C — Art polish (non-blocking)

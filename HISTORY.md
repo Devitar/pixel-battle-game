@@ -29,6 +29,22 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-29 · Lost-hero scene rendering + roster bugfix (Cluster B · 11)
+
+- **Why:** Closes the gdd §8 distinction between Fallen (combat death) and Lost (narrative removal) at the visual layer, and fixes the latent bug discovered when shipping Camp Node UI: Lost heroes were left in the roster after cashout/wipe, appearing "alive" in Tavern/Barracks. Three rendering touchpoints (dungeon party row, post-boss cashout summary, wipe panel) plus three roster-cleanup call sites.
+- **Decisions:**
+  - **Slot-agnostic tombstone append.** `runState.lost` doesn't carry slot info; rather than introduce one mid-task, the dungeon party row just appends `🪦` glyphs after surviving heroes. Combat is unaffected — `buildCombatState` reads `runState.party` directly, which already excludes Lost heroes from the loseHero op. The "this slot used to have someone" beat is faint; the count is what matters visually.
+  - **`🪦` gravestone glyph at 32px** matches the paperdoll height when scaled. Keeps tonal weight without bespoke art.
+  - **Distinct colors for Fallen vs Lost:** `#cc8888` (existing pinkish-red) for Fallen, `#aa66aa` (muted purple) for Lost. Used consistently in cashout summary line + wipe panel section headers.
+  - **Wipe panel gets dynamic height.** Adding a Lost section can take the panel over its old fixed 220px. Compute `panelHeight = baseHeight + extraLines * 14` so 0–6 hero entries all render cleanly.
+  - **`buildFallenLine` keeps its name** despite now also rendering the Lost line. Renaming would propagate beyond the task's scope. Future cleanup if it bothers.
+  - **Three roster-cleanup sites in lockstep.** `camp_screen_scene.onLeave`, `camp_node_overlay_scene.applyLeave`, and `dungeon_scene.onWipeReturn` each got a parallel Lost-id removeHero loop alongside the existing Fallen-id one. Pattern is mechanical; verifying all three at once keeps them consistent.
+- **Surprises:**
+  - **Wipe path also had the bug,** not just the cashout paths. Spec self-review flagged the wipe path as "verify in implementation"; quick grep confirmed and the spec was promoted to a definitive third site rather than a "maybe."
+  - **No data-layer changes.** Cluster A · 15 had already done the heavy lifting (split `heroesLost` → `heroesFallen` + new `heroesLost` semantically; populated both from `runState.fallen` / `runState.lost`). This task is purely scenes consuming the already-correct data.
+  - **Manual play verification** is hand-crafted-state-only because events aren't yet in the floor generator (Cluster A · 13 explicitly deferred floor integration). The Lost-hero path can't be reached through normal gameplay yet — making this somewhat speculative UI. Documented in plan; will become organically testable when event-floor integration ships.
+- **Source:** TODO.md Cluster B · 11 → spec at `docs/superpowers/specs/2026-04-29-lost-hero-scene-rendering-design.md` → plan at `docs/superpowers/plans/2026-04-29-lost-hero-scene-rendering.md`. Test count delta: 0 (Phaser scene convention).
+
 ### 2026-04-29 · Camp node UI (Cluster B · 4)
 
 - **Why:** Closes the auto-leave stub from Cluster A · 11. Players hitting a mid-floor camp node now see a 3-button picker (Heal Party / Treat Wound / Leave Dungeon) instead of silently auto-applying heal_party. The Leave path matches the post-boss cashout precisely — full bank to vault, run ends.

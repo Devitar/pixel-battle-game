@@ -336,6 +336,7 @@ export class CampNodeOverlayScene extends Phaser.Scene {
     const result = chooseCampNodeEffect(run, { kind: 'leave' }, rng);
     const outcome = result.outcome!;
     const fallenIds = new Set(outcome.heroesFallen.map((h) => h.id));
+    const lostIds = new Set(outcome.heroesLost.map((h) => h.id));
 
     appState.update((s) => {
       const vault = credit(s.vault, outcome.goldBanked);
@@ -347,6 +348,11 @@ export class CampNodeOverlayScene extends Phaser.Scene {
         }
       }
       for (const id of fallenIds) {
+        if (roster.heroes.some((h) => h.id === id)) {
+          roster = removeHero(roster, id);
+        }
+      }
+      for (const id of lostIds) {
         if (roster.heroes.some((h) => h.id === id)) {
           roster = removeHero(roster, id);
         }
