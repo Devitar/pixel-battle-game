@@ -158,6 +158,7 @@ export class DungeonScene extends Phaser.Scene {
         node.type === 'shop'  ? '🛒' :
         node.type === 'elite' ? '💀' :
         node.type === 'camp'  ? '🏕' :
+        node.type === 'event' ? '❓' :
         '⚔';
       const x = NODE_X[i];
       const icon = this.add
@@ -258,6 +259,20 @@ export class DungeonScene extends Phaser.Scene {
     if (node.type === 'camp') {
       this.scene.launch('camp_node_overlay');
       this.scene.pause();
+      return;
+    }
+    if (node.type === 'event') {
+      // Stub: auto-skip until Cluster B · 5 ships the event overlay.
+      // Player sees event nodes in the icon row but doesn't engage with them.
+      // Equivalent to a "Decline" choice — no payload applied.
+      appState.update((s) => ({
+        ...s,
+        runState: chooseNextNode(s.runState!, node.nextNodeIds[0]),
+      }));
+      this.refreshHud();
+      this.refreshNodeColors();
+      this.refreshStatusBar();
+      this.setState('walking_to_next');
       return;
     }
 

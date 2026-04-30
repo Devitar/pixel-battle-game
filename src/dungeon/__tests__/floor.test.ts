@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CRYPT_BOSS, CRYPT_POOL } from '../../data/enemies';
+import { EVENTS } from '../../data/events';
 import { createRng } from '../../util/rng';
 import { generateFloor } from '../floor';
 import { floorScale } from '../scaling';
@@ -50,9 +51,9 @@ describe('generateFloor — Crypt', () => {
     }
   });
 
-  it('fork branches are exactly the pair from one of six fork shapes', () => {
+  it('fork branches are exactly the pair from one of ten fork shapes', () => {
     const seenShapes = new Set<string>();
-    for (let seed = 1; seed <= 600; seed++) {
+    for (let seed = 1; seed <= 1000; seed++) {
       const { nodes } = generateFloor('crypt', 1, createRng(seed));
       const fork = nodes.find((n) => n.nextNodeIds.length === 2)!;
       const branchTypes = fork.nextNodeIds
@@ -68,6 +69,10 @@ describe('generateFloor — Crypt', () => {
       'camp+combat',
       'camp+shop',
       'camp+elite',
+      'combat+event',
+      'event+shop',
+      'elite+event',
+      'camp+event',
     ]));
   });
 
@@ -100,6 +105,7 @@ describe('generateFloor — Crypt', () => {
       for (const node of nodes) {
         if (node.type === 'shop') continue;
         if (node.type === 'camp') continue; // camp has no encounter
+        if (node.type === 'event') continue; // event has no encounter
         if (node.type === 'elite') continue; // elite scale = floorScale × elite multipliers; covered separately
         expect(node.encounter.scale).toEqual(expected);
       }
@@ -202,7 +208,38 @@ describe('generateFloor — Crypt', () => {
     expect(fork.map((b) => b.type).sort()).toEqual(['camp', 'elite']);
   });
 
-  it('six fork shapes are roughly evenly distributed across seeds', () => {
+  it('event_vs_combat shape: fork branches are exactly one event and one combat', () => {
+    const { fork } = findFloorWithShape('event_vs_combat');
+    expect(fork.map((b) => b.type).sort()).toEqual(['combat', 'event']);
+  });
+
+  it('event_vs_shop shape: fork branches are exactly one event and one shop', () => {
+    const { fork } = findFloorWithShape('event_vs_shop');
+    expect(fork.map((b) => b.type).sort()).toEqual(['event', 'shop']);
+  });
+
+  it('event_vs_elite shape: fork branches are exactly one event and one elite', () => {
+    const { fork } = findFloorWithShape('event_vs_elite');
+    expect(fork.map((b) => b.type).sort()).toEqual(['elite', 'event']);
+  });
+
+  it('event_vs_camp shape: fork branches are exactly one event and one camp', () => {
+    const { fork } = findFloorWithShape('event_vs_camp');
+    expect(fork.map((b) => b.type).sort()).toEqual(['camp', 'event']);
+  });
+
+  it('event nodes carry a valid cardId from the EVENTS table', () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      for (const node of nodes) {
+        if (node.type !== 'event') continue;
+        expect(EVENTS[node.cardId]).toBeDefined();
+        expect(node.nextNodeIds).toHaveLength(1);
+      }
+    }
+  });
+
+  it('ten fork shapes are roughly evenly distributed across seeds', () => {
     const counts = {
       shop_vs_combat: 0,
       elite_vs_combat: 0,
@@ -210,28 +247,40 @@ describe('generateFloor — Crypt', () => {
       camp_vs_combat: 0,
       camp_vs_shop: 0,
       camp_vs_elite: 0,
+      event_vs_combat: 0,
+      event_vs_shop: 0,
+      event_vs_elite: 0,
+      event_vs_camp: 0,
     };
-    for (let seed = 1; seed <= 600; seed++) {
+    for (let seed = 1; seed <= 1000; seed++) {
       const { nodes } = generateFloor('crypt', 1, createRng(seed));
       const fork = nodes.find((n) => n.nextNodeIds.length === 2)!;
       const types = fork.nextNodeIds
         .map((id) => nodes.find((n) => n.id === id)!.type)
         .sort()
         .join('+');
-      if (types === 'combat+shop')       counts.shop_vs_combat += 1;
-      else if (types === 'combat+elite') counts.elite_vs_combat += 1;
-      else if (types === 'elite+shop')   counts.elite_vs_shop += 1;
-      else if (types === 'camp+combat')  counts.camp_vs_combat += 1;
-      else if (types === 'camp+shop')    counts.camp_vs_shop += 1;
-      else if (types === 'camp+elite')   counts.camp_vs_elite += 1;
+      if (types === 'combat+shop')        counts.shop_vs_combat += 1;
+      else if (types === 'combat+elite')  counts.elite_vs_combat += 1;
+      else if (types === 'elite+shop')    counts.elite_vs_shop += 1;
+      else if (types === 'camp+combat')   counts.camp_vs_combat += 1;
+      else if (types === 'camp+shop')     counts.camp_vs_shop += 1;
+      else if (types === 'camp+elite')    counts.camp_vs_elite += 1;
+      else if (types === 'combat+event')  counts.event_vs_combat += 1;
+      else if (types === 'event+shop')    counts.event_vs_shop += 1;
+      else if (types === 'elite+event')   counts.event_vs_elite += 1;
+      else if (types === 'camp+event')    counts.event_vs_camp += 1;
     }
-    // Expected ~100 each (1/6 of 600). Loose lower bound: at least 60.
+    // Expected ~100 each (1/10 of 1000). Loose lower bound: at least 60.
     expect(counts.shop_vs_combat).toBeGreaterThanOrEqual(60);
     expect(counts.elite_vs_combat).toBeGreaterThanOrEqual(60);
     expect(counts.elite_vs_shop).toBeGreaterThanOrEqual(60);
     expect(counts.camp_vs_combat).toBeGreaterThanOrEqual(60);
     expect(counts.camp_vs_shop).toBeGreaterThanOrEqual(60);
     expect(counts.camp_vs_elite).toBeGreaterThanOrEqual(60);
+    expect(counts.event_vs_combat).toBeGreaterThanOrEqual(60);
+    expect(counts.event_vs_shop).toBeGreaterThanOrEqual(60);
+    expect(counts.event_vs_elite).toBeGreaterThanOrEqual(60);
+    expect(counts.event_vs_camp).toBeGreaterThanOrEqual(60);
   });
 
   it('floor 1: combat encounters carry no modifierIds', () => {
@@ -305,8 +354,12 @@ function findFloorWithShape(
     | 'elite_vs_shop'
     | 'camp_vs_combat'
     | 'camp_vs_shop'
-    | 'camp_vs_elite',
-  maxSeeds = 600,
+    | 'camp_vs_elite'
+    | 'event_vs_combat'
+    | 'event_vs_shop'
+    | 'event_vs_elite'
+    | 'event_vs_camp',
+  maxSeeds = 1000,
 ): { nodes: ReturnType<typeof generateFloor>['nodes']; fork: { type: string }[] } {
   for (let seed = 1; seed <= maxSeeds; seed++) {
     const { nodes } = generateFloor('crypt', 1, createRng(seed));
@@ -321,7 +374,11 @@ function findFloorWithShape(
       (shape === 'elite_vs_shop'   && types[0] === 'elite'  && types[1] === 'shop')  ||
       (shape === 'camp_vs_combat'  && types[0] === 'camp'   && types[1] === 'combat') ||
       (shape === 'camp_vs_shop'    && types[0] === 'camp'   && types[1] === 'shop')   ||
-      (shape === 'camp_vs_elite'   && types[0] === 'camp'   && types[1] === 'elite');
+      (shape === 'camp_vs_elite'   && types[0] === 'camp'   && types[1] === 'elite')  ||
+      (shape === 'event_vs_combat' && types[0] === 'combat' && types[1] === 'event')  ||
+      (shape === 'event_vs_shop'   && types[0] === 'event'  && types[1] === 'shop')   ||
+      (shape === 'event_vs_elite'  && types[0] === 'elite'  && types[1] === 'event')  ||
+      (shape === 'event_vs_camp'   && types[0] === 'camp'   && types[1] === 'event');
     if (matches) return { nodes, fork: branches };
   }
   throw new Error(`no '${shape}' floor in first ${maxSeeds} seeds`);

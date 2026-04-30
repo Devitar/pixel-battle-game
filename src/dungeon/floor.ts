@@ -1,8 +1,10 @@
 import { DUNGEONS } from '../data/dungeons';
+import { EVENTS } from '../data/events';
 import type { DungeonId } from '../data/types';
 import type { Rng, WeightedOption } from '../util/rng';
 import { composeBossEncounter, composeCombatEncounter } from './encounter';
 import { composeEliteEncounter } from './elite';
+import { drawEventCard } from './event_deck';
 import { stampCombatModifiers, stampEliteModifiers } from './modifier_stamp';
 import type { Node } from './node';
 import { floorScale } from './scaling';
@@ -14,7 +16,11 @@ type ForkShape =
   | 'elite_vs_shop'
   | 'camp_vs_combat'
   | 'camp_vs_shop'
-  | 'camp_vs_elite';
+  | 'camp_vs_elite'
+  | 'event_vs_combat'
+  | 'event_vs_shop'
+  | 'event_vs_elite'
+  | 'event_vs_camp';
 
 const FORK_SHAPE_WEIGHTS: readonly WeightedOption<ForkShape>[] = [
   { value: 'shop_vs_combat',  weight: 1 },
@@ -23,6 +29,10 @@ const FORK_SHAPE_WEIGHTS: readonly WeightedOption<ForkShape>[] = [
   { value: 'camp_vs_combat',  weight: 1 },
   { value: 'camp_vs_shop',    weight: 1 },
   { value: 'camp_vs_elite',   weight: 1 },
+  { value: 'event_vs_combat', weight: 1 },
+  { value: 'event_vs_shop',   weight: 1 },
+  { value: 'event_vs_elite',  weight: 1 },
+  { value: 'event_vs_camp',   weight: 1 },
 ];
 
 export function generateFloor(
@@ -61,19 +71,28 @@ export function generateFloor(
   const usesCombatBranch =
     shape === 'shop_vs_combat' ||
     shape === 'elite_vs_combat' ||
-    shape === 'camp_vs_combat';
+    shape === 'camp_vs_combat' ||
+    shape === 'event_vs_combat';
   const usesEliteBranch =
     shape === 'elite_vs_combat' ||
     shape === 'elite_vs_shop' ||
-    shape === 'camp_vs_elite';
+    shape === 'camp_vs_elite' ||
+    shape === 'event_vs_elite';
   const usesShopBranch =
     shape === 'shop_vs_combat' ||
     shape === 'elite_vs_shop' ||
-    shape === 'camp_vs_shop';
+    shape === 'camp_vs_shop' ||
+    shape === 'event_vs_shop';
   const usesCampBranch =
     shape === 'camp_vs_combat' ||
     shape === 'camp_vs_shop' ||
-    shape === 'camp_vs_elite';
+    shape === 'camp_vs_elite' ||
+    shape === 'event_vs_camp';
+  const usesEventBranch =
+    shape === 'event_vs_combat' ||
+    shape === 'event_vs_shop' ||
+    shape === 'event_vs_elite' ||
+    shape === 'event_vs_camp';
 
   const combatBranchEncRaw = usesCombatBranch
     ? composeCombatEncounter(dungeon.enemyPool, scale, rng)
@@ -89,6 +108,10 @@ export function generateFloor(
     ? undefined
     : { ...eliteBranchEncRaw, enemies: stampEliteModifiers(eliteBranchEncRaw.enemies, rng) };
   const shopBranchInv = usesShopBranch ? generateShop(floorNumber, rng).inventory : undefined;
+
+  const eventBranchCardId = usesEventBranch
+    ? drawEventCard(Object.values(EVENTS), dungeonId, rng).id
+    : undefined;
 
   const encBoss = composeBossEncounter(dungeon.bossId, dungeon.enemyPool, scale, rng);
 
@@ -118,6 +141,12 @@ export function generateFloor(
     }
     return { id, type: 'camp', nextNodeIds: [idBoss] };
   };
+  const buildEventBranch = (id: string): Node => {
+    if (eventBranchCardId === undefined) {
+      throw new Error(`generateFloor: eventBranchCardId undefined for shape '${shape}'`);
+    }
+    return { id, type: 'event', cardId: eventBranchCardId, nextNodeIds: [idBoss] };
+  };
 
   let node2a: Node;
   let node2b: Node;
@@ -145,6 +174,22 @@ export function generateFloor(
     case 'camp_vs_elite':
       node2a = specialOnBranchA ? buildCampBranch(id2a)   : buildEliteBranch(id2a);
       node2b = specialOnBranchA ? buildEliteBranch(id2b)  : buildCampBranch(id2b);
+      break;
+    case 'event_vs_combat':
+      node2a = specialOnBranchA ? buildEventBranch(id2a)  : buildCombatBranch(id2a);
+      node2b = specialOnBranchA ? buildCombatBranch(id2b) : buildEventBranch(id2b);
+      break;
+    case 'event_vs_shop':
+      node2a = specialOnBranchA ? buildEventBranch(id2a)  : buildShopBranch(id2a);
+      node2b = specialOnBranchA ? buildShopBranch(id2b)   : buildEventBranch(id2b);
+      break;
+    case 'event_vs_elite':
+      node2a = specialOnBranchA ? buildEventBranch(id2a)  : buildEliteBranch(id2a);
+      node2b = specialOnBranchA ? buildEliteBranch(id2b)  : buildEventBranch(id2b);
+      break;
+    case 'event_vs_camp':
+      node2a = specialOnBranchA ? buildEventBranch(id2a)  : buildCampBranch(id2a);
+      node2b = specialOnBranchA ? buildCampBranch(id2b)   : buildEventBranch(id2b);
       break;
   }
 

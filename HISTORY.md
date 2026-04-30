@@ -29,6 +29,22 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-29 · Event floor integration (strategic precursor)
+
+- **Why:** The Cluster A · 13 spec deferred adding `'event'` to the Node union and the floor generator, leaving events as inert content reachable only through hand-crafted state. This task wires events into actual gameplay — they now appear at forks in ~40% of floors. Unblocks Cluster B · 5 (Event card UI), which can replace this task's auto-skip stub. No TODO entry — added as a strategic precursor outside the existing list.
+- **Decisions:**
+  - **`cardId: EventCardId` stored on the Node**, not the full card object. Single-source-of-truth in `EVENTS` table; UI does `EVENTS[node.cardId]` at render time. Pre-launch save policy already rejects stale shapes, so the rare future "card removed" case is handled by the loader.
+  - **10-shape fork RNG** (was 6). Adding event as a 5th branch type means `C(5,2) = 10` shapes; uniform 1/10 weighting keeps every branch type at 4/10 = 40% per fork. Existing shapes drop from 1/6 to 1/10 — same rebalance pattern used when camp was added.
+  - **`specialOnBranchA = true → event` for all four event pairings.** Pinning a single rule (event always lands on A when "true") keeps test coverage simple. Arbitrary for event-vs-elite and event-vs-camp; consistent everywhere else.
+  - **Auto-skip stub at arrival**, not auto-pick-choice-0. The deck includes `lose_hero` cards; auto-picking choice 0 on those would silently lose a random hero (no `selectedHeroIndex` could be supplied anyway — the resolver throws). Auto-skip applies no payload, equivalent to a Decline; once Cluster B · 5 ships the overlay, this becomes `scene.launch('event_overlay')`.
+- **Surprises:**
+  - **Three additional shim sites tsc flagged** beyond the spec's listed two:
+    - `floor.test.ts` — an existing test loop accessing `node.encounter` after filtering shop/camp/elite needed `'event'` added too.
+    - `run_state.ts` `completeCombat` — the existing shop/camp guard preventing combat on non-combat nodes needed `'event'` added so the `kind: CombatKind` derivation stays type-safe.
+    - All four pre-existing `uses*Branch` flags in `floor.ts` needed extending to include their `event_vs_*` counterparts (initially I only updated `usesCampBranch` for `event_vs_camp`; tsc was silent because the flag is only used for the `composeXEncounter` call, not for type narrowing — but the flag's semantic correctness still matters for "did we draw the resources we'll need").
+  - **Test count delta = +5** (4 shape coverage + 1 cardId sanity). The two existing 6-shape tests were replaced in-place with 10-shape versions, so net new is just the additions.
+- **Source:** spec at `docs/superpowers/specs/2026-04-29-event-floor-integration-design.md` → plan at `docs/superpowers/plans/2026-04-29-event-floor-integration.md`. Test count delta: 1284 → 1289 (+5).
+
 ### 2026-04-29 · Wound display on HeroCard + Barracks (Cluster B · 9)
 
 - **Why:** Wounds existed in the data layer (Cluster A · 3) and were treatable at the Hospital (Cluster B · 1), but heroes carrying wounds gave no visible indicator anywhere a roster was shown — a player browsing the Tavern or Barracks couldn't see which heroes needed treatment without clicking through. Closes that visibility gap.

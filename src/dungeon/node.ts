@@ -1,3 +1,4 @@
+import type { EventCardId } from '../data/events';
 import type { ModifierId } from '../data/modifiers';
 import type { EnemyId, Item, SlotIndex } from '../data/types';
 
@@ -28,6 +29,7 @@ export type Node =
   | { id: string; type: 'elite';  encounter: Encounter; nextNodeIds: readonly string[] }
   | { id: string; type: 'boss';   encounter: Encounter; nextNodeIds: readonly string[] }
   | { id: string; type: 'shop';   inventory: readonly ShopItem[]; nextNodeIds: readonly string[] }
-  | { id: string; type: 'camp';   nextNodeIds: readonly string[] };
+  | { id: string; type: 'camp';   nextNodeIds: readonly string[] }
+  | { id: string; type: 'event';  cardId: EventCardId; nextNodeIds: readonly string[] };
 
 export type NodeType = Node['type'];
