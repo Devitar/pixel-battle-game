@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-29 · Camp node UI (Cluster B · 4)
+
+- **Why:** Closes the auto-leave stub from Cluster A · 11. Players hitting a mid-floor camp node now see a 3-button picker (Heal Party / Treat Wound / Leave Dungeon) instead of silently auto-applying heal_party. The Leave path matches the post-boss cashout precisely — full bank to vault, run ends.
+- **Decisions:**
+  - **Single overlay scene with state-machine, content-swap pattern** rather than separate scenes per state. Pattern-consistent with `shop_overlay_scene` (one scene file, one panel, content rebuilds on state changes). Three states: `'main' | 'treat_picker' | 'leave_confirm'`.
+  - **Treat Wound shows a flat (hero, wound) list** rather than a 2-step hero→wound picker. With party of 3 and typically 0–2 wounds per hero, the flat list reads cleanly. Reuses `describeWoundEffect` shipped in Hospital UI.
+  - **Leave confirmation shows a banking preview** (gold, items, surviving heroes, Lost hero count if any) so the player understands what they're locking in. Single Confirm button. Back button on confirm + treat sub-states returns to main.
+  - **Persistence on Leave mirrors `camp_screen_scene.onLeave` exactly** — same `credit/addItems/updateHero/removeHero/tickRosterWounds` sequence. Avoids divergence when the two paths should produce identical post-cashout state.
+- **Surprises:**
+  - **Plan self-review caught a type-quality issue:** initial spec used `woundId: string` in the picker pair type, requiring a cast in `buildWoundRow`. Fixed to `WoundId` upfront — no cast needed.
+  - **Spec self-review caught an incomplete cashout-persistence example.** First draft missed `updateHero` for survivors and `tickRosterWounds`. Fixed by reading `camp_screen_scene.onLeave` and copying the pattern verbatim.
+  - **Pre-existing latent bug surfaced:** `camp_screen_scene.onLeave` doesn't remove Lost heroes from the roster, so a Lost hero stays "alive" in Tavern/Barracks. Both `camp_screen_scene.onLeave` and the new `camp_node_overlay_scene.applyLeave` carry the bug uniformly today. Cluster B · 11's TODO entry was updated to capture the fix-both-call-sites scope.
+  - **`tsc TS6133` flagged the unused `chooseCampNodeEffect` import** in `dungeon_scene.ts` after the auto-leave stub was removed. Cleaned up.
+- **Source:** TODO.md Cluster B · 4 → spec at `docs/superpowers/specs/2026-04-29-camp-node-ui-design.md` → plan at `docs/superpowers/plans/2026-04-29-camp-node-ui.md`. Test count delta: 0 (Phaser scene convention; manual play verification).
+
 ### 2026-04-29 · Hospital building UI (Cluster B · 1)
 
 - **Why:** First Cluster B task. The wound system + treatment data layer (Cluster A · 3) had been complete for some time, but players had no in-game way to spend gold on wound treatment. Ships the camp-hub Hospital scene that closes that loop. Pattern-consistent with `barracks_panel_scene.ts` (left list / right detail).

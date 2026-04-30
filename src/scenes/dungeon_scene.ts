@@ -5,7 +5,6 @@ import type { Node } from '../dungeon/node';
 import { heroToLoadout } from '../render/hero_loadout';
 import { Paperdoll } from '../render/paperdoll';
 import {
-  chooseCampNodeEffect,
   chooseNextNode,
   completeCombat,
   currentNode,
@@ -247,24 +246,8 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (node.type === 'camp') {
-      // Stub: auto-apply heal_party and advance. Cluster B · 4 replaces this
-      // with a picker overlay launch (matching the shop_overlay pattern).
-      const rngState = appState.get().runRngState;
-      if (rngState === undefined) {
-        console.warn('handleArrival: camp node reached without runRngState');
-        return;
-      }
-      const rng = createRngFromState(rngState);
-      const result = chooseCampNodeEffect(run, { kind: 'heal_party' }, rng);
-      appState.update((s) => ({
-        ...s,
-        runState: result.runState,
-        runRngState: rng.getState(),
-      }));
-      this.refreshHud();
-      this.refreshNodeColors();
-      this.refreshStatusBar();
-      this.setState('walking_to_next');
+      this.scene.launch('camp_node_overlay');
+      this.scene.pause();
       return;
     }
 

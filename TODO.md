@@ -38,16 +38,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Touches:** `src/scenes/blacksmith_scene.ts` (new), camp scene wiring.
 - **Source:** gdd §6 + §10 Tier 2.
 
-### 4 · Camp node UI (mid-floor)
-
-- **What:** UI for mid-floor camp nodes — three buttons: Rest (heal HP), Treat Wound (with a hero picker), Sharpen (temp Attack buff next combat). Pairs with Cluster A task 11.
-- **Why:** Pairs with camp-node data; needed for the player to interact.
-- **Tier:** 2
-- **Acceptance:**
-  - Camp-node entry overlays a 3-option picker; selecting an option resolves the effect and advances.
-- **Touches:** `src/scenes/dungeon_scene.ts`, `src/scenes/camp_node_overlay.ts` (new).
-- **Source:** gdd §4 + §10 Tier 2.
-
 ### 5 · Event card UI
 
 - **What:** Event card overlay. Shows card body text and two choice buttons; on choice, payload effects apply via the core event resolver and an outcome panel summarises the result before dismissal. Pairs with Cluster A task 13.
@@ -72,13 +62,14 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 
 ### 11 · "Lost" hero handling in scenes
 
-- **What:** When a hero is "Lost" mid-run (per Cluster A task 15), surface it visibly: tombstone in the party UI for the remainder of the run; cashout / wipe summary lists Fallen and Lost separately ("X was Lost" vs "X Fell").
-- **Why:** Without visible feedback, the design distinction between Fallen and Lost is invisible.
+- **What:** When a hero is "Lost" mid-run (per Cluster A task 15), surface it visibly: tombstone in the party UI for the remainder of the run; cashout / wipe summary lists Fallen and Lost separately ("X was Lost" vs "X Fell"). Also fix the latent bug where Lost heroes stay in the roster after cashout (both `camp_screen_scene.onLeave` and `camp_node_overlay_scene.applyLeave` need `removeHero` calls for `outcome.heroesLost` to mirror what's already done for `heroesFallen`).
+- **Why:** Without visible feedback, the design distinction between Fallen and Lost is invisible. The roster-removal bug means a Lost hero appears alive in the Tavern/Barracks after the run, contradicting gdd §8.
 - **Tier:** 2
 - **Acceptance:**
   - Party UI shows a tombstone slot for Lost heroes.
   - Cashout / wipe summary differentiates Fallen and Lost in the death list.
-- **Touches:** `src/scenes/dungeon_scene.ts`, `src/scenes/camp_screen_scene.ts`, summary widget.
+  - Lost heroes are removed from the roster on cashout (both call sites).
+- **Touches:** `src/scenes/dungeon_scene.ts`, `src/scenes/camp_screen_scene.ts`, `src/scenes/camp_node_overlay_scene.ts`, summary widget.
 - **Source:** gdd §8 + §10 Tier 2.
 
 ---
