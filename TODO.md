@@ -27,17 +27,7 @@ One section per task.
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render. Entries 1–11 shipped; 12+ surface gameplay-loop, visibility, and bug-fix work audited from gdd §6 / §10 and `bugs.md` against current HISTORY (2026-04-30).
 
-### 18 · Noticeboard signature-enemy preview
-
-- **What:** Add a "Signature enemies" section to the dungeon-list card in the Noticeboard, rendering a small icon row (sprite frames) for the dungeon's `enemyPool`. Optionally: tier label and floor-length badge.
-- **Why:** gdd §5: "Each dungeon shows its tier, expected floor length, and a preview of the **signature enemies** and loot." Today the card shows name + theme + "3 floors" only. Marginal while The Crypt is the only dungeon, but turns into "obviously missing" the moment a 2nd dungeon ships — better to land it now while there's no data-shape pressure.
-- **Tier:** 2
-- **Acceptance:**
-  - Dungeon card renders enemy sprites for each id in `DUNGEONS[id].enemyPool` plus the boss sprite (visually distinguished, e.g. larger or with a crown icon).
-  - Tier label rendered (currently DungeonDef has no `tier` field — defer if introducing one is out of scope; otherwise add it via a single-line type/data extension).
-  - Loot preview deferred — too speculative without dungeon-specific loot pools.
-- **Touches:** `src/scenes/noticeboard_panel_scene.ts`, possibly `src/data/dungeons.ts` (tier field) and `src/data/types.ts` (DungeonDef extension).
-- **Source:** ad-hoc audit 2026-04-30 (gdd §5 alignment).
+_(All Cluster B entries shipped. Cluster header retained for the upcoming backlog audit.)_
 
 ---
 

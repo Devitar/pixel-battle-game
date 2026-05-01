@@ -29,6 +29,23 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-01 · Noticeboard signature-enemy preview (Cluster B · 18)
+
+- **Why:** gdd §5 alignment: "Each dungeon shows its tier, expected floor length, and a preview of the **signature enemies** and loot." Card today shows only name + theme + floors. Marginal while The Crypt is the only dungeon, but landed now to avoid data-shape pressure when the 2nd dungeon ships — once the visual gap is obvious, you'd be tempted to extend `DungeonDef` under deadline.
+- **Decisions:**
+  - **Boss differentiated by native sprite size** (32×32 frame at scale 2× → 64px) vs minions (16×16 frame at scale 2× → 32px). No crown icon, no "BOSS" label, no separate sub-section. The boss is genuinely a different model in a different sheet — showing its actual silhouette is the most honest signal of "this is the heavy hitter," and we don't have a crown frame in the existing sprite catalog anyway.
+  - **Tier label deferred.** Tier 1 on a single-dungeon card is informationally redundant — players have nothing to compare against. The 2nd dungeon will need to update `DungeonDef` regardless (probably with scaling overrides + floor count + tier), so adding `tier` now doesn't avoid future migration. Same "needs comparison to be meaningful" argument the task itself rests on.
+  - **Bottom-aligned on a shared ground line at y=337**, not center-aligned. Mirrors combat scene's "all enemies stand on a floor" framing — visual continuity into combat. Center-alignment would leave the boss "popping out" both above and below the row, breaking the lineup.
+  - **Reuse `EnemySprite` directly.** Container constructor handles both regular and boss sprite paths via `ENEMY_VISUALS[id]`; one constructor call per sprite, zero new render code.
+  - **No header text and no per-sprite name labels.** Sprites read as preview implicitly; labels would crowd the card and minions are too narrow (32px) for readable name text.
+  - **Sprites parented to `stageContainer`** — existing `removeAll(true)` on stage transition cleans them up; no leak handling needed. Returning to `dungeon_list` rebuilds them.
+  - **Layout fits between existing elements** with no displacement: ground line at y=337 sits 7px above CTA (y=350) and the boss top (y=273) sits 8px below "3 floors" bottom (~265). No existing element moved.
+  - **No tests** (Phaser scene/UI convention).
+- **Surprises:**
+  - **Phaser containers don't respect `setOrigin`.** `EnemySprite extends Phaser.GameObjects.Container`; calling `setOrigin(0.5, 1)` to bottom-align is a silent no-op. The fix is to compute `centerY = PREVIEW_GROUND_Y - fullSize / 2` and position the container by its center. Called out load-bearing in the spec + plan + manual-verification checklist because a future maintainer "cleaning up" the math by reaching for setOrigin would visibly regress the boss-bottom alignment without any compile-time signal.
+  - **Card had ~100px of empty vertical space** between "3 floors" (y=250) and the CTA (y=350) — the new sprite row dropped in cleanly without touching any existing element. Lucky alignment; would have been less clean if the original card layout was tighter.
+- **Source:** TODO.md Cluster B · 18 → spec at `docs/superpowers/specs/2026-05-01-noticeboard-signature-enemies-design.md` → plan at `docs/superpowers/plans/2026-05-01-noticeboard-signature-enemies.md`. Test count delta: 1321 → 1321 (+0).
+
 ### 2026-05-01 · Retire hero from Barracks (Cluster B · 14)
 
 - **Why:** gdd §6 explicit: "retire heroes (frees a slot, no refund)." Players who filled their 12-slot roster with bad rolls or unwanted classes had no path to free space short of waiting for a combat death — real meta-progression friction. Closes the player-initiated removal loop.
