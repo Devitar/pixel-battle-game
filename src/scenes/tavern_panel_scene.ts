@@ -3,6 +3,7 @@ import {
   generateCandidate,
   generateCandidates,
   HIRE_COST,
+  REROLL_COST,
 } from '../camp/buildings/tavern';
 import { addHero, canAdd, listHeroes } from '../camp/roster';
 import { balance, spend } from '../camp/vault';
@@ -28,6 +29,7 @@ export class TavernPanelScene extends Phaser.Scene {
   private rng!: Rng;
   private hireButtons: HireButton[] = [];
   private footerText!: Phaser.GameObjects.Text;
+  private rerollButton?: { bg: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text };
 
   constructor() {
     super('tavern_panel');
@@ -38,6 +40,7 @@ export class TavernPanelScene extends Phaser.Scene {
     // so a re-open does not retain destroyed game objects from a prior session.
     this.candidates = [];
     this.hireButtons = [];
+    this.rerollButton = undefined;
 
     this.buildPanelChrome();
 
@@ -46,6 +49,7 @@ export class TavernPanelScene extends Phaser.Scene {
 
     SLOT_X.forEach((x, i) => this.buildSlot(i, x));
     this.buildFooter();
+    this.buildRerollButton();
 
     this.refreshButtons();
     this.refreshFooter();
@@ -109,6 +113,41 @@ export class TavernPanelScene extends Phaser.Scene {
       .setOrigin(0.5);
   }
 
+  private buildRerollButton(): void {
+    const x = 800;
+    const y = 113;
+    const bg = this.add
+      .rectangle(x, y, 130, 28, 0x333333)
+      .setStrokeStyle(2, 0x555555);
+    const label = this.add
+      .text(x, y, `Reroll · ${REROLL_COST}g`, {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: '#777777',
+      })
+      .setOrigin(0.5);
+    bg.setInteractive({ useHandCursor: true });
+    bg.on('pointerdown', () => this.reroll());
+    this.rerollButton = { bg, label };
+  }
+
+  private reroll(): void {
+    const state = appState.get();
+    if (balance(state.vault) < REROLL_COST) return;
+
+    appState.update((s) => ({
+      ...s,
+      vault: spend(s.vault, REROLL_COST),
+    }));
+
+    this.candidates = generateCandidates(this.rng, appState.get().unlocks.classes);
+    for (let i = 0; i < this.hireButtons.length; i++) {
+      this.hireButtons[i].card.setHero(this.candidates[i]);
+    }
+    this.refreshButtons();
+    this.refreshFooter();
+  }
+
   private buildCloseButton(): void {
     const closeBg = this.add
       .rectangle(933, 113, 28, 28, 0x553333)
@@ -148,11 +187,11 @@ export class TavernPanelScene extends Phaser.Scene {
     const state = appState.get();
     const gold = balance(state.vault);
     const canAddHero = canAdd(state.roster);
-    const canAfford = gold >= HIRE_COST;
-    const enabled = canAddHero && canAfford;
+    const canAffordHire = gold >= HIRE_COST;
+    const enabled = canAddHero && canAffordHire;
 
     let reason = '';
-    if (!canAfford) reason = 'Not enough gold';
+    if (!canAffordHire) reason = 'Not enough gold';
     else if (!canAddHero) reason = 'Roster full';
 
     for (const btn of this.hireButtons) {
@@ -164,6 +203,18 @@ export class TavernPanelScene extends Phaser.Scene {
         btn.label.setColor('#777777');
       }
       btn.reason.setText(reason);
+    }
+
+    // Reroll button is gated only by gold (rerolling doesn't add to roster).
+    if (this.rerollButton) {
+      const canAffordReroll = gold >= REROLL_COST;
+      if (canAffordReroll) {
+        this.rerollButton.bg.setFillStyle(0x2a4a2a).setStrokeStyle(2, 0x44cc44);
+        this.rerollButton.label.setColor('#ffffff');
+      } else {
+        this.rerollButton.bg.setFillStyle(0x333333).setStrokeStyle(2, 0x555555);
+        this.rerollButton.label.setColor('#777777');
+      }
     }
   }
 

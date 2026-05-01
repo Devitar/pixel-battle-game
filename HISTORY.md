@@ -29,6 +29,52 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-01 · Tavern reroll (Cluster B · 16)
+
+- **Why:** gdd §6 explicit: L1 Tavern has reroll for gold cost. Tavern shipped showing 3 fixed candidates per visit with no way to reroll; players were locked into whatever the session-fresh RNG produced. Closes a meaningful agency lever from recruitment.
+- **Decisions:**
+  - **`REROLL_COST = 25` in `src/camp/buildings/tavern.ts`** alongside `HIRE_COST = 50`. Half the hire cost feels right — rerolling is a setup cost, not a commitment, and players visit the Tavern with low gold early-game when 25g is real money. Single tunable site.
+  - **Reroll uses `this.rng` (the session RNG seeded from `Date.now()` on scene create).** Each click advances the stream; outcomes are non-deterministic across sessions but stable within one. Same RNG already powers `generateCandidate` post-hire — just calling `generateCandidates` (plural) replaces all three at once.
+  - **Reroll button in the title row at x=800, y=113** — sits between the title text and the close × at the right edge. Same vertical level as the title and close button, distinct from the per-candidate Hire buttons below the cards.
+  - **Reroll only checks gold, not roster capacity.** The hire buttons are disabled when the roster is full (no slot to receive the hire). Reroll just changes what's *displayed*; it doesn't add anyone to the roster, so a full-roster player can still browse fresh candidates (useful for previewing what's available before retiring someone — pairs with TODO #14 retire).
+  - **`refreshButtons` extended** rather than splitting into a separate `refreshRerollButton`. Both buttons need the same `gold = balance(state.vault)` read; folding the reroll-affordability branch into the existing method keeps the gold lookup single-source.
+  - **No new tests.** Phaser scene/UI convention is manual-play verification; the reroll's behavior is a one-block scene change.
+- **Surprises:**
+  - **Naming variable bump:** the existing `canAfford` flag was hire-cost-specific. Renamed to `canAffordHire` to make space for `canAffordReroll` in the same method. Rename was tight (3 sites in the existing block) and improves clarity even if reroll hadn't landed.
+- **Source:** TODO.md Cluster B · 16 (originated from gdd §6 alignment audit 2026-04-30) → no formal spec/plan (single-file UI extension). Test count delta: 0 (1321 → 1321).
+
+### 2026-05-01 · Outfit + hat wired into paperdoll loadout (Cluster B · 17)
+
+- **Why:** Closes the gap between gdd's "Equipment drives both look and stats" promise and the actual paperdoll renderer. Stats had been wired across all 4 slots since Cluster A · 4; rendering had only been wired for weapon + shield. As soon as Cluster C · 2 ships real outfit/hat sprites, this wire-up lights up the visual side automatically.
+- **Decisions:**
+  - **Placeholder sentinel guard.** TODO entry claimed the wiring was "harmless" pre-Cluster-C-2 because outfit/hat `spriteId` values are `'0'`. Wrong — naively rendering frame 0 as a stacked layer for any hero with an equipped outfit/hat (which IS reachable via the Equip panel and the new BarracksEquipScene) would visibly stack frame 0 onto the paperdoll. Added a `itemFrame()` helper that returns `undefined` for `spriteId === '0'`, which `layerFramesFor` then skips. Layer renders as if no item were equipped.
+  - **Inline `'0'` sentinel rather than a named constant.** Considered `PLACEHOLDER_SPRITE_ID` in `data/items.ts` but the inline value with a clear comment is enough — single read site, single value, well-documented.
+  - **Three new tests** in `hero_loadout.test.ts`: heroes without outfit/hat (loadout slots undefined), and the placeholder-guard behavior for both outfit and hat slots. The "real sprite renders correctly" path is implicitly covered by the existing weapon/shield tests using real spriteIds; explicit coverage waits for Cluster C · 2 to add real outfit/hat frames.
+  - **No changes to `paperdoll.ts` or `paperdoll_layers.ts`** — both already supported `outfit` and `hat` in the `Loadout` type and `LAYER_ORDER`. The wiring change was confined to `hero_loadout.ts`.
+- **Surprises:**
+  - **TODO entry's "harmless" claim was wrong.** Frame 0 isn't an "invisible" sentinel; it's whatever the spritesheet's first frame is — would have rendered a real (wrong) sprite stacked on the paperdoll. The guard is load-bearing today, not just future-proofing. Lesson: TODO entries' "this is safe" claims need verification against actual data, not just types.
+  - **All consumer sites benefit automatically.** `heroToLoadout` is called by Paperdoll in combat scene, dungeon scene, Barracks detail, BarracksEquipScene, equip_panel, event_overlay hero picker, perk overlay, hospital, tavern, hero card, and the camp screen. None needed touching.
+- **Source:** TODO.md Cluster B · 17 (originated from gdd §6 alignment audit 2026-04-30) → no formal spec/plan (single-file change with placeholder-guard subtlety). Test count delta: 1318 → 1321 (+3).
+
+### 2026-05-01 · Equip-from-stash at Barracks (Cluster B · 12)
+
+- **Why:** Closes the load-bearing meta-progression gap surfaced in the 2026-04-30 audit. Items went pack→stash on cashout but stash was read-only as far as equip was concerned (Blacksmith was the only consumer, and only for upgrades). Heroes who survived a run could not wear the loot you banked. gdd §6 explicit: "Inspect stats, **equip gear from stash**, set formation defaults, retire heroes."
+- **Decisions:**
+  - **Separate scene launched from Barracks**, not a sub-state of `barracks_panel_scene.ts`. Mirrors the proven `shop_overlay → equip_panel` mid-run pattern. Avoided the "Barracks file grows by 200 lines" problem of a sub-state and the "scatter conditionals through 580+ lines" problem of reusing `equip_panel_scene.ts` with a `mode` parameter.
+  - **Single-hero context** — `BarracksEquipScene.init({ heroId })` receives the Barracks-selected hero. Player exits to switch heroes. No left-pane party-list duplication.
+  - **Slot-first picker** with "(empty)" first row for non-weapon slots. Mental model for stash management is "this hero is missing X — what X do I have?" Mid-run pack uses item-first because the rhythm there is "I just looted X, where does it go?" — different question, different best UI.
+  - **2-click commit** (highlight then commit) — mirrors mid-run `equip_panel`. Preserves stat-preview value on touch (no hover assumption) and keeps muscle-memory consistent.
+  - **Stat preview reuses `previewStats` from `items/selectors.ts`.** For the "(empty)" row, an inline simulation builds the post-unequip equipment object and runs `applyEquipmentStats` directly; couldn't reuse `previewStats` there because it expects an Item to swap in.
+  - **Core helpers in new `src/items/equip_camp.ts`** (`equipFromStash`, `unequipToStash`, private `recomputeMaxHp`). Mirrors `src/run/equip_run.ts`'s shape but operates on `(roster, stash)` and returns `{ roster, stash }`. The `recomputeMaxHp` helper duplicates the same pattern in `equip_run.ts`; promoting to a shared module is reasonable future work but not blocking.
+  - **`(empty)` row hidden when slot is already empty.** The picker only offers unequip when there's actually something to unequip — no degenerate "(empty)" → "(empty)" no-op flow. Same for weapon slot, where unequip is forbidden anyway by `equip.ts`.
+  - **Equip Gear button at fixed y=430** in Barracks detail pane. Spec acknowledged this could collide with deeper-ability classes in the future — current Tier 2 classes (3-4 abilities) end around y=415 worst case, so the fixed position holds. Future class additions may need an adaptive `Math.max(430, abilitiesEndY + 8)`.
+  - **Barracks RESUME handler** added to call `rebuildDetail()` so the detail pane reflects the post-equip state (paperdoll, stats, equipment slot strip) when the equip scene closes. Same pattern as `camp_scene.ts`'s RESUME handler.
+  - **Scene render order resolved by main.ts position.** `BarracksEquipScene` registered immediately after `BarracksPanelScene` — so it naturally renders on top when launched. No `bringToTop` shenanigans (unlike Cluster B · 20's shop fix).
+- **Surprises:**
+  - **Smoothest execution since the Event card UI work.** Plan code blocks transferred 1:1; tsc happy on first try; the `PickerRow` discriminated union (`{ kind: 'empty' } | { kind: 'item'; item: Item }`) and `EMPTY_SENTINEL = '__empty__'` constant kept the highlight/commit dispatch clean throughout.
+  - **`equip_run.ts` has a latent perk-hp-effect bug** I noticed while writing the recompute helper. `computeMaxHp` accepts an optional `perk?: PerkDef` but `equip_run.ts` doesn't pass it; equipping during a run could erase a hero's perk-granted HP boost. I followed the same bug-for-bug pattern in `equip_camp.ts` for parity. Fix is its own future task.
+- **Source:** TODO.md Cluster B · 12 → spec at `docs/superpowers/specs/2026-04-30-equip-from-stash-design.md` → plan at `docs/superpowers/plans/2026-04-30-equip-from-stash.md`. Test count delta: 1307 → 1318 (+11).
+
 ### 2026-04-30 · Save loader warns on version-discard (Cluster A · 16)
 
 - **Why:** All other null-return paths in `load()` (corrupt JSON, shape mismatch, future version, paired-rng-state violation) emit a `console.warn` to make the discard visible. The "no migration registered for older version" path was silently returning `null`. Pre-launch hygiene — currently a non-issue because the schema is pinned at 1 and the path is unreachable in production, but the warn lights up the moment a future schema bump happens.

@@ -81,6 +81,12 @@ export class BarracksPanelScene extends Phaser.Scene {
     this.selectHero(heroes[0]?.id ?? null);
 
     this.input.keyboard?.on('keydown-ESC', () => this.close());
+
+    // When BarracksEquipScene closes, refresh the detail pane so the post-equip
+    // paperdoll / stats / equipment slot strip reflect the new state.
+    this.events.on(Phaser.Scenes.Events.RESUME, () => {
+      this.rebuildDetail();
+    });
   }
 
   private buildOverlayAndPanel(): void {
@@ -341,6 +347,27 @@ export class BarracksPanelScene extends Phaser.Scene {
 
       yCursor += ABILITY_BLOCK_GAP;
     }
+
+    // Equip Gear button — fixed position at bottom of the detail pane.
+    const equipBtn = this.add
+      .rectangle(DETAIL_TEXT_X + 80, 430, 140, 32, 0x335533)
+      .setStrokeStyle(2, 0x66aa66);
+    this.detailContainer.add(equipBtn);
+    this.detailContainer.add(
+      this.add
+        .text(DETAIL_TEXT_X + 80, 430, 'Equip Gear', {
+          fontFamily: 'monospace',
+          fontSize: '13px',
+          color: '#ffffff',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5),
+    );
+    equipBtn.setInteractive({ useHandCursor: true });
+    equipBtn.on('pointerdown', () => {
+      this.scene.launch('barracks_equip', { heroId: hero.id });
+      this.scene.pause();
+    });
   }
 
   private close(): void {

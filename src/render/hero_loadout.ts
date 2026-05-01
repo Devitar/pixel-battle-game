@@ -7,6 +7,17 @@ export function heroToLoadout(hero: Hero): Loadout {
   return {
     body: parseInt(hero.bodySpriteId, 10),
     weapon: parseInt(BASE_ITEMS[eq.weapon.baseId].spriteId, 10),
-    shield: eq.shield ? parseInt(BASE_ITEMS[eq.shield.baseId].spriteId, 10) : undefined,
+    shield: eq.shield ? itemFrame(eq.shield.baseId) : undefined,
+    outfit: eq.outfit ? itemFrame(eq.outfit.baseId) : undefined,
+    hat: eq.hat ? itemFrame(eq.hat.baseId) : undefined,
   };
+}
+
+// '0' is the placeholder sentinel for items without a real sprite frame yet
+// (currently outfits + hats per Cluster C · 2). Returning undefined skips the
+// layer entirely instead of rendering frame 0 as a stacked visual artifact.
+function itemFrame(baseId: keyof typeof BASE_ITEMS): number | undefined {
+  const spriteId = BASE_ITEMS[baseId].spriteId;
+  if (spriteId === '0') return undefined;
+  return parseInt(spriteId, 10);
 }

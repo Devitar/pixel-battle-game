@@ -27,19 +27,6 @@ One section per task.
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render. Entries 1–11 shipped; 12+ surface gameplay-loop, visibility, and bug-fix work audited from gdd §6 / §10 and `bugs.md` against current HISTORY (2026-04-30).
 
-### 12 · Equip-from-stash at Barracks
-
-- **What:** Add an equip/unequip flow inside the Barracks scene that reads from `state.stash` and writes through `equip()` / `unequip()` to the selected hero's equipment slots. Mirrors the mid-run `equip_panel_scene.ts` interaction but with stash as the item pool instead of pack.
-- **Why:** gdd §6 explicitly: "Inspect stats, **equip gear from stash**, set formation defaults, retire heroes." Today nothing reads stash for equip purposes — the Blacksmith reads it for upgrades, but stash items can never get onto a camp hero. Heroes who survive a run cannot wear the loot you banked. This is a load-bearing gap in the meta-progression loop.
-- **Tier:** 2
-- **Acceptance:**
-  - In Barracks, the selected hero's equipment slots are clickable; clicking opens a stash-item picker filtered to the slot.
-  - Picking a stash item swaps it onto the hero (`equip(hero, item, slot)`); the displaced item, if any, returns to stash.
-  - Unequipping a slot (other than weapon — weapon must always be present per `equip.ts`) sends the item back to stash.
-  - Stat-preview on swap uses the existing `previewStats` helper from `items/selectors.ts` for UX parity with `equip_panel_scene.ts`.
-- **Touches:** `src/scenes/barracks_panel_scene.ts` (extend the detail pane with slot widgets + picker), possibly a small extracted helper in `src/ui/`.
-- **Source:** ad-hoc audit 2026-04-30 (gdd §6 alignment).
-
 ### 13 · Floor-modifier visibility in combat
 
 - **What:** Surface enemy modifiers (`armored`, `venomous`, `enraged`) on the combat scene — at minimum, a small badge or label below each enemy nameplate listing active modifier names. Optionally, a one-line "Modifiers in effect: …" status line at fight start.
@@ -75,30 +62,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
   - Hovering / tapping the badge shows the wound-effect summary (one line per wound) — defer if the combat scene doesn't support hover.
 - **Touches:** `src/scenes/combat_scene.ts`, possibly a shared widget in `src/ui/`.
 - **Source:** ad-hoc audit 2026-04-30.
-
-### 16 · Tavern reroll
-
-- **What:** Add a "Reroll Candidates" button to the Tavern panel that costs gold (suggest 25g L1) and replaces the current 3 candidates with a fresh `generateCandidates(rng, unlockedClasses)` roll. Threads the run-RNG / a fresh camp RNG appropriately.
-- **Why:** gdd §6 explicit: L1 Tavern has reroll for gold cost. Today, the Tavern shows 3 fixed candidates per visit with no way to reroll — players are locked into whatever spawns. Removes a meaningful agency lever from recruitment.
-- **Tier:** 2
-- **Acceptance:**
-  - "Reroll · {N}g" button in the Tavern; greyed when player can't afford.
-  - Click deducts gold via `spend(vault, REROLL_COST)`, calls `generateCandidates`, and persists the new candidate set in scene state.
-  - The Tavern's candidate list lives in scene state currently (no save persistence per visit) — confirm before changing that contract.
-- **Touches:** `src/scenes/tavern_panel_scene.ts`, possibly a new `REROLL_COST` constant in `src/camp/buildings/tavern.ts`.
-- **Source:** ad-hoc audit 2026-04-30 (gdd §6 alignment).
-
-### 17 · Outfit + hat rendering on paperdoll
-
-- **What:** Extend `heroToLoadout` to also read `equipment.outfit` and `equipment.hat` and pass their `spriteId` values into the paperdoll. Currently only weapon + shield are wired into the rendered loadout.
-- **Why:** gdd: "Equipment drives both **look** and stats." Stats are wired (`applyEquipmentStats` reads all 4 slots); rendering is not. As soon as Cluster C · 2 ships real outfit/hat sprites, this wire-up lights up the visual side. Pre-Cluster-C-2, the wiring is harmless because both placeholder spriteIds are `'0'` (no visible change).
-- **Tier:** 2
-- **Acceptance:**
-  - `heroToLoadout` returns a `Loadout` containing `outfit?` and `hat?` sprite indices when those slots are populated.
-  - `Paperdoll` already renders these layers (per `render/paperdoll.ts` ordering: body → legs → feet → outfit → hair → hat → shield → weapon); confirm before changing.
-  - All current sites that use `heroToLoadout` (combat scene, dungeon scene, equip panel, event overlay hero picker, etc.) automatically benefit.
-- **Touches:** `src/render/hero_loadout.ts`, possibly `src/render/paperdoll.ts` if the `Loadout` type needs expansion.
-- **Source:** ad-hoc audit 2026-04-30. Pairs with — and is gated on — Cluster C · 2 sprites.
 
 ### 18 · Noticeboard signature-enemy preview
 
