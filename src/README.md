@@ -27,7 +27,7 @@ Why: keeps the game logic unit-testable without a browser, keeps Vitest fast, an
 | `camp/` | Persistent hub state. Roster, vault, stash, building logic, unlocks. | `roster.ts`, `vault.ts`, `stash.ts`, `unlocks.ts`, `buildings/tavern.ts`, etc. |
 | `save/` | Persistence and migrations. | `save.ts`, `migration.ts` |
 | `data/` | Content as TS modules. **No logic, just data.** | `classes.ts`, `abilities.ts`, `enemies.ts`, `items.ts`, `dungeons.ts`, `events.ts`, `traits.ts`, `perks.ts`, `names.ts` |
-| `scenes/` | Phaser scenes — the bridge between core and rendering. One scene per major game screen. | `boot_scene.ts`, `camp_scene.ts`, `dungeon_scene.ts`, `combat_scene.ts`, `camp_screen_scene.ts`, `noticeboard_scene.ts` |
+| `scenes/` | Phaser scenes — the bridge between core and rendering. One scene per major game screen. | `boot_scene.ts`, `camp_scene.ts`, `dungeon_scene.ts`, `combat_scene.ts`, `camp_screen_scene.ts`, `expeditions_panel_scene.ts` |
 | `scenes/dev/` | Dev-only scenes (sprite explorer, paperdoll demos). Not part of the shipping flow. | `main_scene.ts`, `explorer_scene.ts` |
 | `ui/` | Reusable Phaser UI widgets. | `hero_card.ts`, `ability_icon.ts`, `formation_editor.ts`, `pack_panel.ts`, `inventory_panel.ts`, `shop_panel.ts`, `event_card_panel.ts` |
 | `render/` | Rendering and sprite-atlas helpers. | `paperdoll.ts`, `paperdoll_layers.ts`, `frames.ts`, `parse_sprite_names.ts`, `sprite_names.generated.ts` |

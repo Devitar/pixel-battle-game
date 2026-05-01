@@ -14,7 +14,7 @@ import { DungeonScene } from './scenes/dungeon_scene';
 import { EquipPanelScene } from './scenes/equip_panel_scene';
 import { EventOverlayScene } from './scenes/event_overlay_scene';
 import { HospitalPanelScene } from './scenes/hospital_panel_scene';
-import { NoticeboardPanelScene } from './scenes/noticeboard_panel_scene';
+import { ExpeditionsPanelScene } from './scenes/expeditions_panel_scene';
 import { PerkOverlayScene } from './scenes/perk_overlay_scene';
 import { ShopOverlayScene } from './scenes/shop_overlay_scene';
 import { TavernPanelScene } from './scenes/tavern_panel_scene';
@@ -39,7 +39,7 @@ new Phaser.Game({
     BarracksEquipScene,
     BlacksmithPanelScene,
     HospitalPanelScene,
-    NoticeboardPanelScene,
+    ExpeditionsPanelScene,
     DungeonScene,
     CombatScene,
     CampScreenScene,

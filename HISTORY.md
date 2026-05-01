@@ -29,6 +29,22 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-01 · Rename Noticeboard → Expeditions (Cluster B · 27)
+
+- **Why:** From ideas.md #4 — short cosmetic alignment so the camp building's player-facing name matches its purpose ("pick a dungeon, descend"). "Noticeboard" reads as a passive bulletin; "Expeditions" reads as the verb the player is actually doing.
+- **Decisions:**
+  - **Full rename (UI + code internals + design docs)**, not UI-strings-only. The blast radius for full was small (5 code files, ~7 line diffs plus the file rename); UI-only would have created code/UI vocabulary drift ("the Expeditions button is in `noticeboard_panel_scene.ts`?") that confuses new contributors.
+  - **`git mv` for the file rename** preserves history across `git log` and `git blame` traces. Renamed `src/scenes/noticeboard_panel_scene.ts` → `src/scenes/expeditions_panel_scene.ts`.
+  - **Class + Phaser scene key + camp tile label flipped together.** `NoticeboardPanelScene` → `ExpeditionsPanelScene`, `'noticeboard_panel'` → `'expeditions_panel'`, `'Noticeboard'` → `'Expeditions'` (camp button label and panel title). Three call sites: the renamed file, `main.ts` (import + registration), `camp_scene.ts` (`buildBuilding` invocation).
+  - **HISTORY.md untouched** (~20 references reflect past names at past times — retro-edits would falsify the record). Existing spec/plan files in `docs/superpowers/` also untouched as frozen artefacts. New HISTORY/spec/plan entries from now on use "Expeditions."
+  - **Updated gdd.md (6 touches), CLAUDE.md (1), src/README.md (1).** The gdd is the design source-of-truth; if the building is "Expeditions" in-game, the gdd should say "Expeditions." Same logic for CLAUDE.md's Tier 1 build target description.
+  - **Grep-verified completeness.** Post-rename `git grep -i "noticeboard"` returned only HISTORY.md, spec/plan files, and the not-yet-migrated TODO #27 entry. No `src/`, no `gdd.md`, no `CLAUDE.md`, no `src/README.md` hits — confirms nothing was missed.
+  - **No tests added or removed** (1330 → 1330). Pure rename, no behavior change.
+- **Surprises:**
+  - **Pre-existing abbreviation slip in `src/README.md`** — the directory table referenced `noticeboard_scene.ts`, but the actual file was always `noticeboard_panel_scene.ts`. Caught while planning the rename touch; fixed both the rename and the abbreviation in the same diff (`expeditions_panel_scene.ts`). Lesson: when the rename touchpoint involves docs that abbreviate or paraphrase code symbols, verify the abbreviation matches reality before composing the replacement.
+  - **The grep verification step is genuinely load-bearing for renames.** Caught nothing missed this time, but the post-condition "only HISTORY + spec/plan should mention the old name" is the kind of zero-ambiguity check that turns "I think I got everything" into "I know I got everything." Worth keeping in the rename playbook.
+- **Source:** TODO.md Cluster B · 27 → spec at `docs/superpowers/specs/2026-05-01-rename-noticeboard-expeditions-design.md` → plan at `docs/superpowers/plans/2026-05-01-rename-noticeboard-expeditions.md`. Test count delta: 1330 → 1330 (+0).
+
 ### 2026-05-01 · Combat AI shuffles toward preferred slots (Cluster B · 26)
 
 - **Why:** From ideas.md #2 — observed during task 17 smoke testing: Knight dragged into slot 3 spammed Bulwark/Taunt forever (shield_bash blocked by canCastFrom, but bulwark/taunt castable from any slot, so the engine never fell through to the null/shuffle path). Same pattern locked Archer at slot 1 into archer_shoot and Priest at slot 1 into priest_strike. Visually these classes never moved toward their roles — contradicting the "tank up front" mental model the picker labels imply.

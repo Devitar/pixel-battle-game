@@ -27,18 +27,6 @@ One section per task.
 
 Tier 2 scope from gdd §10 is substantially complete (entries 1–24 shipped). Entries 25+ surface latent bugs, combat-engine quality, and pre-launch hygiene work audited 2026-05-01 against current HISTORY. Entries may touch any layer (scenes, combat engine, build config) — kept under the Cluster B umbrella since Cluster A (pure-TS data layer) was closed at task 16.
 
-### 27 · Rename Noticeboard → Expeditions
-
-- **What:** Rename the camp building from "Noticeboard" to "Expeditions" across all player-facing UI strings. The building keeps all existing functionality.
-- **Why:** From ideas.md #4 — short cosmetic improvement. "Expeditions" more directly conveys the building's purpose (pick a dungeon, descend) than the passive "Noticeboard."
-- **Tier:** 2
-- **Acceptance:**
-  - All player-facing strings updated: camp tile label, panel title, any transition messaging.
-  - Decision in brainstorming: rename the file/scene-key (`noticeboard_panel_scene.ts` / `'noticeboard_panel'`) too, or keep internal names and only change UI strings? Internal rename is more thorough but adds blast radius (main.ts registration, every `scene.launch` site).
-  - tsc + tests + build stay green.
-- **Touches:** `src/scenes/noticeboard_panel_scene.ts` (UI strings; possibly file rename + scene key), `src/scenes/camp_scene.ts` (tile label + launch site), possibly `src/main.ts` (scene registration).
-- **Source:** ideas.md #4.
-
 ### 28 · Absolute import paths
 
 - **What:** Configure absolute import aliases (e.g., `@camp/`, `@data/`, `@util/`, `@render/`, `@scenes/`, `@combat/`, `@dungeon/`, `@items/`, `@heroes/`, `@run/`, `@save/`, `@ui/`) so imports look like `import { listHeroes } from '@camp/roster'` instead of `import { listHeroes } from '../camp/roster'`. Configure both `vite.config.ts` (resolve.alias) and `tsconfig.json` (compilerOptions.paths). Migrate existing imports.

@@ -56,7 +56,7 @@ A domain folder with tests has a `__tests__/` subdirectory alongside its source 
 The game design is ambitious; the build order is phased into tiers in `gdd.md §10`:
 
 - **Tier 0** — paperdoll rendering, sprite catalog, codegen. *Done, in-repo.*
-- **Tier 1** — vertical slice: 3 classes (Knight, Archer, Priest), 1 dungeon (Crypt, 3 linear floors), 4 stats, basic camp (Tavern/Barracks/Noticeboard), pack + cashout/press-on, permadeath, save/load. This is the next build target.
+- **Tier 1** — vertical slice: 3 classes (Knight, Archer, Priest), 1 dungeon (Crypt, 3 linear floors), 4 stats, basic camp (Tavern/Barracks/Expeditions), pack + cashout/press-on, permadeath, save/load. This is the next build target.
 - **Tier 2** — feature-complete v1 (full 7-stat model, wounds, blacksmith, forks, shops, events, 6 classes).
 - **Tier 3** — dungeons 2–4, unlockable classes, Training Grounds, Chapel, legendary tier, milestone achievements.
 

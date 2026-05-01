@@ -61,7 +61,7 @@ const REASON_Y = 475;
 const HERO_BG_W = 184;
 const HERO_BG_H = 60;
 
-export class NoticeboardPanelScene extends Phaser.Scene {
+export class ExpeditionsPanelScene extends Phaser.Scene {
   private stage: Stage = 'dungeon_list';
   private stageContainer!: Phaser.GameObjects.Container;
   private titleText!: Phaser.GameObjects.Text;
@@ -78,7 +78,7 @@ export class NoticeboardPanelScene extends Phaser.Scene {
   private descendReasonText?: Phaser.GameObjects.Text;
 
   constructor() {
-    super('noticeboard_panel');
+    super('expeditions_panel');
   }
 
   create(): void {
@@ -149,7 +149,7 @@ export class NoticeboardPanelScene extends Phaser.Scene {
     this.descendReasonText = undefined;
 
     if (next === 'dungeon_list') {
-      this.titleText.setText('Noticeboard');
+      this.titleText.setText('Expeditions');
       this.buildDungeonListStage();
     } else {
       this.titleText.setText('The Crypt — Pick Your Party');
