@@ -1,7 +1,5 @@
-import { CLASSES } from '../data/classes';
-import { TRAITS } from '../data/traits';
 import type { ItemSlot } from '../data/types';
-import { computeMaxHp, type Hero } from '../heroes/hero';
+import { recomputeMaxHp } from '../heroes/hero';
 import { type Roster, updateHero } from '../camp/roster';
 import { addItems, removeItem, type Stash } from '../camp/stash';
 import { equip, unequip } from './equip';
@@ -51,16 +49,5 @@ export function unequipToStash(
   return {
     roster: updateHero(roster, clampedHero),
     stash: addItems(stash, [item]),
-  };
-}
-
-function recomputeMaxHp(hero: Hero): Hero {
-  const classDef = CLASSES[hero.classId];
-  const trait = TRAITS[hero.traitId];
-  const newMaxHp = computeMaxHp(classDef.baseStats.hp, trait, hero.equipment);
-  return {
-    ...hero,
-    maxHp: newMaxHp,
-    currentHp: Math.min(hero.currentHp, newMaxHp),
   };
 }

@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-01 · Perk-HP equip-path bug fix (Cluster B · 25)
+
+- **Why:** Cluster B · 12 HISTORY (2026-05-01) flagged a latent bug in `equip_run.ts` and `equip_camp.ts`: both call `computeMaxHp` without the optional `perk?: PerkDef` parameter, silently dropping the perk's HP bonus on every equip/unequip. Affects Stout+Resolute Knights and Steadfast Priests today (the only HP perks shipped); pattern would affect any future HP perk. Concrete repro: Stout+Resolute Knight (maxHp=24) equipping a +6 HP outfit produces maxHp=28 instead of the correct 30 — silent 2-HP data corruption, then more on subsequent equips.
+- **Decisions:**
+  - **Extracted shared `recomputeMaxHp(hero: Hero): Hero` to `src/heroes/hero.ts`** alongside `computeMaxHp`. Both equip paths import it; the inline blocks (equip_run) and local helper (equip_camp) are gone. Single tunable site for future HP-recompute changes; collapses duplication B · 12 explicitly named as future work.
+  - **Helper preserves clamp-don't-scale currentHp behavior.** Equipping never auto-heals; unequipping a +HP item from a hero at full HP just clamps currentHp DOWN. Deliberately diverges from `applyPerk`'s proportional scale-up because applyPerk runs once at level-up while recomputeMaxHp can run repeatedly (every equip swap) — proportional scaling would compound and silently inflate currentHp on each touch.
+  - **TDD ordering** — each behavior change preceded by a failing test that exposes the regression it closes. Unit test for the helper first, then equip_camp integration, then equip_run integration. Each step's failure mode pinned the symptom (got 28, expected 30).
+  - **No `computeMaxHp` change** — the optional `perk` parameter has been correct since perks shipped; only the callers were buggy. Minimal-change fix.
+- **Surprises:**
+  - **Duplicate `unequipToPack` import in `equip_run.test.ts`** — separated from the top-of-file import block by ~120 lines, immediately above its own `describe('unequipToPack')` block. The plan only updated the top import; the parser caught the duplicate at first run (`Identifier 'unequipToPack' has already been declared`). Quick fix; the duplicate is now consolidated into the top imports. Lesson: when adding to a multi-import-block file, grep for the symbol's existing imports before assuming the top block is canonical.
+  - **`Hero` type import became unused in `equip_camp.ts`.** The local `recomputeMaxHp` consumed it; once the local helper was deleted in favor of the shared one (which takes a Hero from the imported function signature), nothing in the file referenced the `Hero` type directly. tsc TS6133 caught it on the post-edit typecheck; dropped the type from the import.
+  - **Test count delta exactly +3** (1321 → 1324) as planned. The two integration tests + one unit test pin the fix at all three layers (helper, run-equip path, camp-equip path).
+- **Source:** TODO.md Cluster B · 25 → spec at `docs/superpowers/specs/2026-05-01-perk-hp-equip-fix-design.md` → plan at `docs/superpowers/plans/2026-05-01-perk-hp-equip-fix.md`. Test count delta: 1321 → 1324 (+3).
+
 ### 2026-05-01 · Noticeboard signature-enemy preview (Cluster B · 18)
 
 - **Why:** gdd §5 alignment: "Each dungeon shows its tier, expected floor length, and a preview of the **signature enemies** and loot." Card today shows only name + theme + floors. Marginal while The Crypt is the only dungeon, but landed now to avoid data-shape pressure when the 2nd dungeon ships — once the visual gap is obvious, you'd be tempted to extend `DungeonDef` under deadline.

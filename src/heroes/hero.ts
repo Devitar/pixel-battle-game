@@ -64,6 +64,18 @@ export function computeMaxHp(
   return base + gearTotal(equipment);
 }
 
+export function recomputeMaxHp(hero: Hero): Hero {
+  const classDef = CLASSES[hero.classId];
+  const trait = TRAITS[hero.traitId];
+  const perk = hero.perkId ? PERKS[hero.perkId] : undefined;
+  const newMaxHp = computeMaxHp(classDef.baseStats.hp, trait, hero.equipment, perk);
+  return {
+    ...hero,
+    maxHp: newMaxHp,
+    currentHp: Math.min(hero.currentHp, newMaxHp),
+  };
+}
+
 export function applyPerk(hero: Hero, perkId: PerkId): Hero {
   const perk = PERKS[perkId];
   const updated: Hero = { ...hero, perkId, pendingPerk: false };

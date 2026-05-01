@@ -27,19 +27,6 @@ One section per task.
 
 Tier 2 scope from gdd §10 is substantially complete (entries 1–24 shipped). Entries 25+ surface latent bugs, combat-engine quality, and pre-launch hygiene work audited 2026-05-01 against current HISTORY. Entries may touch any layer (scenes, combat engine, build config) — kept under the Cluster B umbrella since Cluster A (pure-TS data layer) was closed at task 16.
 
-### 25 · Fix perk-HP bug in equip paths
-
-- **What:** `computeMaxHp` accepts an optional `perk?: PerkDef`, but neither `src/run/equip_run.ts` nor `src/items/equip_camp.ts` passes it when recomputing maxHp on equip/unequip. Equipping (during a run OR at Barracks) silently erases a hero's perk-granted HP bonus.
-- **Why:** Cluster B · 12 HISTORY (2026-05-01) flagged this as a latent bug discovered while writing `equip_camp.ts`'s `recomputeMaxHp` helper — bug-for-bug parity was kept rather than fixing scope-creep mid-task. Affects any hero with a perk that grants HP (today: only "Resolute" +10% HP, but the pattern would affect any future HP perk too). Real silent data corruption.
-- **Tier:** 2
-- **Acceptance:**
-  - Both `equip_run.ts` and `equip_camp.ts` pass `hero.perkId ? PERKS[hero.perkId] : undefined` into `computeMaxHp`.
-  - Consider extracting a shared `recomputeMaxHp` helper since both files now duplicate the same pattern; promotion is reasonable but optional.
-  - Test added: hero with Resolute perk, equip a +HP item then unequip it, verify the perk's +10% HP is preserved across the round-trip. Same test for both equip paths.
-  - Existing perk and equip tests stay green.
-- **Touches:** `src/run/equip_run.ts`, `src/items/equip_camp.ts`, possibly a new shared helper in `src/items/`; new tests in the relevant `__tests__/` folder.
-- **Source:** HISTORY 2026-05-01 (Cluster B · 12, "Surprises" section).
-
 ### 26 · Combat AI — shuffle toward preferred slots
 
 - **What:** Heroes whose role-defining abilities require specific slots fall back to low-priority self-buffs forever when at a non-preferred slot, instead of shuffling toward their preferred position. Add `preferredSlots` to hero class definitions and bias `pickAbility` to prefer the shuffle action over self-buff fallbacks when at a non-preferred slot.
