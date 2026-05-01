@@ -27,17 +27,6 @@ One section per task.
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render. Entries 1–11 shipped; 12+ surface gameplay-loop, visibility, and bug-fix work audited from gdd §6 / §10 and `bugs.md` against current HISTORY (2026-04-30).
 
-### 24 · Long trait names overflow Barracks hero display
-
-- **What:** Trait names that exceed some implicit width break out of the trait box / hero display area in the Barracks panel — visually leaks past the container border.
-- **Why:** Layout bug. Either the trait label text isn't constrained by a `wordWrap` width, or the container clipping isn't enforced. Probably a one-line `wordWrap: { width: N }` fix in the Barracks scene's trait-rendering call.
-- **Tier:** 2 (visual bug)
-- **Acceptance:**
-  - Heroes whose trait has a long name (e.g., the longest entry in `TRAITS`) render the trait inside the Barracks layout without overflow.
-  - If the trait name truly cannot fit at the existing font size, either wrap, truncate with ellipsis, or shrink the font — pick one and document.
-- **Touches:** `src/scenes/barracks_panel_scene.ts`, possibly `src/ui/hero_card.ts` if the same trait rendering is shared.
-- **Source:** `bugs.md` (2026-04-30 user screenshot at `c:\Users\admin\Downloads\Screenshot 2026-04-30 233030.png`).
-
 ### 12 · Equip-from-stash at Barracks
 
 - **What:** Add an equip/unequip flow inside the Barracks scene that reads from `state.stash` and writes through `equip()` / `unequip()` to the selected hero's equipment slots. Mirrors the mid-run `equip_panel_scene.ts` interaction but with stash as the item pool instead of pack.

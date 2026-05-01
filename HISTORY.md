@@ -29,6 +29,19 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-30 · Trait text wraps in Barracks detail (Cluster B · 24)
+
+- **Why:** Long trait descriptions ("+2 Attack when below 50% HP" etc.) overflowed the Barracks detail pane horizontally — visible leak past the right edge. User-reported with screenshot.
+- **Decisions:**
+  - **`wordWrap: { width: 340 }` on the trait text style.** Detail pane spans x=590 (text origin) to x=935 (pane right edge) = 345px available; 340 leaves a small margin. Wrap was preferred over truncation/ellipsis (preserves info) and over font-shrink (kept consistent with surrounding 11px lines).
+  - **Captured trait text into a local + dynamic `woundsCursor`.** When trait wraps to two lines, it occupies y=172..194, overlapping the historic `woundsCursor = 192`. Changed to `Math.max(192, traitText.y + traitText.height + 6)` so single-line traits keep the historic layout exactly while wrapped traits push wounds (and the cascade-dependent ABILITIES section that already uses `Math.max(ABILITY_HEADER_Y, woundsCursor)`) down. The pre-existing `Math.max` cascade from Cluster B · 9 (Wound display) made this a one-line edit instead of a layout refactor.
+  - **Did not touch the small `HeroCard` trait line.** It uses `shortDescription` (much shorter — "Bloodthirsty · +2 Atk <50%HP" at 28 chars) and the user's report was specifically about Barracks. The small card has fixed-position siblings that wordWrap could overlap; if a trait overflow surfaces there too, fix then.
+  - **No new tests.** Phaser scene/UI convention is manual-play verification.
+- **Surprises:**
+  - **Almost shipped a bad refactor** — first attempt extracted the wounds rendering into a separate `renderWoundsSection(hero, startY)` method, but I prematurely closed `rebuildDetail`'s brace and would have left abilities orphaned. Caught immediately on inspection; reverted to a minimal change that just made `woundsCursor` dynamic.
+  - **The Cluster B · 9 `Math.max` cascade paid off again.** That HISTORY entry called out the dynamic `Math.max(ABILITY_HEADER_Y, woundsCursor)` shift as serving wound counts; here it serves wrapped trait text too, with no additional code. Generic vertical-stack guards age well.
+- **Source:** TODO.md Cluster B · 24 (originated from `bugs.md` 2026-04-30 with screenshot) → no formal spec/plan (single-file change). Test count delta: 0 (1307 → 1307).
+
 ### 2026-04-30 · Camp-node outcome panel (Cluster B · 23)
 
 - **Why:** Picking Heal Party or Treat Wound at a mid-floor camp node closed the overlay and dropped the player straight into the next encounter walk — no acknowledgment of what just happened. User-reported as jarring. Event overlay (Cluster B · 5) had already established the "important choices get an outcome beat" pattern; camp-node was the lone holdout.

@@ -233,20 +233,24 @@ export class BarracksPanelScene extends Phaser.Scene {
         },
       ),
     );
-    this.detailContainer.add(
-      this.add.text(
-        DETAIL_TEXT_X,
-        172,
-        `trait: ${traitDef.name} — ${traitDef.description}`,
-        {
-          fontFamily: 'monospace',
-          fontSize: '11px',
-          color: '#ccbbaa',
-        },
-      ),
+    const traitText = this.add.text(
+      DETAIL_TEXT_X,
+      172,
+      `trait: ${traitDef.name} — ${traitDef.description}`,
+      {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#ccbbaa',
+        wordWrap: { width: 340 },
+      },
     );
+    this.detailContainer.add(traitText);
 
-    let woundsCursor = 192;
+    // If the trait wraps to multiple lines, push wounds (and the cascade-
+    // dependent ABILITIES section below — see Math.max guard further down) so
+    // they don't overlap. Single-line traits produce ~14px height → woundsCursor
+    // stays at the historic 192.
+    let woundsCursor = Math.max(192, traitText.y + traitText.height + 6);
 
     if (hero.wounds.length > 0) {
       this.detailContainer.add(
