@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-01 · Outfit sprite wire-up (Cluster B · 31)
+
+- **Why:** Discovered during the post-Tier-2 audit (2026-05-01) when the user asked whether Cluster C · 2 actually needed new art. Verification found `clotharmor_*` (18 frames in 6 colors × 3 tiers) and `leatherarmor_tier1-5` already existed in `spritenames.txt` — outfit_cloth and outfit_leather just needed wire-up, not new art. The Cluster B · 17 placeholder-guard had been silently no-op'ing the layer for outfits equipped via the Equip panel; this lights up the actual visual.
+- **Decisions:**
+  - **`clotharmor_tan1` for `outfit_cloth`** (frame 335). Tan is the most "raw undyed cloth" reading; the BASE_ITEMS entry name is just "Cloth Robes" with no color modifier. Leaves room for the future random-color recruitment layer mentioned in gdd §3 ("Starter outfit — random color so heroes look distinct"). Five other color options exist but tan is most neutral.
+  - **`leatherarmor_tier1` for `outfit_leather`** (frame 171). Common-rarity item suggests tier 1; no color variants for leather (tiers 1–5 only).
+  - **Refreshed the placeholder-guard comment in `hero_loadout.ts`** to note that only hats remain on the `'0'` sentinel ("currently hats per Cluster C · 2 — outfits wired up in Cluster B · 31"). Guard logic itself unchanged — `hat_cap`/`hat_hood` continue to use the placeholder until Cluster C · 2 lands either new art or a rename.
+  - **Split task from original Cluster C · 2.** Audit found C · 2 was wrong about outfits ("no bespoke frames existed yet" — the frames did exist) and right about hats (no semantic match for "Cap" or "Hood" in the head catalog). Outfits became a Cluster B-style "no new art needed" wire-up; C · 2 was slimmed to hats-only with a "draw new art OR rename items" decision deferred to brainstorming.
+  - **No new tests.** The change is a literal field-value update; tsc catches typos. The Cluster B · 17 placeholder-guard tests still exercise the guard via `hat_cap`.
+- **Surprises:**
+  - **An existing test asserted the bug we just fixed.** `hero_loadout.test.ts` had a "placeholder spriteId '0' is treated as no-render (outfit slot)" test from Cluster B · 17 — its premise (`outfit_cloth.spriteId === '0'`) no longer held after this change, so the test failed on first run. Flipped it to assert the wire-up renders correctly (`expect(loadout.outfit).toBe(parseInt(BASE_ITEMS.outfit_cloth.spriteId, 10))`). Same pattern as the Archer test flip in Cluster B · 26 — third "assertion-of-the-bug-we-fixed" pattern this audit cycle. Plan/spec self-review missed this; worth adding "grep for tests using the symbol I'm changing" as a self-review step for future minor data-shape edits.
+  - **The hat-slot version of the same test still passes** — `hat_cap` retains the `'0'` placeholder, so the guard's behavior for hats is still validated.
+- **Source:** TODO.md Cluster B · 31 (added today during the post-Tier-2 audit, as the outfit half of split Cluster C · 2) → spec at `docs/superpowers/specs/2026-05-01-outfit-sprite-wireup-design.md` → plan at `docs/superpowers/plans/2026-05-01-outfit-sprite-wireup.md`. Test count delta: 1330 → 1330 (+0; one test flipped, no count change).
+
 ### 2026-05-01 · Absolute import paths (Cluster B · 28)
 
 - **Why:** From ideas.md #5 — pre-launch infrastructure refactor. Relative imports across ~100 .ts files in 12 top-level folders were fragile (file moves churned every importer; multi-level `'../../...'` was hard to scan). Adds `@folder/*` aliases configured in vite.config.ts + tsconfig.json, migrates 367 cross-folder imports across 104 files via a one-shot script, leaves the script in the repo for future folder-rename / new-folder migrations.

@@ -14,8 +14,9 @@ export function heroToLoadout(hero: Hero): Loadout {
 }
 
 // '0' is the placeholder sentinel for items without a real sprite frame yet
-// (currently outfits + hats per Cluster C · 2). Returning undefined skips the
-// layer entirely instead of rendering frame 0 as a stacked visual artifact.
+// (currently hats per Cluster C · 2 — outfits wired up in Cluster B · 31).
+// Returning undefined skips the layer entirely instead of rendering frame 0
+// as a stacked visual artifact.
 function itemFrame(baseId: keyof typeof BASE_ITEMS): number | undefined {
   const spriteId = BASE_ITEMS[baseId].spriteId;
   if (spriteId === '0') return undefined;

@@ -43,20 +43,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 - **Touches:** `src/camp/buildings/*`, `src/scenes/camp_scene.ts`, `src/scenes/tavern_panel_scene.ts`, `src/scenes/barracks_panel_scene.ts`, `src/scenes/hospital_panel_scene.ts`, `src/scenes/blacksmith_panel_scene.ts`, `src/save/*`, new `src/camp/building_levels.ts`.
 - **Source:** gdd §6 (per-building upgrade column).
 
-### 31 · Wire up outfit sprites (no new art needed)
-
-- **What:** Replace the placeholder `spriteId: '0'` entries in `BASE_ITEMS` for `outfit_cloth` and `outfit_leather` with real frame names from `SPRITE_NAMES.torso.*`. The catalog already contains `clotharmor_*` (6 colors × 3 tiers, 18 frames) and `leatherarmor_tier1-5` (5 frames) — direct visual matches for "Cloth Robes" and "Leather Tunic." No new art needed.
-- **Why:** Cluster A · 4 (Gear rarity tiers) HISTORY noted `'0'` placeholders shipped because "no bespoke frames existed yet" — but the 2026-05-01 audit (Cluster C · 2 verification) found the outfit frames DO exist in `spritenames.txt` and just need referencing. Currently the placeholder-guard in `hero_loadout.ts` (added by Cluster B · 17) safely skips the layer for outfits, so heroes wearing equipped cloth/leather outfits render as if no outfit equipped — a real visual gap with a free fix. (Hats remain a Cluster C art task — no semantic match in the catalog for "Cap" or "Hood.")
-- **Tier:** 2 polish
-- **Acceptance:**
-  - `outfit_cloth` in `src/data/items.ts` references a real `SPRITE_NAMES.torso.clotharmor_*` frame (e.g., `String(SPRITE_NAMES.torso.clotharmor_blue1)`); pick a frame whose color reads cleanly with the existing hero body palettes.
-  - `outfit_leather` references `String(SPRITE_NAMES.torso.leatherarmor_tier1)` (or another tier — common-rarity item suggests tier 1).
-  - The two outfit variants are visually distinguishable when rendered on a hero (verify by spawning a Knight + outfit_cloth and a Knight + outfit_leather in the explorer dev scene OR via Equip panel + paperdoll preview).
-  - The placeholder-guard in `hero_loadout.ts` continues to work for the still-placeholder hats — verify by inspection that `'0'` still maps to "skip layer."
-  - tsc + tests + build green; no test count change.
-- **Touches:** `src/data/items.ts` (2 spriteId fields), possibly verify `src/render/hero_loadout.ts` placeholder guard.
-- **Source:** Cluster C · 2 verification (2026-05-01) — outfit half of the original task; hats split out to a slimmer Cluster C entry.
-
 ### 30 · Brainstorm + ship dungeon travel impact
 
 - **What:** Per ideas.md #3 — make travel between dungeon rooms non-instant and meaningful. Walking animation (heroes bob between nodes), a low-% chance of surprise encounters (combat/event/merchant) every quarter-step, passive HP changes during travel (heal if healthy, take damage if wounded/sick), hero chatter snippets for charm.

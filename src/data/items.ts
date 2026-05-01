@@ -44,8 +44,8 @@ export const BASE_ITEMS: Record<ItemBaseId, BaseItemDef> = {
   daggers_basic:  { baseId: 'daggers_basic',  name: 'Dagger',          slot: 'weapon', weaponType: 'daggers',      spriteId: String(SPRITE_NAMES.weapon.dagger_tier1) },
   staff_basic:    { baseId: 'staff_basic',    name: 'Staff',           slot: 'weapon', weaponType: 'staff',        spriteId: String(SPRITE_NAMES.weapon.staff_blue_tier1) },
   shield_basic:   { baseId: 'shield_basic',   name: 'Shield',          slot: 'shield',                              spriteId: String(SPRITE_NAMES.shield.alloy_shield_1) },
-  outfit_cloth:   { baseId: 'outfit_cloth',   name: 'Cloth Robes',     slot: 'outfit',                              spriteId: '0' },
-  outfit_leather: { baseId: 'outfit_leather', name: 'Leather Tunic',   slot: 'outfit',                              spriteId: '0' },
+  outfit_cloth:   { baseId: 'outfit_cloth',   name: 'Cloth Robes',     slot: 'outfit',                              spriteId: String(SPRITE_NAMES.torso.clotharmor_tan1) },
+  outfit_leather: { baseId: 'outfit_leather', name: 'Leather Tunic',   slot: 'outfit',                              spriteId: String(SPRITE_NAMES.torso.leatherarmor_tier1) },
   hat_cap:        { baseId: 'hat_cap',        name: 'Cap',             slot: 'hat',                                 spriteId: '0' },
   hat_hood:       { baseId: 'hat_hood',       name: 'Hood',            slot: 'hat',                                 spriteId: '0' },
 };
