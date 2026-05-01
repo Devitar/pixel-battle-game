@@ -29,6 +29,18 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-30 · Hotfix: shop "Manage Gear" trap (Cluster B · 20)
+
+- **Why:** User repro: clicking Manage Gear in the shop overlay rendered the shop on top of an inert/blank equip panel, with no way to recover. The TODO entry hypothesised a missing `scene.pause()` call, but inspection found the pause was already there — there were actually **two** distinct bugs colluding to produce the trap.
+- **Decisions:**
+  - **Bug A — `equip_panel` early-returned on non-`camp_screen` status.** `repaint()` had `if (!run || run.status !== 'camp_screen') return;`. Launched from camp_screen this works (status matches). Launched from the shop, `runState.status === 'in_dungeon'` and `repaint()` no-ops — so the panel renders empty (just chrome + close button). Fix: loosen the guard to accept both `'camp_screen'` and `'in_dungeon'` (both states have valid `party` + `pack`, which is everything `equipFromPack`/`unequipToPack` need). Comment added explaining why both statuses are accepted.
+  - **Bug B — `EquipPanelScene` registered before `ShopOverlayScene` in `main.ts` → renders beneath shop.** Phaser's default scene render order follows registration order. EquipPanelScene is at index 10; ShopOverlayScene at 12. Without intervention, when both are running the shop renders on top of the equip panel. Fix: `this.scene.bringToTop('equip_panel')` after the launch. Tighter blast radius than reordering main.ts (which would risk affecting other launch sites).
+  - **Both fixes together** unlock the path: equip panel renders correctly (Bug A) and is visible/interactive (Bug B). When the equip panel closes, the shop overlay (still registered later than equip_panel) returns to the top automatically — no extra cleanup needed.
+- **Surprises:**
+  - **TODO hypothesis was wrong about which call was missing.** `scene.pause()` was already present at `shop_overlay_scene.ts:214`. The "missing pause" framing in the bug entry led me to expect a one-line fix; reality was a two-bug collusion. Lesson: when the TODO says "scope is X", treat it as a hypothesis, not a spec — the audit was useful for spotting the symptom, but the root cause needed direct inspection.
+  - **Phaser's render-order vs. interactivity** is its own gotcha. A paused scene still renders and (apparently from this user repro) can occlude other scenes' input — even though `scene.pause()` is supposed to disable input updates. Worth keeping in mind when designing future overlay-on-overlay flows.
+- **Source:** TODO.md Cluster B · 20 (which originated from `bugs.md` 2026-04-30) → no formal spec/plan (two-line hotfix). Test count delta: 0 (1307 → 1307).
+
 ### 2026-04-30 · Hotfix: event overlay throws on outcome render (Cluster B · 19)
 
 - **Why:** Same-day regression from Cluster B · 5 (shipped 2026-04-30). User repro: picking any event-card choice (e.g., starving_merchant's "Bleed for him") threw `Error: event_overlay: current node is 'boss', not 'event'` and broke the run. Every applied choice hit the same path. Caught via play-testing within hours of shipping.

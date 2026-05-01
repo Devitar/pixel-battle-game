@@ -27,18 +27,6 @@ One section per task.
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render. Entries 1–11 shipped; 12+ surface gameplay-loop, visibility, and bug-fix work audited from gdd §6 / §10 and `bugs.md` against current HISTORY (2026-04-30).
 
-### 20 · 🐛 HIGH: Shop "Manage Gear" leaves shop overlay on top, traps player
-
-- **What:** Clicking "Manage Gear" in the shop overlay launches `equip_panel` but doesn't pause/hide the shop overlay. The shop renders on top, equip-panel is unreachable, and the player can't recover or continue.
-- **Why:** `shop_overlay_scene.ts:213` calls `this.scene.launch('equip_panel', { returnTo: 'shop_overlay' })` without a corresponding `this.scene.pause()` (or `setVisible(false)`). Compare to other launch sites (e.g. `camp_scene.buildBuilding` → `scene.launch + scene.pause`).
-- **Tier:** 2 (bug fix of a Tier 2 feature)
-- **Acceptance:**
-  - Clicking "Manage Gear" hides/pauses shop overlay; equip panel is fully interactive.
-  - Closing equip panel resumes shop overlay; player can buy more, leave, or click Manage Gear again.
-  - Player can never end up with both overlays visible and interactive.
-- **Touches:** `src/scenes/shop_overlay_scene.ts` (the `Manage Gear` click handler), possibly `src/scenes/equip_panel_scene.ts` (verify it correctly resumes its `returnTo` scene on close).
-- **Source:** `bugs.md` (2026-04-30 user repro).
-
 ### 21 · 🐛 Combat results modal omits Fallen heroes
 
 - **What:** The post-combat "Victory" results panel lists per-hero HP changes for survivors but doesn't indicate which heroes Fell in the fight. A hero who died gets no line at all — silent loss.
