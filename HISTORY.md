@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-01 · Wound-effect display in combat HUD (Cluster B · 15)
+
+- **Why:** Cluster B · 9 added wound badges to HeroCard / Barracks, but combat — the surface where wound stat-effects actually fire — didn't show them. A hero fighting at -2 Attack from Winded had no on-screen indicator of why their numbers looked off. Closes the visibility loop on the wound system; data was already in `hero.wounds`.
+- **Decisions:**
+  - **`🩸 N` badge below the nameplate** (color `#ff6666`, parity with HeroCard), mirroring the enemy modifier line at `nameY + 10`. Heroes never carry modifiers; enemies never carry wounds — so the slot below the name is "owned" by whichever side has data, with zero collision risk between the two systems.
+  - **No tooltip listing wound effects.** Combat scene has no hover infrastructure today (`CombatActor` only handles `pointerdown`); adding it for one badge would mean new tap-target / show-hide / z-order machinery. Cluster B · 13 made the same call for enemy modifiers — same reasoning here. Revisit if playtesting flags confusion or if hover infra arrives for another reason.
+  - **Parallel `WOUND_*` constants next to the `MODIFIER_*` constants** rather than collapsing into a shared `EXTRA_LINE_*` constant. Two consumers, two distinct concepts that happen to share a row; the file's existing constants follow a "what is it" naming pattern (`HPBAR_BELOW_FEET`, `NAME_BELOW_FEET`). Promote to a shared constant the day a third "below the name" element shows up.
+  - **No data plumbing.** `HeroActorInit.hero` already carried the full Hero object (used by `Paperdoll`); `init.hero.wounds.length` was directly accessible at construction. Single-file change in `combat_actor.ts`.
+  - **No `isDead` suppression in combat.** HeroCard's `isDead` check exists for cashout/wipe death-list rendering; in combat every hero entering is alive at construction, and mid-fight death is handled by `CombatActor.collapse()` fading the whole container (badge included).
+  - **No tests** (Phaser scene/UI convention; matches Cluster B · 13).
+- **Surprises:**
+  - **`wound_inflicted` events fire mid-fight as observation-only.** Initial spec draft incorrectly claimed they didn't fire mid-fight at all. Caught in self-review: `effects.ts:138` only pushes the event (so `combat_playback.ts:onWoundInflicted` can spawn the `"WoundName!"` floating text + log line); the wound only realizes onto the `Hero` object post-fight via `run_state.ts:429` and doesn't mutate combatant stats this fight. The badge therefore correctly represents "wounds biting THIS fight" by ignoring mid-fight increments — a property worth noting because it could otherwise look like a bug.
+  - **Even smaller than Cluster B · 13.** That task needed a new optional field on `EnemyActorInit` plus encounter→scene→actor plumbing; this one was confined to a single render block in `CombatActor` because hero data was already in scope. Combat-scene file untouched.
+- **Source:** TODO.md Cluster B · 15 → spec at `docs/superpowers/specs/2026-05-01-wound-effect-display-combat-design.md` → plan at `docs/superpowers/plans/2026-05-01-wound-effect-display-combat.md`. Test count delta: 1321 → 1321 (+0).
+
 ### 2026-05-01 · Floor-modifier visibility in combat (Cluster B · 13)
 
 - **Why:** Cluster A · 12 (Floor-milestone enemy modifiers) shipped Armored / Venomous / Enraged with real combat effects, but no UI surfaced them — players were getting hit by extra defense, poison ticks, or a sudden mid-fight attack spike with zero on-screen indication. Closes the Tier-2 visibility gap on the floor-milestone modifiers feature.

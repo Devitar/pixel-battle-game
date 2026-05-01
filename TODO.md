@@ -40,17 +40,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Touches:** `src/scenes/barracks_panel_scene.ts`.
 - **Source:** ad-hoc audit 2026-04-30 (gdd §6 alignment).
 
-### 15 · Wound-effect display in combat HUD
-
-- **What:** Show wound badges on the party-side combat HUD. Each hero with `wounds.length > 0` gets a small `🩸 N` badge near their nameplate (matching the HeroCard convention from Cluster B · 9). Optional tooltip: list each wound's effect via the existing `describeWoundEffect` helper.
-- **Why:** Cluster B · 9 added wound badges to HeroCard / Barracks. Combat — the surface where wound effects actually fire — doesn't show them. A hero fighting at -2 Attack from Winded has no on-screen indicator of why their numbers look off. The data is right there in `hero.wounds`.
-- **Tier:** 2
-- **Acceptance:**
-  - Heroes in combat with `wounds.length > 0` render a `🩸 N` badge near their nameplate (color `#ff6666` for visual parity with HeroCard).
-  - Hovering / tapping the badge shows the wound-effect summary (one line per wound) — defer if the combat scene doesn't support hover.
-- **Touches:** `src/scenes/combat_scene.ts`, possibly a shared widget in `src/ui/`.
-- **Source:** ad-hoc audit 2026-04-30.
-
 ### 18 · Noticeboard signature-enemy preview
 
 - **What:** Add a "Signature enemies" section to the dungeon-list card in the Noticeboard, rendering a small icon row (sprite frames) for the dungeon's `enemyPool`. Optionally: tier label and floor-length badge.

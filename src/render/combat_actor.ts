@@ -54,6 +54,9 @@ const NAME_BELOW_FEET = 24;
 const MODIFIER_BELOW_NAME = 10;
 const MODIFIER_FONT = '8px';
 const MODIFIER_COLOR = '#ffaa44';
+const WOUND_BELOW_NAME = 10;
+const WOUND_FONT = '8px';
+const WOUND_COLOR = '#ff6666';
 const STATUS_ABOVE_HEAD = 10;
 
 const HERO_FRAME_SIZE = SHEET.frameWidth;
@@ -156,6 +159,18 @@ export class CombatActor extends Phaser.GameObjects.Container {
         })
         .setOrigin(0.5);
       this.add(modifierText);
+    }
+
+    if (init.kind === 'hero' && init.hero.wounds.length > 0) {
+      const woundY = nameY + WOUND_BELOW_NAME;
+      const woundText = scene.add
+        .text(0, woundY, `🩸 ${init.hero.wounds.length}`, {
+          fontFamily: 'monospace',
+          fontSize: WOUND_FONT,
+          color: WOUND_COLOR,
+        })
+        .setOrigin(0.5);
+      this.add(woundText);
     }
 
     this.hpBarBg = scene.add.rectangle(0, hpBarY, HP_BAR_W, HP_BAR_H, 0x333333);
