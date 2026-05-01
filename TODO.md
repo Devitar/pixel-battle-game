@@ -27,18 +27,6 @@ One section per task.
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render. Entries 1–11 shipped; 12+ surface gameplay-loop, visibility, and bug-fix work audited from gdd §6 / §10 and `bugs.md` against current HISTORY (2026-04-30).
 
-### 13 · Floor-modifier visibility in combat
-
-- **What:** Surface enemy modifiers (`armored`, `venomous`, `enraged`) on the combat scene — at minimum, a small badge or label below each enemy nameplate listing active modifier names. Optionally, a one-line "Modifiers in effect: …" status line at fight start.
-- **Why:** Cluster A · 12 (Floor-milestone enemy modifiers) shipped the data layer — Armored / Venomous / Enraged each carry a real combat effect — but no UI references modifiers anywhere (`Grep src/scenes/**` for `modifier` returns zero hits). Players get hit by extra defense, poison ticks, or a sudden attack spike without any signal. Closes the visibility gap on Tier 2's "scaling milestones within a dungeon" feature.
-- **Tier:** 2
-- **Acceptance:**
-  - Each enemy with at least one modifier shows badge text (e.g., "Armored", "Venomous") near its sprite/nameplate.
-  - Modifier names use a consistent color (suggest an orange / amber to read as "watch out") and use `MODIFIERS[id].name` for the label so future-added modifiers don't need scene edits.
-  - Bosses (which never roll modifiers per Cluster A · 12 HISTORY) just don't render the badge — no special branch needed.
-- **Touches:** `src/scenes/combat_scene.ts` (or wherever enemy nameplates render), `src/data/modifiers.ts` (read-only).
-- **Source:** ad-hoc audit 2026-04-30.
-
 ### 14 · Retire hero from Barracks
 
 - **What:** Add a "Retire" button to the Barracks hero detail pane. Clicking it shows a confirm dialog ("This frees the slot. The hero is gone forever. No refund."); confirm calls `removeHero(roster, hero.id)` and rebuilds the panel.

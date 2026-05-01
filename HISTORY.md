@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-01 · Floor-modifier visibility in combat (Cluster B · 13)
+
+- **Why:** Cluster A · 12 (Floor-milestone enemy modifiers) shipped Armored / Venomous / Enraged with real combat effects, but no UI surfaced them — players were getting hit by extra defense, poison ticks, or a sudden mid-fight attack spike with zero on-screen indication. Closes the Tier-2 visibility gap on the floor-milestone modifiers feature.
+- **Decisions:**
+  - **Single comma-joined orange line below the enemy nameplate** (vs separate per-modifier "pill" badges or stacked lines). Combat scene is already dense with HP bar / HP text / name / status glyphs; one short label below the name reads cleanly without competing for vertical space, and most enemies carry 0–1 modifiers anyway. Color `#ffaa44` (amber-orange) — distinct from white name, hp green/yellow/red, the `#ffcc66` round-banner amber, and the existing status-glyph palette.
+  - **No fight-start "Modifiers in effect: …" banner.** Per-enemy badges are persistent and tie a modifier to a specific sprite; a banner would be transient and undifferentiated. Kept one signal instead of two; can revisit if playtesting shows badges aren't catching the eye.
+  - **`modifierIds` stays display-only on `EnemyActorInit`, not added to `Combatant`.** Resolver only reads the unpacked passive fields (`venomousDamage`, `enragedThreshold`, etc.); putting `modifierIds` next to those would create a redundant source of truth on a core type already carrying a "consolidate into a passives bag once 3+ more land" comment. Promotion path stays open the day a real consumer (combat log decoration, inspect tooltip) shows up.
+  - **Pairing `e${i} ↔ encounter.enemies[i]` reuses the existing implicit contract from `buildCombatState`.** Both iterate `encounter.enemies` in order and assign IDs by the same index; `buildActors` just extends the contract one step further by tracking `enemyIdx` separately inside the enemy branch.
+  - **Label uses `MODIFIERS[id].name`** so future-added modifiers don't require scene edits.
+  - **No tests** (Phaser scene/UI convention; matches wound-display, hospital, camp-node-UI). The render logic is a one-line `MODIFIERS[id].name` lookup + `.join(', ')` — no behavior worth isolating.
+- **Surprises:**
+  - **Bosses needed no special branch.** Boss placements never carry `modifierIds` (per Cluster A · 12); the `init.modifierIds && init.modifierIds.length > 0` guard naturally no-ops the render. One less conditional than the spec originally hinted.
+  - **`node.encounter` was already in scope in `create()`** after the existing `node.type === 'shop' | 'camp' | 'event'` early-return narrows the type. Threading it into `buildActors` was one signature line + one call-site change; no plumbing through `currentNode()` again.
+- **Source:** TODO.md Cluster B · 13 → spec at `docs/superpowers/specs/2026-05-01-floor-modifier-visibility-design.md` → plan at `docs/superpowers/plans/2026-05-01-floor-modifier-visibility.md`. Test count delta: 1321 → 1321 (+0).
+
 ### 2026-05-01 · Tavern reroll (Cluster B · 16)
 
 - **Why:** gdd §6 explicit: L1 Tavern has reroll for gold cost. Tavern shipped showing 3 fixed candidates per visit with no way to reroll; players were locked into whatever the session-fresh RNG produced. Closes a meaningful agency lever from recruitment.

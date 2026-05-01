@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { resolveCombat } from '../combat/combat';
 import type { CombatantId, CombatState } from '../combat/types';
 import { ENEMIES } from '../data/enemies';
+import type { Encounter } from '../dungeon/node';
 import type { Hero } from '../heroes/hero';
 import { CombatActor } from '../render/combat_actor';
 import { ENEMY_VISUALS } from '../render/enemy_sprites';
@@ -71,7 +72,7 @@ export class CombatScene extends Phaser.Scene {
     this.buildBackground();
     const hud = this.buildHud();
     const displayNames = this.buildDisplayNames(run, combatState);
-    this.buildActors(combatState, run, displayNames);
+    this.buildActors(combatState, run, displayNames, node.encounter);
 
     this.playback = new CombatPlayback(
       this,
@@ -177,7 +178,9 @@ export class CombatScene extends Phaser.Scene {
     combatState: CombatState,
     run: RunState,
     displayNames: Map<CombatantId, string>,
+    encounter: Encounter,
   ): void {
+    let enemyIdx = 0;
     for (const c of combatState.combatants) {
       const x = c.side === 'player' ? PARTY_X[c.slot] : ENEMY_X[c.slot];
       const displayName = displayNames.get(c.id) ?? c.id;
@@ -198,6 +201,7 @@ export class CombatScene extends Phaser.Scene {
         const isBoss = ENEMIES[enemyId].role === 'boss';
         const visual = ENEMY_VISUALS[enemyId];
         const bodyScale = visual.bodyScale ?? (isBoss ? BOSS_BODY_SCALE : 3);
+        const placement = encounter.enemies[enemyIdx++];
         actor = new CombatActor(this, x, ROW_Y, {
           kind: 'enemy',
           combatantId: c.id,
@@ -206,6 +210,7 @@ export class CombatScene extends Phaser.Scene {
           currentHp: c.currentHp,
           maxHp: c.maxHp,
           bodyScale,
+          ...(placement.modifierIds !== undefined ? { modifierIds: placement.modifierIds } : {}),
         });
       }
       this.actors.set(c.id, actor);
