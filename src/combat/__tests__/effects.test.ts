@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ABILITIES } from '../../data/abilities';
-import { createRng } from '../../util/rng';
+import { ABILITIES } from '@data/abilities';
+import { createRng } from '@util/rng';
 import { applyAbility } from '../effects';
 import type { CombatEvent, StatusInstance } from '../types';
 import { makeEnemyCombatant, makeHeroCombatant, makeTestState } from './helpers';

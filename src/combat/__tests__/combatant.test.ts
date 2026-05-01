@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CLASSES } from '../../data/classes';
-import { ENEMIES } from '../../data/enemies';
+import { CLASSES } from '@data/classes';
+import { ENEMIES } from '@data/enemies';
 import { createEnemyCombatant, createHeroCombatant } from '../combatant';
 
 describe('createHeroCombatant', () => {

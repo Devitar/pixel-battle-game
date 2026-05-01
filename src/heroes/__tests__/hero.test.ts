@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CLASSES } from '../../data/classes';
-import { PERKS } from '../../data/perks';
-import { TRAITS } from '../../data/traits';
+import { CLASSES } from '@data/classes';
+import { PERKS } from '@data/perks';
+import { TRAITS } from '@data/traits';
 import { applyPerk, computeMaxHp, createHero, recomputeMaxHp, type Hero } from '../hero';
 
 describe('createHero — basic shape', () => {

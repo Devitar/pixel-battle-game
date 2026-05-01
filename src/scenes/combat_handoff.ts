@@ -1,4 +1,4 @@
-import type { CombatResult } from '../combat/types';
+import type { CombatResult } from '@combat/types';
 
 let pending: { result: CombatResult; rngStateAfter: number } | undefined;
 

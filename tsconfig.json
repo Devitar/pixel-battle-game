@@ -6,18 +6,31 @@
     "types": ["vite/client", "node"],
     "skipLibCheck": true,
 
-    /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
 
-    /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    "paths": {
+      "@camp/*":    ["./src/camp/*"],
+      "@combat/*":  ["./src/combat/*"],
+      "@data/*":    ["./src/data/*"],
+      "@dungeon/*": ["./src/dungeon/*"],
+      "@heroes/*":  ["./src/heroes/*"],
+      "@items/*":   ["./src/items/*"],
+      "@render/*":  ["./src/render/*"],
+      "@run/*":     ["./src/run/*"],
+      "@save/*":    ["./src/save/*"],
+      "@scenes/*":  ["./src/scenes/*"],
+      "@ui/*":      ["./src/ui/*"],
+      "@util/*":    ["./src/util/*"]
+    }
   },
   "include": ["src"]
 }

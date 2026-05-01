@@ -1,13 +1,13 @@
-import { ENEMIES } from '../data/enemies';
-import { MODIFIERS, type ModifierId } from '../data/modifiers';
-import { resolveCombatAbilities } from '../items/kit';
-import { applyEquipmentStats, rarePropertyFields } from '../items/stats';
-import type { EnemyId, SlotIndex, Wound } from '../data/types';
-import { WOUNDS } from '../data/wounds';
-import { createEnemyCombatant, createHeroCombatant } from '../combat/combatant';
-import type { CombatState, Combatant, Stats } from '../combat/types';
-import type { Encounter, ScaleFactors } from '../dungeon/node';
-import type { Hero } from '../heroes/hero';
+import { ENEMIES } from '@data/enemies';
+import { MODIFIERS, type ModifierId } from '@data/modifiers';
+import { resolveCombatAbilities } from '@items/kit';
+import { applyEquipmentStats, rarePropertyFields } from '@items/stats';
+import type { EnemyId, SlotIndex, Wound } from '@data/types';
+import { WOUNDS } from '@data/wounds';
+import { createEnemyCombatant, createHeroCombatant } from '@combat/combatant';
+import type { CombatState, Combatant, Stats } from '@combat/types';
+import type { Encounter, ScaleFactors } from '@dungeon/node';
+import type { Hero } from '@heroes/hero';
 
 function applyWoundsToStats(base: Stats, wounds: readonly Wound[]): Stats {
   const result: Stats = { ...base };

@@ -1,4 +1,4 @@
-import type { Item } from '../data/types';
+import type { Item } from '@data/types';
 
 export interface Stash {
   readonly items: readonly Item[];

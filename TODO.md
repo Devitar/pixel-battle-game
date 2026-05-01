@@ -25,20 +25,7 @@ One section per task.
 
 ## Cluster B — Scenes & UI / Tier 2 polish
 
-Tier 2 scope from gdd §10 is substantially complete (entries 1–24 shipped). Entries 25+ surface latent bugs, combat-engine quality, and pre-launch hygiene work audited 2026-05-01 against current HISTORY. Entries may touch any layer (scenes, combat engine, build config) — kept under the Cluster B umbrella since Cluster A (pure-TS data layer) was closed at task 16.
-
-### 28 · Absolute import paths
-
-- **What:** Configure absolute import aliases (e.g., `@camp/`, `@data/`, `@util/`, `@render/`, `@scenes/`, `@combat/`, `@dungeon/`, `@items/`, `@heroes/`, `@run/`, `@save/`, `@ui/`) so imports look like `import { listHeroes } from '@camp/roster'` instead of `import { listHeroes } from '../camp/roster'`. Configure both `vite.config.ts` (resolve.alias) and `tsconfig.json` (compilerOptions.paths). Migrate existing imports.
-- **Why:** From ideas.md #5 — pre-launch maintenance refactor. Relative imports are fragile when files move and create churn during refactors. With ~100 `.ts` files across many folders, the relative-import noise has grown.
-- **Tier:** 2
-- **Acceptance:**
-  - `vite.config.ts` + `tsconfig.json` carry matching `paths` aliases for each top-level `src/` folder.
-  - Existing imports migrated. Decision in brainstorming: do intra-folder imports stay relative (common convention: absolute across folders, relative within a folder), or go absolute too?
-  - tsc + tests + build stay green; no behavior change.
-  - Vitest still resolves the aliases (vitest reads vite config by default; verify).
-- **Touches:** `vite.config.ts`, `tsconfig.json`, every `.ts` file with cross-folder relative imports (~100 files for a complete migration).
-- **Source:** ideas.md #5.
+_(All Cluster B entries shipped — Tier 2 scope from gdd §10 is complete. Cluster header retained as anchor for the next backlog audit; new entries land here as 29+.)_
 
 ---
 

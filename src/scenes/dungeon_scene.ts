@@ -1,10 +1,10 @@
 import * as Phaser from 'phaser';
-import { removeHero, tickRosterWounds } from '../camp/roster';
-import type { CombatResult } from '../combat/types';
-import type { Node } from '../dungeon/node';
-import type { Hero } from '../heroes/hero';
-import { heroToLoadout } from '../render/hero_loadout';
-import { Paperdoll } from '../render/paperdoll';
+import { removeHero, tickRosterWounds } from '@camp/roster';
+import type { CombatResult } from '@combat/types';
+import type { Node } from '@dungeon/node';
+import type { Hero } from '@heroes/hero';
+import { heroToLoadout } from '@render/hero_loadout';
+import { Paperdoll } from '@render/paperdoll';
 import {
   chooseNextNode,
   completeCombat,
@@ -12,8 +12,8 @@ import {
   playerPath,
   type RunState,
   type WipeOutcome,
-} from '../run/run_state';
-import { createRngFromState } from '../util/rng';
+} from '@run/run_state';
+import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 import { consumeCombatResult } from './combat_handoff';
 

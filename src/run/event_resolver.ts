@@ -1,8 +1,8 @@
-import type { EventCard, EventPayload } from '../data/events';
-import type { Item } from '../data/types';
-import { rollEventItem } from '../dungeon/loot';
-import type { Hero } from '../heroes/hero';
-import type { Rng } from '../util/rng';
+import type { EventCard, EventPayload } from '@data/events';
+import type { Item } from '@data/types';
+import { rollEventItem } from '@dungeon/loot';
+import type { Hero } from '@heroes/hero';
+import type { Rng } from '@util/rng';
 import { addGold, addItem, spendGold } from './pack';
 import { loseHero, type RunState } from './run_state';
 

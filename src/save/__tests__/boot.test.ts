@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRoster } from '../../camp/roster';
-import { createStash } from '../../camp/stash';
-import { createVault, credit } from '../../camp/vault';
-import { createRng } from '../../util/rng';
+import { createRoster } from '@camp/roster';
+import { createStash } from '@camp/stash';
+import { createVault, credit } from '@camp/vault';
+import { createRng } from '@util/rng';
 import { resolveSaveState } from '../boot';
 import {
   CURRENT_SCHEMA_VERSION,

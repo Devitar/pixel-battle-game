@@ -1,6 +1,6 @@
-import { ENEMIES } from '../data/enemies';
-import type { EnemyId, SlotIndex } from '../data/types';
-import type { Rng } from '../util/rng';
+import { ENEMIES } from '@data/enemies';
+import type { EnemyId, SlotIndex } from '@data/types';
+import type { Rng } from '@util/rng';
 import type { Encounter, EnemyPlacement, ScaleFactors } from './node';
 
 const ENCOUNTER_SIZE_WEIGHTS = [

@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
-import { listHeroes } from '../camp/roster';
-import { balance } from '../camp/vault';
+import { listHeroes } from '@camp/roster';
+import { balance } from '@camp/vault';
 import { appState } from './app_state';
 
 export class CampScene extends Phaser.Scene {

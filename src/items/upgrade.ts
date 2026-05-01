@@ -1,7 +1,7 @@
-import { BLACKSMITH_UPGRADE_COST } from '../data/blacksmith';
-import type { AffixId, Item, Rarity, RolledAffix } from '../data/types';
-import { pickRareProperty, rollAffixValue } from '../dungeon/loot';
-import { generateItemId, type Rng } from '../util/rng';
+import { BLACKSMITH_UPGRADE_COST } from '@data/blacksmith';
+import type { AffixId, Item, Rarity, RolledAffix } from '@data/types';
+import { pickRareProperty, rollAffixValue } from '@dungeon/loot';
+import { generateItemId, type Rng } from '@util/rng';
 
 const ALL_AFFIX_IDS: readonly AffixId[] = [
   'of_power', 'of_insight', 'of_the_bear', 'of_vigor',

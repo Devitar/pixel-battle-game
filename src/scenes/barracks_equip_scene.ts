@@ -1,14 +1,14 @@
 import * as Phaser from 'phaser';
-import { CLASSES } from '../data/classes';
-import { BASE_ITEMS } from '../data/items';
-import type { Item, ItemSlot, Rarity } from '../data/types';
-import { equipFromStash, unequipToStash } from '../items/equip_camp';
-import { itemAffixDescription, itemDisplayName, previewStats, type StatPreview } from '../items/selectors';
-import { applyEquipmentStats } from '../items/stats';
-import type { Hero } from '../heroes/hero';
-import { heroToLoadout } from '../render/hero_loadout';
-import { Paperdoll } from '../render/paperdoll';
-import type { Stats } from '../combat/types';
+import { CLASSES } from '@data/classes';
+import { BASE_ITEMS } from '@data/items';
+import type { Item, ItemSlot, Rarity } from '@data/types';
+import { equipFromStash, unequipToStash } from '@items/equip_camp';
+import { itemAffixDescription, itemDisplayName, previewStats, type StatPreview } from '@items/selectors';
+import { applyEquipmentStats } from '@items/stats';
+import type { Hero } from '@heroes/hero';
+import { heroToLoadout } from '@render/hero_loadout';
+import { Paperdoll } from '@render/paperdoll';
+import type { Stats } from '@combat/types';
 import { appState } from './app_state';
 
 const PANEL_CX = 480;

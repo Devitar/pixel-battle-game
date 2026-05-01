@@ -1,4 +1,4 @@
-import { SPRITE_NAMES } from '../render/sprite_names.generated';
+import { SPRITE_NAMES } from '@render/sprite_names.generated';
 
 export const PLAYER_BODY_SPRITES: readonly string[] = [
   String(SPRITE_NAMES.character.female_light),

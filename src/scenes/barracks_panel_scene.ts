@@ -1,15 +1,15 @@
 import * as Phaser from 'phaser';
-import { listHeroes, removeHero } from '../camp/roster';
-import { ABILITIES } from '../data/abilities';
-import { describeAbility } from '../data/ability_describe';
-import { CLASSES } from '../data/classes';
-import { TRAITS } from '../data/traits';
-import { WOUNDS, describeWoundEffect } from '../data/wounds';
-import type { Hero } from '../heroes/hero';
-import { describeKitStatus, resolveCombatAbilities } from '../items/kit';
-import { heroToLoadout } from '../render/hero_loadout';
-import { Paperdoll } from '../render/paperdoll';
-import { HeroCard } from '../ui/hero_card';
+import { listHeroes, removeHero } from '@camp/roster';
+import { ABILITIES } from '@data/abilities';
+import { describeAbility } from '@data/ability_describe';
+import { CLASSES } from '@data/classes';
+import { TRAITS } from '@data/traits';
+import { WOUNDS, describeWoundEffect } from '@data/wounds';
+import type { Hero } from '@heroes/hero';
+import { describeKitStatus, resolveCombatAbilities } from '@items/kit';
+import { heroToLoadout } from '@render/hero_loadout';
+import { Paperdoll } from '@render/paperdoll';
+import { HeroCard } from '@ui/hero_card';
 import { appState } from './app_state';
 
 interface RosterCard {

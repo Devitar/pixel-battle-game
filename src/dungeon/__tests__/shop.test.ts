@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRng } from '../../util/rng';
+import { createRng } from '@util/rng';
 import { generateShop } from '../shop';
 
 describe('generateShop', () => {

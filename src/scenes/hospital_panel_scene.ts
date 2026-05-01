@@ -1,9 +1,9 @@
 import * as Phaser from 'phaser';
-import { listHeroes, treatHeroWound, updateHero } from '../camp/roster';
-import { balance, spend } from '../camp/vault';
-import { HOSPITAL_TREATMENT_COST, WOUNDS, describeWoundEffect } from '../data/wounds';
-import type { Hero } from '../heroes/hero';
-import { HeroCard } from '../ui/hero_card';
+import { listHeroes, treatHeroWound, updateHero } from '@camp/roster';
+import { balance, spend } from '@camp/vault';
+import { HOSPITAL_TREATMENT_COST, WOUNDS, describeWoundEffect } from '@data/wounds';
+import type { Hero } from '@heroes/hero';
+import { HeroCard } from '@ui/hero_card';
 import { appState } from './app_state';
 
 const PANEL_CX = 480;

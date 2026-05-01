@@ -1,9 +1,9 @@
-import type { Roster } from '../camp/roster';
-import { createStash, type Stash } from '../camp/stash';
-import type { Vault } from '../camp/vault';
-import type { Unlocks } from '../data/types';
-import type { Hero } from '../heroes/hero';
-import type { RunState } from '../run/run_state';
+import type { Roster } from '@camp/roster';
+import { createStash, type Stash } from '@camp/stash';
+import type { Vault } from '@camp/vault';
+import type { Unlocks } from '@data/types';
+import type { Hero } from '@heroes/hero';
+import type { RunState } from '@run/run_state';
 import { CURRENT_SCHEMA_VERSION, migrate } from './migration';
 
 export { CURRENT_SCHEMA_VERSION } from './migration';

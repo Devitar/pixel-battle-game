@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CRYPT_BOSS, CRYPT_POOL } from '../../data/enemies';
-import { EVENTS } from '../../data/events';
-import { createRng } from '../../util/rng';
+import { CRYPT_BOSS, CRYPT_POOL } from '@data/enemies';
+import { EVENTS } from '@data/events';
+import { createRng } from '@util/rng';
 import { generateFloor } from '../floor';
 import { floorScale } from '../scaling';
 

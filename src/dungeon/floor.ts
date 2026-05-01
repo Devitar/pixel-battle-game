@@ -1,7 +1,7 @@
-import { DUNGEONS } from '../data/dungeons';
-import { EVENTS } from '../data/events';
-import type { DungeonId } from '../data/types';
-import type { Rng, WeightedOption } from '../util/rng';
+import { DUNGEONS } from '@data/dungeons';
+import { EVENTS } from '@data/events';
+import type { DungeonId } from '@data/types';
+import type { Rng, WeightedOption } from '@util/rng';
 import { composeBossEncounter, composeCombatEncounter } from './encounter';
 import { composeEliteEncounter } from './elite';
 import { drawEventCard } from './event_deck';

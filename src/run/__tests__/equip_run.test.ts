@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { Item } from '../../data/types';
-import { applyPerk, createHero } from '../../heroes/hero';
+import type { Item } from '@data/types';
+import { applyPerk, createHero } from '@heroes/hero';
 import { addItem, createPack } from '../pack';
 import { startRun } from '../run_state';
-import { createRng } from '../../util/rng';
+import { createRng } from '@util/rng';
 import { equipFromPack, unequipToPack } from '../equip_run';
 
 const sword = (id: string, overrides: Partial<Item> = {}): Item => ({

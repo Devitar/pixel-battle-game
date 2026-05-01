@@ -1,8 +1,8 @@
-import { AFFIXES, BASE_ITEMS, RARE_PROPERTIES } from '../data/items';
-import type { HeroEquipment, Item, ItemSlot, RolledAffix, RolledRareProperty } from '../data/types';
-import type { Stats } from '../combat/types';
-import type { Hero } from '../heroes/hero';
-import type { Pack } from '../run/pack';
+import { AFFIXES, BASE_ITEMS, RARE_PROPERTIES } from '@data/items';
+import type { HeroEquipment, Item, ItemSlot, RolledAffix, RolledRareProperty } from '@data/types';
+import type { Stats } from '@combat/types';
+import type { Hero } from '@heroes/hero';
+import type { Pack } from '@run/pack';
 import { applyEquipmentStats } from './stats';
 
 const AFFIX_STAT_SUFFIX: Record<RolledAffix['affixId'], string> = {

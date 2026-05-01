@@ -1,12 +1,12 @@
-import { BASE_ITEMS, BASE_ITEM_STATS } from '../data/items';
-import { CLASSES } from '../data/classes';
-import { PERKS } from '../data/perks';
-import { TRAITS } from '../data/traits';
+import { BASE_ITEMS, BASE_ITEM_STATS } from '@data/items';
+import { CLASSES } from '@data/classes';
+import { PERKS } from '@data/perks';
+import { TRAITS } from '@data/traits';
 import type {
   ClassId, HeroEquipment, Item, ItemBaseId, ItemSlot,
   PerkDef, PerkId, StarterLoadout, TraitDef, TraitHpEffect, TraitId, Wound,
-} from '../data/types';
-import type { Stats } from '../combat/types';
+} from '@data/types';
+import type { Stats } from '@combat/types';
 
 export interface Hero {
   id: string;

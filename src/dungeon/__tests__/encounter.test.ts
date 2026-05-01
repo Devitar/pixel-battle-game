@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CRYPT_BOSS, CRYPT_POOL, ENEMIES } from '../../data/enemies';
-import type { EnemyId } from '../../data/types';
-import { createRng, type Rng, type WeightedOption } from '../../util/rng';
+import { CRYPT_BOSS, CRYPT_POOL, ENEMIES } from '@data/enemies';
+import type { EnemyId } from '@data/types';
+import { createRng, type Rng, type WeightedOption } from '@util/rng';
 import { composeBossEncounter, composeCombatEncounter } from '../encounter';
 
 const FLAT_SCALE = { hp: 1.0, attack: 1.0 };

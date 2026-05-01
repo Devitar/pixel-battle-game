@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRoster } from '../../camp/roster';
-import { createStash } from '../../camp/stash';
-import { createVault, credit } from '../../camp/vault';
-import type { RunState } from '../../run/run_state';
+import { createRoster } from '@camp/roster';
+import { createStash } from '@camp/stash';
+import { createVault, credit } from '@camp/vault';
+import type { RunState } from '@run/run_state';
 import {
   CURRENT_SCHEMA_VERSION,
   STORAGE_KEY,

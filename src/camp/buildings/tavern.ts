@@ -1,9 +1,9 @@
-import { PLAYER_BODY_SPRITES } from '../../data/body_sprites';
-import { NAMES } from '../../data/names';
-import { TRAITS } from '../../data/traits';
-import type { ClassId, TraitId } from '../../data/types';
-import { createHero, type Hero } from '../../heroes/hero';
-import type { Rng } from '../../util/rng';
+import { PLAYER_BODY_SPRITES } from '@data/body_sprites';
+import { NAMES } from '@data/names';
+import { TRAITS } from '@data/traits';
+import type { ClassId, TraitId } from '@data/types';
+import { createHero, type Hero } from '@heroes/hero';
+import type { Rng } from '@util/rng';
 
 export const HIRE_COST = 50;
 export const REROLL_COST = 25;

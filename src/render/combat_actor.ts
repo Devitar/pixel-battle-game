@@ -1,8 +1,8 @@
 import * as Phaser from 'phaser';
-import type { CombatantId } from '../combat/types';
-import { MODIFIERS, type ModifierId } from '../data/modifiers';
-import type { EnemyId, StatusId } from '../data/types';
-import type { Hero } from '../heroes/hero';
+import type { CombatantId } from '@combat/types';
+import { MODIFIERS, type ModifierId } from '@data/modifiers';
+import type { EnemyId, StatusId } from '@data/types';
+import type { Hero } from '@heroes/hero';
 import { ENEMY_VISUALS } from './enemy_sprites';
 import { EnemySprite } from './enemy_sprite';
 import { BOSS_SHEET, ENEMY_SHEET, SHEET } from './frames';

@@ -1,8 +1,8 @@
-import { addHero, createRoster } from '../camp/roster';
-import { createStash } from '../camp/stash';
-import { createVault, credit } from '../camp/vault';
-import { generateStarterRoster } from '../camp/buildings/tavern';
-import type { Rng } from '../util/rng';
+import { addHero, createRoster } from '@camp/roster';
+import { createStash } from '@camp/stash';
+import { createVault, credit } from '@camp/vault';
+import { generateStarterRoster } from '@camp/buildings/tavern';
+import type { Rng } from '@util/rng';
 
 const STARTER_GOLD = 500;
 import {

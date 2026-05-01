@@ -1,12 +1,12 @@
 import * as Phaser from 'phaser';
-import type { Stats } from '../combat/types';
-import { BASE_ITEMS } from '../data/items';
-import type { HeroEquipment, Item, ItemSlot } from '../data/types';
-import type { Hero } from '../heroes/hero';
-import { itemAffixDescription, itemDisplayName, previewStats, type StatPreview } from '../items/selectors';
-import { applyEquipmentStats } from '../items/stats';
-import { equipFromPack, unequipToPack } from '../run/equip_run';
-import type { RunState } from '../run/run_state';
+import type { Stats } from '@combat/types';
+import { BASE_ITEMS } from '@data/items';
+import type { HeroEquipment, Item, ItemSlot } from '@data/types';
+import type { Hero } from '@heroes/hero';
+import { itemAffixDescription, itemDisplayName, previewStats, type StatPreview } from '@items/selectors';
+import { applyEquipmentStats } from '@items/stats';
+import { equipFromPack, unequipToPack } from '@run/equip_run';
+import type { RunState } from '@run/run_state';
 import { appState } from './app_state';
 
 const PANEL_CX = 480;

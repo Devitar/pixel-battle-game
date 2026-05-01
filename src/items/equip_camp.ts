@@ -1,7 +1,7 @@
-import type { ItemSlot } from '../data/types';
-import { recomputeMaxHp } from '../heroes/hero';
-import { type Roster, updateHero } from '../camp/roster';
-import { addItems, removeItem, type Stash } from '../camp/stash';
+import type { ItemSlot } from '@data/types';
+import { recomputeMaxHp } from '@heroes/hero';
+import { type Roster, updateHero } from '@camp/roster';
+import { addItems, removeItem, type Stash } from '@camp/stash';
 import { equip, unequip } from './equip';
 
 export function equipFromStash(

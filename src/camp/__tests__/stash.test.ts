@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Item } from '../../data/types';
+import type { Item } from '@data/types';
 import { addItems, createStash, removeItem } from '../stash';
 
 const fake = (id: string): Item => ({

@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import type { EnemyId } from '../data/types';
+import type { EnemyId } from '@data/types';
 import { BOSS_SHEET, ENEMY_SHEET, SHEET } from './frames';
 import { ENEMY_VISUALS } from './enemy_sprites';
 import { LAYER_ORDER, type PaperdollSlot } from './paperdoll_layers';

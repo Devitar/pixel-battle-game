@@ -1,5 +1,5 @@
-import type { Wound } from '../data/types';
-import type { Hero } from '../heroes/hero';
+import type { Wound } from '@data/types';
+import type { Hero } from '@heroes/hero';
 
 export const DEFAULT_ROSTER_CAPACITY = 12;
 

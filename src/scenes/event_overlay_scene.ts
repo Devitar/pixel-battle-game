@@ -1,13 +1,13 @@
 import * as Phaser from 'phaser';
-import type { EventOutcome } from '../run/event_resolver';
-import { applyEventChoice } from '../run/event_resolver';
-import { chooseNextNode, currentNode } from '../run/run_state';
-import { EVENTS, describePayload, type EventCard, type EventChoice } from '../data/events';
-import type { Item } from '../data/types';
-import { Paperdoll } from '../render/paperdoll';
-import { heroToLoadout } from '../render/hero_loadout';
-import { itemAffixDescription, itemDisplayName } from '../items/selectors';
-import { createRngFromState } from '../util/rng';
+import type { EventOutcome } from '@run/event_resolver';
+import { applyEventChoice } from '@run/event_resolver';
+import { chooseNextNode, currentNode } from '@run/run_state';
+import { EVENTS, describePayload, type EventCard, type EventChoice } from '@data/events';
+import type { Item } from '@data/types';
+import { Paperdoll } from '@render/paperdoll';
+import { heroToLoadout } from '@render/hero_loadout';
+import { itemAffixDescription, itemDisplayName } from '@items/selectors';
+import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 
 const PANEL_CX = 480;

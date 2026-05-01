@@ -1,5 +1,5 @@
-import type { Rng } from '../util/rng';
-import type { TargetFilter, TargetSelector } from '../data/types';
+import type { Rng } from '@util/rng';
+import type { TargetFilter, TargetSelector } from '@data/types';
 import type { Combatant, CombatantId, CombatSide, CombatState } from './types';
 
 function opposingSide(side: CombatSide): CombatSide {

@@ -1,6 +1,6 @@
-import { PERKS } from '../data/perks';
-import { TRAITS } from '../data/traits';
-import type { BuffableStat, TraitCondition } from '../data/types';
+import { PERKS } from '@data/perks';
+import { TRAITS } from '@data/traits';
+import type { BuffableStat, TraitCondition } from '@data/types';
 import type { Combatant, CombatantId, CombatEvent } from './types';
 
 function evaluateTraitCondition(

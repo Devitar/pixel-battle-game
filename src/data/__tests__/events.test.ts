@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { applyEventChoice } from '../../run/event_resolver';
-import { startRun } from '../../run/run_state';
-import { createHero } from '../../heroes/hero';
-import { createRng } from '../../util/rng';
+import { applyEventChoice } from '@run/event_resolver';
+import { startRun } from '@run/run_state';
+import { createHero } from '@heroes/hero';
+import { createRng } from '@util/rng';
 import { describePayload, EVENTS, type EventCard, type EventPayload } from '../events';
 
 function makeRun() {

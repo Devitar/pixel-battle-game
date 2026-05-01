@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createHeroCombatant } from '../../combat/combatant';
-import type { CombatResult, CombatState } from '../../combat/types';
-import { xpForEliteNode } from '../../data/leveling';
-import type { SlotIndex } from '../../data/types';
-import type { Encounter, Node } from '../../dungeon/node';
-import { createHero, type Hero } from '../../heroes/hero';
-import { createRng } from '../../util/rng';
+import { createHeroCombatant } from '@combat/combatant';
+import type { CombatResult, CombatState } from '@combat/types';
+import { xpForEliteNode } from '@data/leveling';
+import type { SlotIndex } from '@data/types';
+import type { Encounter, Node } from '@dungeon/node';
+import { createHero, type Hero } from '@heroes/hero';
+import { createRng } from '@util/rng';
 import {
   cashout,
   chooseCampNodeEffect,

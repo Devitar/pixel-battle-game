@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { BASE_ITEMS } from '../../data/items';
-import type { Item } from '../../data/types';
-import { createHero } from '../../heroes/hero';
+import { BASE_ITEMS } from '@data/items';
+import type { Item } from '@data/types';
+import { createHero } from '@heroes/hero';
 import { heroToLoadout } from '../hero_loadout';
 
 describe('heroToLoadout', () => {

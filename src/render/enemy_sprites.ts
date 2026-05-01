@@ -1,4 +1,4 @@
-import type { EnemyId } from '../data/types';
+import type { EnemyId } from '@data/types';
 import { SPRITE_NAMES } from './sprite_names.generated';
 
 const ENEMY_BODY = {

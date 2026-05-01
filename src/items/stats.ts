@@ -1,8 +1,8 @@
-import { BASE_ITEM_STATS } from '../data/items';
+import { BASE_ITEM_STATS } from '@data/items';
 import type {
   AffixId, BuffableStat, HeroEquipment, RarePropertyId, RolledRareProperty,
-} from '../data/types';
-import type { Stats } from '../combat/types';
+} from '@data/types';
+import type { Stats } from '@combat/types';
 
 const AFFIX_TO_STAT: Record<AffixId, BuffableStat> = {
   of_power: 'attack',

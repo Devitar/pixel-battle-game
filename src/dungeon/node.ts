@@ -1,6 +1,6 @@
-import type { EventCardId } from '../data/events';
-import type { ModifierId } from '../data/modifiers';
-import type { EnemyId, Item, SlotIndex } from '../data/types';
+import type { EventCardId } from '@data/events';
+import type { ModifierId } from '@data/modifiers';
+import type { EnemyId, Item, SlotIndex } from '@data/types';
 
 export interface ScaleFactors {
   hp: number;

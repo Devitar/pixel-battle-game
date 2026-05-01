@@ -1,4 +1,4 @@
-import type { Item } from '../data/types';
+import type { Item } from '@data/types';
 
 export interface Pack {
   readonly gold: number;

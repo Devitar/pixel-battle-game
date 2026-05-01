@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { BASE_ITEMS } from '../../data/items';
-import { CLASSES } from '../../data/classes';
-import type { ClassId, Item, ItemBaseId, ItemSlot } from '../../data/types';
-import { createHero, type Hero } from '../../heroes/hero';
+import { BASE_ITEMS } from '@data/items';
+import { CLASSES } from '@data/classes';
+import type { ClassId, Item, ItemBaseId, ItemSlot } from '@data/types';
+import { createHero, type Hero } from '@heroes/hero';
 import { describeKitStatus, resolveCombatAbilities } from '../kit';
 
 function makeItem(baseId: ItemBaseId, slot: ItemSlot, id: string): Item {

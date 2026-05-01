@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createHero } from '../../heroes/hero';
+import { createHero } from '@heroes/hero';
 import {
   addHero,
   canAdd,

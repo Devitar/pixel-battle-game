@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { HeroEquipment, Item } from '../../data/types';
-import type { Stats } from '../../combat/types';
+import type { HeroEquipment, Item } from '@data/types';
+import type { Stats } from '@combat/types';
 import { applyEquipmentStats, rarePropertyFields } from '../stats';
 
 const ZERO_STATS: Stats = { hp: 0, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 };

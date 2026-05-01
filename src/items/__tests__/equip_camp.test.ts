@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { addHero, createRoster } from '../../camp/roster';
-import { addItems, createStash } from '../../camp/stash';
-import type { Item } from '../../data/types';
-import { applyPerk, createHero } from '../../heroes/hero';
+import { addHero, createRoster } from '@camp/roster';
+import { addItems, createStash } from '@camp/stash';
+import type { Item } from '@data/types';
+import { applyPerk, createHero } from '@heroes/hero';
 import { equipFromStash, unequipToStash } from '../equip_camp';
 
 function makeOutfitItem(id: string): Item {

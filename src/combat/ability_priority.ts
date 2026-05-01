@@ -1,6 +1,6 @@
-import { ABILITIES } from '../data/abilities';
-import type { AbilityId, AiCondition } from '../data/types';
-import type { Rng } from '../util/rng';
+import { ABILITIES } from '@data/abilities';
+import type { AbilityId, AiCondition } from '@data/types';
+import type { Rng } from '@util/rng';
 import { resolveTargetSelector } from './target_selector';
 import type { Combatant, CombatantId, CombatState } from './types';
 

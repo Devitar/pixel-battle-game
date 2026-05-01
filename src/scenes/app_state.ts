@@ -1,4 +1,4 @@
-import { save, type SaveFile } from '../save/save';
+import { save, type SaveFile } from '@save/save';
 
 class AppState {
   private current: SaveFile | null = null;

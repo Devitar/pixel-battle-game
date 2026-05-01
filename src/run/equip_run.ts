@@ -1,6 +1,6 @@
-import type { ItemSlot } from '../data/types';
-import { recomputeMaxHp } from '../heroes/hero';
-import { equip, unequip } from '../items/equip';
+import type { ItemSlot } from '@data/types';
+import { recomputeMaxHp } from '@heroes/hero';
+import { equip, unequip } from '@items/equip';
 import { addItem, removeItem } from './pack';
 import type { RunState } from './run_state';
 

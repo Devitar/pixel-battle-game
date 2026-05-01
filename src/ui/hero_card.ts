@@ -1,9 +1,9 @@
 import * as Phaser from 'phaser';
-import { CLASSES } from '../data/classes';
-import { TRAITS } from '../data/traits';
-import type { Hero } from '../heroes/hero';
-import { heroToLoadout } from '../render/hero_loadout';
-import { Paperdoll } from '../render/paperdoll';
+import { CLASSES } from '@data/classes';
+import { TRAITS } from '@data/traits';
+import type { Hero } from '@heroes/hero';
+import { heroToLoadout } from '@render/hero_loadout';
+import { Paperdoll } from '@render/paperdoll';
 
 export type HeroCardSize = 'small' | 'large';
 

@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createRoster } from '../../camp/roster';
-import { createStash } from '../../camp/stash';
-import { createVault, credit } from '../../camp/vault';
+import { createRoster } from '@camp/roster';
+import { createStash } from '@camp/stash';
+import { createVault, credit } from '@camp/vault';
 import {
   CURRENT_SCHEMA_VERSION,
   STORAGE_KEY,
   createDefaultUnlocks,
   type SaveFile,
-} from '../../save/save';
+} from '@save/save';
 import { appState } from '../app_state';
 
 class MemoryStorage implements Storage {

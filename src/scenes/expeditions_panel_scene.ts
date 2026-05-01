@@ -1,12 +1,12 @@
 import * as Phaser from 'phaser';
-import { listHeroes } from '../camp/roster';
-import { DUNGEONS } from '../data/dungeons';
-import type { EnemyId } from '../data/types';
-import type { Hero } from '../heroes/hero';
-import { EnemySprite } from '../render/enemy_sprite';
-import { startRun } from '../run/run_state';
-import { HeroCard } from '../ui/hero_card';
-import { createRng } from '../util/rng';
+import { listHeroes } from '@camp/roster';
+import { DUNGEONS } from '@data/dungeons';
+import type { EnemyId } from '@data/types';
+import type { Hero } from '@heroes/hero';
+import { EnemySprite } from '@render/enemy_sprite';
+import { startRun } from '@run/run_state';
+import { HeroCard } from '@ui/hero_card';
+import { createRng } from '@util/rng';
 import { appState } from './app_state';
 
 type Stage = 'dungeon_list' | 'party_picker';

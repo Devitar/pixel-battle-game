@@ -1,5 +1,5 @@
-import { BASE_ITEMS } from '../data/items';
-import type { Hero } from '../heroes/hero';
+import { BASE_ITEMS } from '@data/items';
+import type { Hero } from '@heroes/hero';
 import type { Loadout } from './paperdoll';
 
 export function heroToLoadout(hero: Hero): Loadout {

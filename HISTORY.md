@@ -29,6 +29,23 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-01 · Absolute import paths (Cluster B · 28)
+
+- **Why:** From ideas.md #5 — pre-launch infrastructure refactor. Relative imports across ~100 .ts files in 12 top-level folders were fragile (file moves churned every importer; multi-level `'../../...'` was hard to scan). Adds `@folder/*` aliases configured in vite.config.ts + tsconfig.json, migrates 367 cross-folder imports across 104 files via a one-shot script, leaves the script in the repo for future folder-rename / new-folder migrations.
+- **Decisions:**
+  - **Per-folder aliases** (`@camp/`, `@combat/`, `@data/`, `@dungeon/`, `@heroes/`, `@items/`, `@render/`, `@run/`, `@save/`, `@scenes/`, `@ui/`, `@util/`) over single-root `@/`. Reads cleaner at call sites (one fewer character per import × hundreds of imports adds up). 12-entry config is verbose once but doesn't grow often.
+  - **Intra-folder imports stay relative.** Common JS convention ("absolute across folders, relative within"); communicates locality, leaves intra-folder file moves alone, keeps `__tests__/foo.test.ts` importing `'../foo'` reading as "the module I'm testing." Subfolders (`camp/buildings/`, `scenes/dev/`) inherit their parent's alias when imported externally (e.g., `@camp/buildings/tavern`); intra-parent imports between subfolders stay relative.
+  - **One-shot migration via `scripts/migrate-imports.ts`.** Walks every `.ts` under `src/`, applies a depth-aware heuristic: `..count === depth` → cross-folder (rewrite), `..count < depth` → intra-folder (leave). Handled 367 imports across 104 files in one run. Script kept in repo for future "rename a folder, fix imports" or "add a new top-level folder, migrate to alias" recipes — minimal cost, future-historical reference.
+  - **Single source-of-truth via vite.config.ts.** Vitest 4.1.5 reads vite config automatically — same alias config powers `vite dev`, `vite build`, and `vitest run`. tsconfig mirrors via `paths` (for tsc, which runs as part of `npm run build`).
+  - **Idempotent script.** A second run produces zero changes (already-rewritten imports use `@folder/...`, which doesn't match the regex). Safe to re-run during development.
+  - **No new tests.** Pure refactor; verification is the 4-layer stack (grep, tsc, tests, build). All green; 1330 → 1330 (+0).
+- **Surprises:**
+  - **TypeScript 6.0 deprecates `baseUrl`.** Spec + plan both recommended `baseUrl: "."` (the universal pattern), but TS 6.0 errored on first tsc run with "Option 'baseUrl' is deprecated and will stop functioning in TypeScript 7.0." Fixed by dropping `baseUrl` entirely and adding `./` prefix to each `paths` entry (e.g., `["./src/camp/*"]` instead of `["src/camp/*"]`). Forward-compatible, no deprecation warning, same effective behavior. Lesson: when adding tsconfig fields, verify against the actual TS version in package.json — the "universal pattern" may have shifted.
+  - **Verification grep was too loose initially.** Plan's grep `from '\.\./(camp|combat|...)'` (no trailing slash) matched 14 sibling-test imports whose target module names happen to collide with folder names (`'../combat'` is the `combat.ts` sibling, not the `combat/` folder; `'../save'`, `'../items'`, `'../dungeons'`, etc. all collide). Trailing `/` fix returned the expected zero results. Lesson: when grep-verifying a path-shape migration, anchor the pattern strictly enough to reject same-name false positives.
+  - **Script ran cleanly in one shot.** 367 imports, 104 files, zero edge-case failures, idempotent on re-run. The depth heuristic + uniform import patterns in this codebase (no dynamic imports, single-quoted strings, no unusual whitespace) made the regex-based approach completely safe. AST-based migration would have been overkill.
+  - **The Phaser firewall held automatically.** No module that previously didn't import phaser now does — the migration is path rewrite only. Verified by inspection of the 4-layer stack output (no surprise import-graph changes).
+- **Source:** TODO.md Cluster B · 28 → spec at `docs/superpowers/specs/2026-05-01-absolute-import-paths-design.md` → plan at `docs/superpowers/plans/2026-05-01-absolute-import-paths.md`. Test count delta: 1330 → 1330 (+0). Files touched: vite.config.ts, tsconfig.json, scripts/migrate-imports.ts (new), 104 files under src/.
+
 ### 2026-05-01 · Rename Noticeboard → Expeditions (Cluster B · 27)
 
 - **Why:** From ideas.md #4 — short cosmetic alignment so the camp building's player-facing name matches its purpose ("pick a dungeon, descend"). "Noticeboard" reads as a passive bulletin; "Expeditions" reads as the verb the player is actually doing.
