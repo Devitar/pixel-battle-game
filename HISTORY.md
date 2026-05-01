@@ -29,6 +29,18 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-30 · Hotfix: event overlay throws on outcome render (Cluster B · 19)
+
+- **Why:** Same-day regression from Cluster B · 5 (shipped 2026-04-30). User repro: picking any event-card choice (e.g., starving_merchant's "Bleed for him") threw `Error: event_overlay: current node is 'boss', not 'event'` and broke the run. Every applied choice hit the same path. Caught via play-testing within hours of shipping.
+- **Decisions:**
+  - **Move `currentCard()` into the `'card'` branch only.** `EventOverlayScene.rerender()` had `const card = this.currentCard()` at the top, before the state-switch. After `applyChoice` runs `chooseNextNode`, `currentNodeId` points at the next node (often a boss); `currentCard()`'s `node.type !== 'event'` guard then threw. Fix is a 3-line reshape: only call `currentCard()` inside the `'card'` arm. The `'outcome'` arm reads from `this.lastOutcome` (the in-memory outcome captured pre-advance); the `'hero_picker'` arm uses a hardcoded title and doesn't need the card.
+  - **Comment added** at the call site explaining the constraint ("only safe before applyChoice has advanced currentNodeId") so a future editor doesn't reintroduce the bug by hoisting `currentCard()` back to the top.
+  - **No new tests.** Phaser scene convention is manual-play verification; the bug surfaced via play and the fix is verifiable the same way. Adding a Vitest harness for scene-level state-machine flow would be its own task.
+- **Surprises:**
+  - **The bug was visible during the spec/plan review** if anyone had simulated a state transition by hand — `applyChoice` clearly advances state and *then* triggers `rerender()`, and `rerender()` clearly calls `currentCard()` unconditionally. The atomic-persist-and-advance decision (spec §4) was meant to be load-bearing for state consistency on browser refresh, but it created exactly the read-after-advance problem that broke the outcome render path. Lesson: when a design's atomicity property is described, walk through the immediate post-atomic UI rendering path explicitly — that's where invariants get violated by pre-existing code paths.
+  - **`'hero_picker'` was safe by accident** because its title is hardcoded ("Pick a hero to be Lost.") and it doesn't read the card. If a future card needs a parameterized picker title (e.g., "Pick a hero to dare the well"), the picker will need its own card lookup — which is fine because it runs *before* applyChoice.
+- **Source:** TODO.md Cluster B · 19 → no formal spec/plan (one-block hotfix). Test count delta: 0 (1307 → 1307).
+
 ### 2026-04-30 · Event card UI (Cluster B · 5)
 
 - **Why:** Replaces the auto-skip stub from the event-floor-integration HISTORY entry (2026-04-29). Players walking onto event nodes now see the card body, pick a choice, and read the outcome — making event-node forks meaningful for the first time. Closes Cluster B (the cluster header was removed from TODO.md, matching the Cluster A precedent).

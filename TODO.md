@@ -27,18 +27,6 @@ One section per task.
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render. Entries 1–11 shipped; 12+ surface gameplay-loop, visibility, and bug-fix work audited from gdd §6 / §10 and `bugs.md` against current HISTORY (2026-04-30).
 
-### 19 · 🔥 CRITICAL: Event overlay throws when outcome panel renders after applying a choice
-
-- **What:** Picking any choice on an event card throws `Error: event_overlay: current node is 'boss', not 'event'` after `applyChoice` runs. Reproduced on the `starving_merchant` "Bleed for him" choice but the same code path fires for every applied choice.
-- **Why:** `EventOverlayScene.rerender()` unconditionally calls `this.currentCard()` at the top, but `applyChoice` has already advanced `currentNodeId` via `chooseNextNode` before `setOverlayState('outcome')` triggers the rerender. By the time `currentCard()` reads `currentNode`, it's the next node (often a boss/combat) and the type-guard throws. Regression introduced in the just-shipped Cluster B · 5 (Event card UI).
-- **Tier:** 2 (bug fix of a Tier 2 feature)
-- **Acceptance:**
-  - Picking any choice on any card resolves cleanly through the outcome panel.
-  - Dismissing the outcome panel correctly advances to the next node (boss/combat/etc).
-  - Fix scope: move the `currentCard()` call out of the unconditional path in `rerender()` — only call it when `state === 'card'` or `state === 'hero_picker'` (the picker title doesn't currently use the card, but `applyChoice`'s `currentCard()` lookup uses `initialRs` so it's pre-advance and safe). The `'outcome'` state should not call `currentCard()` at all — it has everything it needs in `this.lastOutcome`.
-- **Touches:** `src/scenes/event_overlay_scene.ts`.
-- **Source:** `bugs.md` (2026-04-30 user repro).
-
 ### 20 · 🐛 HIGH: Shop "Manage Gear" leaves shop overlay on top, traps player
 
 - **What:** Clicking "Manage Gear" in the shop overlay launches `equip_panel` but doesn't pause/hide the shop overlay. The shop renders on top, equip-panel is unreachable, and the player can't recover or continue.
