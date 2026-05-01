@@ -1,7 +1,8 @@
 import * as Phaser from 'phaser';
-import type { CombatantId } from '../combat/types';
-import type { EnemyId, StatusId } from '../data/types';
-import type { Hero } from '../heroes/hero';
+import type { CombatantId } from '@combat/types';
+import { MODIFIERS, type ModifierId } from '@data/modifiers';
+import type { EnemyId, StatusId } from '@data/types';
+import type { Hero } from '@heroes/hero';
 import { ENEMY_VISUALS } from './enemy_sprites';
 import { EnemySprite } from './enemy_sprite';
 import { BOSS_SHEET, ENEMY_SHEET, SHEET } from './frames';
@@ -50,6 +51,12 @@ const FLOOR_Y = 24;
 const HPBAR_BELOW_FEET = 6;
 const HPTEXT_BELOW_FEET = 14;
 const NAME_BELOW_FEET = 24;
+const MODIFIER_BELOW_NAME = 10;
+const MODIFIER_FONT = '8px';
+const MODIFIER_COLOR = '#ffaa44';
+const WOUND_BELOW_NAME = 10;
+const WOUND_FONT = '8px';
+const WOUND_COLOR = '#ff6666';
 const STATUS_ABOVE_HEAD = 10;
 
 const HERO_FRAME_SIZE = SHEET.frameWidth;
@@ -75,6 +82,7 @@ export interface EnemyActorInit {
   currentHp: number;
   maxHp: number;
   bodyScale?: number;
+  modifierIds?: readonly ModifierId[];
 }
 
 export type CombatActorInit = HeroActorInit | EnemyActorInit;
@@ -139,6 +147,31 @@ export class CombatActor extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
     this.add(this.nameText);
+
+    if (init.kind === 'enemy' && init.modifierIds && init.modifierIds.length > 0) {
+      const modifierY = nameY + MODIFIER_BELOW_NAME;
+      const label = init.modifierIds.map(id => MODIFIERS[id].name).join(', ');
+      const modifierText = scene.add
+        .text(0, modifierY, label, {
+          fontFamily: 'monospace',
+          fontSize: MODIFIER_FONT,
+          color: MODIFIER_COLOR,
+        })
+        .setOrigin(0.5);
+      this.add(modifierText);
+    }
+
+    if (init.kind === 'hero' && init.hero.wounds.length > 0) {
+      const woundY = nameY + WOUND_BELOW_NAME;
+      const woundText = scene.add
+        .text(0, woundY, `🩸 ${init.hero.wounds.length}`, {
+          fontFamily: 'monospace',
+          fontSize: WOUND_FONT,
+          color: WOUND_COLOR,
+        })
+        .setOrigin(0.5);
+      this.add(woundText);
+    }
 
     this.hpBarBg = scene.add.rectangle(0, hpBarY, HP_BAR_W, HP_BAR_H, 0x333333);
     this.add(this.hpBarBg);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ENEMIES } from '../../data/enemies';
-import type { Encounter } from '../../dungeon/node';
-import { createHero } from '../../heroes/hero';
+import { ENEMIES } from '@data/enemies';
+import type { Encounter } from '@dungeon/node';
+import { createHero } from '@heroes/hero';
 import { buildCombatState } from '../combat_setup';
 
 const FLAT_SCALE = { hp: 1.0, attack: 1.0 };
@@ -241,8 +241,8 @@ describe('buildCombatState — equipment stats', () => {
   });
 });
 
-import type { Item } from '../../data/types';
-import { resolveCombatAbilities } from '../../items/kit';
+import type { Item } from '@data/types';
+import { resolveCombatAbilities } from '@items/kit';
 
 describe('buildCombatState — kit resolution', () => {
   it('Knight wielding axe → Combatant.abilities includes knight_cleaving_swing, excludes shield_bash', () => {

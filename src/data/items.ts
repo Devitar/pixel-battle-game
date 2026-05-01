@@ -1,5 +1,5 @@
-import { SPRITE_NAMES } from '../render/sprite_names.generated';
-import type { Stats } from '../combat/types';
+import { SPRITE_NAMES } from '@render/sprite_names.generated';
+import type { Stats } from '@combat/types';
 import type {
   AffixDef,
   AffixId,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Item } from '../../data/types';
+import type { Item } from '@data/types';
 import { addGold, addItem, createPack, emptyPack, removeItem, spendGold, totalGold } from '../pack';
 
 describe('Pack — gold', () => {

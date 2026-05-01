@@ -1,4 +1,4 @@
-import { AFFIXES, RARE_PROPERTIES } from '../data/items';
+import { AFFIXES, RARE_PROPERTIES } from '@data/items';
 import type {
   AffixId,
   ItemBaseId,
@@ -9,8 +9,8 @@ import type {
   RolledAffix,
   RolledRareProperty,
   WeaponType,
-} from '../data/types';
-import { generateItemId, type Rng, type WeightedOption } from '../util/rng';
+} from '@data/types';
+import { generateItemId, type Rng, type WeightedOption } from '@util/rng';
 import { floorScale } from './scaling';
 
 const ALL_SLOTS: readonly ItemSlot[] = ['weapon', 'shield', 'outfit', 'hat'];

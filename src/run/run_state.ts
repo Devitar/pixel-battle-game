@@ -1,13 +1,13 @@
-import type { DungeonId, Item, Wound } from '../data/types';
-import { applyLevelUps, levelForXp, xpForBossNode, xpForCombatNode, xpForEliteNode } from '../data/leveling';
-import { DEFAULT_WOUND_RUNS_REMAINING } from '../data/wounds';
-import { applyCampNodeEffect, type CampNodeChoice } from '../dungeon/camp_node';
-import { generateFloor } from '../dungeon/floor';
-import { rollLoot, type CombatKind } from '../dungeon/loot';
-import type { Node } from '../dungeon/node';
-import type { CombatEvent, CombatResult } from '../combat/types';
-import type { Hero } from '../heroes/hero';
-import type { Rng } from '../util/rng';
+import type { DungeonId, Item, Wound } from '@data/types';
+import { applyLevelUps, levelForXp, xpForBossNode, xpForCombatNode, xpForEliteNode } from '@data/leveling';
+import { DEFAULT_WOUND_RUNS_REMAINING } from '@data/wounds';
+import { applyCampNodeEffect, type CampNodeChoice } from '@dungeon/camp_node';
+import { generateFloor } from '@dungeon/floor';
+import { rollLoot, type CombatKind } from '@dungeon/loot';
+import type { Node } from '@dungeon/node';
+import type { CombatEvent, CombatResult } from '@combat/types';
+import type { Hero } from '@heroes/hero';
+import type { Rng } from '@util/rng';
 import { addGold, addItem, createPack, spendGold, type Pack, totalGold } from './pack';
 
 export type RunStatus = 'in_dungeon' | 'camp_screen' | 'ended';

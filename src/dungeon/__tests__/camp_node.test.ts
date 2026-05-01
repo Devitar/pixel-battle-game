@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createHero, type Hero } from '../../heroes/hero';
-import { createRng } from '../../util/rng';
+import { createHero, type Hero } from '@heroes/hero';
+import { createRng } from '@util/rng';
 import { applyCampNodeEffect, HEAL_PARTY_PERCENT } from '../camp_node';
-import type { RunState } from '../../run/run_state';
-import type { Wound } from '../../data/types';
+import type { RunState } from '@run/run_state';
+import type { Wound } from '@data/types';
 
 function makeParty(): Hero[] {
   return [

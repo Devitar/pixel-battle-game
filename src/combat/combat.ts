@@ -1,5 +1,5 @@
-import { ABILITIES } from '../data/abilities';
-import type { Rng } from '../util/rng';
+import { ABILITIES } from '@data/abilities';
+import type { Rng } from '@util/rng';
 import { pickAbility } from './ability_priority';
 import { setCooldown, tickCooldowns } from './cooldowns';
 import { applyAbility } from './effects';

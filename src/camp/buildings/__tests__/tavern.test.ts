@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { CLASSES } from '../../../data/classes';
-import { PLAYER_BODY_SPRITES } from '../../../data/body_sprites';
-import { NAMES } from '../../../data/names';
-import { TRAITS } from '../../../data/traits';
-import type { ClassId } from '../../../data/types';
-import { createRng } from '../../../util/rng';
+import { CLASSES } from '@data/classes';
+import { PLAYER_BODY_SPRITES } from '@data/body_sprites';
+import { NAMES } from '@data/names';
+import { TRAITS } from '@data/traits';
+import type { ClassId } from '@data/types';
+import { createRng } from '@util/rng';
 import {
   generateCandidate,
   generateCandidates,

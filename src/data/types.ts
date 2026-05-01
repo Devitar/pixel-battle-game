@@ -1,4 +1,4 @@
-import type { Stats } from '../combat/types';
+import type { Stats } from '@combat/types';
 
 export type ClassId = 'knight' | 'archer' | 'priest' | 'barbarian' | 'rogue' | 'mage';
 

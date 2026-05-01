@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
-import { listHeroes } from '../camp/roster';
-import { balance } from '../camp/vault';
+import { listHeroes } from '@camp/roster';
+import { balance } from '@camp/vault';
 import { appState } from './app_state';
 
 export class CampScene extends Phaser.Scene {
@@ -17,7 +17,7 @@ export class CampScene extends Phaser.Scene {
     this.buildBuilding('Blacksmith', 300, 0x665533, 100, 120, 'blacksmith_panel');
     this.buildBuilding('Barracks', 440, 0x555555, 100, 130, 'barracks_panel');
     this.buildBuilding('Hospital', 580, 0x885566, 100, 100, 'hospital_panel');
-    this.buildBuilding('Noticeboard', 720, 0x998866, 80, 60, 'noticeboard_panel');
+    this.buildBuilding('Expeditions', 720, 0x998866, 80, 60, 'expeditions_panel');
     this.buildDevHints();
 
     this.events.on(Phaser.Scenes.Events.RESUME, () => {

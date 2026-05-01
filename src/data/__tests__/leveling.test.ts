@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CLASSES } from '../classes';
-import { createHero, type Hero } from '../../heroes/hero';
+import { createHero, type Hero } from '@heroes/hero';
 import {
   applyLevelUps,
   LEVEL_THRESHOLDS,

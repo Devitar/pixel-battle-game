@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { addHero, createRoster } from '../../camp/roster';
-import { addItems, createStash } from '../../camp/stash';
-import type { Item } from '../../data/types';
-import { createHero } from '../../heroes/hero';
+import { addHero, createRoster } from '@camp/roster';
+import { addItems, createStash } from '@camp/stash';
+import type { Item } from '@data/types';
+import { applyPerk, createHero } from '@heroes/hero';
 import { equipFromStash, unequipToStash } from '../equip_camp';
 
 function makeOutfitItem(id: string): Item {
@@ -91,6 +91,29 @@ describe('equipFromStash', () => {
     const outfit = makeOutfitItem('o1');
     const { hero, roster, stash } = setup([outfit]);
     expect(() => equipFromStash(roster, stash, hero.id, outfit.id, 'shield')).toThrow();
+  });
+
+  it('preserves perk HP effect across equip-from-stash round-trip', () => {
+    const stoutKnight = applyPerk(
+      createHero('knight', 'K', 'h0', 'stout', 'body1'),
+      'resolute',
+    );
+    expect(stoutKnight.maxHp).toBe(24);  // sanity: 20 → 22 (Stout) → 24 (Resolute)
+
+    const roster = addHero(createRoster(), stoutKnight);
+    const newOutfit = makeOutfitItem('o_test');
+    const stash = addItems(createStash(), [newOutfit]);
+
+    // Equip a +6 HP outfit → maxHp should be 24 + 6 = 30
+    // (bug: local helper drops perk → 22 + 6 = 28)
+    const equipped = equipFromStash(roster, stash, stoutKnight.id, 'o_test', 'outfit');
+    const equippedHero = equipped.roster.heroes[0];
+    expect(equippedHero.maxHp).toBe(30);
+
+    // Unequip → maxHp should return to 24 (bug: would be 22)
+    const restored = unequipToStash(equipped.roster, equipped.stash, stoutKnight.id, 'outfit');
+    const restoredHero = restored.roster.heroes[0];
+    expect(restoredHero.maxHp).toBe(24);
   });
 });
 

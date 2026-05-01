@@ -1,13 +1,13 @@
 import * as Phaser from 'phaser';
-import { listHeroes, updateHero } from '../camp/roster';
-import { addItems, removeItem } from '../camp/stash';
-import { balance, spend } from '../camp/vault';
-import { BASE_ITEMS } from '../data/items';
-import type { Item, ItemSlot, Rarity } from '../data/types';
-import { equip } from '../items/equip';
-import { itemAffixDescription, itemDisplayName } from '../items/selectors';
-import { canUpgrade, nextRarity, upgradeCost, upgradeItem } from '../items/upgrade';
-import { createRng } from '../util/rng';
+import { listHeroes, updateHero } from '@camp/roster';
+import { addItems, removeItem } from '@camp/stash';
+import { balance, spend } from '@camp/vault';
+import { BASE_ITEMS } from '@data/items';
+import type { Item, ItemSlot, Rarity } from '@data/types';
+import { equip } from '@items/equip';
+import { itemAffixDescription, itemDisplayName } from '@items/selectors';
+import { canUpgrade, nextRarity, upgradeCost, upgradeItem } from '@items/upgrade';
+import { createRng } from '@util/rng';
 import { appState } from './app_state';
 
 const PANEL_CX = 480;

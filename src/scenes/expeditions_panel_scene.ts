@@ -1,10 +1,12 @@
 import * as Phaser from 'phaser';
-import { listHeroes } from '../camp/roster';
-import { DUNGEONS } from '../data/dungeons';
-import type { Hero } from '../heroes/hero';
-import { startRun } from '../run/run_state';
-import { HeroCard } from '../ui/hero_card';
-import { createRng } from '../util/rng';
+import { listHeroes } from '@camp/roster';
+import { DUNGEONS } from '@data/dungeons';
+import type { EnemyId } from '@data/types';
+import type { Hero } from '@heroes/hero';
+import { EnemySprite } from '@render/enemy_sprite';
+import { startRun } from '@run/run_state';
+import { HeroCard } from '@ui/hero_card';
+import { createRng } from '@util/rng';
 import { appState } from './app_state';
 
 type Stage = 'dungeon_list' | 'party_picker';
@@ -27,6 +29,11 @@ const CLOSE_X_Y = 63;
 // Stage 1
 const DUNGEON_CARD_W = 460;
 const DUNGEON_CARD_H = 220;
+const PREVIEW_SCALE = 2;
+const PREVIEW_GROUND_Y = 337;
+const PREVIEW_GAP = 12;
+const ENEMY_FRAME_W = 16;  // ENEMY_SHEET.frameWidth
+const BOSS_FRAME_W = 32;   // BOSS_SHEET.frameWidth
 
 // Stage 2 — slot row. Slot 1 (front) on the right to match combat scene's
 // party layout (party on left of combat, slot 1 closest to enemies on the right).
@@ -54,7 +61,7 @@ const REASON_Y = 475;
 const HERO_BG_W = 184;
 const HERO_BG_H = 60;
 
-export class NoticeboardPanelScene extends Phaser.Scene {
+export class ExpeditionsPanelScene extends Phaser.Scene {
   private stage: Stage = 'dungeon_list';
   private stageContainer!: Phaser.GameObjects.Container;
   private titleText!: Phaser.GameObjects.Text;
@@ -71,7 +78,7 @@ export class NoticeboardPanelScene extends Phaser.Scene {
   private descendReasonText?: Phaser.GameObjects.Text;
 
   constructor() {
-    super('noticeboard_panel');
+    super('expeditions_panel');
   }
 
   create(): void {
@@ -142,7 +149,7 @@ export class NoticeboardPanelScene extends Phaser.Scene {
     this.descendReasonText = undefined;
 
     if (next === 'dungeon_list') {
-      this.titleText.setText('Noticeboard');
+      this.titleText.setText('Expeditions');
       this.buildDungeonListStage();
     } else {
       this.titleText.setText('The Crypt — Pick Your Party');
@@ -207,6 +214,29 @@ export class NoticeboardPanelScene extends Phaser.Scene {
         })
         .setOrigin(0.5, 0),
     );
+
+    // Signature-enemy preview row — minions then boss, bottom-aligned on
+    // PREVIEW_GROUND_Y. Boss is naturally larger via its 32-px frame.
+    const ids: readonly EnemyId[] = [...def.enemyPool, def.bossId];
+    const totalWidth =
+      def.enemyPool.length * ENEMY_FRAME_W * PREVIEW_SCALE
+      + BOSS_FRAME_W * PREVIEW_SCALE
+      + def.enemyPool.length * PREVIEW_GAP;
+    let cursor = PANEL_CX - totalWidth / 2;
+
+    for (const enemyId of ids) {
+      const isBoss = enemyId === def.bossId;
+      const frameW = isBoss ? BOSS_FRAME_W : ENEMY_FRAME_W;
+      const fullSize = frameW * PREVIEW_SCALE;
+      const centerX = cursor + fullSize / 2;
+      // Phaser containers ignore setOrigin — bottom-align by computing center
+      // from the desired bottom edge.
+      const centerY = PREVIEW_GROUND_Y - fullSize / 2;
+      const sprite = new EnemySprite(this, centerX, centerY, enemyId);
+      sprite.setScale(PREVIEW_SCALE);
+      this.stageContainer.add(sprite);
+      cursor += fullSize + PREVIEW_GAP;
+    }
 
     cardBg.setInteractive({ useHandCursor: true });
     cardBg.on('pointerover', () => cardBg.setStrokeStyle(2, 0xffcc66));

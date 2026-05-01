@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
-import { SHEET } from '../../render/frames';
-import { Paperdoll, type Loadout } from '../../render/paperdoll';
-import { SPRITE_NAMES } from '../../render/sprite_names.generated';
+import { SHEET } from '@render/frames';
+import { Paperdoll, type Loadout } from '@render/paperdoll';
+import { SPRITE_NAMES } from '@render/sprite_names.generated';
 
 const SCALE = 6;
 

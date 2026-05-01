@@ -1,10 +1,10 @@
 import * as Phaser from 'phaser';
-import { removeHero, tickRosterWounds, updateHero } from '../camp/roster';
-import { addItems } from '../camp/stash';
-import { credit } from '../camp/vault';
-import { cashout, pressOn, type RunState } from '../run/run_state';
-import { HeroCard } from '../ui/hero_card';
-import { createRngFromState } from '../util/rng';
+import { removeHero, tickRosterWounds, updateHero } from '@camp/roster';
+import { addItems } from '@camp/stash';
+import { credit } from '@camp/vault';
+import { cashout, pressOn, type RunState } from '@run/run_state';
+import { HeroCard } from '@ui/hero_card';
+import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 
 const PARTY_X = [180, 480, 780] as const;

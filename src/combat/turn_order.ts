@@ -1,4 +1,4 @@
-import type { Rng } from '../util/rng';
+import type { Rng } from '@util/rng';
 import { getEffectiveStat } from './statuses';
 import type { Combatant, CombatantId } from './types';
 

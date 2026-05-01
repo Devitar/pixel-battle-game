@@ -1,5 +1,5 @@
-import { MODIFIER_IDS, type ModifierId } from '../data/modifiers';
-import type { Rng } from '../util/rng';
+import { MODIFIER_IDS, type ModifierId } from '@data/modifiers';
+import type { Rng } from '@util/rng';
 import type { EnemyPlacement } from './node';
 
 export function poolForFloor(floorNumber: number): readonly ModifierId[] {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AbilityEffect } from '../../data/types';
+import type { AbilityEffect } from '@data/types';
 import { getEffectiveStat, tickStatuses } from '../statuses';
 import type { CombatEvent, StatusInstance } from '../types';
 import { makeEnemyCombatant, makeHeroCombatant } from './helpers';

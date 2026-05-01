@@ -1,6 +1,6 @@
-import type { Ability, AbilityEffect } from '../data/types';
-import { HEAVY_HIT_WOUND_THRESHOLD, WOUND_CHANCE_PERCENT, WOUND_IDS } from '../data/wounds';
-import type { Rng } from '../util/rng';
+import type { Ability, AbilityEffect } from '@data/types';
+import { HEAVY_HIT_WOUND_THRESHOLD, WOUND_CHANCE_PERCENT, WOUND_IDS } from '@data/wounds';
+import type { Rng } from '@util/rng';
 import { collapseAfterDeath, moveTo, pull, shove, swap } from './positions';
 import { getEffectiveStat } from './statuses';
 import type { Combatant, CombatantId, CombatEvent, CombatState, StatusInstance } from './types';

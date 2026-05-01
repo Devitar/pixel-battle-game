@@ -23,57 +23,9 @@ One section per task.
 
 <!-- Add tasks below this line. Highest priority at the top. -->
 
-## Cluster B — Scenes & UI (Phaser)
+## Cluster B — Scenes & UI / Tier 2 polish
 
-Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render. Entries 1–11 shipped; 12+ surface gameplay-loop, visibility, and bug-fix work audited from gdd §6 / §10 and `bugs.md` against current HISTORY (2026-04-30).
-
-### 13 · Floor-modifier visibility in combat
-
-- **What:** Surface enemy modifiers (`armored`, `venomous`, `enraged`) on the combat scene — at minimum, a small badge or label below each enemy nameplate listing active modifier names. Optionally, a one-line "Modifiers in effect: …" status line at fight start.
-- **Why:** Cluster A · 12 (Floor-milestone enemy modifiers) shipped the data layer — Armored / Venomous / Enraged each carry a real combat effect — but no UI references modifiers anywhere (`Grep src/scenes/**` for `modifier` returns zero hits). Players get hit by extra defense, poison ticks, or a sudden attack spike without any signal. Closes the visibility gap on Tier 2's "scaling milestones within a dungeon" feature.
-- **Tier:** 2
-- **Acceptance:**
-  - Each enemy with at least one modifier shows badge text (e.g., "Armored", "Venomous") near its sprite/nameplate.
-  - Modifier names use a consistent color (suggest an orange / amber to read as "watch out") and use `MODIFIERS[id].name` for the label so future-added modifiers don't need scene edits.
-  - Bosses (which never roll modifiers per Cluster A · 12 HISTORY) just don't render the badge — no special branch needed.
-- **Touches:** `src/scenes/combat_scene.ts` (or wherever enemy nameplates render), `src/data/modifiers.ts` (read-only).
-- **Source:** ad-hoc audit 2026-04-30.
-
-### 14 · Retire hero from Barracks
-
-- **What:** Add a "Retire" button to the Barracks hero detail pane. Clicking it shows a confirm dialog ("This frees the slot. The hero is gone forever. No refund."); confirm calls `removeHero(roster, hero.id)` and rebuilds the panel.
-- **Why:** gdd §6 explicit: "retire heroes (frees a slot, no refund)." The `removeHero` function exists in `roster.ts` but nothing calls it. Players who fill 12 slots with bad rolls or unwanted classes have no way to free space short of waiting for a combat death — a real meta-progression friction.
-- **Tier:** 2
-- **Acceptance:**
-  - "Retire" button visible in Barracks hero detail; styled to look destructive (red/dark).
-  - Confirm-dialog overlay (or inline two-step: "Retire" → "Confirm Retire") prevents accidental clicks.
-  - On confirm: `removeHero` runs, `appState.update` persists, panel rebuilds; the just-retired hero falls out of the list.
-  - Disabled when retiring would drop the roster below the minimum needed to start a run (3 heroes) — or, simpler: always allowed and players can re-recruit at the Tavern.
-- **Touches:** `src/scenes/barracks_panel_scene.ts`.
-- **Source:** ad-hoc audit 2026-04-30 (gdd §6 alignment).
-
-### 15 · Wound-effect display in combat HUD
-
-- **What:** Show wound badges on the party-side combat HUD. Each hero with `wounds.length > 0` gets a small `🩸 N` badge near their nameplate (matching the HeroCard convention from Cluster B · 9). Optional tooltip: list each wound's effect via the existing `describeWoundEffect` helper.
-- **Why:** Cluster B · 9 added wound badges to HeroCard / Barracks. Combat — the surface where wound effects actually fire — doesn't show them. A hero fighting at -2 Attack from Winded has no on-screen indicator of why their numbers look off. The data is right there in `hero.wounds`.
-- **Tier:** 2
-- **Acceptance:**
-  - Heroes in combat with `wounds.length > 0` render a `🩸 N` badge near their nameplate (color `#ff6666` for visual parity with HeroCard).
-  - Hovering / tapping the badge shows the wound-effect summary (one line per wound) — defer if the combat scene doesn't support hover.
-- **Touches:** `src/scenes/combat_scene.ts`, possibly a shared widget in `src/ui/`.
-- **Source:** ad-hoc audit 2026-04-30.
-
-### 18 · Noticeboard signature-enemy preview
-
-- **What:** Add a "Signature enemies" section to the dungeon-list card in the Noticeboard, rendering a small icon row (sprite frames) for the dungeon's `enemyPool`. Optionally: tier label and floor-length badge.
-- **Why:** gdd §5: "Each dungeon shows its tier, expected floor length, and a preview of the **signature enemies** and loot." Today the card shows name + theme + "3 floors" only. Marginal while The Crypt is the only dungeon, but turns into "obviously missing" the moment a 2nd dungeon ships — better to land it now while there's no data-shape pressure.
-- **Tier:** 2
-- **Acceptance:**
-  - Dungeon card renders enemy sprites for each id in `DUNGEONS[id].enemyPool` plus the boss sprite (visually distinguished, e.g. larger or with a crown icon).
-  - Tier label rendered (currently DungeonDef has no `tier` field — defer if introducing one is out of scope; otherwise add it via a single-line type/data extension).
-  - Loot preview deferred — too speculative without dungeon-specific loot pools.
-- **Touches:** `src/scenes/noticeboard_panel_scene.ts`, possibly `src/data/dungeons.ts` (tier field) and `src/data/types.ts` (DungeonDef extension).
-- **Source:** ad-hoc audit 2026-04-30 (gdd §5 alignment).
+_(All Cluster B entries shipped — Tier 2 scope from gdd §10 is complete. Cluster header retained as anchor for the next backlog audit; new entries land here as 29+.)_
 
 ---
 

@@ -1,5 +1,5 @@
-import type { ItemSlot } from '../data/types';
-import type { Rng } from '../util/rng';
+import type { ItemSlot } from '@data/types';
+import type { Rng } from '@util/rng';
 import { rollShopItem } from './loot';
 import type { ShopItem } from './node';
 

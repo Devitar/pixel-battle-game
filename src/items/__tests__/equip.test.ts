@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Item, ItemSlot } from '../../data/types';
-import type { Hero } from '../../heroes/hero';
+import type { Item, ItemSlot } from '@data/types';
+import type { Hero } from '@heroes/hero';
 import { equip, unequip } from '../equip';
 
 const fake = (id: string, slot: ItemSlot): Item => {

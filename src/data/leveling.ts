@@ -1,6 +1,6 @@
 import { CLASSES } from './classes';
-import type { Hero } from '../heroes/hero';
-import type { Stats } from '../combat/types';
+import type { Hero } from '@heroes/hero';
+import type { Stats } from '@combat/types';
 
 export const MAX_LEVEL = 5;
 

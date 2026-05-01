@@ -1,4 +1,4 @@
-import type { AbilityId } from '../data/types';
+import type { AbilityId } from '@data/types';
 import type { Combatant } from './types';
 
 export function tickCooldowns(combatant: Combatant): void {

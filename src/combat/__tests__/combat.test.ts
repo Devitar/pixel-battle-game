@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRng } from '../../util/rng';
+import { createRng } from '@util/rng';
 import { resolveCombat } from '../combat';
 import { makeEnemyCombatant, makeHeroCombatant, makeTestState } from './helpers';
 
@@ -35,6 +35,19 @@ describe('resolveCombat — scripted scenarios', () => {
     );
     const result = resolveCombat(initial, createRng(1));
     expect(result.outcome).toBe('player_victory');
+  });
+
+  it('Knight at non-preferred slot shuffles toward the front in round 1', () => {
+    const knight = makeHeroCombatant('knight', 3, 'p0');
+    const archer = makeHeroCombatant('archer', 2, 'p1');
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    const e1 = makeEnemyCombatant('zombie', 2, 'e1');
+    const state = makeTestState([knight, archer], [e0, e1]);
+    const result = resolveCombat(state, createRng(1));
+    const knightShuffle = result.events.find(
+      (e) => e.kind === 'shuffle' && e.combatantId === 'p0',
+    );
+    expect(knightShuffle).toBeDefined();
   });
 
   it('extreme stalemate resolves via exhaustion (never times out)', () => {

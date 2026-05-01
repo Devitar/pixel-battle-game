@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Item } from '../../data/types';
-import { createHero } from '../../heroes/hero';
+import type { Item } from '@data/types';
+import { applyPerk, createHero } from '@heroes/hero';
 import { addItem, createPack } from '../pack';
 import { startRun } from '../run_state';
-import { createRng } from '../../util/rng';
-import { equipFromPack } from '../equip_run';
+import { createRng } from '@util/rng';
+import { equipFromPack, unequipToPack } from '../equip_run';
 
 const sword = (id: string, overrides: Partial<Item> = {}): Item => ({
   id, baseId: 'sword_basic', slot: 'weapon', rarity: 'common',
@@ -81,6 +81,30 @@ describe('equipFromPack — happy paths', () => {
     expect(packIds).toContain('a');
     expect(after2.party[0].equipment.weapon.id).toBe('b');
   });
+
+  it('preserves perk HP effect across equip-from-pack round-trip', () => {
+    const stoutKnight = applyPerk(
+      createHero('knight', 'K', 'h0', 'stout', '0'),
+      'resolute',
+    );
+    expect(stoutKnight.maxHp).toBe(24);  // sanity: 20 → 22 (Stout) → 24 (Resolute)
+
+    const archer = createHero('archer', 'A', 'h1', 'quick', '0');
+    const priest = createHero('priest', 'P', 'h2', 'quick', '0');
+    const party = [stoutKnight, archer, priest];
+    const rs = startRun('crypt', party, 1, createRng(1));
+    const newOutfit = outfit('o_test');
+    const rsWithItem = { ...rs, pack: addItem(createPack(), newOutfit) };
+
+    // Equip a +6 HP outfit → maxHp should be 24 + 6 = 30
+    // (bug: inline computeMaxHp drops perk → 22 + 6 = 28)
+    const equipped = equipFromPack(rsWithItem, 0, 'o_test', 'outfit');
+    expect(equipped.party[0].maxHp).toBe(30);
+
+    // Unequip → maxHp should return to 24 (bug: would be 22)
+    const restored = unequipToPack(equipped, 0, 'outfit');
+    expect(restored.party[0].maxHp).toBe(24);
+  });
 });
 
 describe('equipFromPack — validation', () => {
@@ -105,8 +129,6 @@ describe('equipFromPack — validation', () => {
     expect(JSON.stringify(rs)).toBe(snapshot);
   });
 });
-
-import { unequipToPack } from '../equip_run';
 
 describe('unequipToPack — happy paths', () => {
   it('moves shield to pack and clears the slot', () => {

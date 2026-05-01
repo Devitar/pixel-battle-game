@@ -1,5 +1,5 @@
-import type { Rng } from '../util/rng';
-import type { RunState } from '../run/run_state';
+import type { Rng } from '@util/rng';
+import type { RunState } from '@run/run_state';
 
 export type CampNodeChoice =
   | { kind: 'heal_party' }

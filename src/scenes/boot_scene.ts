@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
-import { resolveSaveState } from '../save/boot';
-import { SHEET, ENEMY_SHEET, BOSS_SHEET } from '../render/frames';
-import { createRng } from '../util/rng';
+import { resolveSaveState } from '@save/boot';
+import { SHEET, ENEMY_SHEET, BOSS_SHEET } from '@render/frames';
+import { createRng } from '@util/rng';
 import { appState } from './app_state';
 
 export class BootScene extends Phaser.Scene {

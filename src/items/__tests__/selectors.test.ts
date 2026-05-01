@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Item } from '../../data/types';
-import type { Pack } from '../../run/pack';
+import type { Item } from '@data/types';
+import type { Pack } from '@run/pack';
 import { filterPackBySlot, itemAffixDescription, itemDisplayName } from '../selectors';
 
 const sword = (id: string, overrides: Partial<Item> = {}): Item => ({
@@ -95,7 +95,7 @@ describe('itemAffixDescription', () => {
   });
 });
 
-import { createHero } from '../../heroes/hero';
+import { createHero } from '@heroes/hero';
 import { previewStats } from '../selectors';
 
 describe('previewStats', () => {

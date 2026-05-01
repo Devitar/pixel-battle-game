@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { BLACKSMITH_UPGRADE_COST } from '../../data/blacksmith';
-import type { AffixId, Item } from '../../data/types';
-import { rollAffixValue } from '../../dungeon/loot';
-import { createRng } from '../../util/rng';
+import { BLACKSMITH_UPGRADE_COST } from '@data/blacksmith';
+import type { AffixId, Item } from '@data/types';
+import { rollAffixValue } from '@dungeon/loot';
+import { createRng } from '@util/rng';
 import {
   canUpgrade,
   nextRarity,

@@ -10,7 +10,7 @@ Tonal reference: *Darkest Dungeon*, side-scrolling.
 
 A run is one expedition from camp into a dungeon and back.
 
-1. **At camp.** Pick 3 heroes from your roster, arrange their formation (slots 1 / 2 / 3), pick a dungeon from the noticeboard.
+1. **At camp.** Pick 3 heroes from your roster, arrange their formation (slots 1 / 2 / 3), pick a dungeon from Expeditions.
 2. **Descend.** The party walks right through a floor, passing combat / elite / shop / event / camp nodes. Occasional forks let you choose the next node.
 3. **Boss.** Every floor ends in a boss.
 4. **Camp screen.** Post-boss, you see the pack (unbanked loot), the party's condition, and two buttons: **Leave** or **Press On**.
@@ -171,7 +171,7 @@ Three ways a run ends:
 
 ## 5 · Pre-run gameplay (difficulty selection)
 
-Before descending, the player picks their dungeon from the Noticeboard. Each dungeon shows its **tier**, expected floor length, and a preview of the signature enemies and loot. Tier directly sets:
+Before descending, the player picks their dungeon from Expeditions. Each dungeon shows its **tier**, expected floor length, and a preview of the signature enemies and loot. Tier directly sets:
 
 - Nodes per floor (short → long).
 - Scaling rate (gentle → steep).
@@ -194,7 +194,7 @@ Camp is presented as a side-scrolling village at the same pixel scale as combat.
 | **Barracks** | Roster management. Inspect stats, equip gear from stash, set formation defaults, retire heroes (frees a slot, no refund). | L1: 12 slots / L2: 16 / L3: 20 |
 | **Blacksmith** | Upgrade gear tiers (common → uncommon → rare). Costs gold + materials (drop from elites / bosses). | L1: common→uncommon / L2: +uncommon→rare / L3: +rare→epic |
 | **Hospital** | Heal Wounds. Gold per wound, or time-based (wounds clear after N runs for free). | L1: 1 wound/run cheap / L2: 2 / L3: 3 + faster time-heal |
-| **Noticeboard** | Pick the next dungeon. Not upgraded directly — unlocks appear here as bosses are beaten. | n/a |
+| **Expeditions** | Pick the next dungeon. Not upgraded directly — unlocks appear here as bosses are beaten. | n/a |
 | **Chapel** *(unlock)* | Remove a Trait from a hero. Expensive. Unlocks after first Sunken Keep clear. | L1 only |
 | **Training Grounds** *(unlock)* | Benched heroes passively gain XP from every completed run (active or not). XP gain is pro-rated against what an active hero of the same level would have earned on that run, so deep runs train better. Gained on both cashout and wipe; wipes pay less. | L1: 2 trainee slots, 25% pro-rated XP / L2: 3 slots, 40% / L3: 4 slots, 55%. Unlocks: first Sunken Keep clear. |
 
@@ -204,7 +204,7 @@ Camp is presented as a side-scrolling village at the same pixel scale as combat.
 2. Hospital & Barracks usually need attention first.
 3. Spend at Blacksmith on gear you care about. Re-slot equipment off of dead heroes.
 4. Stop at the Tavern if short-handed or fishing for a good trait.
-5. Noticeboard → dungeon → 3-hero pick → formation → go.
+5. Expeditions → dungeon → 3-hero pick → formation → go.
 
 ---
 
@@ -301,7 +301,7 @@ Minimum viable game that *feels* like the design.
 - **Combat scene.** 3v3 ranked combat. 4 stats (HP, Attack, Defense, Speed). Auto-resolved turns with position-aware ability priorities. No Crit / Dodge yet.
 - **3 classes.** Knight, Archer, Priest. Covers melee / ranged / support.
 - **1 dungeon.** The Crypt: 3 floors, 4 enemy types, 1 boss. Linear (no forks, shops, or events yet).
-- **Camp.** Tavern (fixed 3-candidate pool, no reroll), Barracks (12 slots, equip & formation), Noticeboard (Crypt only).
+- **Camp.** Tavern (fixed 3-candidate pool, no reroll), Barracks (12 slots, equip & formation), Expeditions (Crypt only).
 - **Pack system.** Gold-in-pack + post-boss Camp Screen with Leave / Press On.
 - **Permadeath.** Fallen category only (gear to pack if survivors).
 - **Save / load.**
@@ -341,7 +341,7 @@ The texture that makes the game *good* rather than *working*.
 Things that are bigger than they look and should be sized honestly.
 
 - **Auto-battler AI priorities.** Each class needs a small state machine that picks "the right" ability from its kit given current positions and ally/enemy state. This is the single thing that makes combat feel intentional vs. random. Budget real time.
-- **UI density.** Camp alone has 5+ sub-panels (Barracks, Tavern, Blacksmith, Hospital, Noticeboard). The post-boss Camp Screen is its own UI. Combat overlays, equipment screen, map screen, event cards — UI is the largest single-scope risk.
+- **UI density.** Camp alone has 5+ sub-panels (Barracks, Tavern, Blacksmith, Hospital, Expeditions). The post-boss Camp Screen is its own UI. Combat overlays, equipment screen, map screen, event cards — UI is the largest single-scope risk.
 - **Balance surface.** 6 classes × 3–4 abilities × gear modifiers × 4 dungeons × scaling curves is a lot of math. Tier 1 is deliberately small (3 classes, 1 dungeon, 4 enemies) so it's tuneable by a small team.
 - **Save-state.** Persistent roster + banked vault + camp upgrades + unlock progress + gear stash is real save logic. Don't put it off.
 

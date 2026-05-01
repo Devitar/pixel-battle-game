@@ -1,11 +1,11 @@
 import * as Phaser from 'phaser';
-import { removeHero, tickRosterWounds, updateHero } from '../camp/roster';
-import { addItems } from '../camp/stash';
-import { credit } from '../camp/vault';
-import type { WoundId } from '../data/types';
-import { WOUNDS, describeWoundEffect } from '../data/wounds';
-import { chooseCampNodeEffect } from '../run/run_state';
-import { createRngFromState } from '../util/rng';
+import { removeHero, tickRosterWounds, updateHero } from '@camp/roster';
+import { addItems } from '@camp/stash';
+import { credit } from '@camp/vault';
+import type { WoundId } from '@data/types';
+import { WOUNDS, describeWoundEffect } from '@data/wounds';
+import { chooseCampNodeEffect } from '@run/run_state';
+import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 
 const PANEL_CX = 480;

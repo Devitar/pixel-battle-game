@@ -1,6 +1,6 @@
-import { CLASSES } from '../data/classes';
-import { ENEMIES } from '../data/enemies';
-import type { ClassId, EnemyId, SlotIndex } from '../data/types';
+import { CLASSES } from '@data/classes';
+import { ENEMIES } from '@data/enemies';
+import type { ClassId, EnemyId, SlotIndex } from '@data/types';
 import type { Combatant, CombatantId } from './types';
 
 export function createHeroCombatant(

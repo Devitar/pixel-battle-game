@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CLASSES } from '../../data/classes';
-import { PERKS } from '../../data/perks';
-import { TRAITS } from '../../data/traits';
-import { applyPerk, computeMaxHp, createHero, type Hero } from '../hero';
+import { CLASSES } from '@data/classes';
+import { PERKS } from '@data/perks';
+import { TRAITS } from '@data/traits';
+import { applyPerk, computeMaxHp, createHero, recomputeMaxHp, type Hero } from '../hero';
 
 describe('createHero — basic shape', () => {
   it('builds a Knight with full HP and stored trait / body', () => {
@@ -152,5 +152,15 @@ describe('computeMaxHp — perk HP effect', () => {
     );
     // 20 → round(20 * 1.1) = 22 → round(22 * 1.1) = 24, plus 0 gear HP.
     expect(result).toBe(24);
+  });
+});
+
+describe('recomputeMaxHp', () => {
+  it('preserves perk HP effect when recomputing', () => {
+    const knight = createHero('knight', 'K', 'h0', 'stout', 'body1');
+    const withPerk = applyPerk(knight, 'resolute');
+    expect(withPerk.maxHp).toBe(24);  // 20 → 22 (Stout +10%) → 24 (Resolute +10%)
+    const recomputed = recomputeMaxHp(withPerk);
+    expect(recomputed.maxHp).toBe(24);  // bug: would be 22 if perk dropped
   });
 });

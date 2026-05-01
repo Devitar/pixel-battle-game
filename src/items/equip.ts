@@ -1,5 +1,5 @@
-import type { Item, ItemSlot } from '../data/types';
-import type { Hero } from '../heroes/hero';
+import type { Item, ItemSlot } from '@data/types';
+import type { Hero } from '@heroes/hero';
 
 export interface EquipResult {
   hero: Hero;

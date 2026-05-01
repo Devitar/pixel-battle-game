@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CRYPT_POOL, ENEMIES } from '../../data/enemies';
-import type { EnemyId } from '../../data/types';
-import { createRng } from '../../util/rng';
+import { CRYPT_POOL, ENEMIES } from '@data/enemies';
+import type { EnemyId } from '@data/types';
+import { createRng } from '@util/rng';
 import { composeEliteEncounter, ELITE_ATTACK_MULT, ELITE_HP_MULT } from '../elite';
 import { floorScale } from '../scaling';
 

@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
-import { SHEET, CATEGORIES, frameAt, firstFrameOf, type CategoryName } from '../../render/frames';
-import { SPRITE_NAMES } from '../../render/sprite_names.generated';
+import { SHEET, CATEGORIES, frameAt, firstFrameOf, type CategoryName } from '@render/frames';
+import { SPRITE_NAMES } from '@render/sprite_names.generated';
 
 const FRAME_TO_NAME: Map<number, string> = (() => {
   const map = new Map<number, string>();

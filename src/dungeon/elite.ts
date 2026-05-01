@@ -1,6 +1,6 @@
-import { ENEMIES } from '../data/enemies';
-import type { EnemyId } from '../data/types';
-import type { Rng } from '../util/rng';
+import { ENEMIES } from '@data/enemies';
+import type { EnemyId } from '@data/types';
+import type { Rng } from '@util/rng';
 import { assignSlots } from './encounter';
 import type { Encounter, ScaleFactors } from './node';
 

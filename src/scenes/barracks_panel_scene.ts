@@ -1,15 +1,15 @@
 import * as Phaser from 'phaser';
-import { listHeroes } from '../camp/roster';
-import { ABILITIES } from '../data/abilities';
-import { describeAbility } from '../data/ability_describe';
-import { CLASSES } from '../data/classes';
-import { TRAITS } from '../data/traits';
-import { WOUNDS, describeWoundEffect } from '../data/wounds';
-import type { Hero } from '../heroes/hero';
-import { describeKitStatus, resolveCombatAbilities } from '../items/kit';
-import { heroToLoadout } from '../render/hero_loadout';
-import { Paperdoll } from '../render/paperdoll';
-import { HeroCard } from '../ui/hero_card';
+import { listHeroes, removeHero } from '@camp/roster';
+import { ABILITIES } from '@data/abilities';
+import { describeAbility } from '@data/ability_describe';
+import { CLASSES } from '@data/classes';
+import { TRAITS } from '@data/traits';
+import { WOUNDS, describeWoundEffect } from '@data/wounds';
+import type { Hero } from '@heroes/hero';
+import { describeKitStatus, resolveCombatAbilities } from '@items/kit';
+import { heroToLoadout } from '@render/hero_loadout';
+import { Paperdoll } from '@render/paperdoll';
+import { HeroCard } from '@ui/hero_card';
 import { appState } from './app_state';
 
 interface RosterCard {
@@ -55,6 +55,7 @@ const ABILITY_BLOCK_GAP = 6;
 export class BarracksPanelScene extends Phaser.Scene {
   private rosterCards: RosterCard[] = [];
   private selectedHeroId: string | null = null;
+  private confirmRetirePending: boolean = false;
   private detailContainer!: Phaser.GameObjects.Container;
   private titleText!: Phaser.GameObjects.Text;
 
@@ -170,6 +171,7 @@ export class BarracksPanelScene extends Phaser.Scene {
 
   private selectHero(id: string | null): void {
     this.selectedHeroId = id;
+    this.confirmRetirePending = false;
     this.refreshSelectionHighlights();
     this.rebuildDetail();
   }
@@ -348,26 +350,112 @@ export class BarracksPanelScene extends Phaser.Scene {
       yCursor += ABILITY_BLOCK_GAP;
     }
 
-    // Equip Gear button — fixed position at bottom of the detail pane.
-    const equipBtn = this.add
-      .rectangle(DETAIL_TEXT_X + 80, 430, 140, 32, 0x335533)
-      .setStrokeStyle(2, 0x66aa66);
-    this.detailContainer.add(equipBtn);
-    this.detailContainer.add(
-      this.add
-        .text(DETAIL_TEXT_X + 80, 430, 'Equip Gear', {
-          fontFamily: 'monospace',
-          fontSize: '13px',
-          color: '#ffffff',
-          fontStyle: 'bold',
-        })
-        .setOrigin(0.5),
-    );
-    equipBtn.setInteractive({ useHandCursor: true });
-    equipBtn.on('pointerdown', () => {
-      this.scene.launch('barracks_equip', { heroId: hero.id });
-      this.scene.pause();
-    });
+    // Bottom action row — either normal (Equip Gear + Retire) or confirm
+    // (warning + Cancel + Confirm Retire).
+    if (!this.confirmRetirePending) {
+      // Equip Gear — left slot
+      const equipBtn = this.add
+        .rectangle(DETAIL_TEXT_X + 80, 430, 140, 32, 0x335533)
+        .setStrokeStyle(2, 0x66aa66);
+      this.detailContainer.add(equipBtn);
+      this.detailContainer.add(
+        this.add
+          .text(DETAIL_TEXT_X + 80, 430, 'Equip Gear', {
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            color: '#ffffff',
+            fontStyle: 'bold',
+          })
+          .setOrigin(0.5),
+      );
+      equipBtn.setInteractive({ useHandCursor: true });
+      equipBtn.on('pointerdown', () => {
+        this.scene.launch('barracks_equip', { heroId: hero.id });
+        this.scene.pause();
+      });
+
+      // Retire — right slot, destructive red
+      const retireBtn = this.add
+        .rectangle(DETAIL_TEXT_X + 230, 430, 140, 32, 0x553333)
+        .setStrokeStyle(2, 0x885555);
+      this.detailContainer.add(retireBtn);
+      this.detailContainer.add(
+        this.add
+          .text(DETAIL_TEXT_X + 230, 430, 'Retire', {
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            color: '#ffffff',
+            fontStyle: 'bold',
+          })
+          .setOrigin(0.5),
+      );
+      retireBtn.setInteractive({ useHandCursor: true });
+      retireBtn.on('pointerdown', () => {
+        this.confirmRetirePending = true;
+        this.rebuildDetail();
+      });
+    } else {
+      // Confirm row — warning text above, Cancel + Confirm Retire below
+      const rosterLen = appState.get().roster.heroes.length;
+      let warning = `Retire ${hero.name}? Hero is gone forever. No refund.`;
+      if (rosterLen - 1 < 3) {
+        warning += ' ⚠ Roster will drop below 3 — recruit at the Tavern before starting a run.';
+      }
+
+      this.detailContainer.add(
+        this.add
+          .text(DETAIL_PANE_CX, 405, warning, {
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            color: '#ff6666',
+            align: 'center',
+            wordWrap: { width: 400 },
+          })
+          .setOrigin(0.5, 1),
+      );
+
+      // Cancel — left slot, muted gray
+      const cancelBtn = this.add
+        .rectangle(DETAIL_TEXT_X + 80, 430, 140, 32, 0x444444)
+        .setStrokeStyle(2, 0x888888);
+      this.detailContainer.add(cancelBtn);
+      this.detailContainer.add(
+        this.add
+          .text(DETAIL_TEXT_X + 80, 430, 'Cancel', {
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            color: '#ffffff',
+            fontStyle: 'bold',
+          })
+          .setOrigin(0.5),
+      );
+      cancelBtn.setInteractive({ useHandCursor: true });
+      cancelBtn.on('pointerdown', () => {
+        this.confirmRetirePending = false;
+        this.rebuildDetail();
+      });
+
+      // Confirm Retire — right slot, destructive red
+      const confirmBtn = this.add
+        .rectangle(DETAIL_TEXT_X + 230, 430, 140, 32, 0x553333)
+        .setStrokeStyle(2, 0x885555);
+      this.detailContainer.add(confirmBtn);
+      this.detailContainer.add(
+        this.add
+          .text(DETAIL_TEXT_X + 230, 430, 'Confirm Retire', {
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            color: '#ffffff',
+            fontStyle: 'bold',
+          })
+          .setOrigin(0.5),
+      );
+      confirmBtn.setInteractive({ useHandCursor: true });
+      confirmBtn.on('pointerdown', () => {
+        appState.update((s) => ({ ...s, roster: removeHero(s.roster, hero.id) }));
+        this.scene.restart();
+      });
+    }
   }
 
   private close(): void {

@@ -1,8 +1,8 @@
 import * as Phaser from 'phaser';
-import { BASE_ITEMS } from '../data/items';
-import { itemAffixDescription, itemDisplayName } from '../items/selectors';
-import { currentNode, leaveShop, purchaseItem } from '../run/run_state';
-import type { ShopItem } from '../dungeon/node';
+import { BASE_ITEMS } from '@data/items';
+import { itemAffixDescription, itemDisplayName } from '@items/selectors';
+import { currentNode, leaveShop, purchaseItem } from '@run/run_state';
+import type { ShopItem } from '@dungeon/node';
 import { appState } from './app_state';
 
 const PANEL_CX = 480;

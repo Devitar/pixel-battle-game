@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { EventCard } from '../../data/events';
-import { createHero, type Hero } from '../../heroes/hero';
-import { createRng } from '../../util/rng';
+import type { EventCard } from '@data/events';
+import { createHero, type Hero } from '@heroes/hero';
+import { createRng } from '@util/rng';
 import { applyEventChoice } from '../event_resolver';
 import type { RunState } from '../run_state';
 import { startRun } from '../run_state';

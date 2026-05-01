@@ -1,14 +1,14 @@
 import * as Phaser from 'phaser';
-import { ABILITIES } from '../data/abilities';
-import type { AbilityId, SlotIndex, StatusId } from '../data/types';
-import { WOUNDS } from '../data/wounds';
+import { ABILITIES } from '@data/abilities';
+import type { AbilityId, SlotIndex, StatusId } from '@data/types';
+import { WOUNDS } from '@data/wounds';
 import type {
   CombatantId,
   CombatEvent,
   CombatSide,
   CombatState,
-} from '../combat/types';
-import type { CombatActor } from '../render/combat_actor';
+} from '@combat/types';
+import type { CombatActor } from '@render/combat_actor';
 
 export interface CombatPlaybackHud {
   roundCounter: Phaser.GameObjects.Text;

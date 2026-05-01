@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRng } from '../../util/rng';
+import { createRng } from '@util/rng';
 import { resolveTargetSelector } from '../target_selector';
 import type { StatusInstance } from '../types';
 import { makeEnemyCombatant, makeHeroCombatant, makeTestState } from './helpers';

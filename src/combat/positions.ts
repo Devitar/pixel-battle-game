@@ -1,4 +1,4 @@
-import type { SlotIndex } from '../data/types';
+import type { SlotIndex } from '@data/types';
 import type { Combatant, CombatEvent, CombatSide, CombatState } from './types';
 
 function livingOnSide(state: CombatState, side: CombatSide): Combatant[] {

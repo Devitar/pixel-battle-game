@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { EventCard } from '../../data/events';
-import type { DungeonId } from '../../data/types';
-import { createRng } from '../../util/rng';
+import type { EventCard } from '@data/events';
+import type { DungeonId } from '@data/types';
+import { createRng } from '@util/rng';
 import { drawEventCard } from '../event_deck';
 
 const SHARED_A: EventCard = {

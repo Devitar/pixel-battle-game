@@ -9,7 +9,7 @@ import type {
   StatusId,
   TraitId,
   WoundId,
-} from '../data/types';
+} from '@data/types';
 
 export interface Stats {
   hp: number;

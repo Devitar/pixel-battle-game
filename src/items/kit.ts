@@ -1,8 +1,8 @@
-import { ABILITIES } from '../data/abilities';
-import { CLASSES } from '../data/classes';
-import { WEAPON_DISPLAY_NAME, WEAPON_FAMILY } from '../data/items';
-import type { AbilityId } from '../data/types';
-import type { Hero } from '../heroes/hero';
+import { ABILITIES } from '@data/abilities';
+import { CLASSES } from '@data/classes';
+import { WEAPON_DISPLAY_NAME, WEAPON_FAMILY } from '@data/items';
+import type { AbilityId } from '@data/types';
+import type { Hero } from '@heroes/hero';
 
 export interface ResolvedCombatAbilities {
   abilities: readonly AbilityId[];

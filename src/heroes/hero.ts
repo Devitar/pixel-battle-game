@@ -1,12 +1,12 @@
-import { BASE_ITEMS, BASE_ITEM_STATS } from '../data/items';
-import { CLASSES } from '../data/classes';
-import { PERKS } from '../data/perks';
-import { TRAITS } from '../data/traits';
+import { BASE_ITEMS, BASE_ITEM_STATS } from '@data/items';
+import { CLASSES } from '@data/classes';
+import { PERKS } from '@data/perks';
+import { TRAITS } from '@data/traits';
 import type {
   ClassId, HeroEquipment, Item, ItemBaseId, ItemSlot,
   PerkDef, PerkId, StarterLoadout, TraitDef, TraitHpEffect, TraitId, Wound,
-} from '../data/types';
-import type { Stats } from '../combat/types';
+} from '@data/types';
+import type { Stats } from '@combat/types';
 
 export interface Hero {
   id: string;
@@ -62,6 +62,18 @@ export function computeMaxHp(
   if (trait.hpEffect) base = applyHpEffect(base, trait.hpEffect);
   if (perk?.hpEffect) base = applyHpEffect(base, perk.hpEffect);
   return base + gearTotal(equipment);
+}
+
+export function recomputeMaxHp(hero: Hero): Hero {
+  const classDef = CLASSES[hero.classId];
+  const trait = TRAITS[hero.traitId];
+  const perk = hero.perkId ? PERKS[hero.perkId] : undefined;
+  const newMaxHp = computeMaxHp(classDef.baseStats.hp, trait, hero.equipment, perk);
+  return {
+    ...hero,
+    maxHp: newMaxHp,
+    currentHp: Math.min(hero.currentHp, newMaxHp),
+  };
 }
 
 export function applyPerk(hero: Hero, perkId: PerkId): Hero {

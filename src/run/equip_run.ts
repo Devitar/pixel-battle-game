@@ -1,8 +1,6 @@
-import { CLASSES } from '../data/classes';
-import { TRAITS } from '../data/traits';
-import type { ItemSlot } from '../data/types';
-import { computeMaxHp } from '../heroes/hero';
-import { equip, unequip } from '../items/equip';
+import type { ItemSlot } from '@data/types';
+import { recomputeMaxHp } from '@heroes/hero';
+import { equip, unequip } from '@items/equip';
 import { addItem, removeItem } from './pack';
 import type { RunState } from './run_state';
 
@@ -29,14 +27,7 @@ export function equipFromPack(
   }
 
   const { hero: nextHero, displaced } = equip(hero, packItem, slot);
-  const classDef = CLASSES[nextHero.classId];
-  const trait = TRAITS[nextHero.traitId];
-  const newMaxHp = computeMaxHp(classDef.baseStats.hp, trait, nextHero.equipment);
-  const clampedHero = {
-    ...nextHero,
-    maxHp: newMaxHp,
-    currentHp: Math.min(nextHero.currentHp, newMaxHp),
-  };
+  const clampedHero = recomputeMaxHp(nextHero);
 
   let nextPack = removeItem(runState.pack, packItemId);
   if (displaced !== undefined) nextPack = addItem(nextPack, displaced);
@@ -63,15 +54,7 @@ export function unequipToPack(
   const { hero: nextHero, item } = unequip(hero, slot);
   if (item === undefined) return runState;
 
-  const classDef = CLASSES[nextHero.classId];
-  const trait = TRAITS[nextHero.traitId];
-  const newMaxHp = computeMaxHp(classDef.baseStats.hp, trait, nextHero.equipment);
-  const clampedHero = {
-    ...nextHero,
-    maxHp: newMaxHp,
-    currentHp: Math.min(nextHero.currentHp, newMaxHp),
-  };
-
+  const clampedHero = recomputeMaxHp(nextHero);
   const nextPack = addItem(runState.pack, item);
   const nextParty = [...runState.party];
   nextParty[heroIndex] = clampedHero;

@@ -1,11 +1,11 @@
 import * as Phaser from 'phaser';
-import { listHeroes } from '../camp/roster';
-import { CLASSES } from '../data/classes';
-import { CLASS_PERK_PAIRS, PERKS } from '../data/perks';
-import type { PerkId } from '../data/types';
-import { applyPerk, type Hero } from '../heroes/hero';
-import { heroToLoadout } from '../render/hero_loadout';
-import { Paperdoll } from '../render/paperdoll';
+import { listHeroes } from '@camp/roster';
+import { CLASSES } from '@data/classes';
+import { CLASS_PERK_PAIRS, PERKS } from '@data/perks';
+import type { PerkId } from '@data/types';
+import { applyPerk, type Hero } from '@heroes/hero';
+import { heroToLoadout } from '@render/hero_loadout';
+import { Paperdoll } from '@render/paperdoll';
 import { appState } from './app_state';
 
 const PANEL_CX = 480;

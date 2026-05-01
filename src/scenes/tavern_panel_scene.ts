@@ -4,12 +4,12 @@ import {
   generateCandidates,
   HIRE_COST,
   REROLL_COST,
-} from '../camp/buildings/tavern';
-import { addHero, canAdd, listHeroes } from '../camp/roster';
-import { balance, spend } from '../camp/vault';
-import type { Hero } from '../heroes/hero';
-import { HeroCard } from '../ui/hero_card';
-import { createRng, type Rng } from '../util/rng';
+} from '@camp/buildings/tavern';
+import { addHero, canAdd, listHeroes } from '@camp/roster';
+import { balance, spend } from '@camp/vault';
+import type { Hero } from '@heroes/hero';
+import { HeroCard } from '@ui/hero_card';
+import { createRng, type Rng } from '@util/rng';
 import { appState } from './app_state';
 
 interface HireButton {
