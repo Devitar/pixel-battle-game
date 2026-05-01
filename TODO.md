@@ -23,23 +23,6 @@ One section per task.
 
 <!-- Add tasks below this line. Highest priority at the top. -->
 
-## Cluster B — Scenes & UI (Phaser)
-
-Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
-
-### 5 · Event card UI
-
-- **What:** Event card overlay. Shows card body text and two choice buttons; on choice, payload effects apply via the core event resolver and an outcome panel summarises the result before dismissal. Pairs with Cluster A task 13.
-- **Why:** Without UI, events are invisible to the player.
-- **Tier:** 2
-- **Acceptance:**
-  - Event-node entry overlays the card; choice buttons call into `applyEventChoice`.
-  - Outcome panel describes what changed (HP, gold, gear, hero loss) before the player advances.
-- **Touches:** `src/scenes/event_overlay.ts` (new), dungeon scene wiring.
-- **Source:** gdd §7 + §10 Tier 2.
-
----
-
 ## Cluster C — Art polish (non-blocking)
 
 Art tasks that aren't blocking gameplay. Enemies, heroes, and rooms already render with placeholder / reused frames; entries here replace placeholders with bespoke pixel art. Deprioritised relative to Clusters A/B.

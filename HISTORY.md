@@ -29,6 +29,22 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-30 · Event card UI (Cluster B · 5)
+
+- **Why:** Replaces the auto-skip stub from the event-floor-integration HISTORY entry (2026-04-29). Players walking onto event nodes now see the card body, pick a choice, and read the outcome — making event-node forks meaningful for the first time. Closes Cluster B (the cluster header was removed from TODO.md, matching the Cluster A precedent).
+- **Decisions:**
+  - **Three-state overlay machine** (`'card'` / `'hero_picker'` / `'outcome'`) modeled after `camp_node_overlay_scene.ts`. Single scene, one panel, content rebuilds on `setOverlayState(s)`. Back button on sub-states; Dismiss on outcome. ESC disabled on `'card'` (events mandatory), Back on `'hero_picker'`, Dismiss on `'outcome'`.
+  - **Atomic apply-and-advance.** `applyChoice` calls `applyEventChoice` then `chooseNextNode(..., node.nextNodeIds[0])` and persists in one `appState.update`. Outcome panel is informational only — on browser refresh mid-outcome, dungeon reopens at next node and the readout is lost. Same persistence semantics as every other overlay (camp_node, shop).
+  - **Random affix + rare-property already handled by the resolver** — no additional UI for crafting; the outcome panel just shows what came back in `EventOutcome`. Per-hero HP deltas in green/pink, signed gold delta in gold-yellow, item shown in rarity color with affixes on a sub-line, Lost-hero in `#aa66aa` purple.
+  - **`describePayload` lives in `src/data/events.ts`**, not the scene. Pure-TS so it's tested in Vitest. Card-stage subtitle uses it: `choice.payloads.map(describePayload).join(' · ')`. Empty-payload Decline shows the literal `"Walk away"` (generated in the scene).
+  - **Hero picker uses paperdoll thumbnails.** Same `Paperdoll` + `heroToLoadout` render path as the dungeon party row. Three rows, name + HP + Pick button. The chosen-choice index is captured into `pendingChoiceIndex` before transitioning so Pick knows what to apply.
+  - **`rebuildParty()` fix folded into scope.** Pre-existing latent bug: `dungeon_scene.buildParty()` was only called once on `create()`, so any mid-scene party change (combat-Fallen, and now event-Lost) left stale paperdolls. New private method called from RESUME and `processCombatReturn`. The fix has the side effect of correcting the latent combat-Fallen visual bug too — Cluster B · 11's HISTORY entry had flagged that mid-scene-state Lost-hero rendering wasn't reachable through gameplay; now it is, and it works.
+  - **Grammar shortcut on `describePayload` for `add_item`:** `"Gain a uncommon item"` rather than handling the vowel-sound "an"/"a" check. Single-rule renderer is clean and the player rarely sees the uncommon string (most cards offer common or rare).
+- **Surprises:**
+  - **Smoothest execution of the three Cluster B tasks so far** — plan code blocks transferred 1:1, no tsc edits needed mid-execution. The discriminated-union narrowing in `describePayload`'s switch and in the `OverlayState` machine held first try; the precise `rebuildParty()` insertion sites were exactly where the spec said they were.
+  - **`chooseNextNode` import in `dungeon_scene.ts` stayed used** after the stub removal because the fork-pick path (line 489) also calls it. Plan defensively flagged the TS6133 case; turned out to be a non-issue (cleaned up the dead instruction in spec self-review).
+- **Source:** TODO.md Cluster B · 5 → spec at `docs/superpowers/specs/2026-04-30-event-card-ui-design.md` → plan at `docs/superpowers/plans/2026-04-30-event-card-ui.md`. Test count delta: 1301 → 1307 (+6).
+
 ### 2026-04-30 · Blacksmith building (Cluster B · 2)
 
 - **Why:** Closes the only remaining "you have stash items and nothing to spend gold on between Tavern/Hospital" gap. Pairs with gear rarity tiers — gives the player a path from common gear to rare and a long-term sink for vault gold.
