@@ -91,13 +91,13 @@ function pickAffixes(rng: Rng, count: number): AffixId[] {
   return shuffled.slice(0, count);
 }
 
-function rollAffixValue(affixId: AffixId, floor: number): number {
+export function rollAffixValue(affixId: AffixId, floor: number): number {
   const def = AFFIXES[affixId];
   const scaled = scaleByFloor(def.baseValue, floor);
   return def.hpMultiplier === 3 ? scaled * 3 : scaled;
 }
 
-function pickRareProperty(rng: Rng, slot: ItemSlot, floor: number): RolledRareProperty | undefined {
+export function pickRareProperty(rng: Rng, slot: ItemSlot, floor: number): RolledRareProperty | undefined {
   if (slot === 'hat') return undefined;
   const candidates: RarePropertyId[] = [];
   for (const id of Object.keys(RARE_PROPERTIES) as RarePropertyId[]) {

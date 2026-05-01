@@ -77,6 +77,7 @@ export class DungeonScene extends Phaser.Scene {
       this.refreshHud();
       this.refreshNodeColors();
       this.refreshStatusBar();
+      this.rebuildParty();
       this.setState('walking_to_next');
     });
 
@@ -115,6 +116,7 @@ export class DungeonScene extends Phaser.Scene {
     this.refreshHud();
     this.refreshNodeColors();
     this.refreshStatusBar();
+    this.rebuildParty();
 
     if (wipe) {
       this.wipeOutcome = wipe;
@@ -201,6 +203,13 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
+  private rebuildParty(): void {
+    const x = this.partyContainer.x;
+    this.partyContainer.destroy();
+    this.buildParty();
+    this.partyContainer.x = x;
+  }
+
   private buildStatusBar(): void {
     this.statusText = this.add
       .text(16, 524, '', {
@@ -262,17 +271,8 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (node.type === 'event') {
-      // Stub: auto-skip until Cluster B · 5 ships the event overlay.
-      // Player sees event nodes in the icon row but doesn't engage with them.
-      // Equivalent to a "Decline" choice — no payload applied.
-      appState.update((s) => ({
-        ...s,
-        runState: chooseNextNode(s.runState!, node.nextNodeIds[0]),
-      }));
-      this.refreshHud();
-      this.refreshNodeColors();
-      this.refreshStatusBar();
-      this.setState('walking_to_next');
+      this.scene.launch('event_overlay');
+      this.scene.pause();
       return;
     }
 

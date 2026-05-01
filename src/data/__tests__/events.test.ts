@@ -3,7 +3,7 @@ import { applyEventChoice } from '../../run/event_resolver';
 import { startRun } from '../../run/run_state';
 import { createHero } from '../../heroes/hero';
 import { createRng } from '../../util/rng';
-import { EVENTS, type EventCard, type EventPayload } from '../events';
+import { describePayload, EVENTS, type EventCard, type EventPayload } from '../events';
 
 function makeRun() {
   return startRun(
@@ -134,5 +134,41 @@ describe('EVENTS deck — end-to-end resolution sanity', () => {
     for (const hero of result.runState.party) {
       expect(hero.currentHp).toBeGreaterThan(1);
     }
+  });
+});
+
+describe('describePayload', () => {
+  it('renders a negative hp_delta_party as "Party loses N% HP"', () => {
+    expect(describePayload({ kind: 'hp_delta_party', percent: -0.20 }))
+      .toBe('Party loses 20% HP');
+  });
+
+  it('renders a positive hp_delta_party as "Party heals N% HP"', () => {
+    expect(describePayload({ kind: 'hp_delta_party', percent: 0.25 }))
+      .toBe('Party heals 25% HP');
+  });
+
+  it('renders a positive gold_delta with a + sign', () => {
+    expect(describePayload({ kind: 'gold_delta', amount: 150 }))
+      .toBe('+150g');
+  });
+
+  it('renders a negative gold_delta with the literal sign', () => {
+    expect(describePayload({ kind: 'gold_delta', amount: -80 }))
+      .toBe('-80g');
+  });
+
+  it('renders add_item with the rarity word', () => {
+    expect(describePayload({ kind: 'add_item', rarity: 'common' }))
+      .toBe('Gain a common item');
+    expect(describePayload({ kind: 'add_item', rarity: 'uncommon' }))
+      .toBe('Gain a uncommon item');
+    expect(describePayload({ kind: 'add_item', rarity: 'rare' }))
+      .toBe('Gain a rare item');
+  });
+
+  it('renders lose_hero as "Lose a hero"', () => {
+    expect(describePayload({ kind: 'lose_hero' }))
+      .toBe('Lose a hero');
   });
 });

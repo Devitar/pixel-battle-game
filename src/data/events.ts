@@ -326,3 +326,18 @@ export const EVENTS: Record<EventCardId, EventCard> = {
     dungeonId: 'crypt',
   },
 };
+
+export function describePayload(payload: EventPayload): string {
+  switch (payload.kind) {
+    case 'hp_delta_party': {
+      const pct = Math.abs(Math.round(payload.percent * 100));
+      return payload.percent >= 0 ? `Party heals ${pct}% HP` : `Party loses ${pct}% HP`;
+    }
+    case 'gold_delta':
+      return payload.amount >= 0 ? `+${payload.amount}g` : `${payload.amount}g`;
+    case 'add_item':
+      return `Gain a ${payload.rarity} item`;
+    case 'lose_hero':
+      return 'Lose a hero';
+  }
+}

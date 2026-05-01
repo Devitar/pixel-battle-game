@@ -23,34 +23,6 @@ One section per task.
 
 <!-- Add tasks below this line. Highest priority at the top. -->
 
-## Cluster B — Scenes & UI (Phaser)
-
-Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render.
-
-### 2 · Blacksmith building
-
-- **What:** Blacksmith scene/screen. Lists upgradeable stash items; player spends gold + materials to upgrade an item one rarity tier (capped per Blacksmith level: L1 → uncommon, L2 → rare, L3 → epic).
-- **Why:** Pairs with gear rarity tiers — gives the player a long-term sink for vault gold and a path from common gear to rare.
-- **Tier:** 2
-- **Acceptance:**
-  - Blacksmith tile opens the UI; UI lists stash items with current rarity, upgrade cost (gold + materials), and a disabled state when the cap is reached.
-  - "Upgrade" deducts costs and bumps the item's rarity.
-- **Touches:** `src/scenes/blacksmith_scene.ts` (new), camp scene wiring.
-- **Source:** gdd §6 + §10 Tier 2.
-
-### 5 · Event card UI
-
-- **What:** Event card overlay. Shows card body text and two choice buttons; on choice, payload effects apply via the core event resolver and an outcome panel summarises the result before dismissal. Pairs with Cluster A task 13.
-- **Why:** Without UI, events are invisible to the player.
-- **Tier:** 2
-- **Acceptance:**
-  - Event-node entry overlays the card; choice buttons call into `applyEventChoice`.
-  - Outcome panel describes what changed (HP, gold, gear, hero loss) before the player advances.
-- **Touches:** `src/scenes/event_overlay.ts` (new), dungeon scene wiring.
-- **Source:** gdd §7 + §10 Tier 2.
-
----
-
 ## Cluster C — Art polish (non-blocking)
 
 Art tasks that aren't blocking gameplay. Enemies, heroes, and rooms already render with placeholder / reused frames; entries here replace placeholders with bespoke pixel art. Deprioritised relative to Clusters A/B.
