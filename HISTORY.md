@@ -29,6 +29,25 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-01 · Equip-from-stash at Barracks (Cluster B · 12)
+
+- **Why:** Closes the load-bearing meta-progression gap surfaced in the 2026-04-30 audit. Items went pack→stash on cashout but stash was read-only as far as equip was concerned (Blacksmith was the only consumer, and only for upgrades). Heroes who survived a run could not wear the loot you banked. gdd §6 explicit: "Inspect stats, **equip gear from stash**, set formation defaults, retire heroes."
+- **Decisions:**
+  - **Separate scene launched from Barracks**, not a sub-state of `barracks_panel_scene.ts`. Mirrors the proven `shop_overlay → equip_panel` mid-run pattern. Avoided the "Barracks file grows by 200 lines" problem of a sub-state and the "scatter conditionals through 580+ lines" problem of reusing `equip_panel_scene.ts` with a `mode` parameter.
+  - **Single-hero context** — `BarracksEquipScene.init({ heroId })` receives the Barracks-selected hero. Player exits to switch heroes. No left-pane party-list duplication.
+  - **Slot-first picker** with "(empty)" first row for non-weapon slots. Mental model for stash management is "this hero is missing X — what X do I have?" Mid-run pack uses item-first because the rhythm there is "I just looted X, where does it go?" — different question, different best UI.
+  - **2-click commit** (highlight then commit) — mirrors mid-run `equip_panel`. Preserves stat-preview value on touch (no hover assumption) and keeps muscle-memory consistent.
+  - **Stat preview reuses `previewStats` from `items/selectors.ts`.** For the "(empty)" row, an inline simulation builds the post-unequip equipment object and runs `applyEquipmentStats` directly; couldn't reuse `previewStats` there because it expects an Item to swap in.
+  - **Core helpers in new `src/items/equip_camp.ts`** (`equipFromStash`, `unequipToStash`, private `recomputeMaxHp`). Mirrors `src/run/equip_run.ts`'s shape but operates on `(roster, stash)` and returns `{ roster, stash }`. The `recomputeMaxHp` helper duplicates the same pattern in `equip_run.ts`; promoting to a shared module is reasonable future work but not blocking.
+  - **`(empty)` row hidden when slot is already empty.** The picker only offers unequip when there's actually something to unequip — no degenerate "(empty)" → "(empty)" no-op flow. Same for weapon slot, where unequip is forbidden anyway by `equip.ts`.
+  - **Equip Gear button at fixed y=430** in Barracks detail pane. Spec acknowledged this could collide with deeper-ability classes in the future — current Tier 2 classes (3-4 abilities) end around y=415 worst case, so the fixed position holds. Future class additions may need an adaptive `Math.max(430, abilitiesEndY + 8)`.
+  - **Barracks RESUME handler** added to call `rebuildDetail()` so the detail pane reflects the post-equip state (paperdoll, stats, equipment slot strip) when the equip scene closes. Same pattern as `camp_scene.ts`'s RESUME handler.
+  - **Scene render order resolved by main.ts position.** `BarracksEquipScene` registered immediately after `BarracksPanelScene` — so it naturally renders on top when launched. No `bringToTop` shenanigans (unlike Cluster B · 20's shop fix).
+- **Surprises:**
+  - **Smoothest execution since the Event card UI work.** Plan code blocks transferred 1:1; tsc happy on first try; the `PickerRow` discriminated union (`{ kind: 'empty' } | { kind: 'item'; item: Item }`) and `EMPTY_SENTINEL = '__empty__'` constant kept the highlight/commit dispatch clean throughout.
+  - **`equip_run.ts` has a latent perk-hp-effect bug** I noticed while writing the recompute helper. `computeMaxHp` accepts an optional `perk?: PerkDef` but `equip_run.ts` doesn't pass it; equipping during a run could erase a hero's perk-granted HP boost. I followed the same bug-for-bug pattern in `equip_camp.ts` for parity. Fix is its own future task.
+- **Source:** TODO.md Cluster B · 12 → spec at `docs/superpowers/specs/2026-04-30-equip-from-stash-design.md` → plan at `docs/superpowers/plans/2026-04-30-equip-from-stash.md`. Test count delta: 1307 → 1318 (+11).
+
 ### 2026-04-30 · Save loader warns on version-discard (Cluster A · 16)
 
 - **Why:** All other null-return paths in `load()` (corrupt JSON, shape mismatch, future version, paired-rng-state violation) emit a `console.warn` to make the discard visible. The "no migration registered for older version" path was silently returning `null`. Pre-launch hygiene — currently a non-issue because the schema is pinned at 1 and the path is unreachable in production, but the warn lights up the moment a future schema bump happens.

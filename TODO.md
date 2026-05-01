@@ -27,19 +27,6 @@ One section per task.
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render. Entries 1–11 shipped; 12+ surface gameplay-loop, visibility, and bug-fix work audited from gdd §6 / §10 and `bugs.md` against current HISTORY (2026-04-30).
 
-### 12 · Equip-from-stash at Barracks
-
-- **What:** Add an equip/unequip flow inside the Barracks scene that reads from `state.stash` and writes through `equip()` / `unequip()` to the selected hero's equipment slots. Mirrors the mid-run `equip_panel_scene.ts` interaction but with stash as the item pool instead of pack.
-- **Why:** gdd §6 explicitly: "Inspect stats, **equip gear from stash**, set formation defaults, retire heroes." Today nothing reads stash for equip purposes — the Blacksmith reads it for upgrades, but stash items can never get onto a camp hero. Heroes who survive a run cannot wear the loot you banked. This is a load-bearing gap in the meta-progression loop.
-- **Tier:** 2
-- **Acceptance:**
-  - In Barracks, the selected hero's equipment slots are clickable; clicking opens a stash-item picker filtered to the slot.
-  - Picking a stash item swaps it onto the hero (`equip(hero, item, slot)`); the displaced item, if any, returns to stash.
-  - Unequipping a slot (other than weapon — weapon must always be present per `equip.ts`) sends the item back to stash.
-  - Stat-preview on swap uses the existing `previewStats` helper from `items/selectors.ts` for UX parity with `equip_panel_scene.ts`.
-- **Touches:** `src/scenes/barracks_panel_scene.ts` (extend the detail pane with slot widgets + picker), possibly a small extracted helper in `src/ui/`.
-- **Source:** ad-hoc audit 2026-04-30 (gdd §6 alignment).
-
 ### 13 · Floor-modifier visibility in combat
 
 - **What:** Surface enemy modifiers (`armored`, `venomous`, `enraged`) on the combat scene — at minimum, a small badge or label below each enemy nameplate listing active modifier names. Optionally, a one-line "Modifiers in effect: …" status line at fight start.
