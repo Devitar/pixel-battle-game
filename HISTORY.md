@@ -29,6 +29,22 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-01 · Retire hero from Barracks (Cluster B · 14)
+
+- **Why:** gdd §6 explicit: "retire heroes (frees a slot, no refund)." Players who filled their 12-slot roster with bad rolls or unwanted classes had no path to free space short of waiting for a combat death — real meta-progression friction. Closes the player-initiated removal loop.
+- **Decisions:**
+  - **Inline two-step confirm** (vs modal overlay or state-machine sub-pane). The Retire button transforms into "Confirm Retire" + a "Cancel" sibling, with a red warning line above. Single button → confirm flow doesn't justify a state machine; a modal would be tonally heavy next to the casual Equip Gear button. Lives entirely inside `rebuildDetail` via one `confirmRetirePending` boolean.
+  - **Allowed-but-warned at low roster size** (vs hard-disabling at <= 3). Tavern is one click away in camp; gating Retire is paternalistic. Instead, when the post-retire roster would be < 3, the warning text appends `"⚠ Roster will drop below 3 — recruit at the Tavern before starting a run."` Preserves agency, surfaces consequence at the moment it matters.
+  - **`scene.restart()` after confirm** (vs in-scene `rebuildList` refactor). The list pane today builds untracked empty-slot rectangles in `create()`; a tracked rebuild would mean ~30 lines of refactor for marginal polish on a rarely-hit flow. Restart is one line, re-runs `create()`, and the brief redraw arguably reads as "something significant just happened" — appropriate framing for a destructive action.
+  - **`confirmRetirePending` cleared in `selectHero`.** Without this, selecting hero B while confirm is pending on hero A would render the confirm UI for B (because `rebuildDetail` re-reads the field) — clicking Confirm would silently retire B instead of A. Called out explicitly in the spec; one-line addition.
+  - **Buttons share fixed slots** at `(DETAIL_TEXT_X + 80, 430)` and `(DETAIL_TEXT_X + 230, 430)` — labels and colors swap between states (Equip Gear↔Cancel, Retire↔Confirm Retire) but positions stay stable. Avoids layout reflow on state change.
+  - **Warning at `DETAIL_PANE_CX` (715), bottom-anchored** with `setOrigin(0.5, 1)` so multi-line wraps grow upward into the abilities region. Acceptable trade for the rare confirm-state moment.
+  - **No tests** (Phaser scene/UI convention).
+- **Surprises:**
+  - **TODO entry's "`removeHero` exists but nothing calls it" was stale.** `removeHero` already had four callers (`dungeon_scene.ts`, `camp_screen_scene.ts`, `camp_node_overlay_scene.ts`) for combat-death and lost-hero handling. Only the player-initiated removal path was missing. Caught during context exploration; spec corrected accordingly. Lesson: TODO claims about "function exists but unused" need a quick `git grep` to verify before they shape the design framing.
+  - **`appState.update` already persists.** No save-schema change, no extra plumbing — the existing update path saves on every mutation. Removed any thought of a "should we persist?" branch from the design.
+- **Source:** TODO.md Cluster B · 14 → spec at `docs/superpowers/specs/2026-05-01-retire-from-barracks-design.md` → plan at `docs/superpowers/plans/2026-05-01-retire-from-barracks.md`. Test count delta: 1321 → 1321 (+0).
+
 ### 2026-05-01 · Wound-effect display in combat HUD (Cluster B · 15)
 
 - **Why:** Cluster B · 9 added wound badges to HeroCard / Barracks, but combat — the surface where wound stat-effects actually fire — didn't show them. A hero fighting at -2 Attack from Winded had no on-screen indicator of why their numbers looked off. Closes the visibility loop on the wound system; data was already in `hero.wounds`.

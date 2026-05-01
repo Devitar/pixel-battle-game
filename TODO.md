@@ -27,19 +27,6 @@ One section per task.
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render. Entries 1–11 shipped; 12+ surface gameplay-loop, visibility, and bug-fix work audited from gdd §6 / §10 and `bugs.md` against current HISTORY (2026-04-30).
 
-### 14 · Retire hero from Barracks
-
-- **What:** Add a "Retire" button to the Barracks hero detail pane. Clicking it shows a confirm dialog ("This frees the slot. The hero is gone forever. No refund."); confirm calls `removeHero(roster, hero.id)` and rebuilds the panel.
-- **Why:** gdd §6 explicit: "retire heroes (frees a slot, no refund)." The `removeHero` function exists in `roster.ts` but nothing calls it. Players who fill 12 slots with bad rolls or unwanted classes have no way to free space short of waiting for a combat death — a real meta-progression friction.
-- **Tier:** 2
-- **Acceptance:**
-  - "Retire" button visible in Barracks hero detail; styled to look destructive (red/dark).
-  - Confirm-dialog overlay (or inline two-step: "Retire" → "Confirm Retire") prevents accidental clicks.
-  - On confirm: `removeHero` runs, `appState.update` persists, panel rebuilds; the just-retired hero falls out of the list.
-  - Disabled when retiring would drop the roster below the minimum needed to start a run (3 heroes) — or, simpler: always allowed and players can re-recruit at the Tavern.
-- **Touches:** `src/scenes/barracks_panel_scene.ts`.
-- **Source:** ad-hoc audit 2026-04-30 (gdd §6 alignment).
-
 ### 18 · Noticeboard signature-enemy preview
 
 - **What:** Add a "Signature enemies" section to the dungeon-list card in the Noticeboard, rendering a small icon row (sprite frames) for the dungeon's `enemyPool`. Optionally: tier label and floor-length badge.
