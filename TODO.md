@@ -27,19 +27,6 @@ One section per task.
 
 Tier 2 scope from gdd §10 is substantially complete (entries 1–24 shipped). Entries 25+ surface latent bugs, combat-engine quality, and pre-launch hygiene work audited 2026-05-01 against current HISTORY. Entries may touch any layer (scenes, combat engine, build config) — kept under the Cluster B umbrella since Cluster A (pure-TS data layer) was closed at task 16.
 
-### 26 · Combat AI — shuffle toward preferred slots
-
-- **What:** Heroes whose role-defining abilities require specific slots fall back to low-priority self-buffs forever when at a non-preferred slot, instead of shuffling toward their preferred position. Add `preferredSlots` to hero class definitions and bias `pickAbility` to prefer the shuffle action over self-buff fallbacks when at a non-preferred slot.
-- **Why:** From ideas.md #2 — surfaced during task 17 smoke testing. A Knight dragged into slot 3 spams Bulwark/Taunt forever because `shield_bash` / `knight_slash` require slot 1–2; the engine falls back to self-buffs instead of producing a shuffle event. Same pattern locks Archer at slot 1 and Priest at slot 1 out of their kits. Visually these classes never move toward their roles, contradicting the "tank up front" mental model the picker labels imply ("SLOT 1 — FRONT").
-- **Tier:** 2
-- **Acceptance:**
-  - Hero class definitions in `src/data/classes.ts` carry `preferredSlots: readonly SlotIndex[]` (e.g., Knight `[1, 2]`, Archer `[2, 3]`, Priest `[2, 3]`). Note: `Combatant.preferredSlots` already exists in the engine type — this populates it from class data.
-  - Engine rule: when a hero is at a non-preferred slot AND only low-priority self-buffs are castable, the engine produces a shuffle event toward the closest preferred slot. Exact rule shape (skip-in-priority vs. explicit shuffle-to-preferred priority vs. stricter `canCastFrom` on self-buffs) to be designed in brainstorming.
-  - Tests cover: Knight at slot 3 produces shuffle toward slot 2; Knight at slot 2 doesn't shuffle (already preferred); Archer at slot 1 produces shuffle toward slot 2; Priest at slot 1 produces shuffle toward slot 2.
-  - Interaction with `taunting` status: a taunted hero stays put even if at non-preferred slot (taunt overrides preference).
-- **Touches:** `src/data/classes.ts`, `src/combat/ai.ts` (or wherever `pickAbility` lives), `src/combat/__tests__/`.
-- **Source:** ideas.md #2 (surfaced during task 17 smoke testing).
-
 ### 27 · Rename Noticeboard → Expeditions
 
 - **What:** Rename the camp building from "Noticeboard" to "Expeditions" across all player-facing UI strings. The building keeps all existing functionality.

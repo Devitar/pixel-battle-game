@@ -37,6 +37,19 @@ describe('resolveCombat — scripted scenarios', () => {
     expect(result.outcome).toBe('player_victory');
   });
 
+  it('Knight at non-preferred slot shuffles toward the front in round 1', () => {
+    const knight = makeHeroCombatant('knight', 3, 'p0');
+    const archer = makeHeroCombatant('archer', 2, 'p1');
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    const e1 = makeEnemyCombatant('zombie', 2, 'e1');
+    const state = makeTestState([knight, archer], [e0, e1]);
+    const result = resolveCombat(state, createRng(1));
+    const knightShuffle = result.events.find(
+      (e) => e.kind === 'shuffle' && e.combatantId === 'p0',
+    );
+    expect(knightShuffle).toBeDefined();
+  });
+
   it('extreme stalemate resolves via exhaustion (never times out)', () => {
     const hero = makeHeroCombatant('knight', 1, 'p0', {
       baseStats: { hp: 100, attack: 1, defense: 100, speed: 3, mind: 0, crit: 0, dodge: 0 },

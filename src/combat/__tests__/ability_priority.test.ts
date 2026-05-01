@@ -14,13 +14,16 @@ describe('pickAbility', () => {
     expect(picked).toEqual({ abilityId: 'mend', targetIds: ['p1'] });
   });
 
-  it('falls through when caster slot is not in canCastFrom', () => {
+  it('returns null when only lower-priority abilities are castable from current slot', () => {
     const rng = createRng(1);
     const archer = makeHeroCombatant('archer', 1, 'p0');
     const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
     const state = makeTestState([archer], [e0]);
     const picked = pickAbility(archer, state, rng);
-    expect(picked?.abilityId).toBe('archer_shoot');
+    // Higher-priority abilities (flare_arrow, piercing_shot, volley) are
+    // canCastFrom-blocked; engine prefers shuffle so the Archer can reach
+    // slot 2 where the full kit unlocks.
+    expect(picked).toBeNull();
   });
 
   it('falls through when target set is empty', () => {
@@ -50,5 +53,45 @@ describe('pickAbility', () => {
     const state = makeTestState([priest, knight], [e0]);
     const picked = pickAbility(priest, state, rng);
     expect(picked?.abilityId).toBe('bless');
+  });
+
+  it('returns null when higher-priority abilities are slot-blocked', () => {
+    const rng = createRng(1);
+    const knight = makeHeroCombatant('knight', 3, 'p0');
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    const state = makeTestState([knight], [e0]);
+    expect(pickAbility(knight, state, rng)).toBeNull();
+  });
+
+  it('does NOT prefer shuffle when the higher-priority is blocked by cooldown', () => {
+    const rng = createRng(1);
+    const knight = makeHeroCombatant('knight', 3, 'p0', { cooldowns: { shield_bash: 2 } });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    const state = makeTestState([knight], [e0]);
+    expect(pickAbility(knight, state, rng)?.abilityId).toBe('bulwark');
+  });
+
+  it('returns the highest priority when castable from current slot', () => {
+    const rng = createRng(1);
+    const knight = makeHeroCombatant('knight', 1, 'p0');
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    const state = makeTestState([knight], [e0]);
+    expect(pickAbility(knight, state, rng)?.abilityId).toBe('shield_bash');
+  });
+
+  it('does not prefer shuffle when higher-priority is castable from current slot', () => {
+    const rng = createRng(1);
+    const knight = makeHeroCombatant('knight', 2, 'p0');
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    const state = makeTestState([knight], [e0]);
+    expect(pickAbility(knight, state, rng)?.abilityId).toBe('shield_bash');
+  });
+
+  it('Priest at slot 1 prefers shuffle over priest_strike', () => {
+    const rng = createRng(1);
+    const priest = makeHeroCombatant('priest', 1, 'p0');
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    const state = makeTestState([priest], [e0]);
+    expect(pickAbility(priest, state, rng)).toBeNull();
   });
 });
