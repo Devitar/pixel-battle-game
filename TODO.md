@@ -43,6 +43,20 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 - **Touches:** `src/camp/buildings/*`, `src/scenes/camp_scene.ts`, `src/scenes/tavern_panel_scene.ts`, `src/scenes/barracks_panel_scene.ts`, `src/scenes/hospital_panel_scene.ts`, `src/scenes/blacksmith_panel_scene.ts`, `src/save/*`, new `src/camp/building_levels.ts`.
 - **Source:** gdd §6 (per-building upgrade column).
 
+### 31 · Wire up outfit sprites (no new art needed)
+
+- **What:** Replace the placeholder `spriteId: '0'` entries in `BASE_ITEMS` for `outfit_cloth` and `outfit_leather` with real frame names from `SPRITE_NAMES.torso.*`. The catalog already contains `clotharmor_*` (6 colors × 3 tiers, 18 frames) and `leatherarmor_tier1-5` (5 frames) — direct visual matches for "Cloth Robes" and "Leather Tunic." No new art needed.
+- **Why:** Cluster A · 4 (Gear rarity tiers) HISTORY noted `'0'` placeholders shipped because "no bespoke frames existed yet" — but the 2026-05-01 audit (Cluster C · 2 verification) found the outfit frames DO exist in `spritenames.txt` and just need referencing. Currently the placeholder-guard in `hero_loadout.ts` (added by Cluster B · 17) safely skips the layer for outfits, so heroes wearing equipped cloth/leather outfits render as if no outfit equipped — a real visual gap with a free fix. (Hats remain a Cluster C art task — no semantic match in the catalog for "Cap" or "Hood.")
+- **Tier:** 2 polish
+- **Acceptance:**
+  - `outfit_cloth` in `src/data/items.ts` references a real `SPRITE_NAMES.torso.clotharmor_*` frame (e.g., `String(SPRITE_NAMES.torso.clotharmor_blue1)`); pick a frame whose color reads cleanly with the existing hero body palettes.
+  - `outfit_leather` references `String(SPRITE_NAMES.torso.leatherarmor_tier1)` (or another tier — common-rarity item suggests tier 1).
+  - The two outfit variants are visually distinguishable when rendered on a hero (verify by spawning a Knight + outfit_cloth and a Knight + outfit_leather in the explorer dev scene OR via Equip panel + paperdoll preview).
+  - The placeholder-guard in `hero_loadout.ts` continues to work for the still-placeholder hats — verify by inspection that `'0'` still maps to "skip layer."
+  - tsc + tests + build green; no test count change.
+- **Touches:** `src/data/items.ts` (2 spriteId fields), possibly verify `src/render/hero_loadout.ts` placeholder guard.
+- **Source:** Cluster C · 2 verification (2026-05-01) — outfit half of the original task; hats split out to a slimmer Cluster C entry.
+
 ### 30 · Brainstorm + ship dungeon travel impact
 
 - **What:** Per ideas.md #3 — make travel between dungeon rooms non-instant and meaningful. Walking animation (heroes bob between nodes), a low-% chance of surprise encounters (combat/event/merchant) every quarter-step, passive HP changes during travel (heal if healthy, take damage if wounded/sick), hero chatter snippets for charm.
@@ -99,14 +113,15 @@ Art tasks that aren't blocking gameplay. Enemies, heroes, and rooms already rend
   - Boss is visually distinguishable beyond just scale (unique frame or silhouette).
 - **Touches:** `public/assets/sprites/base_sprites.png`, `spritenames.txt`, `src/render/sprite_names.generated.ts` (regenerated).
 
-### 2 · Bespoke outfit + hat sprites for items system
+### 2 · Bespoke hat sprites (or rename items to existing frames)
 
-- **What:** Replace the placeholder `spriteId: '0'` entries in `BASE_ITEMS` for `outfit_cloth`, `outfit_leather`, `hat_cap`, `hat_hood` with real sprite frames. Update `spritenames.txt` and regenerate the names module.
-- **Why:** The items foundation (Cluster A task 4) shipped with `'0'` placeholder sprite IDs for outfits and hats because no bespoke frames existed yet. Heroes still render correctly because `heroToLoadout` only reads weapon + shield from equipment today, but the moment a future task wires outfit/hat sprites into the paperdoll those `'0'` values become visible bugs. Cleaning this up before that wiring lands keeps the item-display task clean.
+- **What:** Resolve the placeholder `spriteId: '0'` for `hat_cap` ("Cap") and `hat_hood` ("Hood") in `BASE_ITEMS`. Two paths: (i) draw new "Cap" + "Hood" sprite frames and add them to `spritenames.txt`, or (ii) rename the items to match an existing head frame in the catalog (e.g., `hat_cap` → "Helmet" using `fullhelmet_1`; `hat_hood` → "Wizard Cowl" using `wizardhat_1`). Decision in brainstorming.
+- **Why:** 2026-05-01 audit (Cluster C · 2 verification) found the head-frame catalog (`crown_*`, `fullhelmet_*`, `jesterhat_*`, `wingedhelmet_*`, `wizardhat_*`) contains no semantic match for "Cap" or "Hood." Outfits had direct matches in the existing catalog and were promoted to Cluster B · 31 (no new art needed); hats genuinely require either new art OR a content rename. The placeholder-guard from Cluster B · 17 keeps the current state safe but visually empty for hats.
 - **Tier:** 1 (originally part of items foundation) — non-blocking now that placeholders work.
 - **Acceptance:**
-  - `outfit_cloth`, `outfit_leather`, `hat_cap`, `hat_hood` in `src/data/items.ts` reference real frame names from `SPRITE_NAMES.outfit.*` / `SPRITE_NAMES.hat.*` (or whatever family they belong to in `spritenames.txt`).
-  - `spritenames.txt` carries the new entries; `npm run generate:names` run and output committed.
-  - The two outfit variants are visually distinguishable; the two hat variants are visually distinguishable.
-- **Touches:** `public/assets/sprites/base_sprites.png` (if new frames needed), `spritenames.txt`, `src/render/sprite_names.generated.ts` (regenerated), `src/data/items.ts` (4 spriteId fields).
-- **Source:** Cluster A task 4 HISTORY entry (2026-04-27 · Gear rarity tiers + items foundation).
+  - Decision in brainstorming: new art (≥2 frames: 1 cap + 1 hood; ideally with 2+ variants each for cosmetic distinction across rarities) OR rename the BASE_ITEMS entries to match existing frames (smallest blast radius, no new art).
+  - **If new art:** `spritenames.txt` updated; `npm run generate:names` run; output committed. `hat_cap` and `hat_hood` in `src/data/items.ts` reference the new `SPRITE_NAMES.head.*` frames.
+  - **If rename:** BASE_ITEMS `name` + `spriteId` fields both updated; verify the renamed strings read sensibly in the Equip panel + Stash UI + tooltip text. `baseId` keys in `BASE_ITEMS` may need a parallel rename for consistency (`hat_cap` → `hat_helmet` etc.) — assess save-schema impact in brainstorming.
+  - Either way: placeholder-guard for these slots in `hero_loadout.ts` is no longer load-bearing (could be removed in a follow-up if both paths land).
+- **Touches:** `public/assets/sprites/base_sprites.png` (if new art), `spritenames.txt` (if new art), `src/render/sprite_names.generated.ts` (regenerated if new art), `src/data/items.ts` (2 spriteId fields, possibly 2 name fields and/or baseId keys if rename).
+- **Source:** Cluster A task 4 HISTORY entry (2026-04-27 · Gear rarity tiers + items foundation), refined by Cluster C · 2 verification (2026-05-01).
