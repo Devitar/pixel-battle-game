@@ -29,6 +29,19 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-01 · Outfit + hat wired into paperdoll loadout (Cluster B · 17)
+
+- **Why:** Closes the gap between gdd's "Equipment drives both look and stats" promise and the actual paperdoll renderer. Stats had been wired across all 4 slots since Cluster A · 4; rendering had only been wired for weapon + shield. As soon as Cluster C · 2 ships real outfit/hat sprites, this wire-up lights up the visual side automatically.
+- **Decisions:**
+  - **Placeholder sentinel guard.** TODO entry claimed the wiring was "harmless" pre-Cluster-C-2 because outfit/hat `spriteId` values are `'0'`. Wrong — naively rendering frame 0 as a stacked layer for any hero with an equipped outfit/hat (which IS reachable via the Equip panel and the new BarracksEquipScene) would visibly stack frame 0 onto the paperdoll. Added a `itemFrame()` helper that returns `undefined` for `spriteId === '0'`, which `layerFramesFor` then skips. Layer renders as if no item were equipped.
+  - **Inline `'0'` sentinel rather than a named constant.** Considered `PLACEHOLDER_SPRITE_ID` in `data/items.ts` but the inline value with a clear comment is enough — single read site, single value, well-documented.
+  - **Three new tests** in `hero_loadout.test.ts`: heroes without outfit/hat (loadout slots undefined), and the placeholder-guard behavior for both outfit and hat slots. The "real sprite renders correctly" path is implicitly covered by the existing weapon/shield tests using real spriteIds; explicit coverage waits for Cluster C · 2 to add real outfit/hat frames.
+  - **No changes to `paperdoll.ts` or `paperdoll_layers.ts`** — both already supported `outfit` and `hat` in the `Loadout` type and `LAYER_ORDER`. The wiring change was confined to `hero_loadout.ts`.
+- **Surprises:**
+  - **TODO entry's "harmless" claim was wrong.** Frame 0 isn't an "invisible" sentinel; it's whatever the spritesheet's first frame is — would have rendered a real (wrong) sprite stacked on the paperdoll. The guard is load-bearing today, not just future-proofing. Lesson: TODO entries' "this is safe" claims need verification against actual data, not just types.
+  - **All consumer sites benefit automatically.** `heroToLoadout` is called by Paperdoll in combat scene, dungeon scene, Barracks detail, BarracksEquipScene, equip_panel, event_overlay hero picker, perk overlay, hospital, tavern, hero card, and the camp screen. None needed touching.
+- **Source:** TODO.md Cluster B · 17 (originated from gdd §6 alignment audit 2026-04-30) → no formal spec/plan (single-file change with placeholder-guard subtlety). Test count delta: 1318 → 1321 (+3).
+
 ### 2026-05-01 · Equip-from-stash at Barracks (Cluster B · 12)
 
 - **Why:** Closes the load-bearing meta-progression gap surfaced in the 2026-04-30 audit. Items went pack→stash on cashout but stash was read-only as far as equip was concerned (Blacksmith was the only consumer, and only for upgrades). Heroes who survived a run could not wear the loot you banked. gdd §6 explicit: "Inspect stats, **equip gear from stash**, set formation defaults, retire heroes."

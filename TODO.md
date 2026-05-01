@@ -75,18 +75,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Touches:** `src/scenes/tavern_panel_scene.ts`, possibly a new `REROLL_COST` constant in `src/camp/buildings/tavern.ts`.
 - **Source:** ad-hoc audit 2026-04-30 (gdd §6 alignment).
 
-### 17 · Outfit + hat rendering on paperdoll
-
-- **What:** Extend `heroToLoadout` to also read `equipment.outfit` and `equipment.hat` and pass their `spriteId` values into the paperdoll. Currently only weapon + shield are wired into the rendered loadout.
-- **Why:** gdd: "Equipment drives both **look** and stats." Stats are wired (`applyEquipmentStats` reads all 4 slots); rendering is not. As soon as Cluster C · 2 ships real outfit/hat sprites, this wire-up lights up the visual side. Pre-Cluster-C-2, the wiring is harmless because both placeholder spriteIds are `'0'` (no visible change).
-- **Tier:** 2
-- **Acceptance:**
-  - `heroToLoadout` returns a `Loadout` containing `outfit?` and `hat?` sprite indices when those slots are populated.
-  - `Paperdoll` already renders these layers (per `render/paperdoll.ts` ordering: body → legs → feet → outfit → hair → hat → shield → weapon); confirm before changing.
-  - All current sites that use `heroToLoadout` (combat scene, dungeon scene, equip panel, event overlay hero picker, etc.) automatically benefit.
-- **Touches:** `src/render/hero_loadout.ts`, possibly `src/render/paperdoll.ts` if the `Loadout` type needs expansion.
-- **Source:** ad-hoc audit 2026-04-30. Pairs with — and is gated on — Cluster C · 2 sprites.
-
 ### 18 · Noticeboard signature-enemy preview
 
 - **What:** Add a "Signature enemies" section to the dungeon-list card in the Noticeboard, rendering a small icon row (sprite frames) for the dungeon's `enemyPool`. Optionally: tier label and floor-length badge.
