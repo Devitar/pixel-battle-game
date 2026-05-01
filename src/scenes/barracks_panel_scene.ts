@@ -215,7 +215,7 @@ export class BarracksPanelScene extends Phaser.Scene {
       }),
     );
     this.detailContainer.add(
-      this.add.text(DETAIL_TEXT_X, 132, classDef.name, {
+      this.add.text(DETAIL_TEXT_X, 132, `${classDef.name} · Lv ${hero.level}`, {
         fontFamily: 'monospace',
         fontSize: '13px',
         color: '#aaaaaa',

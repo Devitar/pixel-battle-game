@@ -29,6 +29,19 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-30 · Hero level surfaced on HeroCard + Barracks detail (Cluster B · 22)
+
+- **Why:** Heroes have had a `level` field since Cluster A · 7 and the perk-picker UI (Cluster B · 8) handled level-up choices, but the resting-state level was never displayed anywhere. Players couldn't see what level their heroes were. Closes the visibility gap.
+- **Decisions:**
+  - **Inline `Lv N` in the existing class line, not a separate badge.** HeroCard's small variant has tight real-estate (180×60, paperdoll on the left); a separate badge would compete with the wound badge already at top-right. Inline keeps the visual weight low and makes the level read as a class-bound stat ("Knight · Lv 5 · 32/40"), which matches how the player thinks about levels.
+  - **Both card sizes get it.** Small-card class line: `{class} · Lv {level} · {hp}/{maxHp}`. Large-card class line: `{class} · Lv {level}` (HP lives in a stats line below). Same data, scaled formatting.
+  - **Barracks detail pane edited separately.** The detail pane renders bespoke text (not HeroCard), so the change had to land in `barracks_panel_scene.ts:218` independently. Class line at y=132 changed from `classDef.name` to `${classDef.name} · Lv ${hero.level}`.
+  - **Always show `Lv 1`** for fresh recruits. Marginal redundancy is worth never having a player wonder "where's my level?" Consistency over compactness.
+  - **No new tests.** Phaser scene/UI convention is manual-play verification.
+- **Surprises:**
+  - **HeroCard is reused in many places** (Tavern, Barracks list pane, dungeon party-row equivalents, hero pickers, perk overlay). The single edit lights up the level everywhere automatically — no per-site work needed. The Barracks DETAIL pane was the only place with bespoke rendering that needed a parallel touch.
+- **Source:** TODO.md Cluster B · 22 (originated from `bugs.md` 2026-04-30) → no formal spec/plan (two-line UI fix). Test count delta: 0 (1307 → 1307).
+
 ### 2026-04-30 · Combat results show Fallen heroes (Cluster B · 21)
 
 - **Why:** Post-combat "Victory!" panel iterated `run.party`, which by the time `buildResultPanel` runs has been pruned of fallen heroes. Heroes who died got no line at all — silent loss. Closes the visibility gap.

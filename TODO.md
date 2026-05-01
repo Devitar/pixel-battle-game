@@ -27,18 +27,6 @@ One section per task.
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render. Entries 1–11 shipped; 12+ surface gameplay-loop, visibility, and bug-fix work audited from gdd §6 / §10 and `bugs.md` against current HISTORY (2026-04-30).
 
-### 22 · Hero level not shown anywhere in the UI
-
-- **What:** Heroes have a `level` field (Cluster A · 7) and gain XP / level up, but the level number isn't displayed on `HeroCard`, in Barracks, or anywhere else. Players can't see their heroes' levels.
-- **Why:** Cluster A · 7 (Hero leveling + level-5 perks) shipped the data layer; Cluster B · 8 (Level-up perk picker) handles the perk choice on level-up but doesn't surface the resting-state level. Closes the visibility gap.
-- **Tier:** 2 (visibility gap on a Tier 2 feature)
-- **Acceptance:**
-  - Hero level shown on `HeroCard` (suggest a small `Lv N` badge near the name or class).
-  - Same level visible in the Barracks detail pane (likely automatic if HeroCard is reused there).
-  - Color/styling distinct enough to read at a glance but not visually noisy.
-- **Touches:** `src/ui/hero_card.ts`, possibly `src/scenes/barracks_panel_scene.ts` if level should be more prominent in the detail view.
-- **Source:** `bugs.md` (2026-04-30 user observation).
-
 ### 23 · Camp-node choice → next encounter feels jarring (no transition beat)
 
 - **What:** When the player picks Heal Party or Treat Wound at a mid-floor camp node, the overlay closes and the dungeon scene immediately walks the party into the next encounter with no acknowledgment of the choice's effect.

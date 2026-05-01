@@ -82,8 +82,8 @@ export class HeroCard extends Phaser.GameObjects.Container {
 
     const classLine =
       size === 'small'
-        ? `${classDef.name} · ${this.hero.currentHp}/${this.hero.maxHp}`
-        : classDef.name;
+        ? `${classDef.name} · Lv ${this.hero.level} · ${this.hero.currentHp}/${this.hero.maxHp}`
+        : `${classDef.name} · Lv ${this.hero.level}`;
     const classText = this.scene.add.text(
       textX,
       nameText.y + nameText.height + 2,
