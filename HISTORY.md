@@ -29,6 +29,23 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-30 · Camp-node outcome panel (Cluster B · 23)
+
+- **Why:** Picking Heal Party or Treat Wound at a mid-floor camp node closed the overlay and dropped the player straight into the next encounter walk — no acknowledgment of what just happened. User-reported as jarring. Event overlay (Cluster B · 5) had already established the "important choices get an outcome beat" pattern; camp-node was the lone holdout.
+- **Decisions:**
+  - **Approach (a) — full outcome panel** rather than HUD flash or status toast. Pattern-consistent with event overlay (player already knows the rhythm); explicit acknowledgment with detailed numbers; lowest novelty cost. The other two options either don't carry enough information or get lost in peripheral attention.
+  - **Added `'outcome'` as a 4th state to the existing state machine** (`'main' | 'treat_picker' | 'leave_confirm' | 'outcome'`). Same state-machine pattern as before; `setOverlayState('outcome')` triggers `rerender()` which routes to `buildOutcome()`. No structural refactor.
+  - **`LastAction` discriminated union for the outcome data.** Two kinds: `'heal'` (carries per-hero `lines` with name/delta/currentHp/maxHp) and `'treat'` (carries `heroName` + `woundName`). Captured at apply-time, before persistence — for treat in particular, the wound is removed by the effect so the name lookup must happen first.
+  - **Heal outcome shows per-hero lines** in green (`#44cc44`) for healed heroes, muted (`#aaaaaa`) "{name}: full HP" for those already at max. Mirrors the combat-results-panel convention where untouched heroes still show a line — keeps the readout uniform and avoids the player wondering "did everyone heal?"
+  - **Treat outcome shows a single line** "{heroName}: {woundName} treated" in green. No need for per-hero detail; it's a single-target action.
+  - **Title differentiates the action** — "Camp · Party Rested" vs "Camp · Wound Treated" — so the player isn't relying on the body text to know what they just did.
+  - **Dismiss button styling matches the green/Pick convention** (`0x335533` bg, `0x66aa66` stroke) rather than the purple Confirm-Leave styling, since this is "acknowledge" not "destructive commit." Visual differentiation between the camp-node's two flavors of confirmable state.
+  - **No new tests.** Phaser scene convention is manual-play verification.
+- **Surprises:**
+  - **`heal_party` doesn't change party indices** (no add/remove of heroes), so per-hero delta computation is a clean `run.party.map((preHero, i) => ...)` against the pre-action snapshot. No need for ID-keyed lookup.
+  - **The leave-confirm path was untouched** — leaving the dungeon already transitions to camp scene atomically (no outcome beat needed; the cashout itself is the "outcome"). Only the in-dungeon-continuing actions (heal/treat) needed the new beat.
+- **Source:** TODO.md Cluster B · 23 (originated from `bugs.md` 2026-04-30) → no formal spec/plan (single-file change in camp_node_overlay_scene.ts). Test count delta: 0 (1307 → 1307).
+
 ### 2026-04-30 · Hero level surfaced on HeroCard + Barracks detail (Cluster B · 22)
 
 - **Why:** Heroes have had a `level` field since Cluster A · 7 and the perk-picker UI (Cluster B · 8) handled level-up choices, but the resting-state level was never displayed anywhere. Players couldn't see what level their heroes were. Closes the visibility gap.

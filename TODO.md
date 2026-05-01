@@ -27,20 +27,6 @@ One section per task.
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render. Entries 1–11 shipped; 12+ surface gameplay-loop, visibility, and bug-fix work audited from gdd §6 / §10 and `bugs.md` against current HISTORY (2026-04-30).
 
-### 23 · Camp-node choice → next encounter feels jarring (no transition beat)
-
-- **What:** When the player picks Heal Party or Treat Wound at a mid-floor camp node, the overlay closes and the dungeon scene immediately walks the party into the next encounter with no acknowledgment of the choice's effect.
-- **Why:** UX polish gap. `camp_node_overlay_scene.applyHealParty` and `applyTreatWound` both `closeAndResume()` immediately on commit; the dungeon's RESUME handler then triggers the walk-to-next animation. Compare to event overlay (Cluster B · 5) which shows an outcome panel beat first. A brief "Healed: +X HP across party" beat or a small visual confirm before walking would land the choice better.
-- **Tier:** 2 (UX polish; not a functional bug)
-- **Acceptance:**
-  - After a camp-node choice (Heal Party / Treat Wound), some kind of acknowledgment beat plays before walking to the next node. Options to consider:
-    - (a) Brief outcome panel (modeled on event UI's outcome) showing per-hero HP delta or treated wound, with Dismiss button.
-    - (b) Brief auto-dismissed flash on the dungeon HUD ("+15 HP across party").
-    - (c) Status-bar toast with the result.
-  - Pick whichever fits best during brainstorming; (a) is most consistent with the event-overlay pattern.
-- **Touches:** `src/scenes/camp_node_overlay_scene.ts`, possibly `src/scenes/dungeon_scene.ts`.
-- **Source:** `bugs.md` (2026-04-30 user observation).
-
 ### 24 · Long trait names overflow Barracks hero display
 
 - **What:** Trait names that exceed some implicit width break out of the trait box / hero display area in the Barracks panel — visually leaks past the container border.
