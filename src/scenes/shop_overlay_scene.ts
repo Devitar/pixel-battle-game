@@ -211,6 +211,10 @@ export class ShopOverlayScene extends Phaser.Scene {
 
   private onManageGear(): void {
     this.scene.launch('equip_panel', { returnTo: 'shop_overlay' });
+    // EquipPanelScene is registered earlier than ShopOverlayScene in main.ts, so
+    // by default it renders BENEATH the shop overlay. Bring it to top so the
+    // player can see and interact with it.
+    this.scene.bringToTop('equip_panel');
     this.scene.pause();
   }
 

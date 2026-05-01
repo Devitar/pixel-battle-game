@@ -35,13 +35,21 @@ const CONFIRM_BUTTON_Y = 360;
 const CONFIRM_BUTTON_W = 200;
 const CONFIRM_BUTTON_H = 36;
 
-type OverlayState = 'main' | 'treat_picker' | 'leave_confirm';
+type OverlayState = 'main' | 'treat_picker' | 'leave_confirm' | 'outcome';
+
+type LastAction =
+  | {
+      kind: 'heal';
+      lines: readonly { name: string; delta: number; currentHp: number; maxHp: number }[];
+    }
+  | { kind: 'treat'; heroName: string; woundName: string };
 
 export class CampNodeOverlayScene extends Phaser.Scene {
   private contentContainer!: Phaser.GameObjects.Container;
   private titleText!: Phaser.GameObjects.Text;
   private backButton?: { bg: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text };
   private state: OverlayState = 'main';
+  private lastAction: LastAction | null = null;
 
   constructor() {
     super('camp_node_overlay');
@@ -49,6 +57,7 @@ export class CampNodeOverlayScene extends Phaser.Scene {
 
   create(): void {
     this.state = 'main';
+    this.lastAction = null;
     this.buildBackgroundAndPanel();
     this.contentContainer = this.add.container(0, 0);
     this.rerender();
@@ -83,10 +92,17 @@ export class CampNodeOverlayScene extends Phaser.Scene {
       this.titleText.setText('Camp · Treat Wound');
       this.buildBackButton();
       this.buildTreatPicker();
-    } else {
+    } else if (this.state === 'leave_confirm') {
       this.titleText.setText('Camp · Leave Dungeon');
       this.buildBackButton();
       this.buildLeaveConfirm();
+    } else {
+      // outcome
+      const action = this.lastAction;
+      this.titleText.setText(
+        action?.kind === 'treat' ? 'Camp · Wound Treated' : 'Camp · Party Rested',
+      );
+      this.buildOutcome();
     }
   }
 
@@ -294,6 +310,56 @@ export class CampNodeOverlayScene extends Phaser.Scene {
     buttonBg.on('pointerdown', () => this.applyLeave());
   }
 
+  private buildOutcome(): void {
+    const action = this.lastAction;
+    if (!action) return;
+
+    if (action.kind === 'heal') {
+      for (let i = 0; i < action.lines.length; i++) {
+        const line = action.lines[i];
+        const text = line.delta > 0
+          ? `${line.name}: +${line.delta} HP (${line.currentHp}/${line.maxHp})`
+          : `${line.name}: full HP`;
+        this.contentContainer.add(
+          this.add
+            .text(PANEL_CX, PREVIEW_Y + i * PREVIEW_LINE_HEIGHT, text, {
+              fontFamily: 'monospace',
+              fontSize: '13px',
+              color: line.delta > 0 ? '#44cc44' : '#aaaaaa',
+            })
+            .setOrigin(0.5),
+        );
+      }
+    } else {
+      this.contentContainer.add(
+        this.add
+          .text(PANEL_CX, PREVIEW_Y, `${action.heroName}: ${action.woundName} treated`, {
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            color: '#44cc44',
+          })
+          .setOrigin(0.5),
+      );
+    }
+
+    const buttonBg = this.add
+      .rectangle(PANEL_CX, CONFIRM_BUTTON_Y, CONFIRM_BUTTON_W, CONFIRM_BUTTON_H, 0x335533)
+      .setStrokeStyle(2, 0x66aa66);
+    this.contentContainer.add(buttonBg);
+    this.contentContainer.add(
+      this.add
+        .text(PANEL_CX, CONFIRM_BUTTON_Y, 'Dismiss', {
+          fontFamily: 'monospace',
+          fontSize: '14px',
+          color: '#ffffff',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5),
+    );
+    buttonBg.setInteractive({ useHandCursor: true });
+    buttonBg.on('pointerdown', () => this.closeAndResume());
+  }
+
   private rng() {
     const rngState = appState.get().runRngState;
     if (rngState === undefined) {
@@ -306,17 +372,38 @@ export class CampNodeOverlayScene extends Phaser.Scene {
     const run = appState.get().runState!;
     const rng = this.rng();
     const result = chooseCampNodeEffect(run, { kind: 'heal_party' }, rng);
+
+    // Compute per-hero deltas before persisting (party indices align — heal_party
+    // doesn't add or remove heroes).
+    const lines = run.party.map((preHero, i) => {
+      const post = result.runState.party[i];
+      return {
+        name: post.name,
+        delta: post.currentHp - preHero.currentHp,
+        currentHp: post.currentHp,
+        maxHp: post.maxHp,
+      };
+    });
+
     appState.update((s) => ({
       ...s,
       runState: result.runState,
       runRngState: rng.getState(),
     }));
-    this.closeAndResume();
+
+    this.lastAction = { kind: 'heal', lines };
+    this.setOverlayState('outcome');
   }
 
   private applyTreatWound(heroIndex: number, woundIndex: number): void {
     const run = appState.get().runState!;
     const rng = this.rng();
+
+    // Capture hero name + wound name BEFORE applying — treat_wound removes the
+    // wound from the hero, so we can't read it afterwards.
+    const heroName = run.party[heroIndex].name;
+    const woundName = WOUNDS[run.party[heroIndex].wounds[woundIndex].id].name;
+
     const result = chooseCampNodeEffect(
       run,
       { kind: 'treat_wound', heroIndex, woundIndex },
@@ -327,7 +414,9 @@ export class CampNodeOverlayScene extends Phaser.Scene {
       runState: result.runState,
       runRngState: rng.getState(),
     }));
-    this.closeAndResume();
+
+    this.lastAction = { kind: 'treat', heroName, woundName };
+    this.setOverlayState('outcome');
   }
 
   private applyLeave(): void {

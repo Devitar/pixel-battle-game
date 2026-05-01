@@ -97,11 +97,12 @@ export class EventOverlayScene extends Phaser.Scene {
     this.contentContainer.removeAll(true);
     this.destroyBackButton();
 
-    const card = this.currentCard();
-
     if (this.state === 'card') {
+      // currentCard() reads the current node's cardId; only safe before applyChoice
+      // has advanced currentNodeId. The 'outcome' state runs *after* that advance,
+      // so it must not call currentCard() — it reads from this.lastOutcome instead.
       this.titleText.setText('Event');
-      this.buildCard(card);
+      this.buildCard(this.currentCard());
     } else if (this.state === 'hero_picker') {
       this.titleText.setText('Pick a hero to be Lost.');
       this.buildBackButton();

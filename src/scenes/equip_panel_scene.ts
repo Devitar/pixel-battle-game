@@ -134,7 +134,9 @@ export class EquipPanelScene extends Phaser.Scene {
   private repaint(): void {
     this.contentContainer.removeAll(true);
     const run = appState.get().runState;
-    if (!run || run.status !== 'camp_screen') return;
+    // Equip panel is reachable from camp_screen (post-boss) and from in-dungeon
+    // overlays (e.g. shop's "Manage Gear"). Both states have valid party + pack.
+    if (!run || (run.status !== 'camp_screen' && run.status !== 'in_dungeon')) return;
 
     this.buildLeftPane(run);
     this.buildRightPane(run);

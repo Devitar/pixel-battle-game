@@ -29,6 +29,96 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-30 · Save loader warns on version-discard (Cluster A · 16)
+
+- **Why:** All other null-return paths in `load()` (corrupt JSON, shape mismatch, future version, paired-rng-state violation) emit a `console.warn` to make the discard visible. The "no migration registered for older version" path was silently returning `null`. Pre-launch hygiene — currently a non-issue because the schema is pinned at 1 and the path is unreachable in production, but the warn lights up the moment a future schema bump happens.
+- **Decisions:**
+  - **One-line warn addition** at the `if (!migrated)` site, with the version number from `versioned.version` and `CURRENT_SCHEMA_VERSION` for context. Message format mirrors the existing `'load: save version N is newer than supported M'` style for consistency.
+  - **No new tests.** The path is currently unreachable: `isPlausibleRawSave` requires `version >= 1`, and with `CURRENT_SCHEMA_VERSION = 1` no version that passes plausibility falls through to the no-migration branch. Adding a test would require mocking `CURRENT_SCHEMA_VERSION`, which is heavier than the value (the warn message itself is straightforward; the next schema bump that introduces real migrations will exercise the path organically).
+  - **Cluster A section removed from TODO** since this was the only entry — same precedent as the Cluster A · 15 (Lost-vs-Fallen) HISTORY entry which removed the empty section.
+- **Surprises:**
+  - **The fix is forward-looking dead code today.** With current schema pinned at 1, the only way to land in the `!migrated` branch would be via `migrate()` getting an object whose version is ≥ 1 but doesn't exhaust the migration loop — and at version === 1 with no migrations registered, the loop never executes and the function returns the input as-is. So the warn never fires in production. The right policy for now: ship the safety net so the next schema bump doesn't reintroduce the silent-discard pattern by accident.
+- **Source:** TODO.md Cluster A · 16 (originated from `bugs.md` 2026-04-26 entry surfaced via Claude-in-Chrome) → no formal spec/plan (one-block hotfix). Test count delta: 0 (1307 → 1307).
+
+### 2026-04-30 · Trait text wraps in Barracks detail (Cluster B · 24)
+
+- **Why:** Long trait descriptions ("+2 Attack when below 50% HP" etc.) overflowed the Barracks detail pane horizontally — visible leak past the right edge. User-reported with screenshot.
+- **Decisions:**
+  - **`wordWrap: { width: 340 }` on the trait text style.** Detail pane spans x=590 (text origin) to x=935 (pane right edge) = 345px available; 340 leaves a small margin. Wrap was preferred over truncation/ellipsis (preserves info) and over font-shrink (kept consistent with surrounding 11px lines).
+  - **Captured trait text into a local + dynamic `woundsCursor`.** When trait wraps to two lines, it occupies y=172..194, overlapping the historic `woundsCursor = 192`. Changed to `Math.max(192, traitText.y + traitText.height + 6)` so single-line traits keep the historic layout exactly while wrapped traits push wounds (and the cascade-dependent ABILITIES section that already uses `Math.max(ABILITY_HEADER_Y, woundsCursor)`) down. The pre-existing `Math.max` cascade from Cluster B · 9 (Wound display) made this a one-line edit instead of a layout refactor.
+  - **Did not touch the small `HeroCard` trait line.** It uses `shortDescription` (much shorter — "Bloodthirsty · +2 Atk <50%HP" at 28 chars) and the user's report was specifically about Barracks. The small card has fixed-position siblings that wordWrap could overlap; if a trait overflow surfaces there too, fix then.
+  - **No new tests.** Phaser scene/UI convention is manual-play verification.
+- **Surprises:**
+  - **Almost shipped a bad refactor** — first attempt extracted the wounds rendering into a separate `renderWoundsSection(hero, startY)` method, but I prematurely closed `rebuildDetail`'s brace and would have left abilities orphaned. Caught immediately on inspection; reverted to a minimal change that just made `woundsCursor` dynamic.
+  - **The Cluster B · 9 `Math.max` cascade paid off again.** That HISTORY entry called out the dynamic `Math.max(ABILITY_HEADER_Y, woundsCursor)` shift as serving wound counts; here it serves wrapped trait text too, with no additional code. Generic vertical-stack guards age well.
+- **Source:** TODO.md Cluster B · 24 (originated from `bugs.md` 2026-04-30 with screenshot) → no formal spec/plan (single-file change). Test count delta: 0 (1307 → 1307).
+
+### 2026-04-30 · Camp-node outcome panel (Cluster B · 23)
+
+- **Why:** Picking Heal Party or Treat Wound at a mid-floor camp node closed the overlay and dropped the player straight into the next encounter walk — no acknowledgment of what just happened. User-reported as jarring. Event overlay (Cluster B · 5) had already established the "important choices get an outcome beat" pattern; camp-node was the lone holdout.
+- **Decisions:**
+  - **Approach (a) — full outcome panel** rather than HUD flash or status toast. Pattern-consistent with event overlay (player already knows the rhythm); explicit acknowledgment with detailed numbers; lowest novelty cost. The other two options either don't carry enough information or get lost in peripheral attention.
+  - **Added `'outcome'` as a 4th state to the existing state machine** (`'main' | 'treat_picker' | 'leave_confirm' | 'outcome'`). Same state-machine pattern as before; `setOverlayState('outcome')` triggers `rerender()` which routes to `buildOutcome()`. No structural refactor.
+  - **`LastAction` discriminated union for the outcome data.** Two kinds: `'heal'` (carries per-hero `lines` with name/delta/currentHp/maxHp) and `'treat'` (carries `heroName` + `woundName`). Captured at apply-time, before persistence — for treat in particular, the wound is removed by the effect so the name lookup must happen first.
+  - **Heal outcome shows per-hero lines** in green (`#44cc44`) for healed heroes, muted (`#aaaaaa`) "{name}: full HP" for those already at max. Mirrors the combat-results-panel convention where untouched heroes still show a line — keeps the readout uniform and avoids the player wondering "did everyone heal?"
+  - **Treat outcome shows a single line** "{heroName}: {woundName} treated" in green. No need for per-hero detail; it's a single-target action.
+  - **Title differentiates the action** — "Camp · Party Rested" vs "Camp · Wound Treated" — so the player isn't relying on the body text to know what they just did.
+  - **Dismiss button styling matches the green/Pick convention** (`0x335533` bg, `0x66aa66` stroke) rather than the purple Confirm-Leave styling, since this is "acknowledge" not "destructive commit." Visual differentiation between the camp-node's two flavors of confirmable state.
+  - **No new tests.** Phaser scene convention is manual-play verification.
+- **Surprises:**
+  - **`heal_party` doesn't change party indices** (no add/remove of heroes), so per-hero delta computation is a clean `run.party.map((preHero, i) => ...)` against the pre-action snapshot. No need for ID-keyed lookup.
+  - **The leave-confirm path was untouched** — leaving the dungeon already transitions to camp scene atomically (no outcome beat needed; the cashout itself is the "outcome"). Only the in-dungeon-continuing actions (heal/treat) needed the new beat.
+- **Source:** TODO.md Cluster B · 23 (originated from `bugs.md` 2026-04-30) → no formal spec/plan (single-file change in camp_node_overlay_scene.ts). Test count delta: 0 (1307 → 1307).
+
+### 2026-04-30 · Hero level surfaced on HeroCard + Barracks detail (Cluster B · 22)
+
+- **Why:** Heroes have had a `level` field since Cluster A · 7 and the perk-picker UI (Cluster B · 8) handled level-up choices, but the resting-state level was never displayed anywhere. Players couldn't see what level their heroes were. Closes the visibility gap.
+- **Decisions:**
+  - **Inline `Lv N` in the existing class line, not a separate badge.** HeroCard's small variant has tight real-estate (180×60, paperdoll on the left); a separate badge would compete with the wound badge already at top-right. Inline keeps the visual weight low and makes the level read as a class-bound stat ("Knight · Lv 5 · 32/40"), which matches how the player thinks about levels.
+  - **Both card sizes get it.** Small-card class line: `{class} · Lv {level} · {hp}/{maxHp}`. Large-card class line: `{class} · Lv {level}` (HP lives in a stats line below). Same data, scaled formatting.
+  - **Barracks detail pane edited separately.** The detail pane renders bespoke text (not HeroCard), so the change had to land in `barracks_panel_scene.ts:218` independently. Class line at y=132 changed from `classDef.name` to `${classDef.name} · Lv ${hero.level}`.
+  - **Always show `Lv 1`** for fresh recruits. Marginal redundancy is worth never having a player wonder "where's my level?" Consistency over compactness.
+  - **No new tests.** Phaser scene/UI convention is manual-play verification.
+- **Surprises:**
+  - **HeroCard is reused in many places** (Tavern, Barracks list pane, dungeon party-row equivalents, hero pickers, perk overlay). The single edit lights up the level everywhere automatically — no per-site work needed. The Barracks DETAIL pane was the only place with bespoke rendering that needed a parallel touch.
+- **Source:** TODO.md Cluster B · 22 (originated from `bugs.md` 2026-04-30) → no formal spec/plan (two-line UI fix). Test count delta: 0 (1307 → 1307).
+
+### 2026-04-30 · Combat results show Fallen heroes (Cluster B · 21)
+
+- **Why:** Post-combat "Victory!" panel iterated `run.party`, which by the time `buildResultPanel` runs has been pruned of fallen heroes. Heroes who died got no line at all — silent loss. Closes the visibility gap.
+- **Decisions:**
+  - **Replaced `preCombatHp: Map<string, number>` with `preCombatParty: Hero[]`.** The old map only carried HP-before; it couldn't surface the names of pruned heroes for Fallen rendering. The new field carries the full pre-combat party snapshot, which is the source of truth for both delta computation and Fallen rendering. Three call sites updated (declaration, `create()` reset, `processCombatReturn` populate); two reads in the panel loop now key off `survivorsById` for membership and the pre-hero snapshot for HP-before.
+  - **Iterate `preCombatParty` instead of `run.party`.** Order is now stable across rebuilds (the panel always lists pre-combat slots in the original order, even after losses). For each pre-hero, look up survivor in a `Map(run.party)` — if absent, render "{name}: Fallen" in pinkish-red `#cc8888`. Color matches the cashout-summary / wipe-panel Fallen convention.
+  - **HP delta computation simplified.** Was `before - hero.currentHp` with `before` from a Map lookup. Now `preHero.currentHp - survivor.currentHp` using the pre-hero snapshot directly — same semantics, no Map lookup.
+  - **No new tests.** Phaser scene convention is manual-play verification.
+- **Surprises:**
+  - **The pre-existing `preCombatHp` field was essentially a half-measure** — it captured *some* pre-combat info but not enough to render the panel correctly when heroes Fell. The right shape was always "snapshot the party," not "snapshot HPs." Quick to fix once spotted.
+- **Source:** TODO.md Cluster B · 21 (originated from `bugs.md` 2026-04-30) → no formal spec/plan (one-block fix in dungeon_scene.ts). Test count delta: 0 (1307 → 1307).
+
+### 2026-04-30 · Hotfix: shop "Manage Gear" trap (Cluster B · 20)
+
+- **Why:** User repro: clicking Manage Gear in the shop overlay rendered the shop on top of an inert/blank equip panel, with no way to recover. The TODO entry hypothesised a missing `scene.pause()` call, but inspection found the pause was already there — there were actually **two** distinct bugs colluding to produce the trap.
+- **Decisions:**
+  - **Bug A — `equip_panel` early-returned on non-`camp_screen` status.** `repaint()` had `if (!run || run.status !== 'camp_screen') return;`. Launched from camp_screen this works (status matches). Launched from the shop, `runState.status === 'in_dungeon'` and `repaint()` no-ops — so the panel renders empty (just chrome + close button). Fix: loosen the guard to accept both `'camp_screen'` and `'in_dungeon'` (both states have valid `party` + `pack`, which is everything `equipFromPack`/`unequipToPack` need). Comment added explaining why both statuses are accepted.
+  - **Bug B — `EquipPanelScene` registered before `ShopOverlayScene` in `main.ts` → renders beneath shop.** Phaser's default scene render order follows registration order. EquipPanelScene is at index 10; ShopOverlayScene at 12. Without intervention, when both are running the shop renders on top of the equip panel. Fix: `this.scene.bringToTop('equip_panel')` after the launch. Tighter blast radius than reordering main.ts (which would risk affecting other launch sites).
+  - **Both fixes together** unlock the path: equip panel renders correctly (Bug A) and is visible/interactive (Bug B). When the equip panel closes, the shop overlay (still registered later than equip_panel) returns to the top automatically — no extra cleanup needed.
+- **Surprises:**
+  - **TODO hypothesis was wrong about which call was missing.** `scene.pause()` was already present at `shop_overlay_scene.ts:214`. The "missing pause" framing in the bug entry led me to expect a one-line fix; reality was a two-bug collusion. Lesson: when the TODO says "scope is X", treat it as a hypothesis, not a spec — the audit was useful for spotting the symptom, but the root cause needed direct inspection.
+  - **Phaser's render-order vs. interactivity** is its own gotcha. A paused scene still renders and (apparently from this user repro) can occlude other scenes' input — even though `scene.pause()` is supposed to disable input updates. Worth keeping in mind when designing future overlay-on-overlay flows.
+- **Source:** TODO.md Cluster B · 20 (which originated from `bugs.md` 2026-04-30) → no formal spec/plan (two-line hotfix). Test count delta: 0 (1307 → 1307).
+
+### 2026-04-30 · Hotfix: event overlay throws on outcome render (Cluster B · 19)
+
+- **Why:** Same-day regression from Cluster B · 5 (shipped 2026-04-30). User repro: picking any event-card choice (e.g., starving_merchant's "Bleed for him") threw `Error: event_overlay: current node is 'boss', not 'event'` and broke the run. Every applied choice hit the same path. Caught via play-testing within hours of shipping.
+- **Decisions:**
+  - **Move `currentCard()` into the `'card'` branch only.** `EventOverlayScene.rerender()` had `const card = this.currentCard()` at the top, before the state-switch. After `applyChoice` runs `chooseNextNode`, `currentNodeId` points at the next node (often a boss); `currentCard()`'s `node.type !== 'event'` guard then threw. Fix is a 3-line reshape: only call `currentCard()` inside the `'card'` arm. The `'outcome'` arm reads from `this.lastOutcome` (the in-memory outcome captured pre-advance); the `'hero_picker'` arm uses a hardcoded title and doesn't need the card.
+  - **Comment added** at the call site explaining the constraint ("only safe before applyChoice has advanced currentNodeId") so a future editor doesn't reintroduce the bug by hoisting `currentCard()` back to the top.
+  - **No new tests.** Phaser scene convention is manual-play verification; the bug surfaced via play and the fix is verifiable the same way. Adding a Vitest harness for scene-level state-machine flow would be its own task.
+- **Surprises:**
+  - **The bug was visible during the spec/plan review** if anyone had simulated a state transition by hand — `applyChoice` clearly advances state and *then* triggers `rerender()`, and `rerender()` clearly calls `currentCard()` unconditionally. The atomic-persist-and-advance decision (spec §4) was meant to be load-bearing for state consistency on browser refresh, but it created exactly the read-after-advance problem that broke the outcome render path. Lesson: when a design's atomicity property is described, walk through the immediate post-atomic UI rendering path explicitly — that's where invariants get violated by pre-existing code paths.
+  - **`'hero_picker'` was safe by accident** because its title is hardcoded ("Pick a hero to be Lost.") and it doesn't read the card. If a future card needs a parameterized picker title (e.g., "Pick a hero to dare the well"), the picker will need its own card lookup — which is fine because it runs *before* applyChoice.
+- **Source:** TODO.md Cluster B · 19 → no formal spec/plan (one-block hotfix). Test count delta: 0 (1307 → 1307).
+
 ### 2026-04-30 · Event card UI (Cluster B · 5)
 
 - **Why:** Replaces the auto-skip stub from the event-floor-integration HISTORY entry (2026-04-29). Players walking onto event nodes now see the card body, pick a choice, and read the outcome — making event-node forks meaningful for the first time. Closes Cluster B (the cluster header was removed from TODO.md, matching the Cluster A precedent).

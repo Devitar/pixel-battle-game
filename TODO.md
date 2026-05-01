@@ -23,6 +23,97 @@ One section per task.
 
 <!-- Add tasks below this line. Highest priority at the top. -->
 
+## Cluster B — Scenes & UI (Phaser)
+
+Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render. Entries 1–11 shipped; 12+ surface gameplay-loop, visibility, and bug-fix work audited from gdd §6 / §10 and `bugs.md` against current HISTORY (2026-04-30).
+
+### 12 · Equip-from-stash at Barracks
+
+- **What:** Add an equip/unequip flow inside the Barracks scene that reads from `state.stash` and writes through `equip()` / `unequip()` to the selected hero's equipment slots. Mirrors the mid-run `equip_panel_scene.ts` interaction but with stash as the item pool instead of pack.
+- **Why:** gdd §6 explicitly: "Inspect stats, **equip gear from stash**, set formation defaults, retire heroes." Today nothing reads stash for equip purposes — the Blacksmith reads it for upgrades, but stash items can never get onto a camp hero. Heroes who survive a run cannot wear the loot you banked. This is a load-bearing gap in the meta-progression loop.
+- **Tier:** 2
+- **Acceptance:**
+  - In Barracks, the selected hero's equipment slots are clickable; clicking opens a stash-item picker filtered to the slot.
+  - Picking a stash item swaps it onto the hero (`equip(hero, item, slot)`); the displaced item, if any, returns to stash.
+  - Unequipping a slot (other than weapon — weapon must always be present per `equip.ts`) sends the item back to stash.
+  - Stat-preview on swap uses the existing `previewStats` helper from `items/selectors.ts` for UX parity with `equip_panel_scene.ts`.
+- **Touches:** `src/scenes/barracks_panel_scene.ts` (extend the detail pane with slot widgets + picker), possibly a small extracted helper in `src/ui/`.
+- **Source:** ad-hoc audit 2026-04-30 (gdd §6 alignment).
+
+### 13 · Floor-modifier visibility in combat
+
+- **What:** Surface enemy modifiers (`armored`, `venomous`, `enraged`) on the combat scene — at minimum, a small badge or label below each enemy nameplate listing active modifier names. Optionally, a one-line "Modifiers in effect: …" status line at fight start.
+- **Why:** Cluster A · 12 (Floor-milestone enemy modifiers) shipped the data layer — Armored / Venomous / Enraged each carry a real combat effect — but no UI references modifiers anywhere (`Grep src/scenes/**` for `modifier` returns zero hits). Players get hit by extra defense, poison ticks, or a sudden attack spike without any signal. Closes the visibility gap on Tier 2's "scaling milestones within a dungeon" feature.
+- **Tier:** 2
+- **Acceptance:**
+  - Each enemy with at least one modifier shows badge text (e.g., "Armored", "Venomous") near its sprite/nameplate.
+  - Modifier names use a consistent color (suggest an orange / amber to read as "watch out") and use `MODIFIERS[id].name` for the label so future-added modifiers don't need scene edits.
+  - Bosses (which never roll modifiers per Cluster A · 12 HISTORY) just don't render the badge — no special branch needed.
+- **Touches:** `src/scenes/combat_scene.ts` (or wherever enemy nameplates render), `src/data/modifiers.ts` (read-only).
+- **Source:** ad-hoc audit 2026-04-30.
+
+### 14 · Retire hero from Barracks
+
+- **What:** Add a "Retire" button to the Barracks hero detail pane. Clicking it shows a confirm dialog ("This frees the slot. The hero is gone forever. No refund."); confirm calls `removeHero(roster, hero.id)` and rebuilds the panel.
+- **Why:** gdd §6 explicit: "retire heroes (frees a slot, no refund)." The `removeHero` function exists in `roster.ts` but nothing calls it. Players who fill 12 slots with bad rolls or unwanted classes have no way to free space short of waiting for a combat death — a real meta-progression friction.
+- **Tier:** 2
+- **Acceptance:**
+  - "Retire" button visible in Barracks hero detail; styled to look destructive (red/dark).
+  - Confirm-dialog overlay (or inline two-step: "Retire" → "Confirm Retire") prevents accidental clicks.
+  - On confirm: `removeHero` runs, `appState.update` persists, panel rebuilds; the just-retired hero falls out of the list.
+  - Disabled when retiring would drop the roster below the minimum needed to start a run (3 heroes) — or, simpler: always allowed and players can re-recruit at the Tavern.
+- **Touches:** `src/scenes/barracks_panel_scene.ts`.
+- **Source:** ad-hoc audit 2026-04-30 (gdd §6 alignment).
+
+### 15 · Wound-effect display in combat HUD
+
+- **What:** Show wound badges on the party-side combat HUD. Each hero with `wounds.length > 0` gets a small `🩸 N` badge near their nameplate (matching the HeroCard convention from Cluster B · 9). Optional tooltip: list each wound's effect via the existing `describeWoundEffect` helper.
+- **Why:** Cluster B · 9 added wound badges to HeroCard / Barracks. Combat — the surface where wound effects actually fire — doesn't show them. A hero fighting at -2 Attack from Winded has no on-screen indicator of why their numbers look off. The data is right there in `hero.wounds`.
+- **Tier:** 2
+- **Acceptance:**
+  - Heroes in combat with `wounds.length > 0` render a `🩸 N` badge near their nameplate (color `#ff6666` for visual parity with HeroCard).
+  - Hovering / tapping the badge shows the wound-effect summary (one line per wound) — defer if the combat scene doesn't support hover.
+- **Touches:** `src/scenes/combat_scene.ts`, possibly a shared widget in `src/ui/`.
+- **Source:** ad-hoc audit 2026-04-30.
+
+### 16 · Tavern reroll
+
+- **What:** Add a "Reroll Candidates" button to the Tavern panel that costs gold (suggest 25g L1) and replaces the current 3 candidates with a fresh `generateCandidates(rng, unlockedClasses)` roll. Threads the run-RNG / a fresh camp RNG appropriately.
+- **Why:** gdd §6 explicit: L1 Tavern has reroll for gold cost. Today, the Tavern shows 3 fixed candidates per visit with no way to reroll — players are locked into whatever spawns. Removes a meaningful agency lever from recruitment.
+- **Tier:** 2
+- **Acceptance:**
+  - "Reroll · {N}g" button in the Tavern; greyed when player can't afford.
+  - Click deducts gold via `spend(vault, REROLL_COST)`, calls `generateCandidates`, and persists the new candidate set in scene state.
+  - The Tavern's candidate list lives in scene state currently (no save persistence per visit) — confirm before changing that contract.
+- **Touches:** `src/scenes/tavern_panel_scene.ts`, possibly a new `REROLL_COST` constant in `src/camp/buildings/tavern.ts`.
+- **Source:** ad-hoc audit 2026-04-30 (gdd §6 alignment).
+
+### 17 · Outfit + hat rendering on paperdoll
+
+- **What:** Extend `heroToLoadout` to also read `equipment.outfit` and `equipment.hat` and pass their `spriteId` values into the paperdoll. Currently only weapon + shield are wired into the rendered loadout.
+- **Why:** gdd: "Equipment drives both **look** and stats." Stats are wired (`applyEquipmentStats` reads all 4 slots); rendering is not. As soon as Cluster C · 2 ships real outfit/hat sprites, this wire-up lights up the visual side. Pre-Cluster-C-2, the wiring is harmless because both placeholder spriteIds are `'0'` (no visible change).
+- **Tier:** 2
+- **Acceptance:**
+  - `heroToLoadout` returns a `Loadout` containing `outfit?` and `hat?` sprite indices when those slots are populated.
+  - `Paperdoll` already renders these layers (per `render/paperdoll.ts` ordering: body → legs → feet → outfit → hair → hat → shield → weapon); confirm before changing.
+  - All current sites that use `heroToLoadout` (combat scene, dungeon scene, equip panel, event overlay hero picker, etc.) automatically benefit.
+- **Touches:** `src/render/hero_loadout.ts`, possibly `src/render/paperdoll.ts` if the `Loadout` type needs expansion.
+- **Source:** ad-hoc audit 2026-04-30. Pairs with — and is gated on — Cluster C · 2 sprites.
+
+### 18 · Noticeboard signature-enemy preview
+
+- **What:** Add a "Signature enemies" section to the dungeon-list card in the Noticeboard, rendering a small icon row (sprite frames) for the dungeon's `enemyPool`. Optionally: tier label and floor-length badge.
+- **Why:** gdd §5: "Each dungeon shows its tier, expected floor length, and a preview of the **signature enemies** and loot." Today the card shows name + theme + "3 floors" only. Marginal while The Crypt is the only dungeon, but turns into "obviously missing" the moment a 2nd dungeon ships — better to land it now while there's no data-shape pressure.
+- **Tier:** 2
+- **Acceptance:**
+  - Dungeon card renders enemy sprites for each id in `DUNGEONS[id].enemyPool` plus the boss sprite (visually distinguished, e.g. larger or with a crown icon).
+  - Tier label rendered (currently DungeonDef has no `tier` field — defer if introducing one is out of scope; otherwise add it via a single-line type/data extension).
+  - Loot preview deferred — too speculative without dungeon-specific loot pools.
+- **Touches:** `src/scenes/noticeboard_panel_scene.ts`, possibly `src/data/dungeons.ts` (tier field) and `src/data/types.ts` (DungeonDef extension).
+- **Source:** ad-hoc audit 2026-04-30 (gdd §5 alignment).
+
+---
+
 ## Cluster C — Art polish (non-blocking)
 
 Art tasks that aren't blocking gameplay. Enemies, heroes, and rooms already render with placeholder / reused frames; entries here replace placeholders with bespoke pixel art. Deprioritised relative to Clusters A/B.
