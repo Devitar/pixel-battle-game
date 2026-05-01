@@ -6,6 +6,7 @@ import { createHero, type Hero } from '../../heroes/hero';
 import type { Rng } from '../../util/rng';
 
 export const HIRE_COST = 50;
+export const REROLL_COST = 25;
 export const TAVERN_CANDIDATE_COUNT = 3;
 
 const ALL_TRAIT_IDS = Object.keys(TRAITS) as TraitId[];

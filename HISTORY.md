@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-01 · Tavern reroll (Cluster B · 16)
+
+- **Why:** gdd §6 explicit: L1 Tavern has reroll for gold cost. Tavern shipped showing 3 fixed candidates per visit with no way to reroll; players were locked into whatever the session-fresh RNG produced. Closes a meaningful agency lever from recruitment.
+- **Decisions:**
+  - **`REROLL_COST = 25` in `src/camp/buildings/tavern.ts`** alongside `HIRE_COST = 50`. Half the hire cost feels right — rerolling is a setup cost, not a commitment, and players visit the Tavern with low gold early-game when 25g is real money. Single tunable site.
+  - **Reroll uses `this.rng` (the session RNG seeded from `Date.now()` on scene create).** Each click advances the stream; outcomes are non-deterministic across sessions but stable within one. Same RNG already powers `generateCandidate` post-hire — just calling `generateCandidates` (plural) replaces all three at once.
+  - **Reroll button in the title row at x=800, y=113** — sits between the title text and the close × at the right edge. Same vertical level as the title and close button, distinct from the per-candidate Hire buttons below the cards.
+  - **Reroll only checks gold, not roster capacity.** The hire buttons are disabled when the roster is full (no slot to receive the hire). Reroll just changes what's *displayed*; it doesn't add anyone to the roster, so a full-roster player can still browse fresh candidates (useful for previewing what's available before retiring someone — pairs with TODO #14 retire).
+  - **`refreshButtons` extended** rather than splitting into a separate `refreshRerollButton`. Both buttons need the same `gold = balance(state.vault)` read; folding the reroll-affordability branch into the existing method keeps the gold lookup single-source.
+  - **No new tests.** Phaser scene/UI convention is manual-play verification; the reroll's behavior is a one-block scene change.
+- **Surprises:**
+  - **Naming variable bump:** the existing `canAfford` flag was hire-cost-specific. Renamed to `canAffordHire` to make space for `canAffordReroll` in the same method. Rename was tight (3 sites in the existing block) and improves clarity even if reroll hadn't landed.
+- **Source:** TODO.md Cluster B · 16 (originated from gdd §6 alignment audit 2026-04-30) → no formal spec/plan (single-file UI extension). Test count delta: 0 (1321 → 1321).
+
 ### 2026-05-01 · Outfit + hat wired into paperdoll loadout (Cluster B · 17)
 
 - **Why:** Closes the gap between gdd's "Equipment drives both look and stats" promise and the actual paperdoll renderer. Stats had been wired across all 4 slots since Cluster A · 4; rendering had only been wired for weapon + shield. As soon as Cluster C · 2 ships real outfit/hat sprites, this wire-up lights up the visual side automatically.

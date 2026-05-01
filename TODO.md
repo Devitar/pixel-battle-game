@@ -63,18 +63,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 - **Touches:** `src/scenes/combat_scene.ts`, possibly a shared widget in `src/ui/`.
 - **Source:** ad-hoc audit 2026-04-30.
 
-### 16 · Tavern reroll
-
-- **What:** Add a "Reroll Candidates" button to the Tavern panel that costs gold (suggest 25g L1) and replaces the current 3 candidates with a fresh `generateCandidates(rng, unlockedClasses)` roll. Threads the run-RNG / a fresh camp RNG appropriately.
-- **Why:** gdd §6 explicit: L1 Tavern has reroll for gold cost. Today, the Tavern shows 3 fixed candidates per visit with no way to reroll — players are locked into whatever spawns. Removes a meaningful agency lever from recruitment.
-- **Tier:** 2
-- **Acceptance:**
-  - "Reroll · {N}g" button in the Tavern; greyed when player can't afford.
-  - Click deducts gold via `spend(vault, REROLL_COST)`, calls `generateCandidates`, and persists the new candidate set in scene state.
-  - The Tavern's candidate list lives in scene state currently (no save persistence per visit) — confirm before changing that contract.
-- **Touches:** `src/scenes/tavern_panel_scene.ts`, possibly a new `REROLL_COST` constant in `src/camp/buildings/tavern.ts`.
-- **Source:** ad-hoc audit 2026-04-30 (gdd §6 alignment).
-
 ### 18 · Noticeboard signature-enemy preview
 
 - **What:** Add a "Signature enemies" section to the dungeon-list card in the Noticeboard, rendering a small icon row (sprite frames) for the dungeon's `enemyPool`. Optionally: tier label and floor-length badge.
