@@ -63,7 +63,12 @@ export function load(storage: Storage): SaveFile | null {
     console.warn('load: migration failed', e);
     return null;
   }
-  if (!migrated) return null;
+  if (!migrated) {
+    console.warn(
+      `load: discarding save with unsupported version ${versioned.version} (current is ${CURRENT_SCHEMA_VERSION})`,
+    );
+    return null;
+  }
 
   if ((migrated.runState === undefined) !== (migrated.runRngState === undefined)) {
     console.warn('load: runState/runRngState pairing invariant violated; discarding run');

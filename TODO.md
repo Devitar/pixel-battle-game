@@ -114,23 +114,6 @@ Everything in this cluster may import `phaser`. Core logic lives in Cluster A mo
 
 ---
 
-## Cluster A — Pure-TS data layer
-
-Modules under `src/combat/`, `src/heroes/`, `src/items/`, `src/dungeon/`, `src/events/`, `src/run/`, `src/camp/`, `src/data/`, `src/util/`, `src/save/`. Cluster shipped 1–15; resurrected 2026-04-30 for one pre-launch cleanup item.
-
-### 16 · Save loader silently discards old-version saves
-
-- **What:** When a save's `version` is older than `CURRENT_SCHEMA_VERSION` and no migration is registered for that version, `migrate()` returns `null` and `load()` returns `null` without emitting a `console.warn`. The boot scene then generates a fresh save with no indication that an old save was thrown away.
-- **Why:** The other null-return paths in `load()` (corrupt JSON, shape mismatch, future version, paired-rng-state violation) all warn — only the no-migration-registered path is silent. Currently a non-issue because the user is the only player, the schema is pinned at 1, and discards are intentional. Worth fixing before launch when player saves are real.
-- **Tier:** 2 (pre-launch hygiene)
-- **Acceptance:**
-  - When `migrate()` returns `null` due to no registered migration for an older version, `load()` emits `console.warn('load: discarding save with unsupported version N (current is M)')` (or equivalent) and returns `null`.
-  - Repro: with a future `CURRENT_SCHEMA_VERSION = 2`, plant `localStorage.setItem('pixel-battle-game/save', JSON.stringify({ version: 1, roster: {}, vault: {}, unlocks: {} }))` and reload — confirm the warn now fires.
-- **Touches:** `src/save/save.ts` (one-line addition after the `if (!migrated) return null;` block).
-- **Source:** `bugs.md` (2026-04-26 entry, surfaced via Claude-in-Chrome v1-discard test).
-
----
-
 ## Cluster C — Art polish (non-blocking)
 
 Art tasks that aren't blocking gameplay. Enemies, heroes, and rooms already render with placeholder / reused frames; entries here replace placeholders with bespoke pixel art. Deprioritised relative to Clusters A/B.

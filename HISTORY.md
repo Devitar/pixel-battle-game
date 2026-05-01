@@ -29,6 +29,17 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-30 · Save loader warns on version-discard (Cluster A · 16)
+
+- **Why:** All other null-return paths in `load()` (corrupt JSON, shape mismatch, future version, paired-rng-state violation) emit a `console.warn` to make the discard visible. The "no migration registered for older version" path was silently returning `null`. Pre-launch hygiene — currently a non-issue because the schema is pinned at 1 and the path is unreachable in production, but the warn lights up the moment a future schema bump happens.
+- **Decisions:**
+  - **One-line warn addition** at the `if (!migrated)` site, with the version number from `versioned.version` and `CURRENT_SCHEMA_VERSION` for context. Message format mirrors the existing `'load: save version N is newer than supported M'` style for consistency.
+  - **No new tests.** The path is currently unreachable: `isPlausibleRawSave` requires `version >= 1`, and with `CURRENT_SCHEMA_VERSION = 1` no version that passes plausibility falls through to the no-migration branch. Adding a test would require mocking `CURRENT_SCHEMA_VERSION`, which is heavier than the value (the warn message itself is straightforward; the next schema bump that introduces real migrations will exercise the path organically).
+  - **Cluster A section removed from TODO** since this was the only entry — same precedent as the Cluster A · 15 (Lost-vs-Fallen) HISTORY entry which removed the empty section.
+- **Surprises:**
+  - **The fix is forward-looking dead code today.** With current schema pinned at 1, the only way to land in the `!migrated` branch would be via `migrate()` getting an object whose version is ≥ 1 but doesn't exhaust the migration loop — and at version === 1 with no migrations registered, the loop never executes and the function returns the input as-is. So the warn never fires in production. The right policy for now: ship the safety net so the next schema bump doesn't reintroduce the silent-discard pattern by accident.
+- **Source:** TODO.md Cluster A · 16 (originated from `bugs.md` 2026-04-26 entry surfaced via Claude-in-Chrome) → no formal spec/plan (one-block hotfix). Test count delta: 0 (1307 → 1307).
+
 ### 2026-04-30 · Trait text wraps in Barracks detail (Cluster B · 24)
 
 - **Why:** Long trait descriptions ("+2 Attack when below 50% HP" etc.) overflowed the Barracks detail pane horizontally — visible leak past the right edge. User-reported with screenshot.
