@@ -27,18 +27,6 @@ One section per task.
 
 Everything in this cluster may import `phaser`. Core logic lives in Cluster A modules; scenes only orchestrate and render. Entries 1–11 shipped; 12+ surface gameplay-loop, visibility, and bug-fix work audited from gdd §6 / §10 and `bugs.md` against current HISTORY (2026-04-30).
 
-### 21 · 🐛 Combat results modal omits Fallen heroes
-
-- **What:** The post-combat "Victory" results panel lists per-hero HP changes for survivors but doesn't indicate which heroes Fell in the fight. A hero who died gets no line at all — silent loss.
-- **Why:** `dungeon_scene.processCombatReturn` shows the result panel built from `run.party`, which by then has already been pruned to survivors. Need to also display fallen heroes (from the just-resolved combat) in the panel.
-- **Tier:** 2 (bug fix)
-- **Acceptance:**
-  - Each hero who Fell in the just-completed combat appears in the results panel with a clear "Fallen" indicator (e.g. "{name}: Fallen" in pinkish-red `#cc8888` matching the existing Fallen color from cashout-summary / wipe panel).
-  - If 0 heroes Fell, behavior is unchanged.
-  - Source the fallen list from `combatResult.fallenHeroIds` or equivalent (verify the data is available at the point the panel renders).
-- **Touches:** `src/scenes/dungeon_scene.ts` (the result panel construction in `processCombatReturn`).
-- **Source:** `bugs.md` (2026-04-30 user observation).
-
 ### 22 · Hero level not shown anywhere in the UI
 
 - **What:** Heroes have a `level` field (Cluster A · 7) and gain XP / level up, but the level number isn't displayed on `HeroCard`, in Barracks, or anywhere else. Players can't see their heroes' levels.

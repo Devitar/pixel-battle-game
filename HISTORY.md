@@ -29,6 +29,18 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-04-30 · Combat results show Fallen heroes (Cluster B · 21)
+
+- **Why:** Post-combat "Victory!" panel iterated `run.party`, which by the time `buildResultPanel` runs has been pruned of fallen heroes. Heroes who died got no line at all — silent loss. Closes the visibility gap.
+- **Decisions:**
+  - **Replaced `preCombatHp: Map<string, number>` with `preCombatParty: Hero[]`.** The old map only carried HP-before; it couldn't surface the names of pruned heroes for Fallen rendering. The new field carries the full pre-combat party snapshot, which is the source of truth for both delta computation and Fallen rendering. Three call sites updated (declaration, `create()` reset, `processCombatReturn` populate); two reads in the panel loop now key off `survivorsById` for membership and the pre-hero snapshot for HP-before.
+  - **Iterate `preCombatParty` instead of `run.party`.** Order is now stable across rebuilds (the panel always lists pre-combat slots in the original order, even after losses). For each pre-hero, look up survivor in a `Map(run.party)` — if absent, render "{name}: Fallen" in pinkish-red `#cc8888`. Color matches the cashout-summary / wipe-panel Fallen convention.
+  - **HP delta computation simplified.** Was `before - hero.currentHp` with `before` from a Map lookup. Now `preHero.currentHp - survivor.currentHp` using the pre-hero snapshot directly — same semantics, no Map lookup.
+  - **No new tests.** Phaser scene convention is manual-play verification.
+- **Surprises:**
+  - **The pre-existing `preCombatHp` field was essentially a half-measure** — it captured *some* pre-combat info but not enough to render the panel correctly when heroes Fell. The right shape was always "snapshot the party," not "snapshot HPs." Quick to fix once spotted.
+- **Source:** TODO.md Cluster B · 21 (originated from `bugs.md` 2026-04-30) → no formal spec/plan (one-block fix in dungeon_scene.ts). Test count delta: 0 (1307 → 1307).
+
 ### 2026-04-30 · Hotfix: shop "Manage Gear" trap (Cluster B · 20)
 
 - **Why:** User repro: clicking Manage Gear in the shop overlay rendered the shop on top of an inert/blank equip panel, with no way to recover. The TODO entry hypothesised a missing `scene.pause()` call, but inspection found the pause was already there — there were actually **two** distinct bugs colluding to produce the trap.

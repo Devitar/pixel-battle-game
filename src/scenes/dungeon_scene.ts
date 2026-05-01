@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { removeHero, tickRosterWounds } from '../camp/roster';
 import type { CombatResult } from '../combat/types';
 import type { Node } from '../dungeon/node';
+import type { Hero } from '../heroes/hero';
 import { heroToLoadout } from '../render/hero_loadout';
 import { Paperdoll } from '../render/paperdoll';
 import {
@@ -45,7 +46,10 @@ export class DungeonScene extends Phaser.Scene {
   private statusText!: Phaser.GameObjects.Text;
   private resultPanel?: Phaser.GameObjects.Container;
   private forkPicker?: Phaser.GameObjects.Container;
-  private preCombatHp = new Map<string, number>();
+  // Snapshot of party at combat start, captured before completeCombat prunes
+  // fallen heroes. Used by the result panel to (a) compute per-hero HP deltas
+  // and (b) render Fallen lines for heroes who didn't survive the fight.
+  private preCombatParty: Hero[] = [];
   private wipeOutcome?: WipeOutcome;
 
   constructor() {
@@ -55,7 +59,7 @@ export class DungeonScene extends Phaser.Scene {
   create(): void {
     this.nodeIcons = [];
     this.nodeLabels = [];
-    this.preCombatHp.clear();
+    this.preCombatParty = [];
     this.resultPanel = undefined;
     this.forkPicker = undefined;
     this.wipeOutcome = undefined;
@@ -95,10 +99,7 @@ export class DungeonScene extends Phaser.Scene {
   private processCombatReturn(result: CombatResult, rngStateAfter: number): void {
     const run = appState.get().runState!;
 
-    this.preCombatHp.clear();
-    for (const hero of run.party) {
-      this.preCombatHp.set(hero.id, hero.currentHp);
-    }
+    this.preCombatParty = [...run.party];
 
     // Loot roll consumes RNG; thread it through completeCombat so the post-loot
     // state is what gets persisted.
@@ -380,19 +381,24 @@ export class DungeonScene extends Phaser.Scene {
 
     const lines: Phaser.GameObjects.Text[] = [];
     let y = -18;
-    for (const hero of run.party) {
-      const before = this.preCombatHp.get(hero.id) ?? hero.currentHp;
-      const delta = before - hero.currentHp;
-      const text =
-        delta === 0
-          ? `${hero.name}: untouched`
-          : `${hero.name}: -${delta} HP (${hero.currentHp}/${hero.maxHp})`;
+    const survivorsById = new Map(run.party.map((h) => [h.id, h]));
+    for (const preHero of this.preCombatParty) {
+      const survivor = survivorsById.get(preHero.id);
+      const fallen = survivor === undefined;
+      const text = fallen
+        ? `${preHero.name}: Fallen`
+        : (() => {
+            const delta = preHero.currentHp - survivor.currentHp;
+            return delta === 0
+              ? `${survivor.name}: untouched`
+              : `${survivor.name}: -${delta} HP (${survivor.currentHp}/${survivor.maxHp})`;
+          })();
       lines.push(
         this.add
           .text(0, y, text, {
             fontFamily: 'monospace',
             fontSize: '10px',
-            color: '#aaaaaa',
+            color: fallen ? '#cc8888' : '#aaaaaa',
           })
           .setOrigin(0.5),
       );
