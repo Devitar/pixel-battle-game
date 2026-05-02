@@ -1,8 +1,10 @@
 import * as Phaser from 'phaser';
 import type { CombatantId } from '@combat/types';
-import { MODIFIERS, type ModifierId } from '@data/modifiers';
+import { MODIFIERS, describeModifierEffect, type ModifierId } from '@data/modifiers';
 import type { EnemyId, StatusId } from '@data/types';
+import { WOUNDS, describeWoundEffect } from '@data/wounds';
 import type { Hero } from '@heroes/hero';
+import { createTooltip } from '@ui/tooltip';
 import { ENEMY_VISUALS } from './enemy_sprites';
 import { EnemySprite } from './enemy_sprite';
 import { BOSS_SHEET, ENEMY_SHEET, SHEET } from './frames';
@@ -100,6 +102,7 @@ export class CombatActor extends Phaser.GameObjects.Container {
   private actorOutline: Phaser.GameObjects.Rectangle;
   private currentHp: number;
   private maxHp: number;
+  private tooltip?: Phaser.GameObjects.Container;
 
   constructor(scene: Phaser.Scene, x: number, y: number, init: CombatActorInit) {
     super(scene, x, y);
@@ -159,6 +162,14 @@ export class CombatActor extends Phaser.GameObjects.Container {
         })
         .setOrigin(0.5);
       this.add(modifierText);
+      const modifierIds = init.modifierIds;
+      modifierText.setInteractive({ useHandCursor: true });
+      modifierText.on('pointerdown', () => {
+        const lines = modifierIds.map((id) =>
+          `${MODIFIERS[id].name} — ${describeModifierEffect(MODIFIERS[id].effect)}`,
+        );
+        this.toggleTooltip(0, modifierY, lines);
+      });
     }
 
     if (init.kind === 'hero' && init.hero.wounds.length > 0) {
@@ -171,6 +182,15 @@ export class CombatActor extends Phaser.GameObjects.Container {
         })
         .setOrigin(0.5);
       this.add(woundText);
+      const wounds = init.hero.wounds;
+      woundText.setInteractive({ useHandCursor: true });
+      woundText.on('pointerdown', () => {
+        const lines = wounds.map((w) => {
+          const def = WOUNDS[w.id];
+          return `${def.name} — ${describeWoundEffect(def.effect)}`;
+        });
+        this.toggleTooltip(0, woundY, lines);
+      });
     }
 
     this.hpBarBg = scene.add.rectangle(0, hpBarY, HP_BAR_W, HP_BAR_H, 0x333333);
@@ -198,6 +218,19 @@ export class CombatActor extends Phaser.GameObjects.Container {
 
   setOutline(active: boolean): void {
     this.actorOutline.setAlpha(active ? 1 : 0);
+  }
+
+  // Tap-to-toggle tooltip for wound / modifier badges. One tooltip per actor at
+  // a time — toggling a different badge (or the same one again) dismisses the
+  // previous. Tooltip is added as a child of the actor container so it follows
+  // the actor's lifecycle (tween on lunge, destroy on scene shutdown).
+  private toggleTooltip(anchorX: number, anchorY: number, lines: readonly string[]): void {
+    if (this.tooltip) {
+      this.tooltip.destroy();
+      this.tooltip = undefined;
+      return;
+    }
+    this.tooltip = createTooltip(this.scene, this, anchorX, anchorY, lines);
   }
 
   lunge(toward: 'left' | 'right'): Promise<void> {

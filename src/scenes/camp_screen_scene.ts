@@ -1,4 +1,5 @@
 import * as Phaser from 'phaser';
+import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels';
 import { removeHero, tickRosterWounds, updateHero } from '@camp/roster';
 import { addItems } from '@camp/stash';
 import { credit } from '@camp/vault';
@@ -191,12 +192,13 @@ export class CampScreenScene extends Phaser.Scene {
           roster = removeHero(roster, id);
         }
       }
-      roster = tickRosterWounds(roster);
+      roster = tickRosterWounds(roster, hospitalTickAmount(s.buildingLevels.hospital));
       return {
         ...s,
         vault,
         stash,
         roster,
+        hospitalTreatmentsRemaining: hospitalTreatmentCap(s.buildingLevels.hospital),
         runState: undefined,
         runRngState: undefined,
       };

@@ -87,10 +87,10 @@ export function collapseAfterDeath(side: CombatSide, state: CombatState, events:
   }
 }
 
-export function shuffle(combatant: Combatant, state: CombatState, events: CombatEvent[]): void {
+export function shuffleDestination(combatant: Combatant, state: CombatState): SlotIndex | null {
   const sameSide = livingOnSide(state, combatant.side);
   const maxSlot = sameSide.length as SlotIndex;
-  if (maxSlot <= 1) return;
+  if (maxSlot <= 1) return null;
 
   let towardSlot: SlotIndex;
   const preferred = combatant.preferredSlots;
@@ -113,8 +113,37 @@ export function shuffle(combatant: Combatant, state: CombatState, events: Combat
     }
   }
 
-  if (towardSlot === combatant.slot) return;
+  if (towardSlot === combatant.slot) return null;
+  if (!sameSide.some((c) => c.slot === towardSlot)) return null;
+  return towardSlot;
+}
 
+// True iff a shuffle would actually make progress — i.e., the neighbor at the
+// destination wouldn't simply swap right back. Detects the 3v3-melee infinite
+// ping-pong where two same-preferences allies shuffle past each other every
+// round and never act.
+export function shuffleWouldProgress(combatant: Combatant, state: CombatState): boolean {
+  const dest = shuffleDestination(combatant, state);
+  if (dest === null) return false;
+  const neighbor = state.combatants.find(
+    (c) => c.side === combatant.side && !c.isDead && c.slot === dest,
+  );
+  if (!neighbor) return false;
+  const np = neighbor.preferredSlots;
+  // Neighbor is indifferent — swap freely.
+  if (!np || np.length === 0) return true;
+  // Neighbor is currently at one of their preferred slots. The swap would
+  // displace them to caster's slot — only productive if THAT slot is also
+  // preferred for them (otherwise they'd shuffle right back next turn).
+  const neighborAtPreferred = np.includes(neighbor.slot);
+  if (!neighborAtPreferred) return true;
+  return np.includes(combatant.slot);
+}
+
+export function shuffle(combatant: Combatant, state: CombatState, events: CombatEvent[]): void {
+  const towardSlot = shuffleDestination(combatant, state);
+  if (towardSlot === null) return;
+  const sameSide = livingOnSide(state, combatant.side);
   const neighbor = sameSide.find((c) => c.slot === towardSlot);
   if (!neighbor) return;
   swap(combatant, neighbor, events);

@@ -1,4 +1,6 @@
 import * as Phaser from 'phaser';
+import { hospitalTreatmentCap, nextLevel } from '@camp/building_levels';
+import { applyBuildingUpgrade } from '@camp/building_upgrade';
 import { listHeroes, treatHeroWound, updateHero } from '@camp/roster';
 import { balance, spend } from '@camp/vault';
 import { HOSPITAL_TREATMENT_COST, WOUNDS, describeWoundEffect } from '@data/wounds';
@@ -58,6 +60,7 @@ export class HospitalPanelScene extends Phaser.Scene {
 
     this.buildOverlayAndPanel();
     this.buildCloseButton();
+    this.buildUpgradeButton();
     this.buildListPaneBackground();
     this.buildDetailPaneBackground();
     this.listContainer = this.add.container(0, 0);
@@ -66,6 +69,48 @@ export class HospitalPanelScene extends Phaser.Scene {
     this.rebuild();
 
     this.input.keyboard?.on('keydown-ESC', () => this.close());
+  }
+
+  private buildUpgradeButton(): void {
+    const level = appState.get().buildingLevels.hospital;
+    const next = nextLevel('hospital', level);
+    if (next === null) return;
+
+    const gold = balance(appState.get().vault);
+    const canAfford = gold >= next.upgradeCost;
+
+    // Mirrors barracks_panel_scene.ts placement.
+    const x = 160;
+    const y = 55;
+    const bgColor = canAfford ? 0x2a4a2a : 0x333333;
+    const strokeColor = canAfford ? 0x44cc44 : 0x555555;
+    const labelColor = canAfford ? '#ffffff' : '#777777';
+
+    const bg = this.add
+      .rectangle(x, y, 160, 24, bgColor)
+      .setStrokeStyle(2, strokeColor);
+    this.add
+      .text(x, y, `Upgrade · ${next.upgradeCost}g`, {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: labelColor,
+      })
+      .setOrigin(0.5);
+    this.add
+      .text(x, y + 20, `→ ${next.unlockDescription}`, {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#aaaaaa',
+      })
+      .setOrigin(0.5);
+
+    if (canAfford) {
+      bg.setInteractive({ useHandCursor: true });
+      bg.on('pointerdown', () => {
+        appState.update((s) => applyBuildingUpgrade(s, 'hospital'));
+        this.scene.restart();
+      });
+    }
   }
 
   private buildOverlayAndPanel(): void {
@@ -125,10 +170,15 @@ export class HospitalPanelScene extends Phaser.Scene {
     this.detailContainer.removeAll(true);
     this.rosterCards = [];
 
-    const wounded = listHeroes(appState.get().roster).filter((h) => h.wounds.length > 0);
+    const state = appState.get();
+    const wounded = listHeroes(state.roster).filter((h) => h.wounds.length > 0);
+    const cap = hospitalTreatmentCap(state.buildingLevels.hospital);
+    const remaining = state.hospitalTreatmentsRemaining;
 
-    this.titleText.setText(`Hospital · ${wounded.length} wounded`);
-    this.goldText.setText(`Gold: ${balance(appState.get().vault)}`);
+    this.titleText.setText(
+      `Hospital · ${wounded.length} wounded · Treatments ${remaining}/${cap}`,
+    );
+    this.goldText.setText(`Gold: ${balance(state.vault)}`);
 
     if (wounded.length === 0) {
       this.listContainer.add(
@@ -214,19 +264,39 @@ export class HospitalPanelScene extends Phaser.Scene {
         .setOrigin(0.5),
     );
 
-    const vaultGold = balance(appState.get().vault);
+    const state = appState.get();
+    const vaultGold = balance(state.vault);
+    const treatmentsLeft = state.hospitalTreatmentsRemaining;
+
+    if (treatmentsLeft === 0) {
+      this.detailContainer.add(
+        this.add
+          .text(DETAIL_PANE_CX, 132, 'Cap reached — refills after next run.', {
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            color: '#cc8866',
+          })
+          .setOrigin(0.5),
+      );
+    }
 
     for (let i = 0; i < hero.wounds.length; i++) {
-      this.buildWoundRow(hero, i, vaultGold);
+      this.buildWoundRow(hero, i, vaultGold, treatmentsLeft > 0);
     }
   }
 
-  private buildWoundRow(hero: Hero, woundIndex: number, vaultGold: number): void {
+  private buildWoundRow(
+    hero: Hero,
+    woundIndex: number,
+    vaultGold: number,
+    hasTreatments: boolean,
+  ): void {
     const wound = hero.wounds[woundIndex];
     const def = WOUNDS[wound.id];
     const desc = describeWoundEffect(def.effect);
     const cost = HOSPITAL_TREATMENT_COST;
     const canAfford = vaultGold >= cost;
+    const canTreat = canAfford && hasTreatments;
     const y = WOUND_ROW_Y_BASE + woundIndex * WOUND_ROW_STRIDE;
 
     const rowBg = this.add
@@ -265,20 +335,20 @@ export class HospitalPanelScene extends Phaser.Scene {
     );
 
     const buttonBg = this.add
-      .rectangle(WOUND_ROW_X + 140, y, 60, 26, canAfford ? 0x335533 : 0x333333)
-      .setStrokeStyle(1, canAfford ? 0x66aa66 : 0x555555);
+      .rectangle(WOUND_ROW_X + 140, y, 60, 26, canTreat ? 0x335533 : 0x333333)
+      .setStrokeStyle(1, canTreat ? 0x66aa66 : 0x555555);
     this.detailContainer.add(buttonBg);
     this.detailContainer.add(
       this.add
         .text(WOUND_ROW_X + 140, y, 'Treat', {
           fontFamily: 'monospace',
           fontSize: '12px',
-          color: canAfford ? '#ffffff' : '#777777',
+          color: canTreat ? '#ffffff' : '#777777',
         })
         .setOrigin(0.5),
     );
 
-    if (canAfford) {
+    if (canTreat) {
       buttonBg.setInteractive({ useHandCursor: true });
       buttonBg.on('pointerdown', () => this.treatWound(hero.id, woundIndex));
     }
@@ -291,12 +361,18 @@ export class HospitalPanelScene extends Phaser.Scene {
     if (woundIndex < 0 || woundIndex >= hero.wounds.length) return;
     const cost = HOSPITAL_TREATMENT_COST;
     if (balance(state.vault) < cost) return;
+    if (state.hospitalTreatmentsRemaining <= 0) return;
 
     const treatedHero = treatHeroWound(hero, woundIndex);
     const newRoster = updateHero(state.roster, treatedHero);
     const newVault = spend(state.vault, cost);
 
-    appState.update((s) => ({ ...s, roster: newRoster, vault: newVault }));
+    appState.update((s) => ({
+      ...s,
+      roster: newRoster,
+      vault: newVault,
+      hospitalTreatmentsRemaining: s.hospitalTreatmentsRemaining - 1,
+    }));
 
     this.rebuild();
   }

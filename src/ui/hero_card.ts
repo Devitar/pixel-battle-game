@@ -1,9 +1,12 @@
 import * as Phaser from 'phaser';
 import { CLASSES } from '@data/classes';
 import { TRAITS } from '@data/traits';
+import { WOUNDS, describeWoundEffect } from '@data/wounds';
 import type { Hero } from '@heroes/hero';
+import { applyEquipmentStats } from '@items/stats';
 import { heroToLoadout } from '@render/hero_loadout';
 import { Paperdoll } from '@render/paperdoll';
+import { createTooltip } from './tooltip';
 
 export type HeroCardSize = 'small' | 'large';
 
@@ -24,6 +27,7 @@ const LARGE_HEIGHT = 120;
 export class HeroCard extends Phaser.GameObjects.Container {
   private hero: Hero;
   private opts: HeroCardOptions;
+  private tooltip?: Phaser.GameObjects.Container;
 
   constructor(
     scene: Phaser.Scene,
@@ -41,6 +45,7 @@ export class HeroCard extends Phaser.GameObjects.Container {
 
   setHero(hero: Hero): void {
     this.hero = hero;
+    this.tooltip = undefined; // child of `this`; cleared by removeAll(true)
     this.removeAll(true);
     this.buildChildren();
   }
@@ -132,7 +137,8 @@ export class HeroCard extends Phaser.GameObjects.Container {
 
     if (size === 'large' && !isDead) {
       const statsY = lastY + 6;
-      const stats = `HP ${this.hero.currentHp}/${this.hero.maxHp}   ATK ${this.hero.baseStats.attack}   DEF ${this.hero.baseStats.defense}   SPD ${this.hero.baseStats.speed}`;
+      const equipped = applyEquipmentStats(this.hero.baseStats, this.hero.equipment);
+      const stats = `HP ${this.hero.currentHp}/${this.hero.maxHp}   ATK ${equipped.attack}   DEF ${equipped.defense}   SPD ${equipped.speed}`;
       const statsText = this.scene.add.text(textX, statsY, stats, {
         fontFamily: 'monospace',
         fontSize: '11px',
@@ -167,6 +173,15 @@ export class HeroCard extends Phaser.GameObjects.Container {
         },
       ).setOrigin(1, 0.5);
       this.add(badgeText);
+      const wounds = this.hero.wounds;
+      badgeText.setInteractive({ useHandCursor: true });
+      badgeText.on('pointerdown', () => {
+        const lines = wounds.map((w) => {
+          const def = WOUNDS[w.id];
+          return `${def.name} — ${describeWoundEffect(def.effect)}`;
+        });
+        this.toggleTooltip(badgeX - 30, badgeY, lines);
+      });
     }
 
     if (this.opts.onClick) {
@@ -179,5 +194,16 @@ export class HeroCard extends Phaser.GameObjects.Container {
     if (ratio > 0.5) return 0x44aa44;
     if (ratio > 0.25) return 0xaaaa44;
     return 0xaa4444;
+  }
+
+  // Tap-to-toggle tooltip for the wound badge. One tooltip per card; tapping
+  // the badge again dismisses it.
+  private toggleTooltip(anchorX: number, anchorY: number, lines: readonly string[]): void {
+    if (this.tooltip) {
+      this.tooltip.destroy();
+      this.tooltip = undefined;
+      return;
+    }
+    this.tooltip = createTooltip(this.scene, this, anchorX, anchorY, lines);
   }
 }

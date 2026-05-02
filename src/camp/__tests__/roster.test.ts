@@ -151,6 +151,19 @@ describe('tickRosterWounds', () => {
     const next = tickRosterWounds(roster);
     expect(next.heroes[0].wounds).toEqual([]);
   });
+
+  it('ticks=2 decrements wounds by 2 (Hospital L3 time-heal)', () => {
+    const hero = createHero('knight', 'A', 'h0', 'quick', 'body1');
+    hero.wounds = [
+      { id: 'bruised', runsRemaining: 5 },
+      { id: 'winded', runsRemaining: 2 },  // expires (5-2=3, 2-2=0)
+    ];
+    const roster = addHero(createRoster(), hero);
+    const next = tickRosterWounds(roster, 2);
+    expect(next.heroes[0].wounds).toEqual([
+      { id: 'bruised', runsRemaining: 3 },
+    ]);
+  });
 });
 
 describe('treatHeroWound', () => {

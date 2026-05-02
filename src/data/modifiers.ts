@@ -20,3 +20,23 @@ export const MODIFIERS: Record<ModifierId, ModifierDef> = {
 };
 
 export const MODIFIER_IDS: readonly ModifierId[] = Object.keys(MODIFIERS) as ModifierId[];
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export function describeModifierEffect(effect: ModifierEffect): string {
+  switch (effect.kind) {
+    case 'statDelta': {
+      const sign = effect.delta >= 0 ? '+' : '';
+      return `${sign}${effect.delta} ${capitalize(effect.stat)}`;
+    }
+    case 'venomous_on_hit':
+      return `+${effect.damagePerTurn} dmg/turn for ${effect.duration} turns on attack`;
+    case 'enraged_threshold': {
+      const pct = Math.round(effect.hpRatio * 100);
+      const sign = effect.attackDelta >= 0 ? '+' : '';
+      return `${sign}${effect.attackDelta} Attack while below ${pct}% HP`;
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import type { BuildingId, BuildingLevel, SaveFile } from '@save/save';
-import { BARRACKS_CAPACITY, nextLevel } from './building_levels';
+import { BARRACKS_CAPACITY, hospitalTreatmentCap, nextLevel } from './building_levels';
 import { spend } from './vault';
 
 export function applyBuildingUpgrade(state: SaveFile, building: BuildingId): SaveFile {
@@ -17,10 +17,17 @@ export function applyBuildingUpgrade(state: SaveFile, building: BuildingId): Sav
   const newRoster = building === 'barracks'
     ? { ...state.roster, capacity: BARRACKS_CAPACITY[newLevel] }
     : state.roster;
+  // Hospital-specific side effect: refill treatment counter to the new cap so
+  // the upgrade is felt immediately (otherwise an upgrade mid-run-cycle is
+  // invisible until the next run-end).
+  const newTreatments = building === 'hospital'
+    ? hospitalTreatmentCap(newLevel)
+    : state.hospitalTreatmentsRemaining;
   return {
     ...state,
     vault: newVault,
     buildingLevels: newBuildingLevels,
     roster: newRoster,
+    hospitalTreatmentsRemaining: newTreatments,
   };
 }

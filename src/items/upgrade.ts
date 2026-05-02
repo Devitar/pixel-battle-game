@@ -1,6 +1,7 @@
 import { BLACKSMITH_UPGRADE_COST } from '@data/blacksmith';
 import type { AffixId, Item, Rarity, RolledAffix } from '@data/types';
 import { pickRareProperty, rollAffixValue } from '@dungeon/loot';
+import type { BuildingLevel } from '@save/save';
 import { generateItemId, type Rng } from '@util/rng';
 
 const ALL_AFFIX_IDS: readonly AffixId[] = [
@@ -20,6 +21,12 @@ export function nextRarity(r: Rarity): Exclude<Rarity, 'common'> | null {
 
 export function canUpgrade(item: Item): boolean {
   return nextRarity(item.rarity) !== null;
+}
+
+export function canBlacksmithUpgrade(item: Item, blacksmithLevel: BuildingLevel): boolean {
+  if (!canUpgrade(item)) return false;
+  if (item.rarity === 'uncommon' && blacksmithLevel < 2) return false;
+  return true;
 }
 
 export function upgradeCost(item: Item): number {

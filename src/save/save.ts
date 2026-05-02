@@ -1,9 +1,11 @@
+import { HIRE_COST } from '@camp/buildings/tavern';
 import type { Roster } from '@camp/roster';
 import { createStash, type Stash } from '@camp/stash';
 import type { Vault } from '@camp/vault';
+import { DEFAULT_FEET_SPRITE, DEFAULT_LEGS_SPRITE } from '@data/body_sprites';
 import type { Unlocks } from '@data/types';
 import type { Hero } from '@heroes/hero';
-import type { RunState } from '@run/run_state';
+import { PARTY_SIZE, type RunState } from '@run/run_state';
 import { CURRENT_SCHEMA_VERSION, migrate } from './migration';
 
 export { CURRENT_SCHEMA_VERSION } from './migration';
@@ -20,6 +22,8 @@ export interface SaveFile {
   stash: Stash;
   unlocks: Unlocks;
   buildingLevels: BuildingLevels;
+  hospitalTreatmentsRemaining: number;
+  tavernCandidates: readonly Hero[];
   runState?: RunState;
   runRngState?: number;
   preferences?: Preferences;
@@ -87,6 +91,13 @@ export function clearSave(storage: Storage): void {
   storage.removeItem(STORAGE_KEY);
 }
 
+// Save is softlocked when the player can't recruit (vault < HIRE_COST) AND
+// can't field an expedition (roster < PARTY_SIZE). Tavern unlocks free hires
+// while in this state; Camp scene surfaces a Reset Camp escape hatch.
+export function isSoftlocked(state: SaveFile): boolean {
+  return state.vault.gold < HIRE_COST && state.roster.heroes.length < PARTY_SIZE;
+}
+
 export function createDefaultUnlocks(): Unlocks {
   return {
     classes: ['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage'],
@@ -108,6 +119,8 @@ function normalizeSaveFile(file: SaveFile): SaveFile {
     ...file,
     stash: file.stash ?? createStash(),
     buildingLevels: file.buildingLevels ?? { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
+    hospitalTreatmentsRemaining: file.hospitalTreatmentsRemaining ?? 1,
+    tavernCandidates: file.tavernCandidates ?? [],
     roster: {
       ...file.roster,
       heroes: file.roster.heroes.map(normalizeHero),
@@ -124,5 +137,7 @@ function normalizeHero(hero: Hero): Hero {
     xp: hero.xp ?? 0,
     level: hero.level ?? 1,
     pendingPerk: hero.pendingPerk ?? false,
+    legsSpriteId: hero.legsSpriteId ?? DEFAULT_LEGS_SPRITE,
+    feetSpriteId: hero.feetSpriteId ?? DEFAULT_FEET_SPRITE,
   };
 }

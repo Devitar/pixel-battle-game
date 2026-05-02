@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { nextLevel, tavernCandidateCount } from '@camp/building_levels';
 import { applyBuildingUpgrade } from '@camp/building_upgrade';
 import {
+  ensureCandidatesForCap,
   generateCandidate,
   generateCandidates,
   HIRE_COST,
@@ -10,6 +11,7 @@ import {
 import { addHero, canAdd, listHeroes } from '@camp/roster';
 import { balance, spend } from '@camp/vault';
 import type { Hero } from '@heroes/hero';
+import { isSoftlocked } from '@save/save';
 import { HeroCard } from '@ui/hero_card';
 import { createRng, type Rng } from '@util/rng';
 import { appState } from './app_state';
@@ -60,12 +62,21 @@ export class TavernPanelScene extends Phaser.Scene {
     this.buildPanelChrome();
 
     this.rng = createRng(Date.now());
-    const tavernLevel = appState.get().buildingLevels.tavern;
-    this.candidates = generateCandidates(
+    const state = appState.get();
+    const tavernLevel = state.buildingLevels.tavern;
+    const targetCount = tavernCandidateCount(tavernLevel);
+    const persisted = state.tavernCandidates;
+    const ensured = ensureCandidatesForCap(
+      persisted,
+      targetCount,
       this.rng,
-      appState.get().unlocks.classes,
-      tavernCandidateCount(tavernLevel),
+      state.unlocks.classes,
     );
+    if (ensured !== persisted) {
+      // ensureCandidatesForCap regenerated (empty save / cap mismatch). Persist.
+      appState.update((s) => ({ ...s, tavernCandidates: ensured }));
+    }
+    this.candidates = [...ensured];
 
     const slotXs = SLOT_X_BY_COUNT[this.candidates.length as 3 | 4 | 5];
     for (let i = 0; i < this.candidates.length; i++) {
@@ -89,8 +100,13 @@ export class TavernPanelScene extends Phaser.Scene {
     this.add
       .rectangle(480, 270, 920, 340, 0x222222)
       .setStrokeStyle(2, 0x666666);
+    const free = isSoftlocked(appState.get());
     this.add
-      .text(480, 110, `Tavern · Hire Cost: ${HIRE_COST}g`, {
+      .text(
+        480,
+        110,
+        free ? 'Tavern · Hires are free until you recover' : `Tavern · Hire Cost: ${HIRE_COST}g`,
+        {
         fontFamily: 'monospace',
         fontSize: '20px',
         color: '#ffffff',
@@ -165,17 +181,20 @@ export class TavernPanelScene extends Phaser.Scene {
     const state = appState.get();
     if (balance(state.vault) < REROLL_COST) return;
 
+    const tavernLevel = state.buildingLevels.tavern;
+    const fresh = generateCandidates(
+      this.rng,
+      state.unlocks.classes,
+      tavernCandidateCount(tavernLevel),
+    );
+
     appState.update((s) => ({
       ...s,
       vault: spend(s.vault, REROLL_COST),
+      tavernCandidates: fresh,
     }));
 
-    const tavernLevel = appState.get().buildingLevels.tavern;
-    this.candidates = generateCandidates(
-      this.rng,
-      appState.get().unlocks.classes,
-      tavernCandidateCount(tavernLevel),
-    );
+    this.candidates = [...fresh];
     for (let i = 0; i < this.hireButtons.length; i++) {
       this.hireButtons[i].card.setHero(this.candidates[i]);
     }
@@ -241,20 +260,22 @@ export class TavernPanelScene extends Phaser.Scene {
 
   private hire(slotIndex: number): void {
     const state = appState.get();
-    if (!canAdd(state.roster) || balance(state.vault) < HIRE_COST) return;
+    const free = isSoftlocked(state);
+    if (!canAdd(state.roster)) return;
+    if (!free && balance(state.vault) < HIRE_COST) return;
 
     const hired = this.candidates[slotIndex];
+    const replacement = generateCandidate(this.rng, state.unlocks.classes);
+    this.candidates[slotIndex] = replacement;
+
     appState.update((s) => ({
       ...s,
-      vault: spend(s.vault, HIRE_COST),
+      vault: free ? s.vault : spend(s.vault, HIRE_COST),
       roster: addHero(s.roster, hired),
+      tavernCandidates: [...this.candidates],
     }));
 
-    this.candidates[slotIndex] = generateCandidate(
-      this.rng,
-      appState.get().unlocks.classes,
-    );
-    this.hireButtons[slotIndex].card.setHero(this.candidates[slotIndex]);
+    this.hireButtons[slotIndex].card.setHero(replacement);
     this.refreshButtons();
     this.refreshFooter();
   }
@@ -262,8 +283,9 @@ export class TavernPanelScene extends Phaser.Scene {
   private refreshButtons(): void {
     const state = appState.get();
     const gold = balance(state.vault);
+    const free = isSoftlocked(state);
     const canAddHero = canAdd(state.roster);
-    const canAffordHire = gold >= HIRE_COST;
+    const canAffordHire = free || gold >= HIRE_COST;
     const enabled = canAddHero && canAffordHire;
 
     let reason = '';
@@ -278,6 +300,7 @@ export class TavernPanelScene extends Phaser.Scene {
         btn.bg.setFillStyle(0x333333).setStrokeStyle(2, 0x555555);
         btn.label.setColor('#777777');
       }
+      btn.label.setText(free ? 'Hire (free)' : `Hire (${HIRE_COST}g)`);
       btn.reason.setText(reason);
     }
 

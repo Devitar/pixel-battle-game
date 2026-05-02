@@ -6,6 +6,8 @@ export function heroToLoadout(hero: Hero): Loadout {
   const eq = hero.equipment;
   return {
     body: parseInt(hero.bodySpriteId, 10),
+    legs: parseInt(hero.legsSpriteId, 10),
+    feet: parseInt(hero.feetSpriteId, 10),
     weapon: parseInt(BASE_ITEMS[eq.weapon.baseId].spriteId, 10),
     shield: eq.shield ? itemFrame(eq.shield.baseId) : undefined,
     outfit: eq.outfit ? itemFrame(eq.outfit.baseId) : undefined,

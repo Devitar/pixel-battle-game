@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MODIFIERS, MODIFIER_IDS } from '../modifiers';
+import { MODIFIERS, MODIFIER_IDS, describeModifierEffect } from '../modifiers';
 
 describe('MODIFIERS table', () => {
   it('armored has statDelta defense +2', () => {
@@ -37,5 +37,23 @@ describe('MODIFIER_IDS', () => {
   it('contains exactly the three modifier IDs', () => {
     expect(MODIFIER_IDS).toHaveLength(3);
     expect(new Set(MODIFIER_IDS)).toEqual(new Set(['armored', 'venomous', 'enraged']));
+  });
+});
+
+describe('describeModifierEffect', () => {
+  it('formats armored statDelta as "+2 Defense"', () => {
+    expect(describeModifierEffect(MODIFIERS.armored.effect)).toBe('+2 Defense');
+  });
+
+  it('formats venomous_on_hit with damage and duration', () => {
+    expect(describeModifierEffect(MODIFIERS.venomous.effect)).toBe(
+      '+2 dmg/turn for 2 turns on attack',
+    );
+  });
+
+  it('formats enraged_threshold as "+3 Attack while below 50% HP"', () => {
+    expect(describeModifierEffect(MODIFIERS.enraged.effect)).toBe(
+      '+3 Attack while below 50% HP',
+    );
   });
 });
