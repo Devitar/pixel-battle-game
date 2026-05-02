@@ -27,31 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 38 · Choice/event nodes lack distinct glyph in dungeon icon row
-
-- **What:** Choice nodes (event `❓` per gdd §4) appear as the same glyph as combat nodes in the dungeon scene's icon row, making it hard for the player to anticipate node types ahead.
-- **Why:** Visibility bug. Cluster B · 10 shipped distinct elite glyph (`💀`); the same treatment is owed to event/choice nodes (and possibly camp `🏕️`, shop `🛒`).
-- **Tier:** 2 (bug fix)
-- **Acceptance:**
-  - Verify the current glyph mapping in `src/scenes/dungeon_scene.ts` (search for the elite-glyph code added in B · 10).
-  - Add distinct glyphs for all node types per gdd §4: event `❓`, camp `🏕️`, shop `🛒` (plus existing combat `⚔️`, elite `💀`, boss).
-  - Maintain the future-state vs. past-state vs. current-state color tier from B · 10.
-- **Touches:** `src/scenes/dungeon_scene.ts` (the icon-row rendering function).
-- **Source:** bugs.md (2026-05-01).
-
-### 39 · No travel animation between shop/event nodes and next encounter
-
-- **What:** Leaving a shop or event node instantly starts the next encounter — no walking-between-nodes beat. Player has no acknowledgment of "moving" through the dungeon.
-- **Why:** UX bug. Subset of Cluster B · 30 (dungeon travel impact), but a smaller-scoped fix: just add a transition animation/delay when leaving non-combat nodes. Could ship before #30's larger redesign lands.
-- **Tier:** 2 (bug fix / UX polish)
-- **Acceptance:**
-  - When leaving a shop or event node, the dungeon scene plays a short walking transition (heroes bob right toward the next node icon) before the next encounter begins.
-  - Player can fast-forward the transition.
-  - Same treatment applied to combat → next-node transitions for consistency, OR scoped to just shop/event for a minimal fix.
-  - Decision in brainstorming: ship as a standalone fix or roll into Cluster B · 30 (the bigger dungeon-travel redesign). They're related but separable.
-- **Touches:** `src/scenes/dungeon_scene.ts`.
-- **Source:** bugs.md (2026-05-01). Related: Cluster B · 30, ideas.md #3.
-
 ### 40 · Save can hard-lock: no money + insufficient roster + no fallback
 
 - **What:** If a player has < 50g (Tavern hire cost) AND fewer than 3 surviving heroes (run minimum), they can't recruit and can't expedition — save is dead-locked. No fallback mechanic exists.
@@ -92,20 +67,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
   - Or: separate "Veteran Tavern" L4 building unlock that always rolls level-N candidates.
 - **Touches:** `src/camp/buildings/tavern.ts` (candidate generation), `src/scenes/tavern_panel_scene.ts` (cost display per candidate), possibly `src/camp/building_levels.ts` (Tavern L4).
 - **Source:** bugs.md (2026-05-01) — feature suggestion bundled with the Tavern reroll bug (split during scoping).
-
-### 43 · Combat results don't show loot drops
-
-- **What:** Post-combat results panel doesn't show what gear/items dropped. Per gdd §7 + Cluster A · 10 HISTORY, elite combats guarantee a Rare drop and normal combats can drop loot too — but the player learns about acquired loot only indirectly (by browsing pack inventory later). Elite drops in particular feel "missed" because the visible result is just "Victory!"
-- **Why:** Real visibility bug. The whole point of an elite's "guaranteed Rare drop" trade-off is that players see the reward; without surfacing it, the asymmetric value of elite vs. combat nodes is invisible at the moment it matters.
-- **Tier:** 2 (bug fix / visibility)
-- **Acceptance:**
-  - Post-combat results panel includes a "Loot:" section listing items added to pack from this fight: name, rarity-colored, with affixes per project convention.
-  - Elite drops surface explicitly (always at least one Rare).
-  - Normal combat drops also surface when the loot-roll RNG fires (`src/dungeon/loot.ts`).
-  - Empty case: if no loot dropped (e.g., the combat-loot RNG missed), "Loot: —" or omit the section.
-  - Possibly also surface gold + XP gain in the same panel for parity (might already exist; verify).
-- **Touches:** `src/scenes/dungeon_scene.ts` (where `processCombatReturn` calls `buildResultPanel`), the post-combat panel render code.
-- **Source:** bugs.md (2026-05-01).
 
 ### 44 · No wound-effect tooltip in run (combat / dungeon HUD)
 
@@ -155,21 +116,23 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 - **Touches:** `src/scenes/barracks_panel_scene.ts`, possibly `src/ui/hero_card.ts`. No data-layer changes — `rarePropertyFields` already returns the four fields.
 - **Source:** Cluster B · 34 implementation (2026-05-02).
 
-### 30 · Brainstorm + ship dungeon travel impact
+### 30 · Brainstorm + ship dungeon travel impact (incl. fog-of-war + travel animation)
 
-- **What:** Per ideas.md #3 — make travel between dungeon rooms non-instant and meaningful. Walking animation (heroes bob between nodes), a low-% chance of surprise encounters (combat/event/merchant) every quarter-step, passive HP changes during travel (heal if healthy, take damage if wounded/sick), hero chatter snippets for charm.
-- **Why:** Today the dungeon scene is essentially a hub between combat/shop/event screens — almost all of the play experience IS the combat scene. Adding travel beats spreads the play surface, opens room for charm and personality, and gives the dungeon its own atmosphere distinct from combat.
+- **What:** Per ideas.md #3 — make travel between dungeon rooms non-instant and meaningful. Walking animation, low-% surprise encounters, passive HP changes during travel, hero chatter snippets. Folds in former Cluster B · 38 (icon-row fog-of-war + fork visualization, reframed during scoping) and former Cluster B · 39 (post-shop/event travel animation, always noted as a subset of this task).
+- **Why:** Today the dungeon scene is essentially a hub between combat/shop/event screens — almost all of the play experience IS the combat scene. Adding travel beats spreads the play surface, opens room for charm and personality, and gives the dungeon its own atmosphere distinct from combat. Two known correctness bugs in the current icon-row visualization (silent branch-picking at forks, full future-content reveal) belong in the same redesign rather than as point fixes that would be revisited.
 - **Tier:** 2 polish (scope-dependent; could touch Tier 3 if surprise-encounter system is broad).
 - **Acceptance:**
   - **Needs brainstorming first** — the idea is a paragraph in `ideas.md #3`; design pass should decompose into discrete sub-tasks. Likely sub-tasks:
-    - Walking animation (visual): hero bob/sway tween between current and next node icon.
-    - Travel-time pacing (scene state machine): non-zero transition delay; player can fast-forward.
-    - Surprise-encounter mechanic (RNG + node-injection logic): low-% per quarter-step, draws from combat / merchant / event pools.
-    - Passive HP changes: per-step heal/damage modeled on hero condition (wounds, statuses).
-    - Hero chatter: text snippets + display widget. Could be its own task.
-  - Some sub-tasks likely warrant their own brainstorms (especially surprise-encounter mechanic — what's the encounter pool? how do node graphs handle injected nodes?).
-- **Touches:** `src/scenes/dungeon_scene.ts`, `src/dungeon/*` (encounter draws), `src/data/events.ts` (potentially), new chatter data module.
-- **Source:** ideas.md #3.
+    - **Icon-row fog-of-war** (from #38): today `playerPath` (run_state.ts:380) returns a single linear path even at forks, defaulting to branch 0 — the icon row LIES about topology. Plus all future node types are revealed up-front. Decision needed: hide future entirely (strict A), show topology with `?` content (B), or strict + boss-anchored (C); icon row stays 1D vs. visualizes branches. Touches `dungeon_scene.ts:155-185` (`buildNodes`) and `dungeon_scene.ts:669-685` (`refreshNodeColors`).
+    - **Fork-picker glyph fix** (discovered while scoping #38): `dungeon_scene.ts:457` has its own glyph map that's `boss/shop` only and falls through to `'⚔'` for elite/camp/event branches — fork branches of those types render as crossed swords. Trivial fix; folded here to ship with the broader rework rather than as an isolated edit.
+    - **Travel animation** (from #39): leaving shop/event nodes (and combat → next-node) currently snaps to next state instantly. Heroes should bob/sway between current and next node icon; player can fast-forward.
+    - **Travel-time pacing** (scene state machine): non-zero transition delay; player can fast-forward.
+    - **Surprise-encounter mechanic** (RNG + node-injection logic): low-% per quarter-step, draws from combat / merchant / event pools.
+    - **Passive HP changes**: per-step heal/damage modeled on hero condition (wounds, statuses).
+    - **Hero chatter**: text snippets + display widget. Could be its own task.
+  - Some sub-tasks likely warrant their own brainstorms (especially surprise-encounter mechanic — what's the encounter pool? how do node graphs handle injected nodes? — and the fog-of-war A/B/C decision).
+- **Touches:** `src/scenes/dungeon_scene.ts`, `src/run/run_state.ts` (`playerPath` may need a fork-aware variant), `src/dungeon/*` (encounter draws), `src/data/events.ts` (potentially), new chatter data module.
+- **Source:** ideas.md #3, plus folded-in former Cluster B · 38 (2026-05-02 scoping discovered the entry's described bug was stale; actual bug is fork visualization + fog-of-war) and former Cluster B · 39 (travel animation, subset).
 
 ---
 

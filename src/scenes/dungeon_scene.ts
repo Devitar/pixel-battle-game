@@ -3,7 +3,9 @@ import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels'
 import { removeHero, tickRosterWounds } from '@camp/roster';
 import type { CombatResult } from '@combat/types';
 import type { Node } from '@dungeon/node';
+import type { Item, Rarity } from '@data/types';
 import type { Hero } from '@heroes/hero';
+import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { heroToLoadout } from '@render/hero_loadout';
 import { Paperdoll } from '@render/paperdoll';
 import {
@@ -35,6 +37,12 @@ const SLOT_X_OFFSETS = [-40, 0, 40] as const;
 const COMBAT_NODE_REWARD = 15;
 const BOSS_NODE_REWARD = 100;
 
+const RARITY_HEX: Record<Rarity, string> = {
+  common: '#cccccc',
+  uncommon: '#4488ff',
+  rare: '#ffcc66',
+};
+
 const WALK_IN_DURATION = 800;
 const WALK_NEXT_DURATION = 600;
 
@@ -51,6 +59,9 @@ export class DungeonScene extends Phaser.Scene {
   // fallen heroes. Used by the result panel to (a) compute per-hero HP deltas
   // and (b) render Fallen lines for heroes who didn't survive the fight.
   private preCombatParty: Hero[] = [];
+  // Items added to the pack during the just-completed combat (rollLoot drops +
+  // recovered fallen-hero gear). Captured by diffing pack.items length.
+  private combatLoot: readonly Item[] = [];
   private wipeOutcome?: WipeOutcome;
 
   constructor() {
@@ -61,6 +72,7 @@ export class DungeonScene extends Phaser.Scene {
     this.nodeIcons = [];
     this.nodeLabels = [];
     this.preCombatParty = [];
+    this.combatLoot = [];
     this.resultPanel = undefined;
     this.forkPicker = undefined;
     this.wipeOutcome = undefined;
@@ -101,11 +113,16 @@ export class DungeonScene extends Phaser.Scene {
     const run = appState.get().runState!;
 
     this.preCombatParty = [...run.party];
+    const prePackLen = run.pack.items.length;
 
     // Loot roll consumes RNG; thread it through completeCombat so the post-loot
     // state is what gets persisted.
     const rng = createRngFromState(rngStateAfter);
     const { runState: nextRun, wipe } = completeCombat(run, result, rng);
+    // Items added during this fight = rollLoot drop + recovered fallen-hero gear.
+    // addItem appends, so the tail of pack.items past the pre-fight length is
+    // exactly what was added. Stash for the result panel.
+    this.combatLoot = nextRun.pack.items.slice(prePackLen);
 
     appState.update((s) => ({
       ...s,
@@ -362,18 +379,25 @@ export class DungeonScene extends Phaser.Scene {
         ? BOSS_NODE_REWARD * run.currentFloorNumber
         : COMBAT_NODE_REWARD * run.currentFloorNumber;
 
+    // Panel grows downward to fit dynamic loot lines. Base height fits title +
+    // gold + survivor lines + dismiss; each loot line adds 14px, with a header.
+    const lootCount = this.combatLoot.length;
+    const lootBlockHeight = lootCount > 0 ? 16 + lootCount * 14 : 0;
+    const bgHeight = 180 + lootBlockHeight;
+    const dismissY = 70 + lootBlockHeight;
+
     const bg = this.add
-      .rectangle(0, 0, 320, 180, 0x1a1a1a)
+      .rectangle(0, 0, 320, bgHeight, 0x1a1a1a)
       .setStrokeStyle(2, 0x666666);
     const title = this.add
-      .text(0, -65, 'Victory!', {
+      .text(0, -bgHeight / 2 + 25, 'Victory!', {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#4caf50',
       })
       .setOrigin(0.5);
     const gold = this.add
-      .text(0, -42, `+${reward}g`, {
+      .text(0, -bgHeight / 2 + 48, `+${reward}g`, {
         fontFamily: 'monospace',
         fontSize: '12px',
         color: '#ffcc66',
@@ -381,7 +405,7 @@ export class DungeonScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const lines: Phaser.GameObjects.Text[] = [];
-    let y = -18;
+    let y = -bgHeight / 2 + 72;
     const survivorsById = new Map(run.party.map((h) => [h.id, h]));
     for (const preHero of this.preCombatParty) {
       const survivor = survivorsById.get(preHero.id);
@@ -406,8 +430,37 @@ export class DungeonScene extends Phaser.Scene {
       y += 14;
     }
 
+    if (lootCount > 0) {
+      y += 4;
+      lines.push(
+        this.add
+          .text(0, y, 'Loot:', {
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            color: '#dddddd',
+          })
+          .setOrigin(0.5),
+      );
+      y += 14;
+      for (const item of this.combatLoot) {
+        const name = itemDisplayName(item);
+        const affixes = itemAffixDescription(item);
+        const text = affixes.length > 0 ? `${name} · ${affixes}` : name;
+        lines.push(
+          this.add
+            .text(0, y, text, {
+              fontFamily: 'monospace',
+              fontSize: '10px',
+              color: RARITY_HEX[item.rarity],
+            })
+            .setOrigin(0.5),
+        );
+        y += 14;
+      }
+    }
+
     const dismiss = this.add
-      .text(0, 70, '▸ click to continue', {
+      .text(0, dismissY, '▸ click to continue', {
         fontFamily: 'monospace',
         fontSize: '9px',
         color: '#888888',

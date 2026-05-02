@@ -29,6 +29,32 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-02 · Combat result panel shows loot drops (Cluster B · 43)
+
+- **Why:** Post-combat panel showed Victory! + gold + per-hero HP deltas, but never surfaced the items added to pack. Elite combats guarantee a Rare drop per gdd §7 — that trade-off is invisible at the moment it matters; players had to browse pack inventory later to know what dropped. Same problem for normal-combat drops and recovered fallen-hero gear.
+- **Decisions:**
+  - **Pack-length diff as the source of truth.** `pack.addItem` always appends; `nextRun.pack.items.slice(prePackLen)` is exactly what entered pack this fight. Avoids changing `completeCombat`'s return shape and the cascade of test fixtures that would touch.
+  - **One unified "Loot:" section, not split "Loot" + "Recovered."** Bundles `rollLoot` drops + recovered fallen-hero gear into one list. The TODO's framing ("items added to pack from this fight") supports this; subdividing would add UI density for an uncommon case (someone fell mid-combat).
+  - **Empty case omits the section** rather than rendering "Loot: —". Cleaner panel for the common-combat-no-drop case (50% miss rate per gdd §7's combat loot rule). The 0-loot path produces a panel that's bit-for-bit identical to the original layout — verified by reading the resulting coordinates against the prior magic numbers (title at `-bgHeight/2 + 25 = -65`, gold at `-42`, survivors at `-18`, dismiss at `+70` — all match original constants).
+  - **Dynamic panel height instead of fixed.** Loot block adds `16 + N * 14` to the bg height; dismiss prompt and content cursor anchor off the new height. Avoids the "loot overlaps dismiss" bug that fixed-height + content-overflow would produce. Cleaner code than the alternative of two-column layout or shrinking other elements.
+  - **Reused `itemDisplayName` / `itemAffixDescription` from `@items/selectors`** + a local `RARITY_HEX` constant matching the Blacksmith's pattern. Skipped promoting the rarity-color map to a shared module — two-call duplication isn't expensive, and a third caller can do the extract.
+  - **Skipped XP display.** TODO mentioned "possibly surface XP gain too." Verified: gold IS displayed, XP isn't. Out-of-scope for this task; the explicit ask was loot. Captured as a one-line follow-up candidate worth doing if visibility bites in playtest, but not enough signal to scope a TODO entry.
+- **Surprises:**
+  - **Diffing `pack.items` length is more robust than threading a return-value change through `completeCombat`.** Initially considered modifying `completeCombat` to return `lootGained: Item[]`, which would have rippled to test fixtures (the same shape-edit pattern from the saved memory). Pack-diff sidesteps that entirely and the invariant it relies on (`addItem` appends) is already tested elsewhere. Net change: 6 source lines + no test churn.
+  - **No tests in this commit.** The change is scene-level rendering with no new logic; the underlying loot-roll + pack semantics are tested in `run_state.test.ts`. Adding a Phaser scene test for the panel would require infrastructure that doesn't exist; the layout was verified by coordinate-by-coordinate comparison against the prior fixed values.
+- **Source:** TODO.md Cluster B · 43. Test count delta: 1392 → 1392 (+0; scene-only change).
+
+### 2026-05-02 · Cluster B · 38 verified — folded into #30 (no code shipped)
+
+- **Why:** TODO #38 reported "event/choice nodes use the same glyph as combat in the icon row." Verification at scoping found the originally-described bug was already fixed by earlier commits (`88bab4f` event glyph, `26632cb` camp glyph) — both pre-dating the 2026-05-01 bug-scoping. Brought the question back to the user; they reframed: the *real* present-day bug is that the icon row silently picks one branch at forks (`playerPath` defaults to branch 0) and reveals all future node types up-front. That's a fog-of-war + fork-visualization problem.
+- **Decisions:**
+  - **Folded the reframed bug into #30 (dungeon travel impact).** Doing the icon-row redesign in isolation would lock in decisions (1D vs. branched topology, fog-of-war strictness A/B/C) that #30's brainstorm would then have to revisit. Same call applied to former #39 (travel animation) — already noted as a subset of #30; consolidated.
+  - **Captured one unrelated bug discovered while scoping**: fork-picker UI at `dungeon_scene.ts:457` has its own glyph map that's `boss/shop` only and falls through to `'⚔'` for elite/camp/event branches. Real visibility bug at the fork-picker overlay, but tiny and adjacent to the #30 redesign — added as a sub-task in #30 rather than a standalone fix to bundle with the broader rework.
+  - **No HISTORY entry per the slim template** would have been justified for a no-code change; including this entry anyway because the *reframing* is load-bearing context for the next session that picks up #30.
+- **Surprises:**
+  - **TODO entries scoped from `bugs.md` aren't always re-verified against current code at scoping time.** TODO #38 described a state that had been fixed before its own scoping date. The pre-condition "the bug reported still exists in code" should be a routine check during the bugs.md → TODO.md graduation step, not just at implementation time. Cheap to verify (1-2 greps); skipping it cost a roundtrip.
+- **Source:** TODO.md Cluster B · 38 (verified, folded). No test count change.
+
 ### 2026-05-02 · Tavern candidate persistence — closes the close+reopen reroll exploit (Cluster B · 36)
 
 - **Why:** `tavern_panel_scene.ts:62` did `createRng(Date.now())` on every `create()`, then regenerated candidates from that fresh RNG. Closing the panel was a free reroll — players could bypass the 25g reroll cost by close+reopen. Bypasses the gdd §6 reroll mechanic.
