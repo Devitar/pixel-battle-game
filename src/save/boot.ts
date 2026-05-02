@@ -39,5 +39,6 @@ function createFreshSave(rng: Rng): SaveFile {
     stash: createStash(),
     unlocks: createDefaultUnlocks(),
     buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
+    hospitalTreatmentsRemaining: 1,
   };
 }

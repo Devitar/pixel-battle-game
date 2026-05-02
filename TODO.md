@@ -27,21 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 33 · Hospital level effects (29c)
-
-- **What:** Phase 3 of the building-levels decomposition. Define what Hospital L2/L3 actually do. Current Hospital UX is unconstrained (treat any number of wounds at 40g each). Gdd row promises "L1: 1 wound/run cheap / L2: 2 / L3: 3 + faster time-heal" but the implementation has no per-visit cap and no time-heal at all — the level effects need a real design pass before implementation.
-- **Why:** gdd §6 Hospital row. Decomposed away from 29a/29b because the gdd row doesn't cleanly map to current code without an interpretive call; forcing the answer mid-build would have shipped a not-quite-right feature.
-- **Tier:** 2 (could shift if scope grows)
-- **Acceptance:**
-  - **Needs brainstorming first** to define the L1/L2/L3 effect model. Possible interpretations:
-    - L1 = 1 free treatment per camp visit, L2 = 2, L3 = 3 + 1 wound auto-heals per run-end.
-    - L1 = cheap (40g), L2 = cheaper (30g), L3 = cheapest (20g) + faster time-heal.
-    - L1 = current unconstrained behavior, L2/L3 = unlock multi-treat or healing-over-runs.
-  - After design: add L2/L3 entries to `BUILDING_LEVELS.hospital`, wire the level-effect logic into `hospital_panel_scene.ts` and/or wound-tick logic.
-  - Add Upgrade button to the Hospital panel (mirrors the Tavern + Barracks pattern from 29a).
-- **Touches:** `src/camp/building_levels.ts` (add L2/L3 entries), `src/scenes/hospital_panel_scene.ts`, possibly `src/camp/roster.ts` (`tickRosterWounds` for time-heal), possibly `src/data/wounds.ts` (cost variations).
-- **Source:** gdd §6 (Hospital row), Cluster B · 29 decomposition (2026-05-01).
-
 ### 35 · Combat AI: enemies with 3+ melee swap forever instead of attacking
 
 - **What:** When an encounter spawns 3 or more melee-preferred enemies (slot [1,2] preference), the back-row enemies repeatedly shuffle toward the front instead of taking actions — because only 2 front-row slots exist but 3+ enemies want them.

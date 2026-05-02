@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   BUILDING_LEVELS,
   BARRACKS_CAPACITY,
+  hospitalTickAmount,
+  hospitalTreatmentCap,
   nextLevel,
   tavernCandidateCount,
 } from '../building_levels';
@@ -51,8 +53,34 @@ describe('nextLevel', () => {
     expect(nextLevel('blacksmith', 2)).toBeNull();
   });
 
-  it('Hospital L1 → null (only L1 defined this phase)', () => {
-    expect(nextLevel('hospital', 1)).toBeNull();
+  it('Hospital L1 → L2 def (2 treatments/run at 200g)', () => {
+    expect(nextLevel('hospital', 1)?.level).toBe(2);
+    expect(nextLevel('hospital', 1)?.upgradeCost).toBe(200);
+  });
+
+  it('Hospital L2 → L3 def (3 treatments/run + 2× time-heal at 500g)', () => {
+    expect(nextLevel('hospital', 2)?.level).toBe(3);
+    expect(nextLevel('hospital', 2)?.upgradeCost).toBe(500);
+  });
+
+  it('Hospital L3 → null (max level)', () => {
+    expect(nextLevel('hospital', 3)).toBeNull();
+  });
+});
+
+describe('hospitalTreatmentCap', () => {
+  it('L1 → 1, L2 → 2, L3 → 3', () => {
+    expect(hospitalTreatmentCap(1)).toBe(1);
+    expect(hospitalTreatmentCap(2)).toBe(2);
+    expect(hospitalTreatmentCap(3)).toBe(3);
+  });
+});
+
+describe('hospitalTickAmount', () => {
+  it('L1 / L2 → 1 tick per run-end; L3 → 2', () => {
+    expect(hospitalTickAmount(1)).toBe(1);
+    expect(hospitalTickAmount(2)).toBe(1);
+    expect(hospitalTickAmount(3)).toBe(2);
   });
 });
 

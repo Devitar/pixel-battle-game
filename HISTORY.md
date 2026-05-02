@@ -29,6 +29,22 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-02 · Hospital level effects + treatment cap (Cluster B · 33 / 29c)
+
+- **Why:** Closes the 29a/b/c arc. gdd §6 promises "L1: 1 wound/run cheap / L2: 2 / L3: 3 + faster time-heal" but Hospital was unconstrained — pay 40g per wound, treat unlimited per visit. The cap was the missing pacing gate that makes Hospital upgrades meaningful and aligns wounds with the "drip cost" framing in gdd §7.
+- **Decisions:**
+  - **Treatment cap, not cost reduction.** Considered (A) cap-per-run, (B) cost-reduction-per-level, (C) hybrid. Picked A as closest to gdd intent and the cleanest single lever. Cost stays flat at 40g — gdd already calls L1 "cheap." A creates a real gold sink that makes Hospital upgrades worth banking for; B preserves the "buy your way out of all wounds" pattern the gdd row is designed to prevent.
+  - **L3 also doubles the time-heal tick rate** (2 ticks/run-end instead of 1). Layers a passive bonus onto the active cap bonus so L3 feels rich vs. L2.
+  - **Counter lives on `SaveFile` (top-level), not on roster.** Hospital is camp infrastructure, not a per-hero attribute. New field `hospitalTreatmentsRemaining: number`, normalized with `?? 1` for old saves. No schema bump (pre-launch policy).
+  - **Refill happens at every `tickRosterWounds` call site.** All three (`dungeon_scene.ts:638` wipe, `camp_screen_scene.ts:194` cashout, `camp_node_overlay_scene.ts:449` leave-from-camp-node) are run-end events. Mid-run camp nodes don't tick wounds today, so the cap stays honest. Initially worried that one of the three might be mid-run; verified by reading each call site that all three end the run (clear `runState`).
+  - **Upgrade also refills.** `applyBuildingUpgrade` resets `hospitalTreatmentsRemaining` to the new cap when the upgrade is `'hospital'`. Otherwise an upgrade mid-run-cycle would feel invisible until the next run-end.
+  - **Two helpers in `building_levels.ts`:** `hospitalTreatmentCap(level)` returns 1/2/3, `hospitalTickAmount(level)` returns 1/1/2. Both pure, easily unit-tested. Three call sites consume them.
+  - **No tooltip on cap-reached state.** Single line below hero name in the detail pane: "Cap reached — refills after next run." Treat buttons gray out via the existing `canAfford`-style pattern (now `canTreat = canAfford && hasTreatments`).
+- **Surprises:**
+  - **Four existing tests had assertions tied to the prior "no L2/L3 hospital" / "no `hospitalTreatmentsRemaining` field" state.** `building_levels.test.ts`, `building_upgrade.test.ts`, `boot.test.ts`, `save.test.ts`, `app_state.test.ts`. All needed parallel updates. **Fourth occurrence of this pattern in two weeks** — Cluster B · 31 outfit-wireup, Cluster B · 26 Archer ability, Cluster B · 32 blacksmith gating, now this. Worth treating "grep tests for the symbol I'm adding to / changing the meaning of" as a reflex pre-edit step. Adding it to my self-review checklist mentally.
+  - **The mid-run-vs-run-end question turned out to be a non-issue.** Initial brainstorm reading suggested camp_node_overlay tickled wounds mid-run, which would have made cap refill semantics tricky (refill mid-run = generous; don't refill = inconsistent). Reading the actual call site showed it's the "leave dungeon early" branch, which IS run-end. Lesson: if a call-site question matters, read the surrounding code, don't trust the file path.
+- **Source:** TODO.md Cluster B · 33. Test count delta: 1354 → 1362 (+8: 4 new for the helpers + cap upgrades + tick=2 case, 4 existing tests updated to match new shape).
+
 ### 2026-05-02 · Blacksmith level gating, L2 added (Cluster B · 32 / 29b)
 
 - **Why:** Phase 2 of the 29a/b/c building-levels decomposition. L1 already shipped (common→uncommon only at the data layer was the *intent*, but `nextRarity` always allowed uncommon→rare too — the gate didn't exist). Adds the L2 unlock at 200g and enforces the L1 gate.

@@ -1,4 +1,5 @@
 import * as Phaser from 'phaser';
+import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels';
 import { removeHero, tickRosterWounds } from '@camp/roster';
 import type { CombatResult } from '@combat/types';
 import type { Node } from '@dungeon/node';
@@ -635,10 +636,11 @@ export class DungeonScene extends Phaser.Scene {
           roster = removeHero(roster, id);
         }
       }
-      roster = tickRosterWounds(roster);
+      roster = tickRosterWounds(roster, hospitalTickAmount(s.buildingLevels.hospital));
       return {
         ...s,
         roster,
+        hospitalTreatmentsRemaining: hospitalTreatmentCap(s.buildingLevels.hospital),
         runState: undefined,
         runRngState: undefined,
       };

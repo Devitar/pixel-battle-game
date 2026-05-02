@@ -58,17 +58,17 @@ export function listHeroes(roster: Roster): readonly Hero[] {
   return roster.heroes;
 }
 
-function tickWound(wound: Wound): Wound | null {
-  const next = wound.runsRemaining - 1;
+function tickWound(wound: Wound, ticks: number): Wound | null {
+  const next = wound.runsRemaining - ticks;
   return next <= 0 ? null : { ...wound, runsRemaining: next };
 }
 
-export function tickRosterWounds(roster: Roster): Roster {
+export function tickRosterWounds(roster: Roster, ticks: number = 1): Roster {
   return {
     ...roster,
     heroes: roster.heroes.map((h) => ({
       ...h,
-      wounds: h.wounds.map(tickWound).filter((w): w is Wound => w !== null),
+      wounds: h.wounds.map((w) => tickWound(w, ticks)).filter((w): w is Wound => w !== null),
     })),
   };
 }

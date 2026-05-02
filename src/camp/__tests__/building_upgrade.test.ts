@@ -14,6 +14,7 @@ function makeBaseState(gold = 1000): SaveFile {
     stash: createStash(),
     unlocks: createDefaultUnlocks(),
     buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
+    hospitalTreatmentsRemaining: 1,
   };
 }
 
@@ -76,9 +77,38 @@ describe('applyBuildingUpgrade', () => {
     expect(() => applyBuildingUpgrade(at_l2, 'blacksmith')).toThrow(/already at max/);
   });
 
-  it('Hospital L1 → null: throws', () => {
-    const state = makeBaseState();
-    expect(() => applyBuildingUpgrade(state, 'hospital')).toThrow(/already at max/);
+  it('Hospital L1 → L2: deducts 200g, bumps level, refills treatments to new cap (2)', () => {
+    const before: SaveFile = { ...makeBaseState(), hospitalTreatmentsRemaining: 0 };
+    const after = applyBuildingUpgrade(before, 'hospital');
+    expect(after.buildingLevels.hospital).toBe(2);
+    expect(after.vault.gold).toBe(800);
+    expect(after.hospitalTreatmentsRemaining).toBe(2);
+  });
+
+  it('Hospital L2 → L3: deducts 500g and refills treatments to new cap (3)', () => {
+    const at_l2: SaveFile = {
+      ...makeBaseState(),
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 2 },
+      hospitalTreatmentsRemaining: 1,
+    };
+    const after = applyBuildingUpgrade(at_l2, 'hospital');
+    expect(after.buildingLevels.hospital).toBe(3);
+    expect(after.vault.gold).toBe(500);
+    expect(after.hospitalTreatmentsRemaining).toBe(3);
+  });
+
+  it('Hospital L3 throws (max level)', () => {
+    const at_l3: SaveFile = {
+      ...makeBaseState(),
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 3 },
+    };
+    expect(() => applyBuildingUpgrade(at_l3, 'hospital')).toThrow(/already at max/);
+  });
+
+  it('non-hospital upgrades leave hospitalTreatmentsRemaining alone', () => {
+    const before: SaveFile = { ...makeBaseState(), hospitalTreatmentsRemaining: 0 };
+    const after = applyBuildingUpgrade(before, 'tavern');
+    expect(after.hospitalTreatmentsRemaining).toBe(0);
   });
 
   it('does not mutate input state', () => {
