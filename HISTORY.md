@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-02 · Pawnshop — sell stash gear at the Blacksmith for gold (Cluster B · 48)
+
+- **Why:** Stash items had no liquidation path — the only item→gold conversion was implicit pack-banking on cashout. Adds a real economic lever (dump stash overflow → vault gold) and incidentally closes the deep-softlock case (player can sell a stash rare for 80g → recruit at Tavern). Spun out of the #40 design discussion when the mercenary system was rejected in favor of lighter alternatives; the pawnshop emerged as the value-add direction (real feature) vs. the safety-net direction (free hire + Reset Camp).
+- **Decisions:**
+  - **Flat by rarity, no floor scaling.** Common 10g, uncommon 30g, rare 80g. Considered floor-scaled (`base × floorRolledAt × 0.33` mirroring the shop buy formula) and affix-count bonuses; rejected both as over-engineering for v1. The flat table is one constant to flip if late-game balance needs late-floor rares to be worth more — easy to reach for later. Numbers chosen so a single rare clears `HIRE_COST` (50g) with margin and 2 uncommons cover it; closes the softlock recovery path cleanly.
+  - **Mode toggle inside the existing Blacksmith panel** — `[Upgrade]` / `[Sell]` buttons above the list pane. Same panel chrome, same list/detail two-pane layout, branched on `mode` state. Cleaner than a separate Pawnshop panel — Blacksmith is already the "gear management" surface, and one panel feels right vs. shipping two near-identical scenes.
+  - **Confirm dialog for rare items only.** Common/uncommon sell instantly (mirrors Upgrade flow). Rare gets a "Sell [item] for 80g?" modal because the loss is irreversible and an 80g resource is much harder to replace than 80g of stash junk. Asymmetric friction matches the asymmetric stakes.
+  - **Stash-only, not equipped.** Sell list shows only `state.stash.items`, not items currently equipped on heroes. Player must unequip first if they want to sell something they're using — the unequip flow already exists in the Equip panel. Keeps the sell scope clean: one source of truth (stash), one action (sell), no displacement logic.
+  - **Sort: rarity desc, floor desc.** Rares surface at the top of the list — high-value items players might forget they're holding. Within rarity, newer drops surface first. Different from the Upgrade list (which sorts ascending so cheap upgrades surface first); the directions match each list's purpose.
+  - **`itemSellValue(item)` + `applyItemSell(state, itemId)` are pure functions in `items/sell.ts`.** Both unit-tested. The scene calls them through `appState.update`. Same pattern as `applyBuildingUpgrade` and the other state-transition helpers.
+- **Surprises:**
+  - **The mode toggle's first frame had a stale `selectedItemId` from upgrade mode** that pointed at an item id present in upgradeable list but not in the sell list (e.g., an item equipped on a hero). The `rebuildSellMode` already had a `!items.some(...)` guard that resets selection — but I'd missed it on the first pass and noticed during the read-through. Pre-existing pattern from the upgrade flow generalized cleanly; one less bug class because both modes use the same selection-rehydration logic.
+  - **Stripped an unused `addHero` import in `sell.test.ts`** flagged by `noUnusedLocals`. Caught at typecheck immediately rather than at PR-review. Confirms the value of running tsc as part of the inner loop.
+- **Source:** TODO.md Cluster B · 48. Test count delta: 1404 → 1411 (+7: 3 `itemSellValue` rarity coverage + 4 `applyItemSell` cases — happy path, throws on missing, no input mutation, multi-item stash).
+
 ### 2026-05-02 · Softlock safety net — free Tavern hires + Reset Camp (Cluster B · 40)
 
 - **Why:** Real player-facing softlock: with `< 50g AND < 3 living heroes`, the player can't recruit (need 50g) and can't expedition (need 3 heroes). No path forward. Closes the last correctness gap in Cluster B's "real bug" surface.

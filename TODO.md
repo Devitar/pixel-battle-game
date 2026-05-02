@@ -71,19 +71,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 - **Touches:** `src/dungeon/node.ts` (Node variant), `src/dungeon/floor.ts` (fork shapes + linear variance), `src/dungeon/loot.ts` (treasure roll + reduce combat rate), `src/scenes/dungeon_scene.ts` (icon glyph + treasure arrival handler), possibly new `src/scenes/treasure_room_overlay_scene.ts` (or inline). No save schema change expected.
 - **Source:** ideas.md #1 (2026-05-01).
 
-### 48 · Pawnshop — sell stash gear at the Blacksmith for gold
-
-- **What:** Add a "Sell" path at the Blacksmith for stash items. Player picks an item from stash, gets gold for it; item is removed. Pricing tied to rarity (and possibly affix count): e.g., common = 10g, uncommon = 30g, rare = 80g (numbers to brainstorm).
-- **Why:** Today the only item→gold conversion is implicit (pack carries gold + items, both bank on cashout). Stash items have no liquidation path. Adds a real economic lever for late game (dump stash overflow → vault gold) AND solves the deep softlock case (player almost always has stash items even after losing their roster, since stash persists across wipes — they just have no way to convert items to gold). Discovered while scoping Cluster B · 40; the mercenary system was rejected partly because the pawnshop is a healthier game-economy answer to the same problem.
-- **Tier:** 2 (gameplay feature)
-- **Acceptance:**
-  - **Needs brainstorming first** to nail the price formula (flat by rarity? scale by `floorRolledAt`? affix-count bonus?).
-  - Add a "Sell" tab/mode to `blacksmith_panel_scene.ts` (or a separate panel — design call). Lists stash items with sell prices; "Sell" button moves item out and credits vault.
-  - Consider: confirm dialog for rare items? (selling a rare by accident is painful) Or "are you sure" only for rare+ ?
-  - Tests: pure pricing function (`itemSellValue(item)`) + `applyItemSell(state, itemId)` helper. Scene wiring is verified by typecheck + manual play.
-- **Touches:** `src/scenes/blacksmith_panel_scene.ts` (new sell mode), possibly new `src/items/sell.ts` for the pure pricing helper, `src/camp/stash.ts` (already has `removeItem`), `src/camp/vault.ts` (already has `credit`).
-- **Source:** Cluster B · 40 design discussion (2026-05-02). User specifically asked to add as a separate task — "worth doing."
-
 ### 30 · Brainstorm + ship dungeon travel impact (incl. fog-of-war + travel animation)
 
 - **What:** Per ideas.md #3 — make travel between dungeon rooms non-instant and meaningful. Walking animation, low-% surprise encounters, passive HP changes during travel, hero chatter snippets. Folds in former Cluster B · 38 (icon-row fog-of-war + fork visualization, reframed during scoping) and former Cluster B · 39 (post-shop/event travel animation, always noted as a subset of this task).
