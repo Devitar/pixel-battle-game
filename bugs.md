@@ -19,3 +19,5 @@ One section per bug. Keep it terse — this is a triage bin, not a formal tracke
 ---
 
 <!-- Add bugs below this line. Newest at the top. -->
+
+### Players should only be able to see what the immediate next node is, not the entire dungeon.
