@@ -11,6 +11,7 @@ import {
 import { addHero, canAdd, listHeroes } from '@camp/roster';
 import { balance, spend } from '@camp/vault';
 import type { Hero } from '@heroes/hero';
+import { isSoftlocked } from '@save/save';
 import { HeroCard } from '@ui/hero_card';
 import { createRng, type Rng } from '@util/rng';
 import { appState } from './app_state';
@@ -99,8 +100,13 @@ export class TavernPanelScene extends Phaser.Scene {
     this.add
       .rectangle(480, 270, 920, 340, 0x222222)
       .setStrokeStyle(2, 0x666666);
+    const free = isSoftlocked(appState.get());
     this.add
-      .text(480, 110, `Tavern · Hire Cost: ${HIRE_COST}g`, {
+      .text(
+        480,
+        110,
+        free ? 'Tavern · Hires are free until you recover' : `Tavern · Hire Cost: ${HIRE_COST}g`,
+        {
         fontFamily: 'monospace',
         fontSize: '20px',
         color: '#ffffff',
@@ -254,7 +260,9 @@ export class TavernPanelScene extends Phaser.Scene {
 
   private hire(slotIndex: number): void {
     const state = appState.get();
-    if (!canAdd(state.roster) || balance(state.vault) < HIRE_COST) return;
+    const free = isSoftlocked(state);
+    if (!canAdd(state.roster)) return;
+    if (!free && balance(state.vault) < HIRE_COST) return;
 
     const hired = this.candidates[slotIndex];
     const replacement = generateCandidate(this.rng, state.unlocks.classes);
@@ -262,7 +270,7 @@ export class TavernPanelScene extends Phaser.Scene {
 
     appState.update((s) => ({
       ...s,
-      vault: spend(s.vault, HIRE_COST),
+      vault: free ? s.vault : spend(s.vault, HIRE_COST),
       roster: addHero(s.roster, hired),
       tavernCandidates: [...this.candidates],
     }));
@@ -275,8 +283,9 @@ export class TavernPanelScene extends Phaser.Scene {
   private refreshButtons(): void {
     const state = appState.get();
     const gold = balance(state.vault);
+    const free = isSoftlocked(state);
     const canAddHero = canAdd(state.roster);
-    const canAffordHire = gold >= HIRE_COST;
+    const canAffordHire = free || gold >= HIRE_COST;
     const enabled = canAddHero && canAffordHire;
 
     let reason = '';
@@ -291,6 +300,7 @@ export class TavernPanelScene extends Phaser.Scene {
         btn.bg.setFillStyle(0x333333).setStrokeStyle(2, 0x555555);
         btn.label.setColor('#777777');
       }
+      btn.label.setText(free ? 'Hire (free)' : `Hire (${HIRE_COST}g)`);
       btn.reason.setText(reason);
     }
 

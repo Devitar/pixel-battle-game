@@ -1,10 +1,11 @@
+import { HIRE_COST } from '@camp/buildings/tavern';
 import type { Roster } from '@camp/roster';
 import { createStash, type Stash } from '@camp/stash';
 import type { Vault } from '@camp/vault';
 import { DEFAULT_FEET_SPRITE, DEFAULT_LEGS_SPRITE } from '@data/body_sprites';
 import type { Unlocks } from '@data/types';
 import type { Hero } from '@heroes/hero';
-import type { RunState } from '@run/run_state';
+import { PARTY_SIZE, type RunState } from '@run/run_state';
 import { CURRENT_SCHEMA_VERSION, migrate } from './migration';
 
 export { CURRENT_SCHEMA_VERSION } from './migration';
@@ -88,6 +89,13 @@ export function load(storage: Storage): SaveFile | null {
 
 export function clearSave(storage: Storage): void {
   storage.removeItem(STORAGE_KEY);
+}
+
+// Save is softlocked when the player can't recruit (vault < HIRE_COST) AND
+// can't field an expedition (roster < PARTY_SIZE). Tavern unlocks free hires
+// while in this state; Camp scene surfaces a Reset Camp escape hatch.
+export function isSoftlocked(state: SaveFile): boolean {
+  return state.vault.gold < HIRE_COST && state.roster.heroes.length < PARTY_SIZE;
 }
 
 export function createDefaultUnlocks(): Unlocks {

@@ -8,10 +8,13 @@ import {
   STORAGE_KEY,
   clearSave,
   createDefaultUnlocks,
+  isSoftlocked,
   load,
   save,
   type SaveFile,
 } from '../save';
+import { createHero } from '@heroes/hero';
+import { addHero } from '@camp/roster';
 
 class MemoryStorage implements Storage {
   private store = new Map<string, string>();
@@ -338,5 +341,54 @@ describe('save normalizer — runState.lost default', () => {
     const loaded = load(storage);
     expect(loaded!.runState!.lost).toHaveLength(1);
     expect(loaded!.runState!.lost[0].id).toBe('h0');
+  });
+});
+
+describe('isSoftlocked', () => {
+  function makeState(gold: number, heroCount: number): SaveFile {
+    let roster = createRoster();
+    for (let i = 0; i < heroCount; i++) {
+      roster = addHero(roster, createHero('knight', `H${i}`, `h${i}`, 'quick', '0'));
+    }
+    return {
+      version: CURRENT_SCHEMA_VERSION,
+      roster,
+      vault: credit(createVault(), gold),
+      stash: createStash(),
+      unlocks: createDefaultUnlocks(),
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
+      hospitalTreatmentsRemaining: 1,
+      tavernCandidates: [],
+    };
+  }
+
+  it('returns true when gold < 50 AND roster < 3', () => {
+    expect(isSoftlocked(makeState(0, 0))).toBe(true);
+    expect(isSoftlocked(makeState(49, 2))).toBe(true);
+    expect(isSoftlocked(makeState(0, 2))).toBe(true);
+  });
+
+  it('returns false when gold >= 50 (player can recruit)', () => {
+    expect(isSoftlocked(makeState(50, 0))).toBe(false);
+    expect(isSoftlocked(makeState(100, 1))).toBe(false);
+  });
+
+  it('returns false when roster >= 3 (player can expedition)', () => {
+    expect(isSoftlocked(makeState(0, 3))).toBe(false);
+    expect(isSoftlocked(makeState(0, 5))).toBe(false);
+  });
+
+  it('returns false when both conditions are met (healthy state)', () => {
+    expect(isSoftlocked(makeState(500, 3))).toBe(false);
+  });
+
+  it('threshold is exclusive on gold (49g + 0 heroes is softlocked)', () => {
+    expect(isSoftlocked(makeState(49, 0))).toBe(true);
+    expect(isSoftlocked(makeState(50, 0))).toBe(false);
+  });
+
+  it('threshold is exclusive on roster (2 heroes + 0g is softlocked, 3 is not)', () => {
+    expect(isSoftlocked(makeState(0, 2))).toBe(true);
+    expect(isSoftlocked(makeState(0, 3))).toBe(false);
   });
 });

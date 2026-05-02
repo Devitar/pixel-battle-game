@@ -29,6 +29,23 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-02 · Softlock safety net — free Tavern hires + Reset Camp (Cluster B · 40)
+
+- **Why:** Real player-facing softlock: with `< 50g AND < 3 living heroes`, the player can't recruit (need 50g) and can't expedition (need 3 heroes). No path forward. Closes the last correctness gap in Cluster B's "real bug" surface.
+- **Decisions:**
+  - **Rejected the full mercenary system the TODO entry proposed.** Brainstormed alternatives: pawnshop, solo/duo expeditions, free hire on softlock, conscription, vault floor, Reset Camp. The mercenary system is heavyweight (new type of hero, hidden gold tax, pickup-attribution rules, generic-archetype balance) for what's a rare problem. Picked **C + D** (free Tavern hire when softlocked + Reset Camp escape hatch) — total ~80 lines of code, no new game systems.
+  - **Spun off the pawnshop as TODO #48.** It's a real game-economy improvement (sell stash gear at the Blacksmith for gold) that incidentally closes the deep-softlock case (player almost always has stash items even after losing their roster). Worth doing as its own feature, not bundled with this fix.
+  - **Free Tavern hire = free WHILE softlocked** (not "first hire is free, then back to 50g"). Rationale: from the 0-hero softlock state, the player needs THREE free hires to reach the 3-hero expedition minimum. Charging after the first re-locks them. The condition naturally bounds it — the moment they have 50g (from gear sales / future pawnshop) OR 3 heroes, pricing returns to normal.
+  - **Reset Camp wires into the existing `BootScene`.** `clearSave()` + `appState.reset()` + `scene.start('boot')` triggers the boot's "no save → createFreshSave" branch. No special reset code needed in the boot path.
+  - **Reset Camp visible only when softlocked.** Considered always-visible for general "I want to start over" use, but a permanent reset button next to the buildings would be a UX trap (accidental clicks). Kept it gated to the rare softlock state where the player is already looking for an escape hatch.
+  - **Confirmation modal is inline, not a separate Phaser scene.** One-off use, ~10 game-objects. Promoting to a scene would be over-engineering for a screen the player should hit at most once per save lifecycle.
+  - **`isSoftlocked(state)` lives in `src/save/save.ts`** alongside the SaveFile type. Imports `HIRE_COST` from `@camp/buildings/tavern` and a newly-exported `PARTY_SIZE` from `@run/run_state`. Two consumers (Tavern panel + Camp scene) both share the predicate so they can't drift on the threshold definition.
+- **Surprises:**
+  - **`PARTY_SIZE` was a private const in `run_state.ts`.** Exported it as a side effect — but worth noting that the implicit "3" was hardcoded in several places (the run-state validator, the Expeditions picker formation `[null, null, null]`, etc.). Future work that touches the party size constraint (e.g., the rejected solo/duo expeditions alternative) would need to thread the constant through those sites; the export is the first step.
+  - **Tavern's title text `Tavern · Hire Cost: 50g` had to become a ternary** to flip to `Tavern · Hires are free until you recover` while softlocked. Caught at implementation — the chrome-builder method had baked-in pricing language that needed dynamic flexibility.
+  - **No edge case in the cashout path needed touching** to make this work — gold earned during the run flows through the existing pack-banking logic, and recovery from softlock just means "earn 50g from a successful run, then Tavern returns to paid." Clean separation between the run loop and the camp economy.
+- **Source:** TODO.md Cluster B · 40. Test count delta: 1398 → 1404 (+6: comprehensive `isSoftlocked` cases — true on both conditions, false when either is met, exclusive thresholds at 49g/50g and 2/3 heroes, healthy state baseline).
+
 ### 2026-05-02 · Display Mind/Crit/Dodge + rare-property fields on Barracks detail (Cluster B · 47)
 
 - **Why:** Cluster B · 34 made HP/ATK/DEF/SPD equipment-aware, but the other four `Stats` fields (`mind`, `crit`, `dodge`) and the four rare-property fields (lifesteal, thorns, regen, burning) remained invisible. Players couldn't see what `of_burning` rares actually did beyond the item tooltip — affected equip decisions on rares and on Mind/Crit/Dodge-affine classes.

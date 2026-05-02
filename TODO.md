@@ -27,22 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 40 · Save can hard-lock: no money + insufficient roster + no fallback
-
-- **What:** If a player has < 50g (Tavern hire cost) AND fewer than 3 surviving heroes (run minimum), they can't recruit and can't expedition — save is dead-locked. No fallback mechanic exists.
-- **Why:** Genuine softlock. The user's own proposal: a "mercenary" system where empty roster slots can be filled with mercenaries (free) who take half the gold earned and keep all items they pick up. That keeps the player able to grind out gold while in this state.
-- **Tier:** 2 (gameplay safety net)
-- **Acceptance:**
-  - **Needs brainstorming first** to design the mercenary mechanic. Open questions:
-    - Mercenaries are temporary? Persistent until explicitly retired?
-    - Keep gear they're equipped with at run-end, or transfer to stash?
-    - Half-gold tax: applied at cashout, or at gold-pickup time?
-    - What stats / class? Generic "mercenary" archetype, or rolled like Tavern hires but free?
-  - Simpler fallback option (defer mercenary): add a "Reset Camp" button when the softlock state is detected, with an explicit "You have nothing to play with — reset your save?" prompt.
-  - Implementation depends on the design call.
-- **Touches:** `src/scenes/camp_scene.ts` (softlock detection, fallback UI), possibly new `src/camp/mercenaries.ts` if going with the full design, possibly `src/run/run_state.ts` (gold-tax hook).
-- **Source:** bugs.md (2026-05-01).
-
 ### 42 · Tavern: pre-leveled hero candidates at higher cost (deferred)
 
 - **What:** Tavern hires are always level-1 fresh recruits regardless of when in the run progression you visit. User suggested higher-level pre-leveled candidates appearing at proportionally higher cost.
@@ -86,6 +70,19 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
   - Manual verification: Crypt run shows mixed node types in linear preamble; forks include treasure-room options; treasure rooms drop loot and add to pack; combat loot drops are noticeably rarer.
 - **Touches:** `src/dungeon/node.ts` (Node variant), `src/dungeon/floor.ts` (fork shapes + linear variance), `src/dungeon/loot.ts` (treasure roll + reduce combat rate), `src/scenes/dungeon_scene.ts` (icon glyph + treasure arrival handler), possibly new `src/scenes/treasure_room_overlay_scene.ts` (or inline). No save schema change expected.
 - **Source:** ideas.md #1 (2026-05-01).
+
+### 48 · Pawnshop — sell stash gear at the Blacksmith for gold
+
+- **What:** Add a "Sell" path at the Blacksmith for stash items. Player picks an item from stash, gets gold for it; item is removed. Pricing tied to rarity (and possibly affix count): e.g., common = 10g, uncommon = 30g, rare = 80g (numbers to brainstorm).
+- **Why:** Today the only item→gold conversion is implicit (pack carries gold + items, both bank on cashout). Stash items have no liquidation path. Adds a real economic lever for late game (dump stash overflow → vault gold) AND solves the deep softlock case (player almost always has stash items even after losing their roster, since stash persists across wipes — they just have no way to convert items to gold). Discovered while scoping Cluster B · 40; the mercenary system was rejected partly because the pawnshop is a healthier game-economy answer to the same problem.
+- **Tier:** 2 (gameplay feature)
+- **Acceptance:**
+  - **Needs brainstorming first** to nail the price formula (flat by rarity? scale by `floorRolledAt`? affix-count bonus?).
+  - Add a "Sell" tab/mode to `blacksmith_panel_scene.ts` (or a separate panel — design call). Lists stash items with sell prices; "Sell" button moves item out and credits vault.
+  - Consider: confirm dialog for rare items? (selling a rare by accident is painful) Or "are you sure" only for rare+ ?
+  - Tests: pure pricing function (`itemSellValue(item)`) + `applyItemSell(state, itemId)` helper. Scene wiring is verified by typecheck + manual play.
+- **Touches:** `src/scenes/blacksmith_panel_scene.ts` (new sell mode), possibly new `src/items/sell.ts` for the pure pricing helper, `src/camp/stash.ts` (already has `removeItem`), `src/camp/vault.ts` (already has `credit`).
+- **Source:** Cluster B · 40 design discussion (2026-05-02). User specifically asked to add as a separate task — "worth doing."
 
 ### 30 · Brainstorm + ship dungeon travel impact (incl. fog-of-war + travel animation)
 

@@ -40,7 +40,7 @@ export interface WipeOutcome {
   heroesLost: readonly Hero[];     // narratively Lost prior to the wipe
 }
 
-const PARTY_SIZE = 3;
+export const PARTY_SIZE = 3;
 const COMBAT_NODE_GOLD = 15;
 const ELITE_NODE_GOLD = 30;
 const BOSS_NODE_GOLD = 100;
