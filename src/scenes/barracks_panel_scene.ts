@@ -10,7 +10,7 @@ import { TRAITS } from '@data/traits';
 import { WOUNDS, describeWoundEffect } from '@data/wounds';
 import type { Hero } from '@heroes/hero';
 import { describeKitStatus, resolveCombatAbilities } from '@items/kit';
-import { applyEquipmentStats } from '@items/stats';
+import { applyEquipmentStats, describeRarePropertyFields, rarePropertyFields } from '@items/stats';
 import { heroToLoadout } from '@render/hero_loadout';
 import { Paperdoll } from '@render/paperdoll';
 import { HeroCard } from '@ui/hero_card';
@@ -304,6 +304,9 @@ export class BarracksPanelScene extends Phaser.Scene {
       }),
     );
     const equippedStats = applyEquipmentStats(hero.baseStats, hero.equipment);
+    // Split across two lines: primary HP/ATK/DEF/SPD on top, secondary MND/CRT/DDG
+    // below. Single-line layout doesn't fit within the detail pane's 345px text
+    // width at 12px monospace once Mind/Crit/Dodge are added.
     this.detailContainer.add(
       this.add.text(
         DETAIL_TEXT_X,
@@ -316,9 +319,21 @@ export class BarracksPanelScene extends Phaser.Scene {
         },
       ),
     );
+    this.detailContainer.add(
+      this.add.text(
+        DETAIL_TEXT_X,
+        168,
+        `MND ${equippedStats.mind} · CRT ${equippedStats.crit}% · DDG ${equippedStats.dodge}%`,
+        {
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          color: '#bbbbbb',
+        },
+      ),
+    );
     const traitText = this.add.text(
       DETAIL_TEXT_X,
-      172,
+      188,
       `trait: ${traitDef.name} — ${traitDef.description}`,
       {
         fontFamily: 'monospace',
@@ -329,11 +344,38 @@ export class BarracksPanelScene extends Phaser.Scene {
     );
     this.detailContainer.add(traitText);
 
-    // If the trait wraps to multiple lines, push wounds (and the cascade-
-    // dependent ABILITIES section below — see Math.max guard further down) so
-    // they don't overlap. Single-line traits produce ~14px height → woundsCursor
-    // stays at the historic 192.
-    let woundsCursor = Math.max(192, traitText.y + traitText.height + 6);
+    // Cascade: trait line wraps may push subsequent sections; properties block
+    // (if any) sits between trait and wounds; wounds block (if any) sits before
+    // abilities. Each step Math.max-guards against the prior step's bottom.
+    let cursor = traitText.y + traitText.height + 6;
+
+    const propLines = describeRarePropertyFields(rarePropertyFields(hero.equipment));
+    if (propLines.length > 0) {
+      this.detailContainer.add(
+        this.add.text(DETAIL_TEXT_X, cursor, 'PROPERTIES', {
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          color: '#bb9966',
+        }),
+      );
+      cursor += 18;
+      for (const line of propLines) {
+        this.detailContainer.add(
+          this.add.text(DETAIL_TEXT_X, cursor, line, {
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            color: '#dddddd',
+          }),
+        );
+        cursor += 14;
+      }
+      cursor += 6;
+    }
+
+    // Single-line trait + no properties produces cursor ~ 208 (188 trait + 14 +
+    // 6); keep historical 208 floor for single-line consistency, mirroring the
+    // prior 192 floor when the stat line was 4 stats and the trait was at 172.
+    let woundsCursor = Math.max(208, cursor);
 
     if (hero.wounds.length > 0) {
       this.detailContainer.add(

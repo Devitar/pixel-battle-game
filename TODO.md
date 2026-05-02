@@ -87,22 +87,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 - **Touches:** `src/dungeon/node.ts` (Node variant), `src/dungeon/floor.ts` (fork shapes + linear variance), `src/dungeon/loot.ts` (treasure roll + reduce combat rate), `src/scenes/dungeon_scene.ts` (icon glyph + treasure arrival handler), possibly new `src/scenes/treasure_room_overlay_scene.ts` (or inline). No save schema change expected.
 - **Source:** ideas.md #1 (2026-05-01).
 
-### 47 · Display Mind/Crit/Dodge + rare-property fields on hero detail
-
-- **What:** The Barracks detail pane and `hero_card.ts` large variant currently show only HP/ATK/DEF/SPD. The `Stats` type also carries `mind`, `crit`, `dodge` — and equipment can roll rare properties (lifesteal `of_vampirism`, thorns `of_thorns`, regen `of_regeneration`, burning `of_burning` — see `rarePropertyFields` in `src/items/stats.ts:41`) that have no display surface anywhere. Players can't see what their gear actually does.
-- **Why:** Discovered during Cluster B · 34 implementation (2026-05-02). That fix made the displayed three stats honest about equipment contributions, but the four hidden stats + four rare-property fields remain invisible. Affects equip decisions on rares and on classes with mind/crit/dodge affinity.
-- **Tier:** 2 (visibility / UI design)
-- **Acceptance:**
-  - **Needs brainstorming first** to decide layout. Open questions:
-    - All seven stats on a single line vs. two-line grid (e.g., `HP/ATK/DEF/SPD` line + `MND/CRT/DDG` line)?
-    - Where do rare-property fields live? Inline with stats, in a dedicated "Properties:" section, or as part of the per-item tooltip rather than the hero summary?
-    - Show stats that are 0 (e.g., a Knight's `mind: 0`) or hide zero values to reduce noise?
-    - Same treatment in `hero_card.ts` large variant, or keep it summary-only there and put the full stats in Barracks only?
-  - After design: update `barracks_panel_scene.ts` detail-text builder + (optionally) `hero_card.ts` large variant. Reuse `applyEquipmentStats` and `rarePropertyFields` (both already exist).
-  - Manual verify: a hero with `weapon_of_swiftness` (+SPD affix) and a `weapon_of_burning` rare shows both the +SPD bump and a "burning damage" line.
-- **Touches:** `src/scenes/barracks_panel_scene.ts`, possibly `src/ui/hero_card.ts`. No data-layer changes — `rarePropertyFields` already returns the four fields.
-- **Source:** Cluster B · 34 implementation (2026-05-02).
-
 ### 30 · Brainstorm + ship dungeon travel impact (incl. fog-of-war + travel animation)
 
 - **What:** Per ideas.md #3 — make travel between dungeon rooms non-instant and meaningful. Walking animation, low-% surprise encounters, passive HP changes during travel, hero chatter snippets. Folds in former Cluster B · 38 (icon-row fog-of-war + fork visualization, reframed during scoping) and former Cluster B · 39 (post-shop/event travel animation, always noted as a subset of this task).

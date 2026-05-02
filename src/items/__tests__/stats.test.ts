@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { HeroEquipment, Item } from '@data/types';
 import type { Stats } from '@combat/types';
-import { applyEquipmentStats, rarePropertyFields } from '../stats';
+import {
+  applyEquipmentStats,
+  describeRarePropertyFields,
+  rarePropertyFields,
+} from '../stats';
 
 const ZERO_STATS: Stats = { hp: 0, attack: 0, defense: 0, speed: 0, mind: 0, crit: 0, dodge: 0 };
 
@@ -95,5 +99,38 @@ describe('rarePropertyFields', () => {
   it('returns empty object when no rare properties', () => {
     const eq: HeroEquipment = { weapon: sword('w') };
     expect(rarePropertyFields(eq)).toEqual({});
+  });
+});
+
+describe('describeRarePropertyFields', () => {
+  it('returns an empty array when no fields are present', () => {
+    expect(describeRarePropertyFields({})).toEqual([]);
+  });
+
+  it('formats burningWeaponDamage as a fixed-2-turns burn line', () => {
+    expect(describeRarePropertyFields({ burningWeaponDamage: 3 })).toEqual([
+      'burns 2 turns (+3 dmg)',
+    ]);
+  });
+
+  it('formats lifesteal / thorns / regen lines individually', () => {
+    expect(describeRarePropertyFields({ lifestealPercent: 25 })).toEqual(['25% lifesteal']);
+    expect(describeRarePropertyFields({ thornsDamage: 2 })).toEqual(['2 thorns']);
+    expect(describeRarePropertyFields({ regenPerRound: 1 })).toEqual(['+1 regen/round']);
+  });
+
+  it('emits lines in fixed order (burning, lifesteal, thorns, regen) regardless of input key order', () => {
+    const fields = {
+      regenPerRound: 1,
+      thornsDamage: 2,
+      lifestealPercent: 25,
+      burningWeaponDamage: 3,
+    };
+    expect(describeRarePropertyFields(fields)).toEqual([
+      'burns 2 turns (+3 dmg)',
+      '25% lifesteal',
+      '2 thorns',
+      '+1 regen/round',
+    ]);
   });
 });

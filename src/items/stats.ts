@@ -53,3 +53,23 @@ export function rarePropertyFields(equipment: HeroEquipment): RarePropertyFields
   }
   return out;
 }
+
+// One human-readable line per active rare property. Ordering is fixed (burning,
+// lifesteal, thorns, regen) so the Barracks panel renders identically across
+// re-equip churn that might change object key order. Empty input → empty list.
+export function describeRarePropertyFields(fields: RarePropertyFields): string[] {
+  const lines: string[] = [];
+  if (fields.burningWeaponDamage !== undefined) {
+    lines.push(`burns 2 turns (+${fields.burningWeaponDamage} dmg)`);
+  }
+  if (fields.lifestealPercent !== undefined) {
+    lines.push(`${fields.lifestealPercent}% lifesteal`);
+  }
+  if (fields.thornsDamage !== undefined) {
+    lines.push(`${fields.thornsDamage} thorns`);
+  }
+  if (fields.regenPerRound !== undefined) {
+    lines.push(`+${fields.regenPerRound} regen/round`);
+  }
+  return lines;
+}
