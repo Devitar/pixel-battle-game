@@ -268,6 +268,9 @@ describe('load — normalize legacy heroes missing xp/level/pendingPerk', () => 
     expect(hero.level).toBe(1);
     expect(hero.pendingPerk).toBe(false);
     expect(hero.perkId).toBeUndefined();
+    // Cluster B · 41: legs + feet default to black sprites for legacy heroes.
+    expect(hero.legsSpriteId).toBe('3'); // SPRITE_NAMES.legs.black
+    expect(hero.feetSpriteId).toBe('4'); // SPRITE_NAMES.feet.black
   });
 });
 

@@ -1,4 +1,8 @@
-import { PLAYER_BODY_SPRITES } from '@data/body_sprites';
+import {
+  PLAYER_BODY_SPRITES,
+  PLAYER_FEET_SPRITES,
+  PLAYER_LEGS_SPRITES,
+} from '@data/body_sprites';
 import { NAMES } from '@data/names';
 import { TRAITS } from '@data/traits';
 import type { ClassId, TraitId } from '@data/types';
@@ -17,9 +21,11 @@ export function generateCandidate(
   const classId = rng.pick(unlockedClasses);
   const traitId = rng.pick(ALL_TRAIT_IDS);
   const bodySpriteId = rng.pick(PLAYER_BODY_SPRITES);
+  const legsSpriteId = rng.pick(PLAYER_LEGS_SPRITES);
+  const feetSpriteId = rng.pick(PLAYER_FEET_SPRITES);
   const name = rng.pick(NAMES);
   const id = `hero_${rng.int(100000, 999999)}`;
-  return createHero(classId, name, id, traitId, bodySpriteId);
+  return createHero(classId, name, id, traitId, bodySpriteId, legsSpriteId, feetSpriteId);
 }
 
 export function generateCandidates(
@@ -53,8 +59,10 @@ export function generateStarterRoster(rng: Rng): Hero[] {
   return classes.map((classId) => {
     const traitId = rng.pick(ALL_TRAIT_IDS);
     const bodySpriteId = rng.pick(PLAYER_BODY_SPRITES);
+    const legsSpriteId = rng.pick(PLAYER_LEGS_SPRITES);
+    const feetSpriteId = rng.pick(PLAYER_FEET_SPRITES);
     const name = rng.pick(NAMES);
     const id = `hero_${rng.int(100000, 999999)}`;
-    return createHero(classId, name, id, traitId, bodySpriteId);
+    return createHero(classId, name, id, traitId, bodySpriteId, legsSpriteId, feetSpriteId);
   });
 }

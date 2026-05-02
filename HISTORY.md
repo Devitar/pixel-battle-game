@@ -29,6 +29,19 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-02 · Cosmetic legs + feet sprite layers on heroes (Cluster B · 41)
+
+- **Why:** The paperdoll's `LAYER_ORDER` already had `legs` and `feet` slots but they never rendered — `heroToLoadout` only set body/weapon/shield/outfit/hat. Heroes looked uniformly bare-legged-and-barefoot. The TODO promised "can be cosmetic if stats are hard to balance" — pure visual variety.
+- **Decisions:**
+  - **Sidestepped the equipment system entirely.** TODO entry's "Touches" list assumed legs/feet would extend `ItemSlot` / `BASE_ITEMS` / `HeroEquipment` — that ripples to ~10 call sites (`loot.ts`, `shop.ts`, `equip_panel_scene.ts`, `barracks_equip_scene.ts`, `stats.ts`, `selectors.ts`, `upgrade.ts`, `equip_camp.ts`, plus all Hero fixtures). For a cosmetic-only feature, that's wasted surface. Stored legs+feet as plain `legsSpriteId: string` / `feetSpriteId: string` fields on `Hero`, mirroring `bodySpriteId`. Zero changes to the equipment pipeline. If the user later wants legs/feet as actual equippable items with affixes, that's a Tier-3 follow-up against the wider system; this task only delivers visual variety.
+  - **Optional positional params on `createHero`** (with `DEFAULT_LEGS_SPRITE` / `DEFAULT_FEET_SPRITE` defaults from `data/body_sprites.ts`). 112 existing `createHero(...)` call sites continue to work unchanged — they get the black defaults. Production paths (Tavern recruit + starter roster) pass real random picks. Keeping fields *required* on the `Hero` interface (with normalizer defaults for old saves) means consumers don't need `?? default` guards everywhere.
+  - **8 colors per layer, no `_large` feet variants.** The sprite catalog has 8 colors for legs and 12 frames for feet (8 colors + 4 `_large`). Skipped the `_large` variants — uniform proportions across the roster reads better than mixed sizes; the variants are still callable via `SPRITE_NAMES.feet.*_large` if a future feature wants them.
+  - **No save schema bump.** New required fields `legsSpriteId` / `feetSpriteId` on `Hero` shape. `normalizeHero` defaults to the black sprite IDs (`'3'` and `'4'`) for old saves predating this task. Legacy saves load with uniform black legs+feet; new saves get variety.
+- **Surprises:**
+  - **112 `createHero` call sites would have been a massive shape edit if I'd made the new params required positional.** Initial design had them required. After grepping (per the saved memory feedback) and finding the call-site count, switched to optional-with-defaults. Test count delta was minimal (1 fixture in `equip.test.ts` needed the two new field literals).
+  - **The two save-test legacy-hero literals** (`legacyHero` / `fakeHero` in `save.test.ts`) are JSON shapes serialized with `JSON.stringify` — TypeScript doesn't enforce shape at the literal site because they're not typed as `Hero`. They survived without modification; the legacy-hero test became the natural place to assert that the normalizer fills the new defaults.
+- **Source:** TODO.md Cluster B · 41. Test count delta: 1392 → 1394 (+2: 1 catalog-membership test in `tavern.test.ts`, 1 field-flow test in `hero_loadout.test.ts`; legacy-hero normalizer assertions added to existing `save.test.ts` test as inline expects).
+
 ### 2026-05-02 · Combat result panel shows loot drops (Cluster B · 43)
 
 - **Why:** Post-combat panel showed Victory! + gold + per-hero HP deltas, but never surfaced the items added to pack. Elite combats guarantee a Rare drop per gdd §7 — that trade-off is invisible at the moment it matters; players had to browse pack inventory later to know what dropped. Same problem for normal-combat drops and recovered fallen-hero gear.

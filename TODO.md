@@ -43,19 +43,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 - **Touches:** `src/scenes/camp_scene.ts` (softlock detection, fallback UI), possibly new `src/camp/mercenaries.ts` if going with the full design, possibly `src/run/run_state.ts` (gold-tax hook).
 - **Source:** bugs.md (2026-05-01).
 
-### 41 · Cosmetic legs/feet equipment slots
-
-- **What:** Heroes don't have `legs` or `feet` equipment slots — only weapon, shield, outfit, hat. The paperdoll renderer's `LAYER_ORDER` already includes `legs` and `feet` (rendered from the starter body sprite or starter loadout), but no items can be equipped into those slots.
-- **Why:** Closes the "promised but not delivered" cosmetic surface. User's framing: "can be cosmetic if stats are hard to balance" — i.e., add the slots without trying to add new stat affixes; just cosmetic variety. Helps heroes look distinct.
-- **Tier:** 2 (cosmetic feature)
-- **Acceptance:**
-  - Add `legs` and `feet` to `ItemSlot` and `HeroEquipment`. Add 2-4 base items per slot in `BASE_ITEMS` (e.g., `legs_cloth`, `legs_leather`, `feet_boots`, `feet_shoes`).
-  - Wire the new slots through `heroToLoadout` (paperdoll layer mapping).
-  - Items can be cosmetic-only (no stat affixes) OR ship with mild affixes — design call.
-  - Loot drops include the new slots? Optional — could ship cosmetic items as starter-only or as Tavern recruit rolls only.
-- **Touches:** `src/data/types.ts` (`ItemSlot`), `src/data/items.ts` (`BASE_ITEMS`, possibly affix rules), `src/heroes/hero.ts` (`HeroEquipment`), `src/render/hero_loadout.ts`, possibly `src/dungeon/loot.ts` if drops include them.
-- **Source:** bugs.md (2026-05-01) — borderline feature/idea framed as a bug.
-
 ### 42 · Tavern: pre-leveled hero candidates at higher cost (deferred)
 
 - **What:** Tavern hires are always level-1 fresh recruits regardless of when in the run progression you visit. User suggested higher-level pre-leveled candidates appearing at proportionally higher cost.

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { CLASSES } from '@data/classes';
-import { PLAYER_BODY_SPRITES } from '@data/body_sprites';
+import {
+  PLAYER_BODY_SPRITES,
+  PLAYER_FEET_SPRITES,
+  PLAYER_LEGS_SPRITES,
+} from '@data/body_sprites';
 import { NAMES } from '@data/names';
 import { TRAITS } from '@data/traits';
 import type { ClassId } from '@data/types';
@@ -35,6 +39,12 @@ describe('generateCandidate', () => {
   it('returns a Hero with a body sprite from PLAYER_BODY_SPRITES', () => {
     const c = generateCandidate(createRng(1), TIER1_CLASSES);
     expect(PLAYER_BODY_SPRITES).toContain(c.bodySpriteId);
+  });
+
+  it('returns a Hero with legs + feet sprites from the catalog (cosmetic variety)', () => {
+    const c = generateCandidate(createRng(1), TIER1_CLASSES);
+    expect(PLAYER_LEGS_SPRITES).toContain(c.legsSpriteId);
+    expect(PLAYER_FEET_SPRITES).toContain(c.feetSpriteId);
   });
 
   it('returns a Hero with a name from NAMES', () => {

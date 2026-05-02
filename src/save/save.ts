@@ -1,6 +1,7 @@
 import type { Roster } from '@camp/roster';
 import { createStash, type Stash } from '@camp/stash';
 import type { Vault } from '@camp/vault';
+import { DEFAULT_FEET_SPRITE, DEFAULT_LEGS_SPRITE } from '@data/body_sprites';
 import type { Unlocks } from '@data/types';
 import type { Hero } from '@heroes/hero';
 import type { RunState } from '@run/run_state';
@@ -128,5 +129,7 @@ function normalizeHero(hero: Hero): Hero {
     xp: hero.xp ?? 0,
     level: hero.level ?? 1,
     pendingPerk: hero.pendingPerk ?? false,
+    legsSpriteId: hero.legsSpriteId ?? DEFAULT_LEGS_SPRITE,
+    feetSpriteId: hero.feetSpriteId ?? DEFAULT_FEET_SPRITE,
   };
 }

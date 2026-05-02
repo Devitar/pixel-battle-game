@@ -1,3 +1,4 @@
+import { DEFAULT_FEET_SPRITE, DEFAULT_LEGS_SPRITE } from '@data/body_sprites';
 import { BASE_ITEMS, BASE_ITEM_STATS } from '@data/items';
 import { CLASSES } from '@data/classes';
 import { PERKS } from '@data/perks';
@@ -17,6 +18,8 @@ export interface Hero {
   maxHp: number;
   traitId: TraitId;
   bodySpriteId: string;
+  legsSpriteId: string;
+  feetSpriteId: string;
   wounds: Wound[];
   equipment: HeroEquipment;
   xp: number;
@@ -31,6 +34,8 @@ export function createHero(
   id: string,
   traitId: TraitId,
   bodySpriteId: string,
+  legsSpriteId: string = DEFAULT_LEGS_SPRITE,
+  feetSpriteId: string = DEFAULT_FEET_SPRITE,
 ): Hero {
   const def = CLASSES[classId];
   const equipment = buildStarterEquipment(id, def.starterLoadout);
@@ -44,6 +49,8 @@ export function createHero(
     maxHp,
     traitId,
     bodySpriteId,
+    legsSpriteId,
+    feetSpriteId,
     wounds: [],
     equipment,
     xp: 0,

@@ -22,6 +22,8 @@ const fakeHero = (overrides: Partial<Hero> = {}): Hero => ({
   maxHp: 20,
   traitId: 'stout',
   bodySpriteId: '0',
+  legsSpriteId: '0',
+  feetSpriteId: '0',
   wounds: [],
   equipment: { weapon: fake('w0', 'weapon') },
   xp: 0,

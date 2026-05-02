@@ -54,6 +54,13 @@ describe('heroToLoadout', () => {
     expect(loadout.outfit).toBe(parseInt(BASE_ITEMS.outfit_cloth.spriteId, 10));
   });
 
+  it('renders legs + feet sprites from the hero fields (cosmetic-only Cluster B · 41)', () => {
+    const hero = createHero('knight', 'K', 'h1', 'quick', '5', '273', '274');
+    const loadout = heroToLoadout(hero);
+    expect(loadout.legs).toBe(273);
+    expect(loadout.feet).toBe(274);
+  });
+
   it('placeholder spriteId "0" is treated as no-render (hat slot)', () => {
     const hat: Item = {
       id: 'h1',
