@@ -6,6 +6,7 @@ import { TRAITS } from '@data/traits';
 import type { ClassId } from '@data/types';
 import { createRng } from '@util/rng';
 import {
+  ensureCandidatesForCap,
   generateCandidate,
   generateCandidates,
   generateStarterRoster,
@@ -74,6 +75,41 @@ describe('generateCandidates', () => {
         }
       }
     }
+  });
+});
+
+describe('ensureCandidatesForCap', () => {
+  it('returns input unchanged when length matches the requested count', () => {
+    const current = generateCandidates(createRng(1), TIER1_CLASSES, 3);
+    const out = ensureCandidatesForCap(current, 3, createRng(99), TIER1_CLASSES);
+    expect(out).toBe(current);
+  });
+
+  it('regenerates when current is empty (fresh save case)', () => {
+    const out = ensureCandidatesForCap([], 3, createRng(1), TIER1_CLASSES);
+    expect(out).toHaveLength(3);
+  });
+
+  it('regenerates when current length is less than requested (post-upgrade cap grew)', () => {
+    const current = generateCandidates(createRng(1), TIER1_CLASSES, 3);
+    const out = ensureCandidatesForCap(current, 4, createRng(2), TIER1_CLASSES);
+    expect(out).toHaveLength(4);
+    expect(out).not.toBe(current);
+  });
+
+  it('regenerates when current length exceeds requested', () => {
+    const current = generateCandidates(createRng(1), TIER1_CLASSES, 5);
+    const out = ensureCandidatesForCap(current, 3, createRng(2), TIER1_CLASSES);
+    expect(out).toHaveLength(3);
+    expect(out).not.toBe(current);
+  });
+
+  it('reference equality on the no-regen path enables a !== check to detect regeneration', () => {
+    // The scene relies on `ensured !== persisted` to decide whether to persist
+    // a new state. Pinning that contract here so a future "always copy" change
+    // doesn't silently break the persistence-skip optimization.
+    const current = generateCandidates(createRng(1), TIER1_CLASSES, 3);
+    expect(ensureCandidatesForCap(current, 3, createRng(1), TIER1_CLASSES)).toBe(current);
   });
 });
 

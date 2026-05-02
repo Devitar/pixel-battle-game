@@ -34,6 +34,20 @@ export function generateCandidates(
   return candidates;
 }
 
+// Persisted-candidate gate: returns `current` unchanged when its length matches
+// the requested count (panel reopen / hire-replace path), or a freshly-rolled
+// set otherwise (empty save, or post-upgrade cap change). The "regenerate on
+// mismatch" semantics double as the explicit reset signal when Tavern upgrades.
+export function ensureCandidatesForCap(
+  current: readonly Hero[],
+  count: number,
+  rng: Rng,
+  unlockedClasses: readonly ClassId[],
+): readonly Hero[] {
+  if (current.length === count) return current;
+  return generateCandidates(rng, unlockedClasses, count);
+}
+
 export function generateStarterRoster(rng: Rng): Hero[] {
   const classes: ClassId[] = ['knight', 'archer', 'priest'];
   return classes.map((classId) => {

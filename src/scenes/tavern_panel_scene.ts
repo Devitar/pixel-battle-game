@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { nextLevel, tavernCandidateCount } from '@camp/building_levels';
 import { applyBuildingUpgrade } from '@camp/building_upgrade';
 import {
+  ensureCandidatesForCap,
   generateCandidate,
   generateCandidates,
   HIRE_COST,
@@ -60,12 +61,21 @@ export class TavernPanelScene extends Phaser.Scene {
     this.buildPanelChrome();
 
     this.rng = createRng(Date.now());
-    const tavernLevel = appState.get().buildingLevels.tavern;
-    this.candidates = generateCandidates(
+    const state = appState.get();
+    const tavernLevel = state.buildingLevels.tavern;
+    const targetCount = tavernCandidateCount(tavernLevel);
+    const persisted = state.tavernCandidates;
+    const ensured = ensureCandidatesForCap(
+      persisted,
+      targetCount,
       this.rng,
-      appState.get().unlocks.classes,
-      tavernCandidateCount(tavernLevel),
+      state.unlocks.classes,
     );
+    if (ensured !== persisted) {
+      // ensureCandidatesForCap regenerated (empty save / cap mismatch). Persist.
+      appState.update((s) => ({ ...s, tavernCandidates: ensured }));
+    }
+    this.candidates = [...ensured];
 
     const slotXs = SLOT_X_BY_COUNT[this.candidates.length as 3 | 4 | 5];
     for (let i = 0; i < this.candidates.length; i++) {
@@ -165,17 +175,20 @@ export class TavernPanelScene extends Phaser.Scene {
     const state = appState.get();
     if (balance(state.vault) < REROLL_COST) return;
 
+    const tavernLevel = state.buildingLevels.tavern;
+    const fresh = generateCandidates(
+      this.rng,
+      state.unlocks.classes,
+      tavernCandidateCount(tavernLevel),
+    );
+
     appState.update((s) => ({
       ...s,
       vault: spend(s.vault, REROLL_COST),
+      tavernCandidates: fresh,
     }));
 
-    const tavernLevel = appState.get().buildingLevels.tavern;
-    this.candidates = generateCandidates(
-      this.rng,
-      appState.get().unlocks.classes,
-      tavernCandidateCount(tavernLevel),
-    );
+    this.candidates = [...fresh];
     for (let i = 0; i < this.hireButtons.length; i++) {
       this.hireButtons[i].card.setHero(this.candidates[i]);
     }
@@ -244,17 +257,17 @@ export class TavernPanelScene extends Phaser.Scene {
     if (!canAdd(state.roster) || balance(state.vault) < HIRE_COST) return;
 
     const hired = this.candidates[slotIndex];
+    const replacement = generateCandidate(this.rng, state.unlocks.classes);
+    this.candidates[slotIndex] = replacement;
+
     appState.update((s) => ({
       ...s,
       vault: spend(s.vault, HIRE_COST),
       roster: addHero(s.roster, hired),
+      tavernCandidates: [...this.candidates],
     }));
 
-    this.candidates[slotIndex] = generateCandidate(
-      this.rng,
-      appState.get().unlocks.classes,
-    );
-    this.hireButtons[slotIndex].card.setHero(this.candidates[slotIndex]);
+    this.hireButtons[slotIndex].card.setHero(replacement);
     this.refreshButtons();
     this.refreshFooter();
   }

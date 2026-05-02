@@ -21,6 +21,7 @@ export interface SaveFile {
   unlocks: Unlocks;
   buildingLevels: BuildingLevels;
   hospitalTreatmentsRemaining: number;
+  tavernCandidates: readonly Hero[];
   runState?: RunState;
   runRngState?: number;
   preferences?: Preferences;
@@ -110,6 +111,7 @@ function normalizeSaveFile(file: SaveFile): SaveFile {
     stash: file.stash ?? createStash(),
     buildingLevels: file.buildingLevels ?? { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
     hospitalTreatmentsRemaining: file.hospitalTreatmentsRemaining ?? 1,
+    tavernCandidates: file.tavernCandidates ?? [],
     roster: {
       ...file.roster,
       heroes: file.roster.heroes.map(normalizeHero),

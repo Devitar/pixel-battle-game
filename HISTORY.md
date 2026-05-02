@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-02 · Tavern candidate persistence — closes the close+reopen reroll exploit (Cluster B · 36)
+
+- **Why:** `tavern_panel_scene.ts:62` did `createRng(Date.now())` on every `create()`, then regenerated candidates from that fresh RNG. Closing the panel was a free reroll — players could bypass the 25g reroll cost by close+reopen. Bypasses the gdd §6 reroll mechanic.
+- **Decisions:**
+  - **Persist `tavernCandidates: readonly Hero[]` on SaveFile.** Heroes are already-saveable shapes (roster heroes go through the same JSON path). Normalizer default `?? []`. No schema bump (pre-launch policy).
+  - **`ensureCandidatesForCap(current, count, rng, classes)` helper in `tavern.ts`.** Pure function, returns `current` unchanged when length matches OR a freshly-rolled set otherwise. The "regenerate on length mismatch" semantics double as the reset signal when Tavern upgrades — empty save / cap grew / cap shrank all funnel through one regen path. Kept the logic in the data layer so it's unit-testable without Phaser.
+  - **Reference equality on the no-regen path.** The scene checks `ensured !== persisted` to decide whether to call `appState.update`. Pinning this contract with a test so a future "always return a copy" refactor doesn't silently break the persistence-skip optimization (which would force a state write on every Tavern reopen — minor, but unnecessary churn through the save layer).
+  - **No special handling for upgrade.** `applyBuildingUpgrade('tavern')` doesn't touch `tavernCandidates`; the scene's `scene.restart()` runs `create()` again, which detects the cap mismatch via the helper and regenerates. Side effect: upgrading the Tavern resets the candidate set — works as a meaningful "the deal changed" UX signal without explicit coupling between the upgrade path and the candidate-management code.
+  - **Hire path: replace just the hired slot with one fresh candidate.** Was already the in-memory behavior; now also persisted. Reroll path: full regenerate, persisted as part of the same `appState.update` that spends the 25g.
+  - **RNG seed kept at `Date.now()` per panel open.** Determinism isn't the goal — the bug was that fresh RNG meant fresh candidates per reopen. With persistence, the seed only matters within one session for reroll/hire-replace operations.
+- **Surprises:**
+  - **Four test fixtures needed `tavernCandidates: []` added** (`building_upgrade.test.ts`, `boot.test.ts`, `save.test.ts`, `app_state.test.ts`). The shape-edit pattern from the `feedback_grep_tests_before_data_edits` memory I saved last task — but I forgot to grep first this time and let the typechecker catch it. Two-step fix loop instead of one. Memory lesson: writing the memory isn't the same as following it. Good signal that the next data-shape edit should start with the grep.
+  - **Adding a new required field to SaveFile triggers TS errors at every fixture, not at consumer call sites.** Useful — fixtures fail loud, consumers don't have to be re-checked. Confirms the pattern of pinning save shape via TS interface rather than runtime checks.
+- **Source:** TODO.md Cluster B · 36. Test count delta: 1387 → 1392 (+5: 5 new tests for `ensureCandidatesForCap` covering the unchanged-on-match, empty-regen, length-mismatch (both directions), and reference-equality contract cases).
+
 ### 2026-05-02 · Combat AI: futile-shuffle detection + melee-enemy fallback abilities (Cluster B · 35)
 
 - **Why:** With 3+ enemies all preferring slots [1,2] and abilities castable only from those slots, the engine entered an infinite shuffle ping-pong: slot-3 enemy defers to shuffle (per Cluster B · 26's `hasShufflableHigherPriority` deferral), engine swaps slot-3 with slot-2, next round the new slot-3 (formerly slot-2) does the same thing → swap back. Forever, no action ever taken. Real correctness bug that triggered on common Crypt comps (skeleton_warrior + ghost + zombie are all slot [1,2] melee).

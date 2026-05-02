@@ -27,18 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 36 · Tavern reroll loophole: closing + reopening produces fresh candidates
-
-- **What:** The Tavern panel uses `createRng(Date.now())` in `create()`, so every reopen of the panel rolls a fresh candidate set. The Reroll button (Cluster B · 16) costs 25g, but a player can simply close the Tavern (free) and reopen it for the same effect.
-- **Why:** Bypasses the reroll-cost mechanic that gdd §6 specifies. Real exploit, simple to fix.
-- **Tier:** 2 (bug fix)
-- **Acceptance:**
-  - Candidates persist across panel close/reopen until the player explicitly rerolls (paying the cost) or hires from the current set (which generates one replacement).
-  - Storage option: persist the current candidate set in `appState.get().tavernCandidates` (new save field with normalizer default `[]`); regenerate only when explicitly rerolled, hired-from, or empty.
-  - Tests: hire a candidate → close panel → reopen → assert remaining 2 candidates are the same. Reroll → assert all 3 are new.
-- **Touches:** `src/scenes/tavern_panel_scene.ts`, `src/save/save.ts` (new field), `src/save/__tests__/save.test.ts` (normalizer default), possibly `src/camp/buildings/tavern.ts` (helper).
-- **Source:** bugs.md (2026-05-01).
-
 ### 38 · Choice/event nodes lack distinct glyph in dungeon icon row
 
 - **What:** Choice nodes (event `❓` per gdd §4) appear as the same glyph as combat nodes in the dungeon scene's icon row, making it hard for the player to anticipate node types ahead.
