@@ -10,15 +10,13 @@ import {
   generateCandidates,
   generateStarterRoster,
   HIRE_COST,
-  TAVERN_CANDIDATE_COUNT,
 } from '../tavern';
 
 const TIER1_CLASSES: ClassId[] = ['knight', 'archer', 'priest'];
 
-describe('HIRE_COST and TAVERN_CANDIDATE_COUNT', () => {
-  it('exports the expected constants', () => {
+describe('HIRE_COST', () => {
+  it('exports the expected constant', () => {
     expect(HIRE_COST).toBe(50);
-    expect(TAVERN_CANDIDATE_COUNT).toBe(3);
   });
 });
 
@@ -51,20 +49,20 @@ describe('generateCandidate', () => {
 });
 
 describe('generateCandidates', () => {
-  it('returns exactly TAVERN_CANDIDATE_COUNT heroes', () => {
-    const list = generateCandidates(createRng(1), TIER1_CLASSES);
-    expect(list).toHaveLength(TAVERN_CANDIDATE_COUNT);
+  it('returns exactly the requested count of heroes', () => {
+    const list = generateCandidates(createRng(1), TIER1_CLASSES, 3);
+    expect(list).toHaveLength(3);
   });
 
   it('is deterministic per seed', () => {
-    const a = generateCandidates(createRng(7), TIER1_CLASSES);
-    const b = generateCandidates(createRng(7), TIER1_CLASSES);
+    const a = generateCandidates(createRng(7), TIER1_CLASSES, 3);
+    const b = generateCandidates(createRng(7), TIER1_CLASSES, 3);
     expect(a).toEqual(b);
   });
 
   it('maxHp matches trait HP effect for stout / frail / others', () => {
     for (let seed = 1; seed <= 50; seed++) {
-      const list = generateCandidates(createRng(seed), TIER1_CLASSES);
+      const list = generateCandidates(createRng(seed), TIER1_CLASSES, 3);
       for (const h of list) {
         const classBase = CLASSES[h.classId].baseStats.hp;
         if (h.traitId === 'stout') {

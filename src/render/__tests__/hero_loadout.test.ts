@@ -34,9 +34,9 @@ describe('heroToLoadout', () => {
     expect(loadout.hat).toBeUndefined();
   });
 
-  it('placeholder spriteId "0" is treated as no-render (outfit slot)', () => {
-    // outfit_cloth currently has spriteId '0' per Cluster C · 2 placeholder.
-    // The guard in heroToLoadout should skip the layer rather than render frame 0.
+  it('outfit slot renders the equipped item\'s wired-up spriteId', () => {
+    // outfit_cloth was wired up in Cluster B · 31 to clotharmor_tan1.
+    // Guards against accidentally regressing spriteId back to '0'.
     const outfit: Item = {
       id: 'o1',
       baseId: 'outfit_cloth',
@@ -51,7 +51,7 @@ describe('heroToLoadout', () => {
       equipment: { ...knight.equipment, outfit },
     };
     const loadout = heroToLoadout(knightWithOutfit);
-    expect(loadout.outfit).toBeUndefined();
+    expect(loadout.outfit).toBe(parseInt(BASE_ITEMS.outfit_cloth.spriteId, 10));
   });
 
   it('placeholder spriteId "0" is treated as no-render (hat slot)', () => {

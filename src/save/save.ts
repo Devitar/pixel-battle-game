@@ -9,12 +9,17 @@ import { CURRENT_SCHEMA_VERSION, migrate } from './migration';
 export { CURRENT_SCHEMA_VERSION } from './migration';
 export const STORAGE_KEY = 'pixel-battle-game/save';
 
+export type BuildingId = 'tavern' | 'barracks' | 'blacksmith' | 'hospital';
+export type BuildingLevel = 1 | 2 | 3;
+export type BuildingLevels = Record<BuildingId, BuildingLevel>;
+
 export interface SaveFile {
   version: number;
   roster: Roster;
   vault: Vault;
   stash: Stash;
   unlocks: Unlocks;
+  buildingLevels: BuildingLevels;
   runState?: RunState;
   runRngState?: number;
   preferences?: Preferences;
@@ -102,6 +107,7 @@ function normalizeSaveFile(file: SaveFile): SaveFile {
   return {
     ...file,
     stash: file.stash ?? createStash(),
+    buildingLevels: file.buildingLevels ?? { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
     roster: {
       ...file.roster,
       heroes: file.roster.heroes.map(normalizeHero),

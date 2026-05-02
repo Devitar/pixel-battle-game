@@ -1,5 +1,8 @@
 import * as Phaser from 'phaser';
+import { nextLevel } from '@camp/building_levels';
+import { applyBuildingUpgrade } from '@camp/building_upgrade';
 import { listHeroes, removeHero } from '@camp/roster';
+import { balance } from '@camp/vault';
 import { ABILITIES } from '@data/abilities';
 import { describeAbility } from '@data/ability_describe';
 import { CLASSES } from '@data/classes';
@@ -35,11 +38,28 @@ const DETAIL_PANE_H = 360;
 
 const SLOT_X_LEFT = 150;
 const SLOT_X_RIGHT = 340;
-const SLOT_Y_BASE = 120;
-const SLOT_STRIDE = 60;
 const SLOT_BG_W = 184;
 const SLOT_BG_H = 60;
-const ROSTER_CAP_DISPLAY = 12;
+
+// Slot stride is computed per-level so the 2-column grid always fits inside
+// LIST_PANE_H = 360 (y=90..450, with first slot center at SLOT_Y_TOP=120 and
+// last slot center at SLOT_Y_BOTTOM=420 — preserves the original L1 layout).
+//
+// At L1 (cap=12 → 6 rows) stride is 60 — cards do not overlap.
+// At L2 (cap=16 → 8 rows) stride is ~43 — cards overlap by ~17px.
+// At L3 (cap=20 → 10 rows) stride is ~33 — cards overlap by ~27px.
+//
+// The paperdoll is on the left and the text column on the right, so name
+// lines stay readable; trait/HP-bar text bleeds into the next row's name at
+// L2/L3. Tradeoff accepted in spec §7 (L1 stays clean; L2/L3 crowded but
+// functional). Future polish: option (iii) scrollable list pane.
+const SLOT_Y_TOP = 120;     // first slot center
+const SLOT_Y_BOTTOM = 420;  // last slot center (matches original L1 bottom row)
+function slotStride(cap: number): number {
+  const rows = Math.ceil(cap / 2);
+  if (rows <= 1) return 0;
+  return (SLOT_Y_BOTTOM - SLOT_Y_TOP) / (rows - 1);
+}
 
 const DETAIL_PAPERDOLL_X = 540;
 const DETAIL_PAPERDOLL_Y = 145;
@@ -70,6 +90,7 @@ export class BarracksPanelScene extends Phaser.Scene {
 
     this.buildOverlayAndPanel();
     this.buildCloseButton();
+    this.buildUpgradeButton();
 
     const heroes = listHeroes(appState.get().roster);
     const cap = appState.get().roster.capacity;
@@ -106,6 +127,53 @@ export class BarracksPanelScene extends Phaser.Scene {
       .setOrigin(0.5);
   }
 
+  private buildUpgradeButton(): void {
+    const level = appState.get().buildingLevels.barracks;
+    const next = nextLevel('barracks', level);
+    if (next === null) return; // Already at max — no button rendered.
+
+    const gold = balance(appState.get().vault);
+    const canAfford = gold >= next.upgradeCost;
+
+    // Top-left of the panel header strip (above the list pane). The panel
+    // header band runs from y=40 (panel top) to y=90 (list pane top); the
+    // close button at (933, 63) sits in the top-right, so the upgrade button
+    // anchors top-left to mirror it. The 160-wide button + 10px subtitle
+    // below stay above the list pane (y=90) and don't intrude on the title
+    // text centered at (480, 60).
+    const x = 160;
+    const y = 55;
+    const bgColor = canAfford ? 0x2a4a2a : 0x333333;
+    const strokeColor = canAfford ? 0x44cc44 : 0x555555;
+    const labelColor = canAfford ? '#ffffff' : '#777777';
+
+    const bg = this.add
+      .rectangle(x, y, 160, 24, bgColor)
+      .setStrokeStyle(2, strokeColor);
+    this.add
+      .text(x, y, `Upgrade · ${next.upgradeCost}g`, {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: labelColor,
+      })
+      .setOrigin(0.5);
+    this.add
+      .text(x, y + 20, `→ ${next.unlockDescription}`, {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#aaaaaa',
+      })
+      .setOrigin(0.5);
+
+    if (canAfford) {
+      bg.setInteractive({ useHandCursor: true });
+      bg.on('pointerdown', () => {
+        appState.update((s) => applyBuildingUpgrade(s, 'barracks'));
+        this.scene.restart();
+      });
+    }
+  }
+
   private buildCloseButton(): void {
     const closeBg = this.add
       .rectangle(933, 63, 28, 28, 0x553333)
@@ -126,23 +194,28 @@ export class BarracksPanelScene extends Phaser.Scene {
       .rectangle(LIST_PANE_CX, LIST_PANE_CY, LIST_PANE_W, LIST_PANE_H, 0x1a1a1a)
       .setStrokeStyle(1, 0x444444);
 
-    for (let i = 0; i < ROSTER_CAP_DISPLAY; i++) {
+    const cap = appState.get().roster.capacity;
+    const stride = slotStride(cap);
+    // Scale slot bg height to the stride so click targets and empty-slot
+    // strokes don't overlap at L2/L3. L1 keeps SLOT_BG_H = 60 exactly.
+    const slotBgH = stride < SLOT_BG_H ? stride - 2 : SLOT_BG_H;
+    for (let i = 0; i < cap; i++) {
       const col = i % 2;
       const row = Math.floor(i / 2);
       const x = col === 0 ? SLOT_X_LEFT : SLOT_X_RIGHT;
-      const y = SLOT_Y_BASE + row * SLOT_STRIDE;
+      const y = SLOT_Y_TOP + row * stride;
 
       if (i < heroes.length) {
-        this.buildFilledSlot(heroes[i], x, y);
+        this.buildFilledSlot(heroes[i], x, y, slotBgH);
       } else {
-        this.buildEmptySlot(x, y);
+        this.buildEmptySlot(x, y, slotBgH);
       }
     }
   }
 
-  private buildFilledSlot(hero: Hero, x: number, y: number): void {
+  private buildFilledSlot(hero: Hero, x: number, y: number, slotBgH: number): void {
     const bg = this.add
-      .rectangle(x, y, SLOT_BG_W, SLOT_BG_H, 0x000000, 0)
+      .rectangle(x, y, SLOT_BG_W, slotBgH, 0x000000, 0)
       .setStrokeStyle(2, 0xffcc66, 0);
     const card = new HeroCard(this, x, y, hero, { size: 'small' });
     bg.setInteractive({ useHandCursor: true });
@@ -150,9 +223,9 @@ export class BarracksPanelScene extends Phaser.Scene {
     this.rosterCards.push({ bg, card, hero });
   }
 
-  private buildEmptySlot(x: number, y: number): void {
+  private buildEmptySlot(x: number, y: number, slotBgH: number): void {
     this.add
-      .rectangle(x, y, 180, 56, 0x1a1a1a)
+      .rectangle(x, y, 180, slotBgH - 4, 0x1a1a1a)
       .setStrokeStyle(1, 0x333333);
     this.add
       .text(x, y, 'empty', {

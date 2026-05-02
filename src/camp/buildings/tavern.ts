@@ -7,7 +7,6 @@ import type { Rng } from '@util/rng';
 
 export const HIRE_COST = 50;
 export const REROLL_COST = 25;
-export const TAVERN_CANDIDATE_COUNT = 3;
 
 const ALL_TRAIT_IDS = Object.keys(TRAITS) as TraitId[];
 
@@ -26,9 +25,10 @@ export function generateCandidate(
 export function generateCandidates(
   rng: Rng,
   unlockedClasses: readonly ClassId[],
+  count: number,
 ): Hero[] {
   const candidates: Hero[] = [];
-  for (let i = 0; i < TAVERN_CANDIDATE_COUNT; i++) {
+  for (let i = 0; i < count; i++) {
     candidates.push(generateCandidate(rng, unlockedClasses));
   }
   return candidates;
