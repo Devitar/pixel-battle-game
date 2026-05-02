@@ -1,4 +1,6 @@
 import * as Phaser from 'phaser';
+import { nextLevel } from '@camp/building_levels';
+import { applyBuildingUpgrade } from '@camp/building_upgrade';
 import { listHeroes, updateHero } from '@camp/roster';
 import { addItems, removeItem } from '@camp/stash';
 import { balance, spend } from '@camp/vault';
@@ -6,7 +8,7 @@ import { BASE_ITEMS } from '@data/items';
 import type { Item, ItemSlot, Rarity } from '@data/types';
 import { equip } from '@items/equip';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
-import { canUpgrade, nextRarity, upgradeCost, upgradeItem } from '@items/upgrade';
+import { canBlacksmithUpgrade, nextRarity, upgradeCost, upgradeItem } from '@items/upgrade';
 import { createRng } from '@util/rng';
 import { appState } from './app_state';
 
@@ -70,6 +72,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
 
     this.buildOverlayAndPanel();
     this.buildCloseButton();
+    this.buildUpgradeButton();
     this.buildListPaneBackground();
     this.buildDetailPaneBackground();
     this.listContainer = this.add.container(0, 0);
@@ -118,6 +121,49 @@ export class BlacksmithPanelScene extends Phaser.Scene {
       .setOrigin(0.5);
     closeBg.setInteractive({ useHandCursor: true });
     closeBg.on('pointerdown', () => this.close());
+  }
+
+  private buildUpgradeButton(): void {
+    const level = appState.get().buildingLevels.blacksmith;
+    const next = nextLevel('blacksmith', level);
+    if (next === null) return;
+
+    const gold = balance(appState.get().vault);
+    const canAfford = gold >= next.upgradeCost;
+
+    // Mirrors barracks_panel_scene.ts placement: top-left of header strip,
+    // close button at (933, 63) is the right-side anchor.
+    const x = 160;
+    const y = 55;
+    const bgColor = canAfford ? 0x2a4a2a : 0x333333;
+    const strokeColor = canAfford ? 0x44cc44 : 0x555555;
+    const labelColor = canAfford ? '#ffffff' : '#777777';
+
+    const bg = this.add
+      .rectangle(x, y, 160, 24, bgColor)
+      .setStrokeStyle(2, strokeColor);
+    this.add
+      .text(x, y, `Upgrade · ${next.upgradeCost}g`, {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: labelColor,
+      })
+      .setOrigin(0.5);
+    this.add
+      .text(x, y + 20, `→ ${next.unlockDescription}`, {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#aaaaaa',
+      })
+      .setOrigin(0.5);
+
+    if (canAfford) {
+      bg.setInteractive({ useHandCursor: true });
+      bg.on('pointerdown', () => {
+        appState.update((s) => applyBuildingUpgrade(s, 'blacksmith'));
+        this.scene.restart();
+      });
+    }
   }
 
   private buildListPaneBackground(): void {
@@ -177,11 +223,12 @@ export class BlacksmithPanelScene extends Phaser.Scene {
 
   private collectUpgradeable(): UpgradeEntry[] {
     const state = appState.get();
+    const blacksmithLevel = state.buildingLevels.blacksmith;
     const entries: UpgradeEntry[] = [];
 
     // Stash first.
     for (const item of state.stash.items) {
-      if (canUpgrade(item)) {
+      if (canBlacksmithUpgrade(item, blacksmithLevel)) {
         entries.push({ item, location: { kind: 'stash' } });
       }
     }
@@ -190,7 +237,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
     for (const hero of listHeroes(state.roster)) {
       for (const slot of slots) {
         const item = hero.equipment[slot];
-        if (item && canUpgrade(item)) {
+        if (item && canBlacksmithUpgrade(item, blacksmithLevel)) {
           entries.push({
             item,
             location: { kind: 'equipped', heroId: hero.id, slot },

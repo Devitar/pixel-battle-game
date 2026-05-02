@@ -4,6 +4,7 @@ import type { AffixId, Item } from '@data/types';
 import { rollAffixValue } from '@dungeon/loot';
 import { createRng } from '@util/rng';
 import {
+  canBlacksmithUpgrade,
   canUpgrade,
   nextRarity,
   upgradeCost,
@@ -79,6 +80,24 @@ describe('canUpgrade', () => {
     expect(canUpgrade(commonSwordAtFloor(5))).toBe(true);
     expect(canUpgrade(uncommonSwordWithPower(5))).toBe(true);
     expect(canUpgrade(rareWeapon(5))).toBe(false);
+  });
+});
+
+describe('canBlacksmithUpgrade', () => {
+  it('L1 allows common→uncommon only', () => {
+    expect(canBlacksmithUpgrade(commonSwordAtFloor(5), 1)).toBe(true);
+    expect(canBlacksmithUpgrade(uncommonSwordWithPower(5), 1)).toBe(false);
+    expect(canBlacksmithUpgrade(rareWeapon(5), 1)).toBe(false);
+  });
+
+  it('L2 allows common→uncommon AND uncommon→rare', () => {
+    expect(canBlacksmithUpgrade(commonSwordAtFloor(5), 2)).toBe(true);
+    expect(canBlacksmithUpgrade(uncommonSwordWithPower(5), 2)).toBe(true);
+    expect(canBlacksmithUpgrade(rareWeapon(5), 2)).toBe(false);
+  });
+
+  it('rare items remain unupgradeable at L3 (epic rarity not yet shipped)', () => {
+    expect(canBlacksmithUpgrade(rareWeapon(5), 3)).toBe(false);
   });
 });
 

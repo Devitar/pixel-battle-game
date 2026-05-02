@@ -60,9 +60,24 @@ describe('applyBuildingUpgrade', () => {
     expect(() => applyBuildingUpgrade(broke, 'tavern')).toThrow();
   });
 
-  it('Blacksmith / Hospital L1 → null: throws', () => {
+  it('Blacksmith L1 → L2: deducts 200g, bumps level, leaves roster capacity alone', () => {
+    const before = makeBaseState();
+    const after = applyBuildingUpgrade(before, 'blacksmith');
+    expect(after.buildingLevels.blacksmith).toBe(2);
+    expect(after.vault.gold).toBe(800);
+    expect(after.roster.capacity).toBe(12);
+  });
+
+  it('Blacksmith L2 throws (L3 waits on epic rarity)', () => {
+    const at_l2: SaveFile = {
+      ...makeBaseState(),
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 2, hospital: 1 },
+    };
+    expect(() => applyBuildingUpgrade(at_l2, 'blacksmith')).toThrow(/already at max/);
+  });
+
+  it('Hospital L1 → null: throws', () => {
     const state = makeBaseState();
-    expect(() => applyBuildingUpgrade(state, 'blacksmith')).toThrow(/already at max/);
     expect(() => applyBuildingUpgrade(state, 'hospital')).toThrow(/already at max/);
   });
 

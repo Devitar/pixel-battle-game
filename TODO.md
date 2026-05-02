@@ -27,20 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 32 · Blacksmith level gating (29b)
-
-- **What:** Phase 2 of the building-levels decomposition (29a shipped Tavern + Barracks). Add L2 to Blacksmith. L1 (already shipped) only allows common→uncommon upgrades. L2 unlocks +uncommon→rare. The L3 +rare→epic gate is doubly out of scope until the epic rarity itself ships (separate Tier-3 task).
-- **Why:** gdd §6 Blacksmith row. Today `nextRarity` allows common→uncommon AND uncommon→rare without any gate at the data layer; the level system needs to introduce the L1-only gate to make L2 a meaningful unlock.
-- **Tier:** 2
-- **Acceptance:**
-  - Add L2 entry to `BUILDING_LEVELS.blacksmith` in `src/camp/building_levels.ts` (cost 200g, `unlockDescription: 'Common → Rare'`).
-  - In `src/scenes/blacksmith_panel_scene.ts`, gate uncommon→rare upgrade rows on `appState.get().buildingLevels.blacksmith >= 2`. Hide or disable+tooltip the upgrade row at L1.
-  - Add Upgrade button to the Blacksmith panel (mirrors the Tavern + Barracks pattern from 29a).
-  - `applyBuildingUpgrade` already supports the `'blacksmith'` branch — no helper change needed.
-  - Tests: at L1, only common items show upgradeable (target=uncommon); at L2, both common AND uncommon items show upgradeable.
-- **Touches:** `src/camp/building_levels.ts` (add L2 entry), `src/scenes/blacksmith_panel_scene.ts`, possibly `src/items/upgrade.ts` (if the gate logic lives there vs. in the scene).
-- **Source:** gdd §6 (Blacksmith row), Cluster B · 29 decomposition (2026-05-01).
-
 ### 33 · Hospital level effects (29c)
 
 - **What:** Phase 3 of the building-levels decomposition. Define what Hospital L2/L3 actually do. Current Hospital UX is unconstrained (treat any number of wounds at 40g each). Gdd row promises "L1: 1 wound/run cheap / L2: 2 / L3: 3 + faster time-heal" but the implementation has no per-visit cap and no time-heal at all — the level effects need a real design pass before implementation.

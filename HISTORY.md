@@ -29,6 +29,18 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-02 · Blacksmith level gating, L2 added (Cluster B · 32 / 29b)
+
+- **Why:** Phase 2 of the 29a/b/c building-levels decomposition. L1 already shipped (common→uncommon only at the data layer was the *intent*, but `nextRarity` always allowed uncommon→rare too — the gate didn't exist). Adds the L2 unlock at 200g and enforces the L1 gate.
+- **Decisions:**
+  - **Gate predicate lives in `items/upgrade.ts`, not the scene.** Added `canBlacksmithUpgrade(item, blacksmithLevel)` alongside the existing `canUpgrade(item)`. Two predicates with distinct meanings: `canUpgrade` answers "is this rarity progressible at all" (rarity-only); `canBlacksmithUpgrade` answers "can the player's blacksmith level act on this right now." Pure-function gate is unit-testable; the scene becomes a thin caller.
+  - **Hide ungrantable rows at L1 instead of showing disabled+tooltip.** Reasons: (1) the panel's title says "N upgradeable" — showing rows that aren't would contradict the count; (2) no tooltip infrastructure exists in the codebase (per deferred-tooltip TODO #44); (3) the new Upgrade button's "→ Common → Rare" subtitle communicates the L2 unlock without needing per-row disabled states. List semantics stay clean.
+  - **Upgrade button placement copies Barracks exactly** (x=160, y=55, 160×24 button + subtitle below). Same panel header geometry; reusing the proven coords avoids new layout fiddling.
+  - **No L3 entry.** The `rare→epic` upgrade gate is doubly blocked: epic rarity itself doesn't exist yet (Tier 3 work). Comment in `building_levels.ts` notes this.
+- **Surprises:**
+  - **Two existing tests had assertions tied to the old "blacksmith has no L2" state** — `building_levels.test.ts` ("Blacksmith / Hospital L1 → null") and `building_upgrade.test.ts` ("Blacksmith / Hospital L1 → null: throws"). Both flipped to assert the new behavior (blacksmith L1→L2 returns/applies, L2→null throws). Same pattern as Cluster B · 31's "test asserted the bug we just fixed" surprise — third occurrence in two weeks. Worth treating "grep tests for symbol I'm changing the meaning of" as a reflex pre-edit step.
+- **Source:** TODO.md Cluster B · 32. Test count delta: 1347 → 1354 (+7: 4 new in `canBlacksmithUpgrade` describe block, 2 new + 1 split-into-two for blacksmith level coverage in upgrade/levels suites).
+
 ### 2026-05-02 · Equipment-applied stats in Barracks + HeroCard (Cluster B · 34)
 
 - **Why:** Two display sites (`barracks_panel_scene.ts:309` and `hero_card.ts:135` large variant) read `hero.baseStats.{attack,defense,speed}` directly, so equipping a shield (or any +ATK/+DEF/+SPD affix) didn't visibly change the stat line. Players couldn't see equip impact.

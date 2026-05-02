@@ -18,8 +18,9 @@ export const BUILDING_LEVELS: Record<BuildingId, readonly BuildingLevelDef[]> = 
     { level: 3, upgradeCost: 500, unlockDescription: '20 hero slots' },
   ],
   blacksmith: [
-    { level: 1, upgradeCost: 0, unlockDescription: 'Common → Uncommon' },
-    // L2 / L3 added when 29b lands.
+    { level: 1, upgradeCost: 0,   unlockDescription: 'Common → Uncommon' },
+    { level: 2, upgradeCost: 200, unlockDescription: 'Common → Rare' },
+    // L3 (rare → epic) waits on the epic rarity itself shipping.
   ],
   hospital: [
     { level: 1, upgradeCost: 0, unlockDescription: 'Treat one wound at a time' },

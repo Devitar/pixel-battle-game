@@ -41,8 +41,17 @@ describe('nextLevel', () => {
     expect(nextLevel('barracks', 3)).toBeNull();
   });
 
-  it('Blacksmith / Hospital L1 → null (only L1 defined this phase)', () => {
-    expect(nextLevel('blacksmith', 1)).toBeNull();
+  it('Blacksmith L1 → L2 def (Common→Rare unlock at 200g)', () => {
+    expect(nextLevel('blacksmith', 1)?.level).toBe(2);
+    expect(nextLevel('blacksmith', 1)?.upgradeCost).toBe(200);
+    expect(nextLevel('blacksmith', 1)?.unlockDescription).toBe('Common → Rare');
+  });
+
+  it('Blacksmith L2 → null (L3 waits on epic rarity)', () => {
+    expect(nextLevel('blacksmith', 2)).toBeNull();
+  });
+
+  it('Hospital L1 → null (only L1 defined this phase)', () => {
     expect(nextLevel('hospital', 1)).toBeNull();
   });
 });
