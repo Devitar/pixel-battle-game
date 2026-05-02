@@ -39,54 +39,33 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 - **Touches:** `src/camp/buildings/tavern.ts` (candidate generation), `src/scenes/tavern_panel_scene.ts` (cost display per candidate), possibly `src/camp/building_levels.ts` (Tavern L4).
 - **Source:** bugs.md (2026-05-01) — feature suggestion bundled with the Tavern reroll bug (split during scoping).
 
-### 44 · No wound-effect tooltip in run (combat / dungeon HUD)
+### 30 · Dungeon gameplay redesign (travel impact + fog-of-war + loot rooms + linear variance)
 
-- **What:** Heroes with wounds show `🩸 N` badges per Cluster B · 15, but the per-wound effect (e.g., "Winded: -2 Attack") isn't visible during a run. Player has to remember from Barracks or wait until camp to see what each wound does.
-- **Why:** Visibility gap explicitly deferred in Cluster B · 15 ("defer if the combat scene doesn't support hover") and Cluster B · 13 (same defer for enemy modifier tooltips). Now surfaced as a real bug — players can't make informed decisions when they don't know what their wounds are doing.
-- **Tier:** 2 (visibility)
+- **What:** A coherent rework of the dungeon-scale player experience, decomposing into many sub-tasks. Combines:
+  - Travel impact (ideas.md #3) — non-instant travel between rooms, walking animation, surprise encounters, passive HP changes, hero chatter.
+  - Icon-row fog-of-war + fork visualization (former Cluster B · 38) — today `playerPath` lies about topology and reveals all future content.
+  - Travel animation between non-combat nodes (former Cluster B · 39).
+  - Loot rooms + linear-node variance (former Cluster B · 46) — new treasure node type, reduced combat loot rate, mixed-type linear preamble nodes.
+- **Why:** Today the dungeon scene is essentially a hub between combat/shop/event screens — almost all of the play experience IS the combat scene. Each sub-area on its own is a feature pitch; together they're a single coherent "what is dungeon gameplay" pass. Designing them separately would force re-coordination at each sub-task (e.g., a treasure node type needs an icon-row glyph; the icon-row fog-of-war design needs to know what node types exist; travel animation needs to know about node types and surprise-encounters). One brainstorm pass produces a unified plan; sub-tasks ship independently.
+- **Tier:** 2 polish (scope-dependent; could touch Tier 3 if surprise-encounter system or treasure rooms grow).
 - **Acceptance:**
-  - Hovering / tapping the wound badge in the combat HUD or dungeon party row shows the wound-effect summary (one line per wound: name + `describeWoundEffect`).
-  - **Needs brainstorming** to decide: build hover infrastructure for combat actors (mentioned as future-work in B · 13/15), OR ship a tap-to-toggle approach that sidesteps hover state.
-  - Same treatment optionally extended to enemy modifier badges (B · 13) since both deferred tooltips for the same reason; landing both together amortizes the hover/tap infrastructure cost.
-- **Touches:** `src/render/combat_actor.ts` (badge interactivity), `src/scenes/combat_scene.ts`, `src/scenes/dungeon_scene.ts` (party row).
-- **Source:** bugs.md (2026-05-01); related to deferred tooltips in Cluster B · 13 + 15.
-
-### 46 · Loot rooms + linear-node variance (floor-gen redesign)
-
-- **What:** Three related floor-generator changes:
-  1. Add **loot rooms** (chests) as a 6th fork-branch type. Lower-value loot than elite drops; no combat. Tier-scaled like elite/normal loot.
-  2. **Reduce normal enemy combat loot rate** — combat still drops loot occasionally (vs. today's 50% per fight) but rarely enough that loot rooms feel meaningful as the primary loot source on non-elite/boss floors.
-  3. **Linear (non-fork) nodes get variance**, weighted toward combat (~70–80% combat, balance distributed across shop / event / camp / loot). Today linear nodes are always combat; this preserves the combat-first feel while breaking the mechanical uniformity of preamble nodes.
-- **Why:** Promoted from ideas.md #1 (2026-05-01). Adds meaningful choice density at forks (elite = high risk + rare drop vs. treasure = no risk + lower-tier drop) and breaks the "preamble nodes are all the same fight" feel of today's floors. Trade-off: combat feels less rewarding moment-to-moment (rarer drops), but is offset by treasure rooms providing a predictable loot path.
-- **Tier:** 2 (touches existing Tier-2 systems: node types, loot, floor gen — but large scope; could shift to Tier 3)
-- **Acceptance:**
-  - **Needs decomposition during brainstorming.** Likely sub-tasks:
-    - **Data layer:** new `'treasure'` Node variant in `src/dungeon/node.ts`. `rollLoot` extended with a `'treasure'` kind (single drop, ~uncommon-or-rare weighted, scaled by floor depth like elite drops).
-    - **Floor gen — fork shapes:** extend the fork-shape RNG from 10 shapes (5 branch types × C(5,2)) to 15 (6 branch types × C(6,2)). Define which pairings are valid (e.g., is treasure-vs-treasure allowed? probably not — same logic as why combat-vs-combat got eliminated).
-    - **Floor gen — linear-node variance:** per non-fork node, weighted random draw with combat at high probability (~70–80%) and the 5 alternatives at low. Tunable in `src/dungeon/floor.ts`.
-    - **Combat loot rate:** drop the per-combat loot-roll RNG from 50% to a value (~20%?) chosen during brainstorming. Tune in `src/dungeon/loot.ts`.
-    - **Treasure room UI:** auto-open on arrival + a brief result panel (similar shape to TODO #43's post-combat loot panel) showing the rolled item, auto-added to pack. No new interactive "open / leave" UI — avoids click complexity.
-    - **Visual:** treasure room icon for the dungeon-scene icon row (companion to TODO #38's glyph-distinction work).
-  - Manual verification: Crypt run shows mixed node types in linear preamble; forks include treasure-room options; treasure rooms drop loot and add to pack; combat loot drops are noticeably rarer.
-- **Touches:** `src/dungeon/node.ts` (Node variant), `src/dungeon/floor.ts` (fork shapes + linear variance), `src/dungeon/loot.ts` (treasure roll + reduce combat rate), `src/scenes/dungeon_scene.ts` (icon glyph + treasure arrival handler), possibly new `src/scenes/treasure_room_overlay_scene.ts` (or inline). No save schema change expected.
-- **Source:** ideas.md #1 (2026-05-01).
-
-### 30 · Brainstorm + ship dungeon travel impact (incl. fog-of-war + travel animation)
-
-- **What:** Per ideas.md #3 — make travel between dungeon rooms non-instant and meaningful. Walking animation, low-% surprise encounters, passive HP changes during travel, hero chatter snippets. Folds in former Cluster B · 38 (icon-row fog-of-war + fork visualization, reframed during scoping) and former Cluster B · 39 (post-shop/event travel animation, always noted as a subset of this task).
-- **Why:** Today the dungeon scene is essentially a hub between combat/shop/event screens — almost all of the play experience IS the combat scene. Adding travel beats spreads the play surface, opens room for charm and personality, and gives the dungeon its own atmosphere distinct from combat. Two known correctness bugs in the current icon-row visualization (silent branch-picking at forks, full future-content reveal) belong in the same redesign rather than as point fixes that would be revisited.
-- **Tier:** 2 polish (scope-dependent; could touch Tier 3 if surprise-encounter system is broad).
-- **Acceptance:**
-  - **Needs brainstorming first** — the idea is a paragraph in `ideas.md #3`; design pass should decompose into discrete sub-tasks. Likely sub-tasks:
+  - **Needs brainstorming first** — the unified pass should decompose into discrete sub-tasks shippable individually. Likely sub-tasks:
     - **Icon-row fog-of-war** (from #38): today `playerPath` (run_state.ts:380) returns a single linear path even at forks, defaulting to branch 0 — the icon row LIES about topology. Plus all future node types are revealed up-front. Decision needed: hide future entirely (strict A), show topology with `?` content (B), or strict + boss-anchored (C); icon row stays 1D vs. visualizes branches. Touches `dungeon_scene.ts:155-185` (`buildNodes`) and `dungeon_scene.ts:669-685` (`refreshNodeColors`).
-    - **Fork-picker glyph fix** (discovered while scoping #38): `dungeon_scene.ts:457` has its own glyph map that's `boss/shop` only and falls through to `'⚔'` for elite/camp/event branches — fork branches of those types render as crossed swords. Trivial fix; folded here to ship with the broader rework rather than as an isolated edit.
+    - **Fork-picker glyph fix** (discovered while scoping #38): `dungeon_scene.ts:457` has its own glyph map that's `boss/shop` only and falls through to `'⚔'` for elite/camp/event branches — fork branches of those types render as crossed swords. Trivial fix; folded here to ship with the broader rework.
     - **Travel animation** (from #39): leaving shop/event nodes (and combat → next-node) currently snaps to next state instantly. Heroes should bob/sway between current and next node icon; player can fast-forward.
     - **Travel-time pacing** (scene state machine): non-zero transition delay; player can fast-forward.
+    - **Loot rooms (treasure node)** (from #46): new `'treasure'` Node variant in `src/dungeon/node.ts`. `rollLoot` extended with a `'treasure'` kind (single drop, ~uncommon-or-rare weighted, scaled by floor depth like elite drops). Auto-open on arrival + brief result panel (similar shape to TODO #43's post-combat loot panel) showing the rolled item, auto-added to pack. No new interactive "open / leave" UI — avoids click complexity.
+    - **Floor gen — fork shapes** (from #46): extend fork-shape RNG from 10 shapes (5 branch types × C(5,2)) to 15 (6 branch types × C(6,2)). Define which pairings are valid (e.g., is treasure-vs-treasure allowed?).
+    - **Floor gen — linear-node variance** (from #46): per non-fork node, weighted random draw with combat at high probability (~70–80%) and the 5 alternatives at low. Tunable in `src/dungeon/floor.ts`. Today linear nodes are always combat.
+    - **Combat loot rate** (from #46): drop the per-combat loot-roll RNG from 50% to a value (~20%?) so treasure rooms feel meaningful as the primary loot source on non-elite/boss floors. Tune in `src/dungeon/loot.ts`.
+    - **Treasure-room icon glyph**: companion to fog-of-war work; the new node type needs a glyph.
     - **Surprise-encounter mechanic** (RNG + node-injection logic): low-% per quarter-step, draws from combat / merchant / event pools.
     - **Passive HP changes**: per-step heal/damage modeled on hero condition (wounds, statuses).
     - **Hero chatter**: text snippets + display widget. Could be its own task.
   - Some sub-tasks likely warrant their own brainstorms (especially surprise-encounter mechanic — what's the encounter pool? how do node graphs handle injected nodes? — and the fog-of-war A/B/C decision).
-- **Touches:** `src/scenes/dungeon_scene.ts`, `src/run/run_state.ts` (`playerPath` may need a fork-aware variant), `src/dungeon/*` (encounter draws), `src/data/events.ts` (potentially), new chatter data module.
+  - Manual verification (overall): Crypt run shows mixed node types in linear preamble; forks include treasure-room options; treasure rooms drop loot and add to pack; combat loot drops are noticeably rarer; player can't see future node types beyond the next; travel between nodes feels acknowledged.
+- **Touches:** `src/scenes/dungeon_scene.ts`, `src/run/run_state.ts` (`playerPath` may need a fork-aware variant), `src/dungeon/node.ts` (Node variant), `src/dungeon/floor.ts` (fork shapes + linear variance), `src/dungeon/loot.ts` (treasure roll + reduce combat rate), `src/data/events.ts` (potentially), new chatter data module, possibly new `src/scenes/treasure_room_overlay_scene.ts` (or inline). No save schema change expected.
+- **Source:** ideas.md #1 + #3, plus folded-in former Cluster B · 38 (icon-row fog-of-war), · 39 (travel animation), · 46 (loot rooms + linear variance). User-directed merge 2026-05-02 — rolling #46 into #30 because both touch dungeon-scale gameplay and would force re-coordination if shipped separately.
 - **Source:** ideas.md #3, plus folded-in former Cluster B · 38 (2026-05-02 scoping discovered the entry's described bug was stale; actual bug is fork visualization + fog-of-war) and former Cluster B · 39 (travel animation, subset).
 
 ---

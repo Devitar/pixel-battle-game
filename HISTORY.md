@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-02 · Tap-to-toggle tooltips for wound badges + enemy modifiers (Cluster B · 44)
+
+- **Why:** Wound `🩸 N` badges and enemy modifier text (Armored/Venomous/Enraged) showed only counts/names with no detail. Player couldn't see "Winded: -2 Attack" or "Armored: +2 Defense" without checking Barracks / out-of-band documentation. Closed the deferred-tooltip gap from Cluster B · 13 (enemy modifiers) and B · 15 (wound badges) — both deferred in their original tasks pending the hover-vs-tap decision.
+- **Decisions:**
+  - **Tap-to-toggle, not hover.** Picked tap (`pointerdown` toggle) over hover (`pointerover`/`pointerout`) or hybrid. Reasons: works on every device (desktop click + mobile touch use the same event), no platform branching, no double-handler bug class. Phaser already runs with `Phaser.Scale.FIT` for mobile, so the tap path is a real concern. If desktop UX feels stiff later, hover is a non-breaking addition.
+  - **Per-element tooltip ownership, not a global manager.** Each tooltip-bearing element (CombatActor, HeroCard) tracks its own `tooltip?: Container` field. Tap toggles: if exists → destroy + clear; else → create. Avoids global pointer-down listeners or tap-elsewhere-to-dismiss complexity. Two tooltips can be open at once (e.g., wound on one card + modifier on an enemy) — that's fine; player taps each off explicitly.
+  - **Tooltip is a child of the trigger's parent container, not scene-level.** Lifecycle follows the parent: `setHero` (HeroCard rebuild) and combat scene shutdown destroy the tooltip automatically via the existing `removeAll(true)` / scene shutdown paths. No manual cleanup in the destroy hooks.
+  - **`createTooltip` builder in `src/ui/tooltip.ts`.** Pure builder — takes scene, parent, anchor, lines, returns a Container. Caller owns the destroy. Auto-sizes width to longest line + 8px padding. Floats 6px above the anchor so it doesn't cover the badge being inspected.
+  - **`describeModifierEffect` mirrors `describeWoundEffect` style.** Lives in `src/data/modifiers.ts` next to `MODIFIERS`. Three cases (statDelta, venomous_on_hit, enraged_threshold) each get a hand-written format string. Same pattern as wounds — type-safe switch over the discriminated union.
+  - **Cluster B · 13's enemy-modifier tooltip landed in the same task.** TODO #44's acceptance explicitly noted "amortizes the hover/tap infrastructure cost." One shared utility, three trigger sites, all closed at once.
+- **Surprises:**
+  - **Phaser containers don't clip children.** Tooltip rendering above its parent container (e.g., HeroCard at top edge of the panel) extends visibly past the parent's nominal bounds. No clipping issues; tooltip just draws on top of whatever's below it. Saves a "promote to scene-level" refactor that the parent-child lifecycle pattern relies on.
+  - **`describeModifierEffect` had no prior coverage in `modifiers.test.ts`.** Three new tests added (one per modifier kind). Easier to land here than as a follow-up — the helper was created in this task and the test file had a clear extension point next to the existing MODIFIERS table tests.
+- **Source:** TODO.md Cluster B · 44. Test count delta: 1411 → 1414 (+3 new tests for `describeModifierEffect`; tooltip itself is a Phaser builder with no unit-test surface, verified by typecheck + manual play).
+
 ### 2026-05-02 · Pawnshop — sell stash gear at the Blacksmith for gold (Cluster B · 48)
 
 - **Why:** Stash items had no liquidation path — the only item→gold conversion was implicit pack-banking on cashout. Adds a real economic lever (dump stash overflow → vault gold) and incidentally closes the deep-softlock case (player can sell a stash rare for 80g → recruit at Tavern). Spun out of the #40 design discussion when the mercenary system was rejected in favor of lighter alternatives; the pawnshop emerged as the value-add direction (real feature) vs. the safety-net direction (free hire + Reset Camp).
