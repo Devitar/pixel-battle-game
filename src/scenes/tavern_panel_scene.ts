@@ -1,4 +1,6 @@
 import * as Phaser from 'phaser';
+import { nextLevel, tavernCandidateCount } from '@camp/building_levels';
+import { applyBuildingUpgrade } from '@camp/building_upgrade';
 import {
   generateCandidate,
   generateCandidates,
@@ -19,7 +21,20 @@ interface HireButton {
   card: HeroCard;
 }
 
-const SLOT_X = [170, 480, 790] as const;
+// Per-candidate-count slot positions. Tavern uses HeroCard `small` (180px wide).
+// Each row is symmetric around the panel center (x=480) so the layout stays
+// balanced as the tavern upgrades from L1 (3 candidates) to L3 (5 candidates).
+//
+// L3 (5 candidates) is the tightest: 180px center spacing means cards touch
+// edge-to-edge across the 920px panel (cards span 30-210, 210-390, 390-570,
+// 570-750, 750-930). Future polish: shrink HeroCard or wrap to two rows for
+// more breathing room — current spec only requires "N candidates show", not
+// pixel-perfect spacing.
+const SLOT_X_BY_COUNT: Record<3 | 4 | 5, readonly number[]> = {
+  3: [170, 480, 790],
+  4: [195, 385, 575, 765],
+  5: [120, 300, 480, 660, 840],
+};
 const SLOT_CARD_Y = 230;
 const HIRE_BTN_Y = 320;
 const REASON_Y = 345;
@@ -45,11 +60,20 @@ export class TavernPanelScene extends Phaser.Scene {
     this.buildPanelChrome();
 
     this.rng = createRng(Date.now());
-    this.candidates = generateCandidates(this.rng, appState.get().unlocks.classes);
+    const tavernLevel = appState.get().buildingLevels.tavern;
+    this.candidates = generateCandidates(
+      this.rng,
+      appState.get().unlocks.classes,
+      tavernCandidateCount(tavernLevel),
+    );
 
-    SLOT_X.forEach((x, i) => this.buildSlot(i, x));
+    const slotXs = SLOT_X_BY_COUNT[this.candidates.length as 3 | 4 | 5];
+    for (let i = 0; i < this.candidates.length; i++) {
+      this.buildSlot(i, slotXs[i]);
+    }
     this.buildFooter();
     this.buildRerollButton();
+    this.buildUpgradeButton();
 
     this.refreshButtons();
     this.refreshFooter();
@@ -75,8 +99,14 @@ export class TavernPanelScene extends Phaser.Scene {
   }
 
   private buildSlot(index: number, x: number): void {
+    // `small` variant (180px wide) is required to fit up to 5 cards across the
+    // 920px panel at tavern L3. Earlier `large` (280px) only fit 3 candidates;
+    // it still showed full stats + trait text, but that doesn't scale. Small
+    // shows trait shortDescription instead of the full description — the
+    // tradeoff matches Barracks/Hospital/Expeditions which all use small for
+    // multi-card grids.
     const card = new HeroCard(this, x, SLOT_CARD_Y, this.candidates[index], {
-      size: 'large',
+      size: 'small',
     });
 
     const bg = this.add
@@ -140,12 +170,58 @@ export class TavernPanelScene extends Phaser.Scene {
       vault: spend(s.vault, REROLL_COST),
     }));
 
-    this.candidates = generateCandidates(this.rng, appState.get().unlocks.classes);
+    const tavernLevel = appState.get().buildingLevels.tavern;
+    this.candidates = generateCandidates(
+      this.rng,
+      appState.get().unlocks.classes,
+      tavernCandidateCount(tavernLevel),
+    );
     for (let i = 0; i < this.hireButtons.length; i++) {
       this.hireButtons[i].card.setHero(this.candidates[i]);
     }
     this.refreshButtons();
     this.refreshFooter();
+  }
+
+  private buildUpgradeButton(): void {
+    const level = appState.get().buildingLevels.tavern;
+    const next = nextLevel('tavern', level);
+    if (next === null) return; // Already at max — no button rendered.
+
+    const gold = balance(appState.get().vault);
+    const canAfford = gold >= next.upgradeCost;
+
+    const x = 160;
+    const y = 113;
+    const bgColor = canAfford ? 0x2a4a2a : 0x333333;
+    const strokeColor = canAfford ? 0x44cc44 : 0x555555;
+    const labelColor = canAfford ? '#ffffff' : '#777777';
+
+    const bg = this.add
+      .rectangle(x, y, 160, 28, bgColor)
+      .setStrokeStyle(2, strokeColor);
+    this.add
+      .text(x, y, `Upgrade · ${next.upgradeCost}g`, {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: labelColor,
+      })
+      .setOrigin(0.5);
+    this.add
+      .text(x, y + 22, `→ ${next.unlockDescription}`, {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#aaaaaa',
+      })
+      .setOrigin(0.5);
+
+    if (canAfford) {
+      bg.setInteractive({ useHandCursor: true });
+      bg.on('pointerdown', () => {
+        appState.update((s) => applyBuildingUpgrade(s, 'tavern'));
+        this.scene.restart();
+      });
+    }
   }
 
   private buildCloseButton(): void {

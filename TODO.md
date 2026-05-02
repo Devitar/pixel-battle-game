@@ -27,21 +27,34 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 29 · Building level upgrades
+### 32 · Blacksmith level gating (29b)
 
-- **What:** Add L2/L3 progression for the camp buildings per gdd §6's table. Tavern: L1=3 candidates, L2=4, L3=5 + better trait odds. Barracks: L1=12 slots, L2=16, L3=20. Blacksmith: L1=common→uncommon, L2=+uncommon→rare, L3=+rare→epic (epic-tier itself is a separate Tier-3 unlock). Hospital: L1=1 wound/run cheap, L2=2, L3=3 + faster time-heal.
-- **Why:** Today every building is conceptually L1; gdd §6 promises a meta-progression ladder that the gold economy is missing. Closes a real gold-sink gap (currently nothing to spend banked vault gold on past mid-game beyond Tavern hires + Hospital + Blacksmith upgrades). Each level upgrade is a meaningful long-term decision target.
+- **What:** Phase 2 of the building-levels decomposition (29a shipped Tavern + Barracks). Add L2 to Blacksmith. L1 (already shipped) only allows common→uncommon upgrades. L2 unlocks +uncommon→rare. The L3 +rare→epic gate is doubly out of scope until the epic rarity itself ships (separate Tier-3 task).
+- **Why:** gdd §6 Blacksmith row. Today `nextRarity` allows common→uncommon AND uncommon→rare without any gate at the data layer; the level system needs to introduce the L1-only gate to make L2 a meaningful unlock.
 - **Tier:** 2
 - **Acceptance:**
-  - Each building has a `level: 1 | 2 | 3` field in save state. Save schema bump + migration path (default missing → 1).
-  - Camp scene shows an "Upgrade" affordance per building — cost, what unlocks, disabled when at max level or insufficient gold.
-  - **Tavern L2/L3:** show 4/5 candidates per visit. Trait-odds tuning is a separate sub-task (or defer — base impl ships level-based candidate counts only).
-  - **Barracks L2/L3:** roster cap 16/20. Slot grid scales (current 2-column × 6-row → 2×8 → 2×10). Verify Barracks panel layout still fits 460×220 detail pane and 380×360 list pane at 20 slots.
-  - **Blacksmith L2/L3:** L1 only allows common→uncommon. L2 unlocks +uncommon→rare. L3 unlocks +rare→epic (epic rarity is itself a separate task — defer this sub-bullet until epic exists).
-  - **Hospital L2/L3:** treat 2/3 wounds per visit (current UX treats one at a time; L2/L3 either changes the picker to multi-select or just removes the one-per-visit cap).
-  - Single tunables file (likely `src/camp/building_levels.ts`) holds upgrade costs + unlock metadata.
-- **Touches:** `src/camp/buildings/*`, `src/scenes/camp_scene.ts`, `src/scenes/tavern_panel_scene.ts`, `src/scenes/barracks_panel_scene.ts`, `src/scenes/hospital_panel_scene.ts`, `src/scenes/blacksmith_panel_scene.ts`, `src/save/*`, new `src/camp/building_levels.ts`.
-- **Source:** gdd §6 (per-building upgrade column).
+  - Add L2 entry to `BUILDING_LEVELS.blacksmith` in `src/camp/building_levels.ts` (cost 200g, `unlockDescription: 'Common → Rare'`).
+  - In `src/scenes/blacksmith_panel_scene.ts`, gate uncommon→rare upgrade rows on `appState.get().buildingLevels.blacksmith >= 2`. Hide or disable+tooltip the upgrade row at L1.
+  - Add Upgrade button to the Blacksmith panel (mirrors the Tavern + Barracks pattern from 29a).
+  - `applyBuildingUpgrade` already supports the `'blacksmith'` branch — no helper change needed.
+  - Tests: at L1, only common items show upgradeable (target=uncommon); at L2, both common AND uncommon items show upgradeable.
+- **Touches:** `src/camp/building_levels.ts` (add L2 entry), `src/scenes/blacksmith_panel_scene.ts`, possibly `src/items/upgrade.ts` (if the gate logic lives there vs. in the scene).
+- **Source:** gdd §6 (Blacksmith row), Cluster B · 29 decomposition (2026-05-01).
+
+### 33 · Hospital level effects (29c)
+
+- **What:** Phase 3 of the building-levels decomposition. Define what Hospital L2/L3 actually do. Current Hospital UX is unconstrained (treat any number of wounds at 40g each). Gdd row promises "L1: 1 wound/run cheap / L2: 2 / L3: 3 + faster time-heal" but the implementation has no per-visit cap and no time-heal at all — the level effects need a real design pass before implementation.
+- **Why:** gdd §6 Hospital row. Decomposed away from 29a/29b because the gdd row doesn't cleanly map to current code without an interpretive call; forcing the answer mid-build would have shipped a not-quite-right feature.
+- **Tier:** 2 (could shift if scope grows)
+- **Acceptance:**
+  - **Needs brainstorming first** to define the L1/L2/L3 effect model. Possible interpretations:
+    - L1 = 1 free treatment per camp visit, L2 = 2, L3 = 3 + 1 wound auto-heals per run-end.
+    - L1 = cheap (40g), L2 = cheaper (30g), L3 = cheapest (20g) + faster time-heal.
+    - L1 = current unconstrained behavior, L2/L3 = unlock multi-treat or healing-over-runs.
+  - After design: add L2/L3 entries to `BUILDING_LEVELS.hospital`, wire the level-effect logic into `hospital_panel_scene.ts` and/or wound-tick logic.
+  - Add Upgrade button to the Hospital panel (mirrors the Tavern + Barracks pattern from 29a).
+- **Touches:** `src/camp/building_levels.ts` (add L2/L3 entries), `src/scenes/hospital_panel_scene.ts`, possibly `src/camp/roster.ts` (`tickRosterWounds` for time-heal), possibly `src/data/wounds.ts` (cost variations).
+- **Source:** gdd §6 (Hospital row), Cluster B · 29 decomposition (2026-05-01).
 
 ### 30 · Brainstorm + ship dungeon travel impact
 

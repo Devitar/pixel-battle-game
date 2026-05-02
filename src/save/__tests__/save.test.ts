@@ -30,6 +30,7 @@ function makeBaseSave(): SaveFile {
     vault: credit(createVault(), 100),
     stash: createStash(),
     unlocks: createDefaultUnlocks(),
+    buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
   };
 }
 
@@ -200,6 +201,26 @@ describe('stash persistence', () => {
     storage.setItem(STORAGE_KEY, JSON.stringify(stale));
     const loaded = load(storage);
     expect(loaded?.stash).toEqual({ items: [] });
+  });
+});
+
+describe('load — buildingLevels normalizer', () => {
+  it('fills in default buildingLevels for old saves missing the field', () => {
+    const storage = new MemoryStorage();
+    // Construct an old-shape save without buildingLevels, written directly to storage.
+    const oldShape = {
+      version: 1,
+      roster: createRoster(),
+      vault: createVault(),
+      stash: createStash(),
+      unlocks: createDefaultUnlocks(),
+      // no buildingLevels field
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(oldShape));
+    const loaded = load(storage);
+    expect(loaded?.buildingLevels).toEqual({
+      tavern: 1, barracks: 1, blacksmith: 1, hospital: 1,
+    });
   });
 });
 
