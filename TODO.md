@@ -56,6 +56,154 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 - **Touches:** `src/camp/building_levels.ts` (add L2/L3 entries), `src/scenes/hospital_panel_scene.ts`, possibly `src/camp/roster.ts` (`tickRosterWounds` for time-heal), possibly `src/data/wounds.ts` (cost variations).
 - **Source:** gdd §6 (Hospital row), Cluster B · 29 decomposition (2026-05-01).
 
+### 34 · Shields don't grant DEF in Barracks display
+
+- **What:** Equipping a shield in Barracks shows the same DEF stat as before — the equipment bonus isn't reflected in the Barracks detail pane stat line. Verified in `src/scenes/barracks_panel_scene.ts:309` which reads `hero.baseStats.defense` directly instead of equipment-applied stats.
+- **Why:** Real bug. Players can't see the impact of equipping a shield (or any +DEF affix), undermining the equip decision. Same likely affects ATK/SPD/etc. for any equipment with stat affixes.
+- **Tier:** 2 (bug fix)
+- **Acceptance:**
+  - Barracks detail pane stat line displays equipment-applied stats, not raw `baseStats`. Use `applyEquipmentStats(hero.baseStats, hero.equipment)` (already exists in `@items/stats`) to derive the displayed values.
+  - Verify the same issue isn't present in HeroCard rendering (`src/ui/hero_card.ts`); if so, fix there too.
+  - Manual verify: Knight with `shield_basic` (+1 DEF per `BASE_ITEM_STATS`) shows `DEF 5` (= 4 base + 1 shield), not `DEF 4`.
+- **Touches:** `src/scenes/barracks_panel_scene.ts:309`, possibly `src/ui/hero_card.ts`.
+- **Source:** bugs.md (2026-05-01) — verified at scoping time.
+
+### 35 · Combat AI: enemies with 3+ melee swap forever instead of attacking
+
+- **What:** When an encounter spawns 3 or more melee-preferred enemies (slot [1,2] preference), the back-row enemies repeatedly shuffle toward the front instead of taking actions — because only 2 front-row slots exist but 3+ enemies want them.
+- **Why:** Combat-engine behavior bug. The shuffle-toward-preferred rule (Cluster B · 26, shipped 2026-05-01) handles "wrong slot" by triggering shuffle, but doesn't account for "preferred slot is already occupied by an ally that's not moving." Enemies stuck at slot 3+ with `[1,2]`-only abilities loop forever.
+- **Tier:** 2 (bug fix)
+- **Acceptance:**
+  - Enemy at slot 3+ with `canCastFrom [1,2]` abilities: if both slots 1 and 2 are occupied by allies who are NOT shuffling, the enemy should fall back to its basic attack (or the highest castable from current slot) rather than perpetually shuffling.
+  - Fix likely lives in `src/combat/ability_priority.ts` (the `hasShufflableHigherPriority` rule from B · 26): add a check that the destination slot is actually reachable (i.e., shuffling would change the slot, not be a no-op because the ally there isn't moving either).
+  - Test: 3v3 fight with 3 melee enemies (skeleton_warrior + ghost + zombie all slot [1,2] preferred) — round 1 should show the back enemy take an action, not just shuffle.
+- **Touches:** `src/combat/ability_priority.ts`, possibly `src/combat/positions.ts` (shuffle no-op detection), tests in `src/combat/__tests__/`.
+- **Source:** bugs.md (2026-05-01).
+
+### 36 · Tavern reroll loophole: closing + reopening produces fresh candidates
+
+- **What:** The Tavern panel uses `createRng(Date.now())` in `create()`, so every reopen of the panel rolls a fresh candidate set. The Reroll button (Cluster B · 16) costs 25g, but a player can simply close the Tavern (free) and reopen it for the same effect.
+- **Why:** Bypasses the reroll-cost mechanic that gdd §6 specifies. Real exploit, simple to fix.
+- **Tier:** 2 (bug fix)
+- **Acceptance:**
+  - Candidates persist across panel close/reopen until the player explicitly rerolls (paying the cost) or hires from the current set (which generates one replacement).
+  - Storage option: persist the current candidate set in `appState.get().tavernCandidates` (new save field with normalizer default `[]`); regenerate only when explicitly rerolled, hired-from, or empty.
+  - Tests: hire a candidate → close panel → reopen → assert remaining 2 candidates are the same. Reroll → assert all 3 are new.
+- **Touches:** `src/scenes/tavern_panel_scene.ts`, `src/save/save.ts` (new field), `src/save/__tests__/save.test.ts` (normalizer default), possibly `src/camp/buildings/tavern.ts` (helper).
+- **Source:** bugs.md (2026-05-01).
+
+### 38 · Choice/event nodes lack distinct glyph in dungeon icon row
+
+- **What:** Choice nodes (event `❓` per gdd §4) appear as the same glyph as combat nodes in the dungeon scene's icon row, making it hard for the player to anticipate node types ahead.
+- **Why:** Visibility bug. Cluster B · 10 shipped distinct elite glyph (`💀`); the same treatment is owed to event/choice nodes (and possibly camp `🏕️`, shop `🛒`).
+- **Tier:** 2 (bug fix)
+- **Acceptance:**
+  - Verify the current glyph mapping in `src/scenes/dungeon_scene.ts` (search for the elite-glyph code added in B · 10).
+  - Add distinct glyphs for all node types per gdd §4: event `❓`, camp `🏕️`, shop `🛒` (plus existing combat `⚔️`, elite `💀`, boss).
+  - Maintain the future-state vs. past-state vs. current-state color tier from B · 10.
+- **Touches:** `src/scenes/dungeon_scene.ts` (the icon-row rendering function).
+- **Source:** bugs.md (2026-05-01).
+
+### 39 · No travel animation between shop/event nodes and next encounter
+
+- **What:** Leaving a shop or event node instantly starts the next encounter — no walking-between-nodes beat. Player has no acknowledgment of "moving" through the dungeon.
+- **Why:** UX bug. Subset of Cluster B · 30 (dungeon travel impact), but a smaller-scoped fix: just add a transition animation/delay when leaving non-combat nodes. Could ship before #30's larger redesign lands.
+- **Tier:** 2 (bug fix / UX polish)
+- **Acceptance:**
+  - When leaving a shop or event node, the dungeon scene plays a short walking transition (heroes bob right toward the next node icon) before the next encounter begins.
+  - Player can fast-forward the transition.
+  - Same treatment applied to combat → next-node transitions for consistency, OR scoped to just shop/event for a minimal fix.
+  - Decision in brainstorming: ship as a standalone fix or roll into Cluster B · 30 (the bigger dungeon-travel redesign). They're related but separable.
+- **Touches:** `src/scenes/dungeon_scene.ts`.
+- **Source:** bugs.md (2026-05-01). Related: Cluster B · 30, ideas.md #3.
+
+### 40 · Save can hard-lock: no money + insufficient roster + no fallback
+
+- **What:** If a player has < 50g (Tavern hire cost) AND fewer than 3 surviving heroes (run minimum), they can't recruit and can't expedition — save is dead-locked. No fallback mechanic exists.
+- **Why:** Genuine softlock. The user's own proposal: a "mercenary" system where empty roster slots can be filled with mercenaries (free) who take half the gold earned and keep all items they pick up. That keeps the player able to grind out gold while in this state.
+- **Tier:** 2 (gameplay safety net)
+- **Acceptance:**
+  - **Needs brainstorming first** to design the mercenary mechanic. Open questions:
+    - Mercenaries are temporary? Persistent until explicitly retired?
+    - Keep gear they're equipped with at run-end, or transfer to stash?
+    - Half-gold tax: applied at cashout, or at gold-pickup time?
+    - What stats / class? Generic "mercenary" archetype, or rolled like Tavern hires but free?
+  - Simpler fallback option (defer mercenary): add a "Reset Camp" button when the softlock state is detected, with an explicit "You have nothing to play with — reset your save?" prompt.
+  - Implementation depends on the design call.
+- **Touches:** `src/scenes/camp_scene.ts` (softlock detection, fallback UI), possibly new `src/camp/mercenaries.ts` if going with the full design, possibly `src/run/run_state.ts` (gold-tax hook).
+- **Source:** bugs.md (2026-05-01).
+
+### 41 · Cosmetic legs/feet equipment slots
+
+- **What:** Heroes don't have `legs` or `feet` equipment slots — only weapon, shield, outfit, hat. The paperdoll renderer's `LAYER_ORDER` already includes `legs` and `feet` (rendered from the starter body sprite or starter loadout), but no items can be equipped into those slots.
+- **Why:** Closes the "promised but not delivered" cosmetic surface. User's framing: "can be cosmetic if stats are hard to balance" — i.e., add the slots without trying to add new stat affixes; just cosmetic variety. Helps heroes look distinct.
+- **Tier:** 2 (cosmetic feature)
+- **Acceptance:**
+  - Add `legs` and `feet` to `ItemSlot` and `HeroEquipment`. Add 2-4 base items per slot in `BASE_ITEMS` (e.g., `legs_cloth`, `legs_leather`, `feet_boots`, `feet_shoes`).
+  - Wire the new slots through `heroToLoadout` (paperdoll layer mapping).
+  - Items can be cosmetic-only (no stat affixes) OR ship with mild affixes — design call.
+  - Loot drops include the new slots? Optional — could ship cosmetic items as starter-only or as Tavern recruit rolls only.
+- **Touches:** `src/data/types.ts` (`ItemSlot`), `src/data/items.ts` (`BASE_ITEMS`, possibly affix rules), `src/heroes/hero.ts` (`HeroEquipment`), `src/render/hero_loadout.ts`, possibly `src/dungeon/loot.ts` if drops include them.
+- **Source:** bugs.md (2026-05-01) — borderline feature/idea framed as a bug.
+
+### 42 · Tavern: pre-leveled hero candidates at higher cost (deferred)
+
+- **What:** Tavern hires are always level-1 fresh recruits regardless of when in the run progression you visit. User suggested higher-level pre-leveled candidates appearing at proportionally higher cost.
+- **Why:** Late-game Tavern hires are weak compared to surviving roster heroes; the pre-leveled-at-cost mechanic gives late-game players a meaningful Tavern decision. Not gdd-promised; pure feature suggestion.
+- **Tier:** 3 (post-launch / Tier 3 feature)
+- **Acceptance:**
+  - **Needs brainstorming first** to define the level-rolling and cost-scaling rules.
+  - Possible model: 10% chance per Tavern visit of a level-N candidate where N scales with player progression; cost = `HIRE_COST × N`.
+  - Or: separate "Veteran Tavern" L4 building unlock that always rolls level-N candidates.
+- **Touches:** `src/camp/buildings/tavern.ts` (candidate generation), `src/scenes/tavern_panel_scene.ts` (cost display per candidate), possibly `src/camp/building_levels.ts` (Tavern L4).
+- **Source:** bugs.md (2026-05-01) — feature suggestion bundled with the Tavern reroll bug (split during scoping).
+
+### 43 · Combat results don't show loot drops
+
+- **What:** Post-combat results panel doesn't show what gear/items dropped. Per gdd §7 + Cluster A · 10 HISTORY, elite combats guarantee a Rare drop and normal combats can drop loot too — but the player learns about acquired loot only indirectly (by browsing pack inventory later). Elite drops in particular feel "missed" because the visible result is just "Victory!"
+- **Why:** Real visibility bug. The whole point of an elite's "guaranteed Rare drop" trade-off is that players see the reward; without surfacing it, the asymmetric value of elite vs. combat nodes is invisible at the moment it matters.
+- **Tier:** 2 (bug fix / visibility)
+- **Acceptance:**
+  - Post-combat results panel includes a "Loot:" section listing items added to pack from this fight: name, rarity-colored, with affixes per project convention.
+  - Elite drops surface explicitly (always at least one Rare).
+  - Normal combat drops also surface when the loot-roll RNG fires (`src/dungeon/loot.ts`).
+  - Empty case: if no loot dropped (e.g., the combat-loot RNG missed), "Loot: —" or omit the section.
+  - Possibly also surface gold + XP gain in the same panel for parity (might already exist; verify).
+- **Touches:** `src/scenes/dungeon_scene.ts` (where `processCombatReturn` calls `buildResultPanel`), the post-combat panel render code.
+- **Source:** bugs.md (2026-05-01).
+
+### 44 · No wound-effect tooltip in run (combat / dungeon HUD)
+
+- **What:** Heroes with wounds show `🩸 N` badges per Cluster B · 15, but the per-wound effect (e.g., "Winded: -2 Attack") isn't visible during a run. Player has to remember from Barracks or wait until camp to see what each wound does.
+- **Why:** Visibility gap explicitly deferred in Cluster B · 15 ("defer if the combat scene doesn't support hover") and Cluster B · 13 (same defer for enemy modifier tooltips). Now surfaced as a real bug — players can't make informed decisions when they don't know what their wounds are doing.
+- **Tier:** 2 (visibility)
+- **Acceptance:**
+  - Hovering / tapping the wound badge in the combat HUD or dungeon party row shows the wound-effect summary (one line per wound: name + `describeWoundEffect`).
+  - **Needs brainstorming** to decide: build hover infrastructure for combat actors (mentioned as future-work in B · 13/15), OR ship a tap-to-toggle approach that sidesteps hover state.
+  - Same treatment optionally extended to enemy modifier badges (B · 13) since both deferred tooltips for the same reason; landing both together amortizes the hover/tap infrastructure cost.
+- **Touches:** `src/render/combat_actor.ts` (badge interactivity), `src/scenes/combat_scene.ts`, `src/scenes/dungeon_scene.ts` (party row).
+- **Source:** bugs.md (2026-05-01); related to deferred tooltips in Cluster B · 13 + 15.
+
+### 46 · Loot rooms + linear-node variance (floor-gen redesign)
+
+- **What:** Three related floor-generator changes:
+  1. Add **loot rooms** (chests) as a 6th fork-branch type. Lower-value loot than elite drops; no combat. Tier-scaled like elite/normal loot.
+  2. **Reduce normal enemy combat loot rate** — combat still drops loot occasionally (vs. today's 50% per fight) but rarely enough that loot rooms feel meaningful as the primary loot source on non-elite/boss floors.
+  3. **Linear (non-fork) nodes get variance**, weighted toward combat (~70–80% combat, balance distributed across shop / event / camp / loot). Today linear nodes are always combat; this preserves the combat-first feel while breaking the mechanical uniformity of preamble nodes.
+- **Why:** Promoted from ideas.md #1 (2026-05-01). Adds meaningful choice density at forks (elite = high risk + rare drop vs. treasure = no risk + lower-tier drop) and breaks the "preamble nodes are all the same fight" feel of today's floors. Trade-off: combat feels less rewarding moment-to-moment (rarer drops), but is offset by treasure rooms providing a predictable loot path.
+- **Tier:** 2 (touches existing Tier-2 systems: node types, loot, floor gen — but large scope; could shift to Tier 3)
+- **Acceptance:**
+  - **Needs decomposition during brainstorming.** Likely sub-tasks:
+    - **Data layer:** new `'treasure'` Node variant in `src/dungeon/node.ts`. `rollLoot` extended with a `'treasure'` kind (single drop, ~uncommon-or-rare weighted, scaled by floor depth like elite drops).
+    - **Floor gen — fork shapes:** extend the fork-shape RNG from 10 shapes (5 branch types × C(5,2)) to 15 (6 branch types × C(6,2)). Define which pairings are valid (e.g., is treasure-vs-treasure allowed? probably not — same logic as why combat-vs-combat got eliminated).
+    - **Floor gen — linear-node variance:** per non-fork node, weighted random draw with combat at high probability (~70–80%) and the 5 alternatives at low. Tunable in `src/dungeon/floor.ts`.
+    - **Combat loot rate:** drop the per-combat loot-roll RNG from 50% to a value (~20%?) chosen during brainstorming. Tune in `src/dungeon/loot.ts`.
+    - **Treasure room UI:** auto-open on arrival + a brief result panel (similar shape to TODO #43's post-combat loot panel) showing the rolled item, auto-added to pack. No new interactive "open / leave" UI — avoids click complexity.
+    - **Visual:** treasure room icon for the dungeon-scene icon row (companion to TODO #38's glyph-distinction work).
+  - Manual verification: Crypt run shows mixed node types in linear preamble; forks include treasure-room options; treasure rooms drop loot and add to pack; combat loot drops are noticeably rarer.
+- **Touches:** `src/dungeon/node.ts` (Node variant), `src/dungeon/floor.ts` (fork shapes + linear variance), `src/dungeon/loot.ts` (treasure roll + reduce combat rate), `src/scenes/dungeon_scene.ts` (icon glyph + treasure arrival handler), possibly new `src/scenes/treasure_room_overlay_scene.ts` (or inline). No save schema change expected.
+- **Source:** ideas.md #1 (2026-05-01).
+
 ### 30 · Brainstorm + ship dungeon travel impact
 
 - **What:** Per ideas.md #3 — make travel between dungeon rooms non-instant and meaningful. Walking animation (heroes bob between nodes), a low-% chance of surprise encounters (combat/event/merchant) every quarter-step, passive HP changes during travel (heal if healthy, take damage if wounded/sick), hero chatter snippets for charm.

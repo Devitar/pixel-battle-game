@@ -19,6 +19,8 @@ One section per idea. A sentence is fine for seeds; a paragraph or two for more 
 
 <!-- Add ideas below this line. Newest at the top. -->
 
+### The branches in a dungeon should be visually shown, not just have one solid line. Two branching paths with two "?" or something on them. 
+
 ### 1. Archer same-family weapon flexibility
 
 - **Pitch:** Archer's preferred is bow (only ranged weapon). With the gear-modifies-abilities rule landing as 3 families (melee/ranged/magic), Archer has no same-family alternative — they only ever hit "preferred" or "wholly wrong" bands. Other classes get a secondary playstyle via swap; Archer doesn't.

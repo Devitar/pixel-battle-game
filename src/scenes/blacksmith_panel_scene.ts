@@ -70,10 +70,10 @@ export class BlacksmithPanelScene extends Phaser.Scene {
 
     this.buildOverlayAndPanel();
     this.buildCloseButton();
-    this.listContainer = this.add.container(0, 0);
-    this.detailContainer = this.add.container(0, 0);
     this.buildListPaneBackground();
     this.buildDetailPaneBackground();
+    this.listContainer = this.add.container(0, 0);
+    this.detailContainer = this.add.container(0, 0);
 
     this.rebuild();
 
