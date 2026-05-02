@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { CLASSES } from '@data/classes';
 import { TRAITS } from '@data/traits';
 import type { Hero } from '@heroes/hero';
+import { applyEquipmentStats } from '@items/stats';
 import { heroToLoadout } from '@render/hero_loadout';
 import { Paperdoll } from '@render/paperdoll';
 
@@ -132,7 +133,8 @@ export class HeroCard extends Phaser.GameObjects.Container {
 
     if (size === 'large' && !isDead) {
       const statsY = lastY + 6;
-      const stats = `HP ${this.hero.currentHp}/${this.hero.maxHp}   ATK ${this.hero.baseStats.attack}   DEF ${this.hero.baseStats.defense}   SPD ${this.hero.baseStats.speed}`;
+      const equipped = applyEquipmentStats(this.hero.baseStats, this.hero.equipment);
+      const stats = `HP ${this.hero.currentHp}/${this.hero.maxHp}   ATK ${equipped.attack}   DEF ${equipped.defense}   SPD ${equipped.speed}`;
       const statsText = this.scene.add.text(textX, statsY, stats, {
         fontFamily: 'monospace',
         fontSize: '11px',

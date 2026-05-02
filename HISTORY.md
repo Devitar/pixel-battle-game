@@ -29,6 +29,18 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-02 · Equipment-applied stats in Barracks + HeroCard (Cluster B · 34)
+
+- **Why:** Two display sites (`barracks_panel_scene.ts:309` and `hero_card.ts:135` large variant) read `hero.baseStats.{attack,defense,speed}` directly, so equipping a shield (or any +ATK/+DEF/+SPD affix) didn't visibly change the stat line. Players couldn't see equip impact.
+- **Decisions:**
+  - **Reused the existing `applyEquipmentStats(stats, equipment)` helper from `@items/stats`.** It already sums BASE_ITEM_STATS + affixes across all four slots — exactly the display contract. Two callsites, identical pattern: compute once, substitute the three values into the existing template.
+  - **Did not touch the HP display.** `currentHp`/`maxHp` already incorporate equipment via `computeMaxHp` → `gearTotal`. No bug there.
+  - **No new tests.** `stats.test.ts` already verifies shield → defense +1 (line 46); the bug was strictly display-side. The fix is a value-substitution in two scene files (Phaser-side, no Vitest coverage).
+- **Surprises:**
+  - **`hero_card.ts` small variant doesn't display ATK/DEF/SPD at all** — it shows `Class · Lv · HP/MaxHP` and the trait line. Bug only existed on the `large` variant. No third site to fix.
+  - **Mind / Crit / Dodge and rare-property fields (lifesteal, thorns, regen, burning) aren't displayed anywhere on the hero detail surface today.** This fix doesn't introduce them — it just makes the existing three (ATK/DEF/SPD) honest. Captured as a separate TODO (Cluster B · 47) to design where/how those should surface.
+- **Source:** TODO.md Cluster B · 34. Test count delta: 1347 → 1347 (+0).
+
 ### 2026-05-01 · Hospital + Blacksmith pane-background z-order bug (Cluster B · 45 + 37)
 
 - **Why:** Two user-reported bugs that turned out to share one root cause. **#45 (Hospital):** opening the Hospital with a wounded hero showed the title "Hospital · N wounded" but both panes were empty — no hero card, no wound rows, no Treat button. **#37 (Blacksmith):** opening the Blacksmith showed an empty list, "no gear" perceived. Single fix resolved both.

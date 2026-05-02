@@ -10,6 +10,7 @@ import { TRAITS } from '@data/traits';
 import { WOUNDS, describeWoundEffect } from '@data/wounds';
 import type { Hero } from '@heroes/hero';
 import { describeKitStatus, resolveCombatAbilities } from '@items/kit';
+import { applyEquipmentStats } from '@items/stats';
 import { heroToLoadout } from '@render/hero_loadout';
 import { Paperdoll } from '@render/paperdoll';
 import { HeroCard } from '@ui/hero_card';
@@ -302,11 +303,12 @@ export class BarracksPanelScene extends Phaser.Scene {
         color: '#aaaaaa',
       }),
     );
+    const equippedStats = applyEquipmentStats(hero.baseStats, hero.equipment);
     this.detailContainer.add(
       this.add.text(
         DETAIL_TEXT_X,
         152,
-        `HP ${hero.currentHp}/${hero.maxHp} · ATK ${hero.baseStats.attack} · DEF ${hero.baseStats.defense} · SPD ${hero.baseStats.speed}`,
+        `HP ${hero.currentHp}/${hero.maxHp} · ATK ${equippedStats.attack} · DEF ${equippedStats.defense} · SPD ${equippedStats.speed}`,
         {
           fontFamily: 'monospace',
           fontSize: '12px',

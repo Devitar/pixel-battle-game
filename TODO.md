@@ -56,18 +56,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 - **Touches:** `src/camp/building_levels.ts` (add L2/L3 entries), `src/scenes/hospital_panel_scene.ts`, possibly `src/camp/roster.ts` (`tickRosterWounds` for time-heal), possibly `src/data/wounds.ts` (cost variations).
 - **Source:** gdd §6 (Hospital row), Cluster B · 29 decomposition (2026-05-01).
 
-### 34 · Shields don't grant DEF in Barracks display
-
-- **What:** Equipping a shield in Barracks shows the same DEF stat as before — the equipment bonus isn't reflected in the Barracks detail pane stat line. Verified in `src/scenes/barracks_panel_scene.ts:309` which reads `hero.baseStats.defense` directly instead of equipment-applied stats.
-- **Why:** Real bug. Players can't see the impact of equipping a shield (or any +DEF affix), undermining the equip decision. Same likely affects ATK/SPD/etc. for any equipment with stat affixes.
-- **Tier:** 2 (bug fix)
-- **Acceptance:**
-  - Barracks detail pane stat line displays equipment-applied stats, not raw `baseStats`. Use `applyEquipmentStats(hero.baseStats, hero.equipment)` (already exists in `@items/stats`) to derive the displayed values.
-  - Verify the same issue isn't present in HeroCard rendering (`src/ui/hero_card.ts`); if so, fix there too.
-  - Manual verify: Knight with `shield_basic` (+1 DEF per `BASE_ITEM_STATS`) shows `DEF 5` (= 4 base + 1 shield), not `DEF 4`.
-- **Touches:** `src/scenes/barracks_panel_scene.ts:309`, possibly `src/ui/hero_card.ts`.
-- **Source:** bugs.md (2026-05-01) — verified at scoping time.
-
 ### 35 · Combat AI: enemies with 3+ melee swap forever instead of attacking
 
 - **What:** When an encounter spawns 3 or more melee-preferred enemies (slot [1,2] preference), the back-row enemies repeatedly shuffle toward the front instead of taking actions — because only 2 front-row slots exist but 3+ enemies want them.
@@ -203,6 +191,22 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
   - Manual verification: Crypt run shows mixed node types in linear preamble; forks include treasure-room options; treasure rooms drop loot and add to pack; combat loot drops are noticeably rarer.
 - **Touches:** `src/dungeon/node.ts` (Node variant), `src/dungeon/floor.ts` (fork shapes + linear variance), `src/dungeon/loot.ts` (treasure roll + reduce combat rate), `src/scenes/dungeon_scene.ts` (icon glyph + treasure arrival handler), possibly new `src/scenes/treasure_room_overlay_scene.ts` (or inline). No save schema change expected.
 - **Source:** ideas.md #1 (2026-05-01).
+
+### 47 · Display Mind/Crit/Dodge + rare-property fields on hero detail
+
+- **What:** The Barracks detail pane and `hero_card.ts` large variant currently show only HP/ATK/DEF/SPD. The `Stats` type also carries `mind`, `crit`, `dodge` — and equipment can roll rare properties (lifesteal `of_vampirism`, thorns `of_thorns`, regen `of_regeneration`, burning `of_burning` — see `rarePropertyFields` in `src/items/stats.ts:41`) that have no display surface anywhere. Players can't see what their gear actually does.
+- **Why:** Discovered during Cluster B · 34 implementation (2026-05-02). That fix made the displayed three stats honest about equipment contributions, but the four hidden stats + four rare-property fields remain invisible. Affects equip decisions on rares and on classes with mind/crit/dodge affinity.
+- **Tier:** 2 (visibility / UI design)
+- **Acceptance:**
+  - **Needs brainstorming first** to decide layout. Open questions:
+    - All seven stats on a single line vs. two-line grid (e.g., `HP/ATK/DEF/SPD` line + `MND/CRT/DDG` line)?
+    - Where do rare-property fields live? Inline with stats, in a dedicated "Properties:" section, or as part of the per-item tooltip rather than the hero summary?
+    - Show stats that are 0 (e.g., a Knight's `mind: 0`) or hide zero values to reduce noise?
+    - Same treatment in `hero_card.ts` large variant, or keep it summary-only there and put the full stats in Barracks only?
+  - After design: update `barracks_panel_scene.ts` detail-text builder + (optionally) `hero_card.ts` large variant. Reuse `applyEquipmentStats` and `rarePropertyFields` (both already exist).
+  - Manual verify: a hero with `weapon_of_swiftness` (+SPD affix) and a `weapon_of_burning` rare shows both the +SPD bump and a "burning damage" line.
+- **Touches:** `src/scenes/barracks_panel_scene.ts`, possibly `src/ui/hero_card.ts`. No data-layer changes — `rarePropertyFields` already returns the four fields.
+- **Source:** Cluster B · 34 implementation (2026-05-02).
 
 ### 30 · Brainstorm + ship dungeon travel impact
 
