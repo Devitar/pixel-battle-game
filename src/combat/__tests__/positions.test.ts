@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collapseAfterDeath, pull, shove, shuffle, swap } from '../positions';
+import { collapseAfterDeath, pull, shove, shuffle, shuffleWouldProgress, swap } from '../positions';
 import type { CombatEvent } from '../types';
 import { makeEnemyCombatant, makeHeroCombatant, makeTestState } from './helpers';
 
@@ -115,5 +115,45 @@ describe('shuffle', () => {
     shuffle(p0, state, events);
     expect(p0.slot).toBe(1);
     expect(p1.slot).toBe(2);
+  });
+});
+
+describe('shuffleWouldProgress', () => {
+  it('false when only one combatant on side (nowhere to shuffle)', () => {
+    const e0 = makeEnemyCombatant('skeleton_warrior', 3, 'e0');
+    const state = makeTestState([], [e0]);
+    expect(shuffleWouldProgress(e0, state)).toBe(false);
+  });
+
+  it('false when neighbor at destination is satisfied AND caster slot is unpreferred for them', () => {
+    // Two melee enemies preferred [1,2]: slot-3 wants to swap with slot-2,
+    // but slot-2 ally is happy at 2 and would be unhappy at 3 — they would
+    // swap right back. Futile.
+    const e0 = makeEnemyCombatant('skeleton_warrior', 2, 'e0');
+    const e1 = makeEnemyCombatant('skeleton_warrior', 3, 'e1');
+    const state = makeTestState([], [e0, e1]);
+    expect(shuffleWouldProgress(e1, state)).toBe(false);
+  });
+
+  it('true when neighbor has different preferences (productive swap)', () => {
+    // Slot-3 melee + slot-2 ranged: melee wants slot 1-2, ranged wants 3-4.
+    // Swap helps both — melee moves to 2, ranged moves to 3.
+    const ghost = makeEnemyCombatant('ghost', 2, 'e0');
+    const archer = makeEnemyCombatant('skeleton_archer', 3, 'e1');
+    const state = makeTestState([], [ghost, archer]);
+    // archer at 3 wants to stay; but invert the test — ghost at 2 already in
+    // preferred. From archer's perspective at slot 3, that IS preferred —
+    // shuffle wouldn't trigger. Test the inverse: archer at slot 1 (forced).
+    archer.slot = 1;
+    ghost.slot = 2;
+    expect(shuffleWouldProgress(archer, state)).toBe(true);
+  });
+
+  it('true when neighbor has no preferredSlots (indifferent)', () => {
+    // Heroes have undefined preferredSlots — always treated as indifferent.
+    const knight = makeHeroCombatant('knight', 3, 'p0');
+    const ally = makeHeroCombatant('priest', 2, 'p1');
+    const state = makeTestState([knight, ally], []);
+    expect(shuffleWouldProgress(knight, state)).toBe(true);
   });
 });

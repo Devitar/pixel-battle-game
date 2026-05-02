@@ -181,7 +181,9 @@ export class CombatPlayback {
   private async onTurnSkipped(ev: Extract<CombatEvent, { kind: 'turn_skipped' }>): Promise<number> {
     if (ev.reason === 'dead') return 1;
     const actor = this.actors.get(ev.combatantId);
-    actor?.spawnNumber('Z', '#aaaaff');
+    const glyph = ev.reason === 'no_action' ? '…' : 'Z';
+    const color = ev.reason === 'no_action' ? '#aaaaaa' : '#aaaaff';
+    actor?.spawnNumber(glyph, color);
     await this.delay(D_TURN_SKIP_STUNNED);
     return 1;
   }

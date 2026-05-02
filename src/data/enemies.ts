@@ -7,8 +7,8 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     role: 'minion',
     baseStats: { hp: 12, attack: 3, defense: 2, speed: 3, mind: 0, crit: 5, dodge: 5 },
     tags: ['undead'],
-    abilities: ['bone_slash'],
-    aiPriority: ['bone_slash'],
+    abilities: ['bone_slash', 'bone_throw'],
+    aiPriority: ['bone_slash', 'bone_throw'],
     preferredSlots: [1, 2],
   },
   skeleton_archer: {
@@ -27,8 +27,8 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     role: 'minion',
     baseStats: { hp: 12, attack: 3, defense: 1, speed: 4, mind: 0, crit: 5, dodge: 5 },
     tags: ['undead'],
-    abilities: ['chilling_touch'],
-    aiPriority: ['chilling_touch'],
+    abilities: ['chilling_touch', 'wail'],
+    aiPriority: ['chilling_touch', 'wail'],
     preferredSlots: [1, 2],
   },
   zombie: {
@@ -37,8 +37,8 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     role: 'minion',
     baseStats: { hp: 16, attack: 3, defense: 1, speed: 2, mind: 0, crit: 5, dodge: 5 },
     tags: ['undead'],
-    abilities: ['rotting_bite'],
-    aiPriority: ['rotting_bite'],
+    abilities: ['rotting_bite', 'lurch'],
+    aiPriority: ['rotting_bite', 'lurch'],
     preferredSlots: [1, 2],
   },
   cultist: {

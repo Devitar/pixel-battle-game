@@ -27,18 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 35 · Combat AI: enemies with 3+ melee swap forever instead of attacking
-
-- **What:** When an encounter spawns 3 or more melee-preferred enemies (slot [1,2] preference), the back-row enemies repeatedly shuffle toward the front instead of taking actions — because only 2 front-row slots exist but 3+ enemies want them.
-- **Why:** Combat-engine behavior bug. The shuffle-toward-preferred rule (Cluster B · 26, shipped 2026-05-01) handles "wrong slot" by triggering shuffle, but doesn't account for "preferred slot is already occupied by an ally that's not moving." Enemies stuck at slot 3+ with `[1,2]`-only abilities loop forever.
-- **Tier:** 2 (bug fix)
-- **Acceptance:**
-  - Enemy at slot 3+ with `canCastFrom [1,2]` abilities: if both slots 1 and 2 are occupied by allies who are NOT shuffling, the enemy should fall back to its basic attack (or the highest castable from current slot) rather than perpetually shuffling.
-  - Fix likely lives in `src/combat/ability_priority.ts` (the `hasShufflableHigherPriority` rule from B · 26): add a check that the destination slot is actually reachable (i.e., shuffling would change the slot, not be a no-op because the ally there isn't moving either).
-  - Test: 3v3 fight with 3 melee enemies (skeleton_warrior + ghost + zombie all slot [1,2] preferred) — round 1 should show the back enemy take an action, not just shuffle.
-- **Touches:** `src/combat/ability_priority.ts`, possibly `src/combat/positions.ts` (shuffle no-op detection), tests in `src/combat/__tests__/`.
-- **Source:** bugs.md (2026-05-01).
-
 ### 36 · Tavern reroll loophole: closing + reopening produces fresh candidates
 
 - **What:** The Tavern panel uses `createRng(Date.now())` in `create()`, so every reopen of the panel rolls a fresh candidate set. The Reroll button (Cluster B · 16) costs 25g, but a player can simply close the Tavern (free) and reopen it for the same effect.

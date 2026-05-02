@@ -3,7 +3,7 @@ import type { Rng } from '@util/rng';
 import { pickAbility } from './ability_priority';
 import { setCooldown, tickCooldowns } from './cooldowns';
 import { applyAbility } from './effects';
-import { collapseAfterDeath, shuffle } from './positions';
+import { collapseAfterDeath, shuffle, shuffleWouldProgress } from './positions';
 import { tickStatuses } from './statuses';
 import { computeInitiative } from './turn_order';
 import type {
@@ -108,9 +108,13 @@ export function resolveCombat(initialState: CombatState, rng: Rng): CombatResult
             // `cooldown` decrements before being deleted to give that many skip-turns.
             setCooldown(combatant, ability.id, ability.cooldown + 1);
           }
-        } else {
+        } else if (shuffleWouldProgress(combatant, state)) {
           events.push({ kind: 'shuffle', combatantId: id });
           shuffle(combatant, state, events);
+        } else {
+          // No castable ability AND shuffle would be futile (a satisfied ally
+          // would just swap back). Skip the turn rather than infinite-loop.
+          events.push({ kind: 'turn_skipped', combatantId: id, reason: 'no_action' });
         }
       }
 

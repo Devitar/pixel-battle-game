@@ -71,7 +71,7 @@ describe('integration: pickAbility skips on-cooldown abilities', () => {
   it('returns null when every priority is on cooldown and nothing else is castable', () => {
     const rng = createRng(1);
     const skeleton = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
-      cooldowns: { bone_slash: 1 },
+      cooldowns: { bone_slash: 1, bone_throw: 1 },
     });
     const p0 = makeHeroCombatant('knight', 1, 'p0');
     const state = makeTestState([p0], [skeleton]);

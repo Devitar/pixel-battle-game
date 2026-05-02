@@ -1,6 +1,7 @@
 import { ABILITIES } from '@data/abilities';
 import type { AbilityId, AiCondition } from '@data/types';
 import type { Rng } from '@util/rng';
+import { shuffleWouldProgress } from './positions';
 import { resolveTargetSelector } from './target_selector';
 import type { Combatant, CombatantId, CombatState } from './types';
 
@@ -23,7 +24,12 @@ export function pickAbility(caster: Combatant, state: CombatState, rng: Rng): Pi
     // shuffle over this lower-priority pick. Avoids the Knight-at-slot-3
     // -spamming-Bulwark anti-pattern where the engine never reaches the
     // null/shuffle path because a self-buff or basic Attack is always castable.
-    if (i > 0 && hasShufflableHigherPriority(caster, i)) return null;
+    // Skip the deferral when the shuffle would be futile — e.g., 3 melee enemies
+    // all at preferredSlots [1,2] would otherwise swap past each other forever
+    // instead of attacking from the back row.
+    if (i > 0 && hasShufflableHigherPriority(caster, i) && shuffleWouldProgress(caster, state)) {
+      return null;
+    }
 
     return { abilityId, targetIds };
   }

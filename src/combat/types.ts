@@ -75,7 +75,7 @@ export type CombatEvent =
   | { kind: 'combat_start'; party: readonly CombatantId[]; enemies: readonly CombatantId[] }
   | { kind: 'round_start'; round: number; order: readonly CombatantId[] }
   | { kind: 'turn_start'; combatantId: CombatantId }
-  | { kind: 'turn_skipped'; combatantId: CombatantId; reason: 'stunned' | 'dead' }
+  | { kind: 'turn_skipped'; combatantId: CombatantId; reason: 'stunned' | 'dead' | 'no_action' }
   | { kind: 'ability_cast'; casterId: CombatantId; abilityId: AbilityId; targetIds: readonly CombatantId[] }
   | { kind: 'shuffle'; combatantId: CombatantId }
   | { kind: 'damage_applied'; sourceId: CombatantId; targetId: CombatantId; amount: number; lethal: boolean; wasCrit: boolean }

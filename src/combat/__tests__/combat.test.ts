@@ -79,6 +79,50 @@ describe('resolveCombat — scripted scenarios', () => {
     expect((healEvent as { sourceId: string }).sourceId).toBe('p0');
   });
 
+  it('back-row melee enemy uses fallback ability instead of perpetually shuffling', () => {
+    // 3 enemies all preferred [1,2]: without the futility check, the slot-3
+    // enemy would defer to shuffle every round, swap with slot-2 ally, and the
+    // pair would ping-pong forever. With the fix + bone_throw fallback, the
+    // slot-3 enemy attacks instead.
+    const knight = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 200, attack: 1, defense: 100, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 200,
+      maxHp: 200,
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0', { baseStats: { hp: 50, attack: 0, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 }, currentHp: 50, maxHp: 50 });
+    const e1 = makeEnemyCombatant('skeleton_warrior', 2, 'e1', { baseStats: { hp: 50, attack: 0, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 }, currentHp: 50, maxHp: 50 });
+    const e2 = makeEnemyCombatant('skeleton_warrior', 3, 'e2', { baseStats: { hp: 50, attack: 0, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 }, currentHp: 50, maxHp: 50 });
+    const initial = makeTestState([knight], [e0, e1, e2]);
+    const result = resolveCombat(initial, createRng(13));
+    const e2BoneThrow = result.events.find(
+      (e) => e.kind === 'ability_cast' && e.casterId === 'e2' && e.abilityId === 'bone_throw',
+    );
+    expect(e2BoneThrow).toBeDefined();
+  });
+
+  it('emits turn_skipped reason=no_action when shuffle is futile and no fallback exists', () => {
+    // Same setup, but strip the fallback off slot-3 enemy so they have no
+    // any-slot ability. Their only ability is bone_slash (slot 1,2). Shuffle
+    // is futile (slot-2 ally satisfied). Engine emits turn_skipped/no_action.
+    const knight = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 200, attack: 1, defense: 100, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 200,
+      maxHp: 200,
+    });
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    const e1 = makeEnemyCombatant('skeleton_warrior', 2, 'e1');
+    const e2 = makeEnemyCombatant('skeleton_warrior', 3, 'e2', {
+      abilities: ['bone_slash'],
+      aiPriority: ['bone_slash'],
+    });
+    const initial = makeTestState([knight], [e0, e1, e2]);
+    const result = resolveCombat(initial, createRng(1));
+    const noActionSkip = result.events.find(
+      (e) => e.kind === 'turn_skipped' && e.combatantId === 'e2' && e.reason === 'no_action',
+    );
+    expect(noActionSkip).toBeDefined();
+  });
+
   it('Shield Bash stun causes a skipped turn for the target', () => {
     const knight = makeHeroCombatant('knight', 1, 'p0');
     const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {

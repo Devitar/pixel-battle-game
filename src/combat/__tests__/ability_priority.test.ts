@@ -17,8 +17,12 @@ describe('pickAbility', () => {
   it('returns null when only lower-priority abilities are castable from current slot', () => {
     const rng = createRng(1);
     const archer = makeHeroCombatant('archer', 1, 'p0');
+    // Need an ally so shuffle has somewhere productive to go — single-combatant
+    // sides can't shuffle, in which case pickAbility correctly falls through
+    // to the lower-priority castable.
+    const ally = makeHeroCombatant('knight', 2, 'p1');
     const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
-    const state = makeTestState([archer], [e0]);
+    const state = makeTestState([archer, ally], [e0]);
     const picked = pickAbility(archer, state, rng);
     // Higher-priority abilities (flare_arrow, piercing_shot, volley) are
     // canCastFrom-blocked; engine prefers shuffle so the Archer can reach
@@ -58,8 +62,9 @@ describe('pickAbility', () => {
   it('returns null when higher-priority abilities are slot-blocked', () => {
     const rng = createRng(1);
     const knight = makeHeroCombatant('knight', 3, 'p0');
+    const ally = makeHeroCombatant('priest', 2, 'p1');
     const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
-    const state = makeTestState([knight], [e0]);
+    const state = makeTestState([knight, ally], [e0]);
     expect(pickAbility(knight, state, rng)).toBeNull();
   });
 
@@ -90,8 +95,23 @@ describe('pickAbility', () => {
   it('Priest at slot 1 prefers shuffle over priest_strike', () => {
     const rng = createRng(1);
     const priest = makeHeroCombatant('priest', 1, 'p0');
+    const ally = makeHeroCombatant('knight', 2, 'p1');
     const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
-    const state = makeTestState([priest], [e0]);
+    const state = makeTestState([priest, ally], [e0]);
     expect(pickAbility(priest, state, rng)).toBeNull();
+  });
+
+  it('does NOT defer to shuffle when shuffle would be futile (3 melee enemies preferred [1,2])', () => {
+    const rng = createRng(1);
+    // Three enemies all preferring slots [1,2]. Slot-3 enemy has bone_slash
+    // (slot-blocked from 3) AND bone_throw (any-slot fallback). Without the
+    // futility check, the engine would defer to shuffle indefinitely; with it,
+    // pickAbility falls through to the fallback bone_throw.
+    const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
+    const e1 = makeEnemyCombatant('skeleton_warrior', 2, 'e1');
+    const e2 = makeEnemyCombatant('skeleton_warrior', 3, 'e2');
+    const p0 = makeHeroCombatant('knight', 1, 'p0');
+    const state = makeTestState([p0], [e0, e1, e2]);
+    expect(pickAbility(e2, state, rng)?.abilityId).toBe('bone_throw');
   });
 });

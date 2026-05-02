@@ -103,6 +103,13 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     target: { side: 'enemy', slots: [1] },
     effects: [{ kind: 'damage', power: 0.8 }],
   },
+  bone_throw: {
+    id: 'bone_throw',
+    name: 'Bone Throw',
+    canCastFrom: [1, 2, 3, 4],
+    target: { side: 'enemy', slots: [1] },
+    effects: [{ kind: 'damage', power: 0.5 }],
+  },
   bone_arrow: {
     id: 'bone_arrow',
     name: 'Bone Arrow',
@@ -120,6 +127,13 @@ export const ABILITIES: Record<AbilityId, Ability> = {
       { kind: 'debuff', stat: 'attack', delta: -1, duration: 2, statusId: 'rotting' },
     ],
   },
+  lurch: {
+    id: 'lurch',
+    name: 'Lurch',
+    canCastFrom: [1, 2, 3, 4],
+    target: { side: 'enemy', slots: [1] },
+    effects: [{ kind: 'damage', power: 0.5 }],
+  },
   chilling_touch: {
     id: 'chilling_touch',
     name: 'Chilling Touch',
@@ -129,6 +143,13 @@ export const ABILITIES: Record<AbilityId, Ability> = {
       { kind: 'damage', power: 0.9 },
       { kind: 'debuff', stat: 'speed', delta: -1, duration: 2, statusId: 'chilled' },
     ],
+  },
+  wail: {
+    id: 'wail',
+    name: 'Wail',
+    canCastFrom: [1, 2, 3, 4],
+    target: { side: 'enemy', slots: [1] },
+    effects: [{ kind: 'damage', power: 0.5 }],
   },
   dark_bolt: {
     id: 'dark_bolt',
