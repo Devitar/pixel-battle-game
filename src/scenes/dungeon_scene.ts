@@ -2,17 +2,15 @@ import * as Phaser from 'phaser';
 import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels';
 import { removeHero, tickRosterWounds } from '@camp/roster';
 import type { CombatResult } from '@combat/types';
+import { computeMapLayout, type MapLayout } from '@dungeon/map_layout';
 import type { Node } from '@dungeon/node';
 import type { Item, Rarity } from '@data/types';
 import type { Hero } from '@heroes/hero';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
-import { heroToLoadout } from '@render/hero_loadout';
-import { Paperdoll } from '@render/paperdoll';
 import {
   chooseNextNode,
   completeCombat,
   currentNode,
-  playerPath,
   type RunState,
   type WipeOutcome,
 } from '@run/run_state';
@@ -24,15 +22,17 @@ type DungeonSceneState =
   | 'walking_in'
   | 'walking_to_next'
   | 'showing_result'
-  | 'awaiting_fork_pick'
   | 'showing_wipe';
 
-const NODE_X = [180, 360, 540, 720] as const;
-const NODE_Y = 460;
-const NODE_LABEL_Y = 498;
-const PARTY_BASE_Y = 440;
-const PARTY_OFFSCREEN_X = -80;
-const SLOT_X_OFFSETS = [-40, 0, 40] as const;
+const MAP_LEFT = 120;
+const MAP_TOP = 100;
+const MAP_WIDTH = 720;
+const MAP_HEIGHT = 380;
+
+const PARTY_OFFSCREEN_X = -40;
+const PARTY_TOKEN_Y_OFFSET = -32;
+
+const NODE_RADIUS = 18;
 
 const COMBAT_NODE_REWARD = 15;
 const BOSS_NODE_REWARD = 100;
@@ -46,15 +46,38 @@ const RARITY_HEX: Record<Rarity, string> = {
 const WALK_IN_DURATION = 800;
 const WALK_NEXT_DURATION = 600;
 
+const NODE_FILL_BY_STATE = {
+  cleared: 0x2a2a2a,
+  current: 0x4a3a1a,
+  upcoming: 0x1a1a1a,
+  fork_choice: 0x2a3a4a,
+} as const;
+const NODE_STROKE_BY_STATE = {
+  cleared: 0x444444,
+  current: 0xffcc66,
+  upcoming: 0x666666,
+  fork_choice: 0x88aaff,
+} as const;
+const GLYPH_COLOR_BY_STATE = {
+  cleared: '#555555',
+  current: '#ffcc66',
+  upcoming: '#aaaaaa',
+  fork_choice: '#ffffff',
+} as const;
+type NodeRenderState = keyof typeof NODE_FILL_BY_STATE;
+
 export class DungeonScene extends Phaser.Scene {
-  private partyContainer!: Phaser.GameObjects.Container;
-  private nodeIcons: Phaser.GameObjects.Text[] = [];
-  private nodeLabels: Phaser.GameObjects.Text[] = [];
+  private partyToken!: Phaser.GameObjects.Container;
+  private layout: MapLayout = { positions: new Map(), edges: [], rowCount: 0 };
+  private nodeContainers = new Map<string, Phaser.GameObjects.Container>();
+  private nodeBgByNodeId = new Map<string, Phaser.GameObjects.Arc>();
+  private nodeGlyphByNodeId = new Map<string, Phaser.GameObjects.Text>();
+  private nodeLabelByNodeId = new Map<string, Phaser.GameObjects.Text>();
+  private edgeGraphics?: Phaser.GameObjects.Graphics;
   private hudFloor!: Phaser.GameObjects.Text;
   private hudPack!: Phaser.GameObjects.Text;
   private statusText!: Phaser.GameObjects.Text;
   private resultPanel?: Phaser.GameObjects.Container;
-  private forkPicker?: Phaser.GameObjects.Container;
   // Snapshot of party at combat start, captured before completeCombat prunes
   // fallen heroes. Used by the result panel to (a) compute per-hero HP deltas
   // and (b) render Fallen lines for heroes who didn't survive the fight.
@@ -69,12 +92,13 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.nodeIcons = [];
-    this.nodeLabels = [];
+    this.nodeContainers = new Map();
+    this.nodeBgByNodeId = new Map();
+    this.nodeGlyphByNodeId = new Map();
+    this.nodeLabelByNodeId = new Map();
     this.preCombatParty = [];
     this.combatLoot = [];
     this.resultPanel = undefined;
-    this.forkPicker = undefined;
     this.wipeOutcome = undefined;
 
     const state = appState.get();
@@ -84,17 +108,24 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
 
+    this.layout = computeMapLayout(state.runState.currentFloorNodes, {
+      left: MAP_LEFT,
+      top: MAP_TOP,
+      width: MAP_WIDTH,
+      height: MAP_HEIGHT,
+    });
+
     this.buildBackground();
     this.buildHud();
+    this.buildEdges();
     this.buildNodes();
-    this.buildParty();
+    this.buildPartyToken();
     this.buildStatusBar();
 
     this.events.on(Phaser.Scenes.Events.RESUME, () => {
       this.refreshHud();
-      this.refreshNodeColors();
+      this.refreshNodeStates();
       this.refreshStatusBar();
-      this.rebuildParty();
       this.setState('walking_to_next');
     });
 
@@ -103,7 +134,7 @@ export class DungeonScene extends Phaser.Scene {
       this.processCombatReturn(handoff.result, handoff.rngStateAfter);
     } else {
       this.refreshHud();
-      this.refreshNodeColors();
+      this.refreshNodeStates();
       this.refreshStatusBar();
       this.setState('walking_in');
     }
@@ -130,12 +161,15 @@ export class DungeonScene extends Phaser.Scene {
       runRngState: rng.getState(),
     }));
 
-    this.partyContainer.x = this.partyXForNode(this.pathPositionFor(run));
+    // Snap the party token to the post-combat current node so the result panel
+    // is anchored sensibly. Actual walk animation lives in Phase 4.
+    const posAfter = this.partyTokenPosFor(nextRun.currentNodeId);
+    this.partyToken.x = posAfter.x;
+    this.partyToken.y = posAfter.y;
 
     this.refreshHud();
-    this.refreshNodeColors();
+    this.refreshNodeStates();
     this.refreshStatusBar();
-    this.rebuildParty();
 
     if (wipe) {
       this.wipeOutcome = wipe;
@@ -149,7 +183,7 @@ export class DungeonScene extends Phaser.Scene {
     this.add
       .rectangle(0, 0, this.scale.width, this.scale.height, 0x1a1020)
       .setOrigin(0, 0);
-    this.add.rectangle(0, 480, this.scale.width, 1, 0x555555).setOrigin(0, 0);
+    this.add.rectangle(0, 510, this.scale.width, 1, 0x555555).setOrigin(0, 0);
   }
 
   private buildHud(): void {
@@ -169,64 +203,72 @@ export class DungeonScene extends Phaser.Scene {
       .setOrigin(1, 0);
   }
 
+  private buildEdges(): void {
+    this.edgeGraphics = this.add.graphics();
+    this.refreshEdges();
+  }
+
+  private refreshEdges(): void {
+    if (!this.edgeGraphics) return;
+    this.edgeGraphics.clear();
+    this.edgeGraphics.lineStyle(2, 0x555555, 1);
+    for (const edge of this.layout.edges) {
+      const from = this.layout.positions.get(edge.fromId);
+      const to = this.layout.positions.get(edge.toId);
+      if (!from || !to) continue;
+      this.edgeGraphics.beginPath();
+      this.edgeGraphics.moveTo(from.x, from.y);
+      this.edgeGraphics.lineTo(to.x, to.y);
+      this.edgeGraphics.strokePath();
+    }
+  }
+
   private buildNodes(): void {
     const run = appState.get().runState!;
-    const path = playerPath(run);
-    for (let i = 0; i < path.length && i < NODE_X.length; i++) {
-      const node = path[i];
-      const glyph =
-        node.type === 'boss'  ? '☠' :
-        node.type === 'shop'  ? '🛒' :
-        node.type === 'elite' ? '💀' :
-        node.type === 'camp'  ? '🏕' :
-        node.type === 'event' ? '❓' :
-        '⚔';
-      const x = NODE_X[i];
-      const icon = this.add
-        .text(x, NODE_Y, glyph, {
+    for (const node of run.currentFloorNodes) {
+      const pos = this.layout.positions.get(node.id);
+      if (!pos) continue;
+      const bg = this.add
+        .circle(0, 0, NODE_RADIUS, NODE_FILL_BY_STATE.upcoming)
+        .setStrokeStyle(2, NODE_STROKE_BY_STATE.upcoming);
+      const glyph = this.add
+        .text(0, -1, glyphForNodeType(node.type), {
           fontFamily: 'monospace',
-          fontSize: '24px',
-          color: '#888888',
+          fontSize: '20px',
+          color: GLYPH_COLOR_BY_STATE.upcoming,
         })
         .setOrigin(0.5);
       const label = this.add
-        .text(x, NODE_LABEL_Y, node.type, {
+        .text(0, NODE_RADIUS + 8, node.type, {
           fontFamily: 'monospace',
           fontSize: '9px',
           color: '#aaaaaa',
         })
         .setOrigin(0.5);
-      this.nodeIcons.push(icon);
-      this.nodeLabels.push(label);
+      const container = this.add.container(pos.x, pos.y, [bg, glyph, label]);
+      this.nodeContainers.set(node.id, container);
+      this.nodeBgByNodeId.set(node.id, bg);
+      this.nodeGlyphByNodeId.set(node.id, glyph);
+      this.nodeLabelByNodeId.set(node.id, label);
+
+      bg.on('pointerdown', () => this.onNodeClicked(node.id));
+      bg.on('pointerover', () => this.onNodeHover(node.id, true));
+      bg.on('pointerout',  () => this.onNodeHover(node.id, false));
     }
   }
 
-  private buildParty(): void {
-    const run = appState.get().runState!;
-    this.partyContainer = this.add.container(PARTY_OFFSCREEN_X, PARTY_BASE_Y);
-    for (let i = 0; i < run.party.length; i++) {
-      const hero = run.party[i];
-      const doll = new Paperdoll(this, SLOT_X_OFFSETS[i], 0, heroToLoadout(hero));
-      doll.setScale(2);
-      this.partyContainer.add(doll);
-    }
-    // Tombstones for Lost heroes — appended after surviving heroes in the row.
-    for (let i = 0; i < run.lost.length; i++) {
-      const slotIndex = run.party.length + i;
-      if (slotIndex >= SLOT_X_OFFSETS.length) break;
-      const tombstone = this.add.text(SLOT_X_OFFSETS[slotIndex], 0, '🪦', {
+  private buildPartyToken(): void {
+    const ring = this.add
+      .circle(0, 0, 11, 0x222244)
+      .setStrokeStyle(2, 0xffcc66);
+    const text = this.add
+      .text(0, -1, '◆◆◆', {
         fontFamily: 'monospace',
-        fontSize: '32px',
-      }).setOrigin(0.5);
-      this.partyContainer.add(tombstone);
-    }
-  }
-
-  private rebuildParty(): void {
-    const x = this.partyContainer.x;
-    this.partyContainer.destroy();
-    this.buildParty();
-    this.partyContainer.x = x;
+        fontSize: '9px',
+        color: '#ffcc66',
+      })
+      .setOrigin(0.5);
+    this.partyToken = this.add.container(PARTY_OFFSCREEN_X, MAP_TOP, [ring, text]);
   }
 
   private buildStatusBar(): void {
@@ -241,27 +283,20 @@ export class DungeonScene extends Phaser.Scene {
 
   private setState(next: DungeonSceneState): void {
     switch (next) {
-      case 'walking_in':
-        this.tweenPartyTo(
-          this.partyXForNode(this.currentNodeIndex()),
-          WALK_IN_DURATION,
-          'Cubic.easeOut',
-          () => this.handleArrival(),
-        );
+      case 'walking_in': {
+        const target = this.partyTokenPosFor(this.currentNodeIdSafe());
+        this.tweenPartyTo(target.x, target.y, WALK_IN_DURATION, 'Cubic.easeOut',
+          () => this.handleArrival());
         break;
-      case 'walking_to_next':
-        this.tweenPartyTo(
-          this.partyXForNode(this.currentNodeIndex()),
-          WALK_NEXT_DURATION,
-          'Cubic.easeInOut',
-          () => this.handleArrival(),
-        );
+      }
+      case 'walking_to_next': {
+        const target = this.partyTokenPosFor(this.currentNodeIdSafe());
+        this.tweenPartyTo(target.x, target.y, WALK_NEXT_DURATION, 'Cubic.easeInOut',
+          () => this.handleArrival());
         break;
+      }
       case 'showing_result':
         this.buildResultPanel();
-        break;
-      case 'awaiting_fork_pick':
-        this.buildForkPicker();
         break;
       case 'showing_wipe':
         this.buildWipePanel();
@@ -274,7 +309,9 @@ export class DungeonScene extends Phaser.Scene {
     if (!run) return;
 
     if (run.awaitingFork) {
-      this.setState('awaiting_fork_pick');
+      // Map's per-node interactivity is wired by refreshNodeStates; the scene
+      // sits idle until the player clicks a fork branch (via onNodeClicked).
+      this.refreshNodeStates();
       return;
     }
 
@@ -300,60 +337,113 @@ export class DungeonScene extends Phaser.Scene {
 
   private tweenPartyTo(
     targetX: number,
+    targetY: number,
     duration: number,
     ease: string,
     onComplete: () => void,
   ): void {
     this.tweens.add({
-      targets: this.partyContainer,
+      targets: this.partyToken,
       x: targetX,
+      y: targetY,
       duration,
       ease,
       onComplete,
     });
   }
 
-  private partyXForNode(nodeIndex: number): number {
-    return NODE_X[nodeIndex] - 80;
+  private partyTokenPosFor(nodeId: string): { x: number; y: number } {
+    const pos = this.layout.positions.get(nodeId);
+    if (!pos) return { x: PARTY_OFFSCREEN_X, y: MAP_TOP };
+    return { x: pos.x, y: pos.y + PARTY_TOKEN_Y_OFFSET };
   }
 
-  private currentNodeIndex(): number {
-    return this.pathPositionFor(appState.get().runState);
-  }
-
-  /**
-   * For the Tier 2 diamond floor (n0 → n1 → n2a/n2b → boss),
-   * returns the player's position in the 4-step icon row.
-   * Cluster B · 6 (fork picker UI) replaces this with a richer per-node renderer.
-   */
-  private pathPositionFor(run: RunState | undefined): number {
-    if (!run) return 0;
-    const referenced = new Set(
-      run.currentFloorNodes.flatMap((n) => [...n.nextNodeIds]),
-    );
-    const start = run.currentFloorNodes.find((n) => !referenced.has(n.id));
-    if (!start) return 0;
-
-    // BFS from start to currentNodeId.
-    const visited = new Set<string>();
-    let frontier: { id: string; depth: number }[] = [{ id: start.id, depth: 0 }];
-    while (frontier.length > 0) {
-      const next: typeof frontier = [];
-      for (const { id, depth } of frontier) {
-        if (id === run.currentNodeId) return depth;
-        if (visited.has(id)) continue;
-        visited.add(id);
-        const node = run.currentFloorNodes.find((n) => n.id === id);
-        if (!node) continue;
-        for (const nextId of node.nextNodeIds) next.push({ id: nextId, depth: depth + 1 });
-      }
-      frontier = next;
-    }
-    return 0;
+  private currentNodeIdSafe(): string {
+    const run = appState.get().runState;
+    return run ? run.currentNodeId : '';
   }
 
   private startCombatAtCurrentNode(): void {
     this.scene.start('combat');
+  }
+
+  private onNodeClicked(nodeId: string): void {
+    const run = appState.get().runState;
+    if (!run || run.status !== 'in_dungeon') return;
+    if (!run.awaitingFork) return;
+    const cur = currentNode(run);
+    if (!cur.nextNodeIds.includes(nodeId)) return;
+    appState.update((s) => ({
+      ...s,
+      runState: chooseNextNode(s.runState!, nodeId),
+    }));
+    this.refreshNodeStates();
+    this.setState('walking_to_next');
+  }
+
+  private onNodeHover(nodeId: string, hovering: boolean): void {
+    const state = this.computeNodeState(nodeId);
+    if (state !== 'fork_choice') return;
+    const bg = this.nodeBgByNodeId.get(nodeId);
+    if (!bg) return;
+    bg.setStrokeStyle(hovering ? 3 : 2, NODE_STROKE_BY_STATE.fork_choice);
+  }
+
+  private computeNodeState(nodeId: string): NodeRenderState {
+    const run = appState.get().runState;
+    if (!run) return 'upcoming';
+    if (nodeId === run.currentNodeId) return 'current';
+    if (run.awaitingFork) {
+      const cur = currentNode(run);
+      if (cur.nextNodeIds.includes(nodeId)) return 'fork_choice';
+    }
+    if (this.isNodeCleared(run, nodeId)) return 'cleared';
+    return 'upcoming';
+  }
+
+  /**
+   * A node is "cleared" if it is reachable backward from currentNodeId via
+   * predecessor edges — i.e., the player has moved past it on the active path.
+   * Phase 2's richer floor generator may motivate adding `traversed: string[]`
+   * to RunState.
+   */
+  private isNodeCleared(run: RunState, nodeId: string): boolean {
+    if (nodeId === run.currentNodeId) return false;
+    const predecessorsOf = (id: string): string[] =>
+      run.currentFloorNodes
+        .filter((n) => n.nextNodeIds.includes(id))
+        .map((n) => n.id);
+    const seen = new Set<string>();
+    const stack: string[] = predecessorsOf(run.currentNodeId);
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      if (id === nodeId) return true;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      stack.push(...predecessorsOf(id));
+    }
+    return false;
+  }
+
+  private refreshNodeStates(): void {
+    const run = appState.get().runState;
+    if (!run) return;
+    for (const node of run.currentFloorNodes) {
+      const state = this.computeNodeState(node.id);
+      const bg = this.nodeBgByNodeId.get(node.id);
+      const glyph = this.nodeGlyphByNodeId.get(node.id);
+      const label = this.nodeLabelByNodeId.get(node.id);
+      if (!bg || !glyph || !label) continue;
+      bg.setFillStyle(NODE_FILL_BY_STATE[state]);
+      bg.setStrokeStyle(2, NODE_STROKE_BY_STATE[state]);
+      glyph.setColor(GLYPH_COLOR_BY_STATE[state]);
+      label.setColor(state === 'cleared' ? '#555555' : '#aaaaaa');
+      if (state === 'fork_choice') {
+        bg.setInteractive({ useHandCursor: true });
+      } else {
+        bg.disableInteractive();
+      }
+    }
   }
 
   private buildResultPanel(): void {
@@ -362,14 +452,10 @@ export class DungeonScene extends Phaser.Scene {
     const isBoss = run.status === 'camp_screen';
     let completedNode: Node;
     if (isBoss) {
-      // Find the boss node (unique terminal).
       completedNode = run.currentFloorNodes.find((n) => n.nextNodeIds.length === 0)!;
     } else if (run.awaitingFork) {
-      // Just cleared the fork source — currentNodeId still points at it.
       completedNode = currentNode(run);
     } else {
-      // Just cleared a linear node — currentNodeId has advanced; the just-completed
-      // node is the one whose nextNodeIds contains the new current id.
       completedNode = run.currentFloorNodes.find((n) =>
         n.nextNodeIds.includes(run.currentNodeId),
       )!;
@@ -379,8 +465,6 @@ export class DungeonScene extends Phaser.Scene {
         ? BOSS_NODE_REWARD * run.currentFloorNumber
         : COMBAT_NODE_REWARD * run.currentFloorNumber;
 
-    // Panel grows downward to fit dynamic loot lines. Base height fits title +
-    // gold + survivor lines + dismiss; each loot line adds 14px, with a header.
     const lootCount = this.combatLoot.length;
     const lootBlockHeight = lootCount > 0 ? 16 + lootCount * 14 : 0;
     const bgHeight = 180 + lootBlockHeight;
@@ -474,95 +558,11 @@ export class DungeonScene extends Phaser.Scene {
     bg.on('pointerdown', () => this.onResultDismiss());
   }
 
-  private buildForkPicker(): void {
-    const run = appState.get().runState!;
-    const cur = currentNode(run);
-    const branchIds = cur.nextNodeIds;
-    if (branchIds.length !== 2) return; // defensive — only render for actual forks
-
-    const forkX = NODE_X[2]; // 540 for Crypt's diamond
-    const upperY = 420;
-    const lowerY = 500;
-    const promptY = 380;
-
-    const prompt = this.add
-      .text(forkX, promptY, 'Choose a path:', {
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: '#ffcc66',
-      })
-      .setOrigin(0.5);
-
-    const upper = this.buildForkOption(forkX, upperY, branchIds[0], 'branch A', run);
-    const lower = this.buildForkOption(forkX, lowerY, branchIds[1], 'branch B', run);
-
-    this.forkPicker = this.add.container(0, 0, [prompt, upper, lower]);
-  }
-
-  private buildForkOption(
-    x: number,
-    y: number,
-    branchId: string,
-    subtitle: string,
-    run: RunState,
-  ): Phaser.GameObjects.Container {
-    const branchNode = run.currentFloorNodes.find((n) => n.id === branchId)!;
-    const glyph = branchNode.type === 'boss' ? '☠' : branchNode.type === 'shop' ? '🛒' : '⚔';
-    const typeLabel = branchNode.type;
-
-    const bg = this.add
-      .rectangle(0, 0, 36, 36, 0x1a1a1a)
-      .setStrokeStyle(1, 0x444444);
-    const glyphText = this.add
-      .text(0, -2, glyph, {
-        fontFamily: 'monospace',
-        fontSize: '20px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-    const subtitleText = this.add
-      .text(0, 24, subtitle, {
-        fontFamily: 'monospace',
-        fontSize: '9px',
-        color: '#aaaaaa',
-      })
-      .setOrigin(0.5);
-    const labelText = this.add
-      .text(0, 36, typeLabel, {
-        fontFamily: 'monospace',
-        fontSize: '9px',
-        color: '#aaaaaa',
-      })
-      .setOrigin(0.5);
-
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerover', () => bg.setStrokeStyle(2, 0xffcc66));
-    bg.on('pointerout', () => bg.setStrokeStyle(1, 0x444444));
-    bg.on('pointerdown', () => this.onForkPick(branchId));
-
-    return this.add.container(x, y, [bg, glyphText, subtitleText, labelText]);
-  }
-
-  private onForkPick(branchId: string): void {
-    appState.update((s) => ({
-      ...s,
-      runState: chooseNextNode(s.runState!, branchId),
-    }));
-    this.destroyForkPicker();
-    this.refreshNodeColors();
-    this.setState('walking_to_next');
-  }
-
-  private destroyForkPicker(): void {
-    this.forkPicker?.destroy(true);
-    this.forkPicker = undefined;
-  }
-
   private onResultDismiss(): void {
     this.resultPanel?.destroy(true);
     this.resultPanel = undefined;
     this.refreshHud();
-    this.refreshNodeColors();
+    this.refreshNodeStates();
     this.refreshStatusBar();
 
     const run = appState.get().runState!;
@@ -572,7 +572,8 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     if (run.awaitingFork) {
-      this.setState('awaiting_fork_pick');
+      // Sit idle on the map; refreshNodeStates above lit fork branches as
+      // interactive. Player picks via onNodeClicked.
       return;
     }
 
@@ -704,12 +705,9 @@ export class DungeonScene extends Phaser.Scene {
 
   private refreshHud(): void {
     const run = appState.get().runState!;
-    const path = playerPath(run);
-    const total = path.length;
-    const pos = this.pathPositionFor(run);
-    const displayIdx = run.status === 'camp_screen' ? total : pos + 1;
+    const total = run.currentFloorNodes.length;
     this.hudFloor.setText(
-      `The Crypt · Floor ${run.currentFloorNumber} · Node ${displayIdx} / ${total}`,
+      `The Crypt · Floor ${run.currentFloorNumber} · ${total} nodes`,
     );
     const itemCount = run.pack.items.length;
     const packLabel =
@@ -719,27 +717,21 @@ export class DungeonScene extends Phaser.Scene {
     this.hudPack.setText(packLabel);
   }
 
-  private refreshNodeColors(): void {
-    const run = appState.get().runState!;
-    const path = playerPath(run);
-    const pos = this.pathPositionFor(run);
-    for (let i = 0; i < this.nodeIcons.length; i++) {
-      const node = path[i];
-      if (!node) continue;
-      const isBoss = node.type === 'boss';
-      const isElite = node.type === 'elite';
-      let color: string;
-      if (i < pos) color = '#444444';
-      else if (i === pos && run.status === 'in_dungeon') color = '#ffcc66';
-      else color = isBoss ? '#cc6666' : isElite ? '#cc8844' : '#888888';
-      this.nodeIcons[i].setColor(color);
-      this.nodeLabels[i].setColor(i < pos ? '#555555' : '#aaaaaa');
-    }
-  }
-
   private refreshStatusBar(): void {
     const run = appState.get().runState!;
     const parts = run.party.map((h) => `${h.name} ${h.currentHp}/${h.maxHp}`);
     this.statusText.setText(parts.join(' · '));
+  }
+}
+
+function glyphForNodeType(type: Node['type']): string {
+  switch (type) {
+    case 'boss':  return '☠';
+    case 'shop':  return '🛒';
+    case 'elite': return '💀';
+    case 'camp':  return '🏕';
+    case 'event': return '❓';
+    case 'combat':
+    default:      return '⚔';
   }
 }

@@ -29,6 +29,18 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-02 · Map-based dungeon scene — Phase 1 (renderer scaffold) (Cluster B · 30)
+
+- **Why:** The icon-row dungeon view picked branch 0 silently at forks (lying about topology), revealed all future node types up front, and didn't fit the gdd's "Expeditions" / cartographer-party fiction. Phase 1 of the locked map redesign (TODO #30, brainstormed 2026-05-02) replaces the visualization with a node graph — *visually transformed, functionally similar* — without changing combat flow or the floor generator.
+- **Decisions:**
+  - **Pure-TS layout module** (`dungeon/map_layout.ts`) sits below the Phaser firewall and is unit-tested; the scene reads positions out of it. BFS-by-depth row assignment + sort-by-id within each row gives deterministic positions. The scene rewrite consumed ~440 lines (down from 745) once paperdolls + fork picker + icon-row helpers were dropped.
+  - **No new RunState fields.** "Cleared" node detection uses backward-reachability from `currentNodeId` rather than a `traversed` history list. Works for Phase 1's simple 4-row floors; Phase 2's richer generator may motivate adding history later. Save schema stays at v1.
+  - **Fork picker overlay removed; map subsumes it.** When `awaitingFork=true`, `refreshNodeStates` lights the next-row branches blue and toggles `setInteractive`/`disableInteractive` per node. The dedicated `'awaiting_fork_pick'` scene state collapsed into "idle on map" — no waiting-state arm needed.
+  - **Paperdolls left the dungeon scene; party became a single small token** (3-diamond glyph in a yellow ring). Paperdolls still render in combat. The dungeon hub had no per-hero info that wasn't already in the bottom status bar, and full paperdolls didn't fit per-node when the map will eventually show 8–10 nodes.
+- **Surprises:**
+  - **The old scene's `'walking_to_next'` tween was effectively a no-op** — `processCombatReturn` snaps the party to the post-combat current node, so the subsequent tween moves zero distance. Phase 1 preserves this snap-then-zero-tween for behavioral parity; actual walk animation is Phase 4's job. Worth knowing if Phase 4 implementer wonders why the existing tween scaffold doesn't already animate inter-node movement.
+- **Source:** TODO.md Cluster B · 30 Phase 1. Plan: `docs/superpowers/plans/2026-05-02-map-dungeon-phase-1.md`. Spec is the locked design embedded in the TODO entry. Test count delta: 1414 → 1421 (+7 layout-module tests; scene has no unit-test surface, verified by typecheck + manual smoke).
+
 ### 2026-05-02 · Tap-to-toggle tooltips for wound badges + enemy modifiers (Cluster B · 44)
 
 - **Why:** Wound `🩸 N` badges and enemy modifier text (Armored/Venomous/Enraged) showed only counts/names with no detail. Player couldn't see "Winded: -2 Attack" or "Armored: +2 Defense" without checking Barracks / out-of-band documentation. Closed the deferred-tooltip gap from Cluster B · 13 (enemy modifiers) and B · 15 (wound badges) — both deferred in their original tasks pending the hover-vs-tap decision.

@@ -1,0 +1,85 @@
+import type { Node } from './node';
+
+export interface MapLayoutPosition {
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface MapLayoutEdge {
+  readonly fromId: string;
+  readonly toId: string;
+}
+
+export interface MapLayout {
+  readonly positions: ReadonlyMap<string, MapLayoutPosition>;
+  readonly edges: readonly MapLayoutEdge[];
+  readonly rowCount: number;
+}
+
+export interface MapLayoutOptions {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export function computeMapLayout(
+  nodes: readonly Node[],
+  options: MapLayoutOptions,
+): MapLayout {
+  if (nodes.length === 0) {
+    return { positions: new Map(), edges: [], rowCount: 0 };
+  }
+
+  const referenced = new Set<string>(nodes.flatMap((n) => [...n.nextNodeIds]));
+  const start = nodes.find((n) => !referenced.has(n.id));
+  if (!start) {
+    return { positions: new Map(), edges: [], rowCount: 0 };
+  }
+
+  const depth = new Map<string, number>();
+  depth.set(start.id, 0);
+  const queue: string[] = [start.id];
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    const node = nodes.find((n) => n.id === id);
+    if (!node) continue;
+    const d = depth.get(id)!;
+    for (const nextId of node.nextNodeIds) {
+      if (!depth.has(nextId)) {
+        depth.set(nextId, d + 1);
+        queue.push(nextId);
+      }
+    }
+  }
+
+  const rowCount = Math.max(...depth.values()) + 1;
+
+  const byRow = new Map<number, string[]>();
+  for (const [id, d] of depth) {
+    const arr = byRow.get(d);
+    if (arr) arr.push(id);
+    else byRow.set(d, [id]);
+  }
+  for (const arr of byRow.values()) arr.sort();
+
+  const positions = new Map<string, MapLayoutPosition>();
+  const colSpacing = rowCount > 1 ? options.width / (rowCount - 1) : 0;
+  for (const [d, ids] of byRow) {
+    const x = options.left + d * colSpacing;
+    const n = ids.length;
+    for (let i = 0; i < n; i++) {
+      const y = options.top + (options.height * (i + 1)) / (n + 1);
+      positions.set(ids[i], { x, y });
+    }
+  }
+
+  const edges: MapLayoutEdge[] = [];
+  for (const node of nodes) {
+    for (const nextId of node.nextNodeIds) {
+      edges.push({ fromId: node.id, toId: nextId });
+    }
+  }
+
+  return { positions, edges, rowCount };
+}
