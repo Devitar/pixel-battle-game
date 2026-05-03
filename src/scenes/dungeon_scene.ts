@@ -4,6 +4,7 @@ import { removeHero, tickRosterWounds } from '@camp/roster';
 import type { CombatResult } from '@combat/types';
 import { computeMapLayout, type MapLayout } from '@dungeon/map_layout';
 import type { Node } from '@dungeon/node';
+import { computeVisibility, LOOKAHEAD_ROWS, type VisibilityResult } from '@dungeon/visibility';
 import type { Item, Rarity } from '@data/types';
 import type { Hero } from '@heroes/hero';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
@@ -11,7 +12,6 @@ import {
   chooseNextNode,
   completeCombat,
   currentNode,
-  type RunState,
   type WipeOutcome,
 } from '@run/run_state';
 import { createRngFromState } from '@util/rng';
@@ -46,6 +46,8 @@ const RARITY_HEX: Record<Rarity, string> = {
 const WALK_IN_DURATION = 800;
 const WALK_NEXT_DURATION = 600;
 
+const GHOST_ALPHA = 0.25;
+
 const NODE_FILL_BY_STATE = {
   cleared: 0x2a2a2a,
   current: 0x4a3a1a,
@@ -69,6 +71,13 @@ type NodeRenderState = keyof typeof NODE_FILL_BY_STATE;
 export class DungeonScene extends Phaser.Scene {
   private partyToken!: Phaser.GameObjects.Container;
   private layout: MapLayout = { positions: new Map(), edges: [], rowCount: 0 };
+  private visibility: VisibilityResult = {
+    revealed: new Set(),
+    visible: new Set(),
+    ghost: new Set(),
+    isEdgeVisible: () => false,
+    isEdgeGhost: () => false,
+  };
   private nodeContainers = new Map<string, Phaser.GameObjects.Container>();
   private nodeBgByNodeId = new Map<string, Phaser.GameObjects.Arc>();
   private nodeGlyphByNodeId = new Map<string, Phaser.GameObjects.Text>();
@@ -114,6 +123,12 @@ export class DungeonScene extends Phaser.Scene {
       width: MAP_WIDTH,
       height: MAP_HEIGHT,
     });
+    this.visibility = computeVisibility(
+      state.runState.currentFloorNodes,
+      state.runState.currentNodeId,
+      state.runState.traversedNodeIds,
+      LOOKAHEAD_ROWS,
+    );
 
     this.buildBackground();
     this.buildHud();
@@ -126,6 +141,13 @@ export class DungeonScene extends Phaser.Scene {
       this.refreshHud();
       this.refreshNodeStates();
       this.refreshStatusBar();
+      // Post-Phase-3, every node-resolution function (leaveShop, claimTreasure,
+      // chooseCampNodeEffect, applyEventChoice) leaves the run with
+      // awaitingFork=true. Sit idle so the player picks the next-row click
+      // target. The walking_to_next branch covers the legacy auto-advance flow
+      // and stays for safety, but is now effectively dead code.
+      const run = appState.get().runState;
+      if (run?.awaitingFork) return;
       this.setState('walking_to_next');
     });
 
@@ -211,11 +233,13 @@ export class DungeonScene extends Phaser.Scene {
   private refreshEdges(): void {
     if (!this.edgeGraphics) return;
     this.edgeGraphics.clear();
-    this.edgeGraphics.lineStyle(2, 0x555555, 1);
     for (const edge of this.layout.edges) {
+      if (!this.visibility.isEdgeVisible(edge.fromId, edge.toId)) continue;
       const from = this.layout.positions.get(edge.fromId);
       const to = this.layout.positions.get(edge.toId);
       if (!from || !to) continue;
+      const alpha = this.visibility.isEdgeGhost(edge.fromId, edge.toId) ? GHOST_ALPHA : 1;
+      this.edgeGraphics.lineStyle(2, 0x555555, alpha);
       this.edgeGraphics.beginPath();
       this.edgeGraphics.moveTo(from.x, from.y);
       this.edgeGraphics.lineTo(to.x, to.y);
@@ -402,53 +426,46 @@ export class DungeonScene extends Phaser.Scene {
       const cur = currentNode(run);
       if (cur.nextNodeIds.includes(nodeId)) return 'fork_choice';
     }
-    if (this.isNodeCleared(run, nodeId)) return 'cleared';
+    if (run.traversedNodeIds.includes(nodeId)) return 'cleared';
     return 'upcoming';
-  }
-
-  /**
-   * A node is "cleared" if it is reachable backward from currentNodeId via
-   * predecessor edges — i.e., the player has moved past it on the active path.
-   * Phase 2's richer floor generator may motivate adding `traversed: string[]`
-   * to RunState.
-   */
-  private isNodeCleared(run: RunState, nodeId: string): boolean {
-    if (nodeId === run.currentNodeId) return false;
-    const predecessorsOf = (id: string): string[] =>
-      run.currentFloorNodes
-        .filter((n) => n.nextNodeIds.includes(id))
-        .map((n) => n.id);
-    const seen = new Set<string>();
-    const stack: string[] = predecessorsOf(run.currentNodeId);
-    while (stack.length > 0) {
-      const id = stack.pop()!;
-      if (id === nodeId) return true;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      stack.push(...predecessorsOf(id));
-    }
-    return false;
   }
 
   private refreshNodeStates(): void {
     const run = appState.get().runState;
     if (!run) return;
+    this.visibility = computeVisibility(
+      run.currentFloorNodes,
+      run.currentNodeId,
+      run.traversedNodeIds,
+      LOOKAHEAD_ROWS,
+    );
     for (const node of run.currentFloorNodes) {
       const state = this.computeNodeState(node.id);
+      const container = this.nodeContainers.get(node.id);
       const bg = this.nodeBgByNodeId.get(node.id);
       const glyph = this.nodeGlyphByNodeId.get(node.id);
       const label = this.nodeLabelByNodeId.get(node.id);
-      if (!bg || !glyph || !label) continue;
+      if (!container || !bg || !glyph || !label) continue;
+      const isGhost = this.visibility.ghost.has(node.id);
+      const isVisibleOrRevealed = this.visibility.revealed.has(node.id) || this.visibility.visible.has(node.id);
+      const isFogged = !isGhost && !isVisibleOrRevealed;
+      container.setVisible(!isFogged);
+      container.setAlpha(isGhost ? GHOST_ALPHA : 1);
+      if (isFogged) {
+        bg.disableInteractive();
+        continue;
+      }
       bg.setFillStyle(NODE_FILL_BY_STATE[state]);
       bg.setStrokeStyle(2, NODE_STROKE_BY_STATE[state]);
       glyph.setColor(GLYPH_COLOR_BY_STATE[state]);
       label.setColor(state === 'cleared' ? '#555555' : '#aaaaaa');
-      if (state === 'fork_choice') {
+      if (state === 'fork_choice' && !isGhost) {
         bg.setInteractive({ useHandCursor: true });
       } else {
         bg.disableInteractive();
       }
     }
+    this.refreshEdges();
   }
 
   private buildResultPanel(): void {

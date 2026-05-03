@@ -127,7 +127,11 @@ function normalizeSaveFile(file: SaveFile): SaveFile {
     },
     runState: file.runState === undefined
       ? undefined
-      : { ...file.runState, lost: file.runState.lost ?? [] },
+      : {
+          ...file.runState,
+          lost: file.runState.lost ?? [],
+          traversedNodeIds: file.runState.traversedNodeIds ?? [file.runState.currentNodeId],
+        },
   };
 }
 

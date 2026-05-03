@@ -24,6 +24,7 @@ export interface RunState {
   readonly status: RunStatus;
   readonly fallen: readonly Hero[];
   readonly lost: readonly Hero[];
+  readonly traversedNodeIds: readonly string[];
 }
 
 export interface CashoutOutcome {
@@ -67,6 +68,7 @@ export function startRun(
     status: 'in_dungeon',
     fallen: [],
     lost: [],
+    traversedNodeIds: [startNodeId],
   };
 }
 
@@ -106,6 +108,7 @@ export function chooseNextNode(runState: RunState, nextNodeId: string): RunState
     ...runState,
     currentNodeId: nextNodeId,
     awaitingFork: false,
+    traversedNodeIds: [...runState.traversedNodeIds, nextNodeId],
   };
 }
 
@@ -124,11 +127,15 @@ export function chooseCampNodeEffect(
   if (choice.kind === 'leave') {
     return cashout(runState);
   }
+  // Non-leave camp choice: apply the effect and stay at the camp node so the
+  // map can light up the next-row choice for the player to click. Same
+  // click-to-advance contract as completeCombat — see the awaitingFork comment
+  // there.
   const newRunState = applyCampNodeEffect(runState, choice, rng);
   return {
     runState: {
       ...newRunState,
-      currentNodeId: cur.nextNodeIds[0],
+      awaitingFork: true,
     },
   };
 }
@@ -214,7 +221,6 @@ export function completeCombat(
   }
   const kind: LootKind = completedNode.type;
   const isBoss = kind === 'boss';
-  const fanout = completedNode.nextNodeIds;
 
   // XP awards — only on victory, only to surviving heroes.
   const xpReward =
@@ -260,21 +266,12 @@ export function completeCombat(
     };
   }
 
-  // Non-boss victory — advance based on fanout.
-  if (fanout.length === 1) {
-    return {
-      runState: {
-        ...runState,
-        party: partyAfterXp,
-        fallen: [...runState.fallen, ...newFallen],
-        pack: newPack,
-        status: 'in_dungeon',
-        currentNodeId: fanout[0],
-      },
-    };
-  }
-
-  // fanout.length === 2 — fork source. Stay at this node; flag awaitingFork.
+  // Non-boss victory — stay at the just-cleared node and flag awaitingFork
+  // (regardless of fanout). The player clicks the next node on the map to
+  // advance, even when there's only one choice. Auto-advancing combat→combat
+  // felt jarring; the cartographer-feel demands every transition be a click.
+  // The "fork" name is now a slight misnomer — it really means "awaiting any
+  // next-node choice, even a single one" — kept for blast-radius reasons.
   return {
     runState: {
       ...runState,
@@ -300,6 +297,7 @@ export function pressOn(runState: RunState, rng: Rng): RunState {
     currentNodeId: startNodeId,
     awaitingFork: false,
     status: 'in_dungeon',
+    traversedNodeIds: [startNodeId],
   };
 }
 
@@ -366,9 +364,12 @@ export function leaveShop(runState: RunState): RunState {
   if (cur.type !== 'shop') {
     throw new Error(`leaveShop: current node is type '${cur.type}', not 'shop'`);
   }
+  // Stay at the shop and flag awaitingFork — the player clicks the next-row
+  // node to advance. This also fixes the "shop at fork-source silently picks
+  // branch 0" bug; the map now offers both branches as click targets.
   return {
     ...runState,
-    currentNodeId: cur.nextNodeIds[0],
+    awaitingFork: true,
   };
 }
 
@@ -383,7 +384,7 @@ export function claimTreasure(runState: RunState, item: Item): RunState {
   return {
     ...runState,
     pack: addItem(runState.pack, item),
-    currentNodeId: cur.nextNodeIds[0],
+    awaitingFork: true,
   };
 }
 
