@@ -79,4 +79,34 @@ describe('computeMapLayout', () => {
     expect(layout.edges).toHaveLength(0);
     expect(layout.rowCount).toBe(0);
   });
+
+  it('uses slot-based y positioning when nodes carry a slot field', () => {
+    const { nodes } = generateFloor('crypt', 1, createRng(1));
+    const layout = computeMapLayout(nodes, VIEWPORT);
+    // VIEWPORT = { left: 100, top: 80, width: 760, height: 360 }.
+    // Slot 0 → top + height × 1/4 = 80 + 90 = 170.
+    // Slot 1 → top + height × 2/4 = 80 + 180 = 260.
+    // Slot 2 → top + height × 3/4 = 80 + 270 = 350.
+    for (const node of nodes) {
+      const slot = (node as { slot: 0 | 1 | 2 }).slot;
+      const expectedY = slot === 0 ? 170 : slot === 1 ? 260 : 350;
+      expect(layout.positions.get(node.id)!.y).toBe(expectedY);
+    }
+  });
+
+  it('falls back to even distribution when no slot field present (pre-2b saves)', () => {
+    // Synthetic 3-node DAG with no `slot` field anywhere. Cast through `unknown`
+    // to deliberately omit the field — exercises the legacy-save fallback path.
+    const nodes: Node[] = [
+      { id: 'a',  type: 'combat', encounter: { enemies: [], scale: { hp: 1, attack: 1 } }, nextNodeIds: ['b1', 'b2'] } as unknown as Node,
+      { id: 'b1', type: 'boss',   encounter: { enemies: [], scale: { hp: 1, attack: 1 } }, nextNodeIds: [] } as unknown as Node,
+      { id: 'b2', type: 'boss',   encounter: { enemies: [], scale: { hp: 1, attack: 1 } }, nextNodeIds: [] } as unknown as Node,
+    ];
+    const layout = computeMapLayout(nodes, VIEWPORT);
+    // Even distribution for the 2-node row [b1, b2]: y at 1/3 and 2/3 of height.
+    // top + height × 1/3 = 80 + 120 = 200; top + height × 2/3 = 80 + 240 = 320.
+    // byRow's per-row sort is alphabetical by id, so b1 → 200 and b2 → 320.
+    expect(layout.positions.get('b1')!.y).toBe(200);
+    expect(layout.positions.get('b2')!.y).toBe(320);
+  });
 });

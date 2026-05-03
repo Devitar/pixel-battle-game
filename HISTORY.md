@@ -29,6 +29,23 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-03 · Phase 2b — New 8/9/10-row DAG floor generator (Cluster B · 30)
+
+- **Why:** TODO #30 Phase 2b. Replaces the 12-fork-shape 5-node generator with row-by-row DAG construction satisfying TODO #30 Q3/Q4/Q6 design constraints: 8/9/10 rows per floor depth, 1-3 columns per middle row, strict no-cross edges via a 3-slot grid + slot ±1 rule, quota-based type assignment with adjacency / back-to-back / penultimate-row constraints. The structural payoff of the map redesign — the floor finally has shape.
+- **Decisions:**
+  - **Row-by-row construction over StS path-tracing.** Maps cleanly to the existing data model and to Phase 1's layout module. Constraints are local (slot ±1 + monotonic-target → no crossings; consecutive-in-slot-sorted-row → adjacency; predecessor-types → back-to-back).
+  - **Quota-based pre-roll over per-row weighted random.** Absolute counts (1 shop / 1 camp / 1-2 treasure / 1-2 event) are guaranteed by construction; the multiset is shuffled and placed with adjacency-violation swaps.
+  - **3-slot grid + `slot` field on Node.** Slot is data-shape-self-describing — generator writes, layout reads. Additive on the union variants (no schema bump). Pre-2b in-flight saves load via the layout-module fallback path that uses even-distribution-by-row-index when `slot` is absent.
+  - **Combat→combat allowed; specials forbidden back-to-back.** Distribution math forces this — combat is ~50% so strict alternation is impossible. Same-row adjacency applies to ALL types (including combat).
+  - **Bounded retries (100) on infeasible quotas + placement failures.** A small middle-node count can produce `combat < 0` after specials, and Pass 7's left-to-right placement can occasionally hit a "remaining list has only same-type-as-left" state. The retry budget bumps the seed and re-rolls; tests confirm 0 failures across 2000 seeds.
+- **Surprises:**
+  - **Slot ±1 alone doesn't prevent edge crossings.** Discovered via a failing test: with row-r slots [0, 1] and row-(r+1) slots [0, 1], node-A at slot 0 → slot 1 AND node-C at slot 1 → slot 0 satisfies slot ±1 but the edges cross visually. Fix: left-to-right iteration tracks `curMin = max-target-slot of already-processed row-r nodes`, and each subsequent row-r node's targets are restricted to `slot ≥ curMin`. The constraint is what StS calls the "monotonic right-leg" rule.
+  - **Pass 8's penult-row swap can introduce path-back-to-back violations downstream.** The original re-validation only checked left/right siblings + predecessors of the swap targets. A swap can introduce a violation where the swapped node's *successor* shares the new special type. Added explicit successor-type check to the re-validation.
+  - **Adding `slot` to the Node union rippled into 3 test fixtures.** `claimTreasure` test (treasure node), eliteEncounter test (synthetic elite), camp test (synthetic camp) all constructed Node literals directly; each needed `slot: 1`. TS strict mode caught all three at typecheck.
+  - **`advanceToBossNode` and shop helpers in run_state.test.ts depended on old fork shape semantics.** Generalized: walks any node type (combat → completeCombat, shop → leaveShop, camp → chooseCampNodeEffect, event/treasure → chooseNextNode); fork branch picker uses combat → elite → shop → camp → fallback. Single helper now works for any topology Phase 2b produces.
+  - **Many tests had hardcoded old IDs** (`crypt-f1-n0`, `crypt-f1-n2a`, `crypt-f1-boss`). Topology-agnostic rewrite: derive IDs from `currentFloorNodes` lookup. Where tests asserted "fork at row 1," replaced with `advanceToFork()` helper that walks until any fork node is reached.
+- **Source:** TODO.md Cluster B · 30 Phase 2b. Plan: `docs/superpowers/plans/2026-05-03-phase-2b-dag-generator.md`. Spec: `docs/superpowers/specs/2026-05-03-phase-2b-dag-generator-design.md`. Test count delta: 1433 → 1445 (+12: ~30 new floor tests added, ~18 old shape tests removed; helper tests stayed; run_state tests rewritten in-place).
+
 ### 2026-05-03 · Treasure rooms — Phase 2a (Cluster B · 30)
 
 - **Why:** TODO #30 Phase 2a (split out from Phase 2 during the 2026-05-02 brainstorm). Adds the new `'treasure'` node type + click-to-open overlay UI inside the existing 5-node fork generator, before Phase 2b changes the floor topology. Splitting separates two variables — the chest mechanic gets playtested in the familiar topology before topology itself moves.

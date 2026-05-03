@@ -65,11 +65,25 @@ export function computeMapLayout(
 
   const positions = new Map<string, MapLayoutPosition>();
   const colSpacing = rowCount > 1 ? options.width / (rowCount - 1) : 0;
+  // Slot-based y positioning (3-slot grid: slot 0 = top-third, slot 1 = mid,
+  // slot 2 = bottom-third). When a node has no `slot` field (legacy save data
+  // from before Phase 2b), fall back to even distribution by within-row index
+  // (Phase 1 behavior).
+  const slotById = new Map<string, 0 | 1 | 2 | undefined>();
+  for (const node of nodes) {
+    slotById.set(node.id, (node as { slot?: 0 | 1 | 2 }).slot);
+  }
+  const ySlotBased = (slot: 0 | 1 | 2): number =>
+    options.top + (options.height * (slot + 1)) / 4;
+  const yEvenFallback = (rowIndex: number, rowSize: number): number =>
+    options.top + (options.height * (rowIndex + 1)) / (rowSize + 1);
+
   for (const [d, ids] of byRow) {
     const x = options.left + d * colSpacing;
     const n = ids.length;
     for (let i = 0; i < n; i++) {
-      const y = options.top + (options.height * (i + 1)) / (n + 1);
+      const slot = slotById.get(ids[i]);
+      const y = slot !== undefined ? ySlotBased(slot) : yEvenFallback(i, n);
       positions.set(ids[i], { x, y });
     }
   }

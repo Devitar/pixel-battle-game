@@ -25,12 +25,12 @@ export interface ShopItem {
 }
 
 export type Node =
-  | { id: string; type: 'combat'; encounter: Encounter; nextNodeIds: readonly string[] }
-  | { id: string; type: 'elite';  encounter: Encounter; nextNodeIds: readonly string[] }
-  | { id: string; type: 'boss';   encounter: Encounter; nextNodeIds: readonly string[] }
-  | { id: string; type: 'shop';   inventory: readonly ShopItem[]; nextNodeIds: readonly string[] }
-  | { id: string; type: 'camp';   nextNodeIds: readonly string[] }
-  | { id: string; type: 'event';  cardId: EventCardId; nextNodeIds: readonly string[] }
-  | { id: string; type: 'treasure'; nextNodeIds: readonly string[] };
+  | { id: string; type: 'combat'; encounter: Encounter; nextNodeIds: readonly string[]; slot: 0 | 1 | 2 }
+  | { id: string; type: 'elite';  encounter: Encounter; nextNodeIds: readonly string[]; slot: 0 | 1 | 2 }
+  | { id: string; type: 'boss';   encounter: Encounter; nextNodeIds: readonly string[]; slot: 0 | 1 | 2 }
+  | { id: string; type: 'shop';   inventory: readonly ShopItem[]; nextNodeIds: readonly string[]; slot: 0 | 1 | 2 }
+  | { id: string; type: 'camp';   nextNodeIds: readonly string[]; slot: 0 | 1 | 2 }
+  | { id: string; type: 'event';  cardId: EventCardId; nextNodeIds: readonly string[]; slot: 0 | 1 | 2 }
+  | { id: string; type: 'treasure'; nextNodeIds: readonly string[]; slot: 0 | 1 | 2 };
 
 export type NodeType = Node['type'];
