@@ -3,13 +3,13 @@ import { createRng } from '@util/rng';
 import { rollEventItem, rollLoot } from '../loot';
 
 describe('rollLoot — drop gate', () => {
-  it('returns null roughly half the time at a non-boss combat node', () => {
+  it('drops at roughly 10% on a non-boss combat node (Phase 5 retune from 50%)', () => {
     let drops = 0;
     for (let seed = 1; seed <= 1000; seed++) {
       if (rollLoot(createRng(seed), 1, 'combat') !== null) drops += 1;
     }
-    expect(drops).toBeGreaterThanOrEqual(400);
-    expect(drops).toBeLessThanOrEqual(600);
+    expect(drops).toBeGreaterThanOrEqual(60);
+    expect(drops).toBeLessThanOrEqual(150);
   });
 
   it('always returns an item on a boss node', () => {

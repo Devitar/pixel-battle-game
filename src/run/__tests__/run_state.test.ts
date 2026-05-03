@@ -461,9 +461,11 @@ describe('completeCombat — XP awards', () => {
 
 describe('completeCombat — loot drop', () => {
   it('drops items into the pack on victory', () => {
+    // Phase 5 dropped combat-loot rate from 50% to 10%, so attempts bumped
+    // from 30 to 100 to keep this test reliable (P(no drop in 100 @ 10%) ≈ 0.003%).
     let rs = startRun('crypt', makeParty(), 1, createRng(1));
     let foundItem = false;
-    for (let attempt = 0; attempt < 30 && !foundItem; attempt++) {
+    for (let attempt = 0; attempt < 100 && !foundItem; attempt++) {
       const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
       const { runState: next } = completeCombat(rs, result, createRng(attempt + 1));
       if (next.pack.items.length > rs.pack.items.length) {

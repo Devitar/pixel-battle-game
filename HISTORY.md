@@ -29,6 +29,14 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-03 · Map-based dungeon scene — Phase 5 (combat loot rate reduction) (Cluster B · 30)
+
+- **Why:** TODO #30 Phase 5. Treasure rooms (guaranteed drop) shipped in Phase 2a but couldn't fully shine while combat drops fired at 50%. This phase widens the gap so treasure rooms become the predictable loot path and combat drops become an occasional bonus, restoring the strategic value of picking treasure-vs-combat at a fork.
+- **Decisions:**
+  - **Combat 10%, elite 50% (unchanged at 100% guaranteed rare actually), boss unchanged.** User-locked: regular combat 10%, elite stays at its existing 100% guaranteed-rare. The retune is surgical — one constant in `rollLoot` (`0.5` → `0.1`); rarity weights, scaling, and slot uniformity all unchanged. Elite combats remain a deliberate fork-pick that rewards the harder fight; bosses still always drop.
+  - **Bumped the integration test's attempt cap from 30 → 100.** The "drops items into the pack on victory" test in `run_state.test.ts` runs combats until it sees a drop; at 50% the 30-attempt cap was comfortable, at 10% it would have been ~4% flake risk. 100 attempts is ~0.003% flake — safe.
+- **Source:** TODO.md Cluster B · 30 Phase 5. No separate plan file (single-knob change). Spec is the locked rate captured in this conversation. Test count delta: 1471 → 1471 (no test added; one rate assertion retuned, one attempt cap bumped).
+
 ### 2026-05-03 · Map-based dungeon scene — Phase 4 (travel animation) (Cluster B · 30)
 
 - **Why:** TODO #30 Phase 4. Original framing was "heroes walk-tween between nodes; player can fast-forward." After Phase 3's click-to-advance change, the existing `walking_to_next` tween was no longer zero-distance — it already animates real inter-node movement. So Phase 4 was scoped down to: add the speed control + clean up the now-dead `processCombatReturn` snap.

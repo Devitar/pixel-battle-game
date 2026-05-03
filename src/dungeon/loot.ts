@@ -183,14 +183,15 @@ export type LootKind = 'combat' | 'elite' | 'boss' | 'treasure';
 
 export function rollLoot(rng: Rng, floorNumber: number, kind: LootKind): Item | null {
   if (kind === 'combat') {
-    if (rng.next() >= 0.5) return null;
+    if (rng.next() >= 0.1) return null;
   }
   // Per-kind policy:
-  //   combat:    50% drop gate (above), current-floor rarity table, current-floor scaling.
+  //   combat:    10% drop gate (above), current-floor rarity table, current-floor scaling.
+  //              Phase 5 dropped this from 50% → 10% to make treasure rooms the
+  //              predictable loot path; combat drops are now an occasional bonus.
   //   elite:     guaranteed drop, forced rarity = rare, current-floor scaling.
   //   boss:      guaranteed drop, NEXT-floor rarity weights, current-floor affix scaling.
   //   treasure:  guaranteed drop, current-floor rarity table, current-floor scaling.
-  //              (Predictability is the value vs. combat; rarity bias is left to Phase 5.)
   const effectiveFloor = kind === 'boss' ? floorNumber + 1 : floorNumber;
 
   const slot = rng.pick(ALL_SLOTS);
