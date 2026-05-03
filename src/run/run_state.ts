@@ -3,7 +3,7 @@ import { applyLevelUps, levelForXp, xpForBossNode, xpForCombatNode, xpForEliteNo
 import { DEFAULT_WOUND_RUNS_REMAINING } from '@data/wounds';
 import { applyCampNodeEffect, type CampNodeChoice } from '@dungeon/camp_node';
 import { generateFloor } from '@dungeon/floor';
-import { rollLoot, type CombatKind } from '@dungeon/loot';
+import { rollLoot, type LootKind } from '@dungeon/loot';
 import type { Node } from '@dungeon/node';
 import type { CombatEvent, CombatResult } from '@combat/types';
 import type { Hero } from '@heroes/hero';
@@ -207,11 +207,12 @@ export function completeCombat(
   if (
     completedNode.type === 'shop' ||
     completedNode.type === 'camp' ||
-    completedNode.type === 'event'
+    completedNode.type === 'event' ||
+    completedNode.type === 'treasure'
   ) {
     throw new Error(`completeCombat: current node is type '${completedNode.type}', not a combat-bearing node`);
   }
-  const kind: CombatKind = completedNode.type;
+  const kind: LootKind = completedNode.type;
   const isBoss = kind === 'boss';
   const fanout = completedNode.nextNodeIds;
 
@@ -367,6 +368,21 @@ export function leaveShop(runState: RunState): RunState {
   }
   return {
     ...runState,
+    currentNodeId: cur.nextNodeIds[0],
+  };
+}
+
+export function claimTreasure(runState: RunState, item: Item): RunState {
+  if (runState.status !== 'in_dungeon') {
+    throw new Error(`claimTreasure: status must be 'in_dungeon', got '${runState.status}'`);
+  }
+  const cur = currentNode(runState);
+  if (cur.type !== 'treasure') {
+    throw new Error(`claimTreasure: current node is type '${cur.type}', not 'treasure'`);
+  }
+  return {
+    ...runState,
+    pack: addItem(runState.pack, item),
     currentNodeId: cur.nextNodeIds[0],
   };
 }

@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-03 · Treasure rooms — Phase 2a (Cluster B · 30)
+
+- **Why:** TODO #30 Phase 2a (split out from Phase 2 during the 2026-05-02 brainstorm). Adds the new `'treasure'` node type + click-to-open overlay UI inside the existing 5-node fork generator, before Phase 2b changes the floor topology. Splitting separates two variables — the chest mechanic gets playtested in the familiar topology before topology itself moves.
+- **Decisions:**
+  - **Click-to-open chest, not pick-from-N.** Two clicks total (open → take). Treasure is a discovery moment, not a decision; pick-from-N would duplicate shop tension and make shops feel worse.
+  - **Current-floor rarity weights, guaranteed drop.** Identical to combat-loot logic minus the 50% gate. Predictability is the value, not rarity bias. Phase 5's combat-loot rate reduction will widen the gap automatically; no need to pre-tune.
+  - **Two fork-shape pairings** (`treasure_vs_combat`, `treasure_vs_elite`) — the two with real "skip the fight for free loot" tension. 12 shapes total; treasure in ~17% of forks ≈ ~50% of 3-floor runs. Enough to validate the UI without bumping the rate to where Phase 2b's distribution rules feel anticlimactic later.
+  - **`CombatKind` renamed to `LootKind`.** The name no longer fit once treasure (non-combat) joined the union. Callers updated in lockstep (`run_state.ts`).
+- **Surprises:**
+  - **Adding a `Node` variant rippled into call sites that didn't filter non-encounter nodes.** Two surfaced: `combat_scene.ts`'s defensive guard (now also rejects `'treasure'`) and `floor.test.ts`'s "every encounter has scale" loop (now also `continue`s past `'treasure'`). Clean signal; both fixes were one-line additions to existing exclusion lists.
+  - **A latent bug in `advanceToBossNode`'s test helper surfaced.** The picker was `combat ?? elite ?? choices[0]`, which for `event_vs_camp`/`event_vs_shop` shapes could land on event and break the next iteration's `completeCombat`. Pre-existing — but adding 2 fork shapes shifted the RNG distribution so seed 1 of three boss-walk tests now rolled an event-bearing shape. Fixed by extending the priority chain to `combat ?? elite ?? shop ?? camp ?? choices[0]`; every shape has at least one combat/elite/shop/camp branch, so the fallback never fires for event/treasure now.
+  - **The XP-after-boss test had a hardcoded "3 combat clears = 15 XP" assumption.** The new picker priority can pick shop/camp branches as fallback (0 XP), so total varied by seed. Refactored to assert the boss-XP delta against pre-boss XP instead of an absolute total — robust to any path the helper takes.
+  - **Generator-time vs. scene-time RNG.** Treasure branches consume zero RNG during `generateFloor` (loot is rolled at scene-time via `runRngState`, mirroring how event cards resolve). This keeps the generator's RNG-consumption deterministic regardless of which fork shape rolled — same property the camp branch already relied on.
+- **Source:** TODO.md Cluster B · 30 Phase 2a. Plan: `docs/superpowers/plans/2026-05-02-treasure-rooms.md`. Spec: `docs/superpowers/specs/2026-05-02-treasure-rooms-design.md`. Test count delta: 1421 → 1433 (+12: claimTreasure ×5, treasure rollLoot ×5, per-shape ×2).
+
 ### 2026-05-02 · Map-based dungeon scene — Phase 1 (renderer scaffold) (Cluster B · 30)
 
 - **Why:** The icon-row dungeon view picked branch 0 silently at forks (lying about topology), revealed all future node types up front, and didn't fit the gdd's "Expeditions" / cartographer-party fiction. Phase 1 of the locked map redesign (TODO #30, brainstormed 2026-05-02) replaces the visualization with a node graph — *visually transformed, functionally similar* — without changing combat flow or the floor generator.

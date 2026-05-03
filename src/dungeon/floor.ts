@@ -20,19 +20,23 @@ type ForkShape =
   | 'event_vs_combat'
   | 'event_vs_shop'
   | 'event_vs_elite'
-  | 'event_vs_camp';
+  | 'event_vs_camp'
+  | 'treasure_vs_combat'
+  | 'treasure_vs_elite';
 
 const FORK_SHAPE_WEIGHTS: readonly WeightedOption<ForkShape>[] = [
-  { value: 'shop_vs_combat',  weight: 1 },
-  { value: 'elite_vs_combat', weight: 1 },
-  { value: 'elite_vs_shop',   weight: 1 },
-  { value: 'camp_vs_combat',  weight: 1 },
-  { value: 'camp_vs_shop',    weight: 1 },
-  { value: 'camp_vs_elite',   weight: 1 },
-  { value: 'event_vs_combat', weight: 1 },
-  { value: 'event_vs_shop',   weight: 1 },
-  { value: 'event_vs_elite',  weight: 1 },
-  { value: 'event_vs_camp',   weight: 1 },
+  { value: 'shop_vs_combat',     weight: 1 },
+  { value: 'elite_vs_combat',    weight: 1 },
+  { value: 'elite_vs_shop',      weight: 1 },
+  { value: 'camp_vs_combat',     weight: 1 },
+  { value: 'camp_vs_shop',       weight: 1 },
+  { value: 'camp_vs_elite',      weight: 1 },
+  { value: 'event_vs_combat',    weight: 1 },
+  { value: 'event_vs_shop',      weight: 1 },
+  { value: 'event_vs_elite',     weight: 1 },
+  { value: 'event_vs_camp',      weight: 1 },
+  { value: 'treasure_vs_combat', weight: 1 },
+  { value: 'treasure_vs_elite',  weight: 1 },
 ];
 
 export function generateFloor(
@@ -72,12 +76,14 @@ export function generateFloor(
     shape === 'shop_vs_combat' ||
     shape === 'elite_vs_combat' ||
     shape === 'camp_vs_combat' ||
-    shape === 'event_vs_combat';
+    shape === 'event_vs_combat' ||
+    shape === 'treasure_vs_combat';
   const usesEliteBranch =
     shape === 'elite_vs_combat' ||
     shape === 'elite_vs_shop' ||
     shape === 'camp_vs_elite' ||
-    shape === 'event_vs_elite';
+    shape === 'event_vs_elite' ||
+    shape === 'treasure_vs_elite';
   const usesShopBranch =
     shape === 'shop_vs_combat' ||
     shape === 'elite_vs_shop' ||
@@ -93,6 +99,9 @@ export function generateFloor(
     shape === 'event_vs_shop' ||
     shape === 'event_vs_elite' ||
     shape === 'event_vs_camp';
+  const usesTreasureBranch =
+    shape === 'treasure_vs_combat' ||
+    shape === 'treasure_vs_elite';
 
   const combatBranchEncRaw = usesCombatBranch
     ? composeCombatEncounter(dungeon.enemyPool, scale, rng)
@@ -147,6 +156,12 @@ export function generateFloor(
     }
     return { id, type: 'event', cardId: eventBranchCardId, nextNodeIds: [idBoss] };
   };
+  const buildTreasureBranch = (id: string): Node => {
+    if (!usesTreasureBranch) {
+      throw new Error(`generateFloor: treasure branch not in shape '${shape}'`);
+    }
+    return { id, type: 'treasure', nextNodeIds: [idBoss] };
+  };
 
   let node2a: Node;
   let node2b: Node;
@@ -190,6 +205,14 @@ export function generateFloor(
     case 'event_vs_camp':
       node2a = specialOnBranchA ? buildEventBranch(id2a)  : buildCampBranch(id2a);
       node2b = specialOnBranchA ? buildCampBranch(id2b)   : buildEventBranch(id2b);
+      break;
+    case 'treasure_vs_combat':
+      node2a = specialOnBranchA ? buildTreasureBranch(id2a) : buildCombatBranch(id2a);
+      node2b = specialOnBranchA ? buildCombatBranch(id2b)   : buildTreasureBranch(id2b);
+      break;
+    case 'treasure_vs_elite':
+      node2a = specialOnBranchA ? buildTreasureBranch(id2a) : buildEliteBranch(id2a);
+      node2b = specialOnBranchA ? buildEliteBranch(id2b)    : buildTreasureBranch(id2b);
       break;
   }
 

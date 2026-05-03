@@ -30,6 +30,7 @@ export type Node =
   | { id: string; type: 'boss';   encounter: Encounter; nextNodeIds: readonly string[] }
   | { id: string; type: 'shop';   inventory: readonly ShopItem[]; nextNodeIds: readonly string[] }
   | { id: string; type: 'camp';   nextNodeIds: readonly string[] }
-  | { id: string; type: 'event';  cardId: EventCardId; nextNodeIds: readonly string[] };
+  | { id: string; type: 'event';  cardId: EventCardId; nextNodeIds: readonly string[] }
+  | { id: string; type: 'treasure'; nextNodeIds: readonly string[] };
 
 export type NodeType = Node['type'];

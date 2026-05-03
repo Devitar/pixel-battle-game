@@ -57,10 +57,10 @@ export class CombatScene extends Phaser.Scene {
 
     const run = state.runState;
     const node = currentNode(run);
-    if (node.type === 'shop' || node.type === 'camp' || node.type === 'event') {
+    if (node.type === 'shop' || node.type === 'camp' || node.type === 'event' || node.type === 'treasure') {
       // Shouldn't happen — the dungeon scene's handleArrival routes shop, camp,
-      // and event nodes away from combat. Defensive guard keeps the type system
-      // happy and catches state-machine bugs.
+      // event, and treasure nodes away from combat. Defensive guard keeps the
+      // type system happy and catches state-machine bugs.
       console.warn(`CombatScene entered with non-combat node type '${node.type}'; returning to dungeon`);
       this.scene.start('dungeon');
       return;

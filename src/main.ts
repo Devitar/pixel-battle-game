@@ -18,6 +18,7 @@ import { ExpeditionsPanelScene } from './scenes/expeditions_panel_scene';
 import { PerkOverlayScene } from './scenes/perk_overlay_scene';
 import { ShopOverlayScene } from './scenes/shop_overlay_scene';
 import { TavernPanelScene } from './scenes/tavern_panel_scene';
+import { TreasureRoomOverlayScene } from './scenes/treasure_room_overlay_scene';
 import { installPwaPrompt } from './util/pwa_install_prompt';
 
 new Phaser.Game({
@@ -48,6 +49,7 @@ new Phaser.Game({
     ShopOverlayScene,
     CampNodeOverlayScene,
     EventOverlayScene,
+    TreasureRoomOverlayScene,
     MainScene,
     ExplorerScene,
   ],

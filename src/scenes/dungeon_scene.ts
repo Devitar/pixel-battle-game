@@ -331,6 +331,11 @@ export class DungeonScene extends Phaser.Scene {
       this.scene.pause();
       return;
     }
+    if (node.type === 'treasure') {
+      this.scene.launch('treasure_room_overlay');
+      this.scene.pause();
+      return;
+    }
 
     this.startCombatAtCurrentNode();
   }
@@ -726,12 +731,13 @@ export class DungeonScene extends Phaser.Scene {
 
 function glyphForNodeType(type: Node['type']): string {
   switch (type) {
-    case 'boss':  return '☠';
-    case 'shop':  return '🛒';
-    case 'elite': return '💀';
-    case 'camp':  return '🏕';
-    case 'event': return '❓';
+    case 'boss':     return '☠';
+    case 'shop':     return '🛒';
+    case 'elite':    return '💀';
+    case 'camp':     return '🏕';
+    case 'event':    return '❓';
+    case 'treasure': return '📦';
     case 'combat':
-    default:      return '⚔';
+    default:         return '⚔';
   }
 }

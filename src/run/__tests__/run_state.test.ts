@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHeroCombatant } from '@combat/combatant';
 import type { CombatResult, CombatState } from '@combat/types';
 import { xpForEliteNode } from '@data/leveling';
-import type { SlotIndex } from '@data/types';
+import type { Item, SlotIndex } from '@data/types';
 import type { Encounter, Node } from '@dungeon/node';
 import { createHero, type Hero } from '@heroes/hero';
 import { createRng } from '@util/rng';
@@ -10,6 +10,7 @@ import {
   cashout,
   chooseCampNodeEffect,
   chooseNextNode,
+  claimTreasure,
   completeCombat,
   currentNode,
   leaveShop,
@@ -69,11 +70,17 @@ function advanceToBossNode(rsArg: ReturnType<typeof startRun>): ReturnType<typeo
     rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
     if (rs.awaitingFork) {
       const choices = nextNodeChoices(rs);
-      const combatBranch =
+      // Prefer handleable branch types; the loop body knows how to advance past
+      // combat / elite / shop / camp nodes but not event / treasure. Every fork
+      // shape pairs at least one handleable type with anything else, so this
+      // priority chain never has to fall through to choices[0].
+      const handleableBranch =
         choices.find((n) => n.type === 'combat') ??
         choices.find((n) => n.type === 'elite') ??
+        choices.find((n) => n.type === 'shop') ??
+        choices.find((n) => n.type === 'camp') ??
         choices[0];
-      rs = chooseNextNode(rs, combatBranch.id);
+      rs = chooseNextNode(rs, handleableBranch.id);
     }
   }
 }
@@ -306,12 +313,14 @@ describe('completeCombat — XP awards', () => {
   it('awards 30×floor XP after a boss victory', () => {
     let rs = startRun('crypt', makeParty(), 1, createRng(1));
     rs = advanceToBossNode(rs);
-    // Path so far = 3 combat clears (n0 + n1 + branch), so each survivor has 15 XP.
+    // Capture per-hero XP after the path walk; advanceToBossNode's path varies
+    // by which fork shape RNG rolled (combat/elite/shop/camp branch). The test
+    // pins the boss-XP delta, not the absolute total.
+    const preBossXp = rs.party.map((h) => h.xp);
     const bossResult = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
     const { runState: rs2 } = completeCombat(rs, bossResult, createRng(99));
-    // 15 (combat) + 30 (boss) = 45.
-    for (const hero of rs2.party) {
-      expect(hero.xp).toBe(45);
+    for (let i = 0; i < rs2.party.length; i++) {
+      expect(rs2.party[i].xp).toBe(preBossXp[i] + 30);
     }
   });
 
@@ -380,11 +389,15 @@ describe('completeCombat — loot drop', () => {
       }
       rs = next;
       if (rs.awaitingFork) {
-        // Prefer combat-bearing branches so completeCombat doesn't throw next iteration.
+        // Prefer combat-bearing then handleable branches so completeCombat
+        // doesn't throw next iteration. Every fork shape has at least one
+        // combat/elite/shop/camp branch — never falls through to choices[0].
         const choices = nextNodeChoices(rs);
         const branch =
           choices.find((n) => n.type === 'combat') ??
           choices.find((n) => n.type === 'elite') ??
+          choices.find((n) => n.type === 'shop') ??
+          choices.find((n) => n.type === 'camp') ??
           choices[0];
         rs = chooseNextNode(rs, branch.id);
       }
@@ -865,5 +878,70 @@ describe('completeCombat wipe — Lost vs Fallen separation', () => {
     expect(wipe).toBeDefined();
     expect(wipe!.heroesLost).toEqual([]);
     expect(wipe!.heroesFallen).toHaveLength(3);
+  });
+});
+
+describe('claimTreasure', () => {
+  function makeRunWithTreasureNode(): ReturnType<typeof startRun> {
+    const baseRun = startRun('crypt', makeParty(), 1, createRng(1));
+    // Substitute a synthetic 2-node floor: treasure → boss. Exercises the
+    // helper in isolation regardless of what generateFloor rolled.
+    const treasureNode: Node = { id: 't0', type: 'treasure', nextNodeIds: ['t-boss'] };
+    const bossNode: Node = baseRun.currentFloorNodes.find((n) => n.type === 'boss')!;
+    return {
+      ...baseRun,
+      currentFloorNodes: [treasureNode, { ...bossNode, id: 't-boss' }],
+      currentNodeId: 't0',
+    };
+  }
+
+  function makeItem(): Item {
+    return {
+      id: 'item-test-1',
+      baseId: 'sword_basic',
+      slot: 'weapon',
+      rarity: 'common',
+      weaponType: 'sword',
+      affixes: [],
+      floorRolledAt: 1,
+    };
+  }
+
+  it('adds the item to the pack', () => {
+    const run = makeRunWithTreasureNode();
+    const item = makeItem();
+    const next = claimTreasure(run, item);
+    expect(next.pack.items).toHaveLength(run.pack.items.length + 1);
+    expect(next.pack.items[next.pack.items.length - 1]).toEqual(item);
+  });
+
+  it('advances currentNodeId to the (single) successor', () => {
+    const run = makeRunWithTreasureNode();
+    const next = claimTreasure(run, makeItem());
+    expect(next.currentNodeId).toBe('t-boss');
+  });
+
+  it("throws if status is not 'in_dungeon'", () => {
+    const run = { ...makeRunWithTreasureNode(), status: 'camp_screen' as const };
+    expect(() => claimTreasure(run, makeItem())).toThrow(
+      /status must be 'in_dungeon'/,
+    );
+  });
+
+  it("throws if current node is not 'treasure'", () => {
+    const run = makeRunWithTreasureNode();
+    const wrongRun = { ...run, currentNodeId: 't-boss' };
+    expect(() => claimTreasure(wrongRun, makeItem())).toThrow(
+      /not 'treasure'/,
+    );
+  });
+
+  it('does not mutate the input runState', () => {
+    const run = makeRunWithTreasureNode();
+    const beforeNodeId = run.currentNodeId;
+    const beforePackLen = run.pack.items.length;
+    claimTreasure(run, makeItem());
+    expect(run.currentNodeId).toBe(beforeNodeId);
+    expect(run.pack.items).toHaveLength(beforePackLen);
   });
 });
