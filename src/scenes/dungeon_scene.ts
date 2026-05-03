@@ -34,6 +34,11 @@ const PARTY_TOKEN_Y_OFFSET = -32;
 
 const NODE_RADIUS = 18;
 
+const FF_X = 944;
+const FF_Y = 48;
+const FF_W = 60;
+const FF_H = 24;
+
 const COMBAT_NODE_REWARD = 15;
 const BOSS_NODE_REWARD = 100;
 
@@ -70,6 +75,14 @@ type NodeRenderState = keyof typeof NODE_FILL_BY_STATE;
 
 export class DungeonScene extends Phaser.Scene {
   private partyToken!: Phaser.GameObjects.Container;
+  private walkSpeed: 1 | 3 = 1;
+  // After walk-in, sit idle until the player clicks the current node to engage
+  // (combat / overlay). Subsequent arrivals reach the node via an explicit
+  // next-node click, so they auto-engage on arrival — only walk-in needs the
+  // extra gate to avoid the "ambushed-on-spawn" feel.
+  private awaitingEngage = false;
+  private ffBg!: Phaser.GameObjects.Rectangle;
+  private ffLabel!: Phaser.GameObjects.Text;
   private layout: MapLayout = { positions: new Map(), edges: [], rowCount: 0 };
   private visibility: VisibilityResult = {
     revealed: new Set(),
@@ -116,6 +129,8 @@ export class DungeonScene extends Phaser.Scene {
       this.scene.start('camp');
       return;
     }
+
+    this.walkSpeed = state.preferences?.walkSpeed ?? 1;
 
     this.layout = computeMapLayout(state.runState.currentFloorNodes, {
       left: MAP_LEFT,
@@ -183,8 +198,11 @@ export class DungeonScene extends Phaser.Scene {
       runRngState: rng.getState(),
     }));
 
-    // Snap the party token to the post-combat current node so the result panel
-    // is anchored sensibly. Actual walk animation lives in Phase 4.
+    // Combat → dungeon scene transition rebuilds the party token at
+    // PARTY_OFFSCREEN_X (scene.start destroys the previous scene's objects).
+    // Snap it to the just-cleared node so the result panel anchors correctly
+    // and the subsequent click-to-walk tween starts from the right origin
+    // instead of from off-screen.
     const posAfter = this.partyTokenPosFor(nextRun.currentNodeId);
     this.partyToken.x = posAfter.x;
     this.partyToken.y = posAfter.y;
@@ -223,6 +241,21 @@ export class DungeonScene extends Phaser.Scene {
         color: '#ffcc66',
       })
       .setOrigin(1, 0);
+
+    this.ffBg = this.add
+      .rectangle(FF_X, FF_Y, FF_W, FF_H, 0x222222)
+      .setOrigin(1, 0)
+      .setStrokeStyle(2, this.walkSpeed === 3 ? 0x44cc44 : 0x666666);
+    this.ffLabel = this.add
+      .text(FF_X - FF_W / 2, FF_Y + FF_H / 2, `${this.walkSpeed}×`, {
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5);
+    this.ffBg.setInteractive({ useHandCursor: true });
+    this.ffBg.on('pointerdown', () => this.toggleWalkSpeed());
+    this.input.keyboard?.on('keydown-F', () => this.toggleWalkSpeed());
   }
 
   private buildEdges(): void {
@@ -310,7 +343,7 @@ export class DungeonScene extends Phaser.Scene {
       case 'walking_in': {
         const target = this.partyTokenPosFor(this.currentNodeIdSafe());
         this.tweenPartyTo(target.x, target.y, WALK_IN_DURATION, 'Cubic.easeOut',
-          () => this.handleArrival());
+          () => this.handleWalkInArrival());
         break;
       }
       case 'walking_to_next': {
@@ -326,6 +359,21 @@ export class DungeonScene extends Phaser.Scene {
         this.buildWipePanel();
         break;
     }
+  }
+
+  private handleWalkInArrival(): void {
+    // Walk-in completes (fresh dungeon entry or post-reload). Don't auto-engage
+    // the current node; flag awaitingEngage so the player explicitly clicks the
+    // start node to begin. Avoids the jarring "ambushed-on-spawn" feel.
+    const run = appState.get().runState;
+    if (!run) return;
+    if (run.awaitingFork) {
+      // Reload landed mid-fork-pause; refreshNodeStates already lit fork
+      // choices. Sit idle and let the player click a next-row node.
+      return;
+    }
+    this.awaitingEngage = true;
+    this.refreshNodeStates();
   }
 
   private handleArrival(): void {
@@ -375,10 +423,23 @@ export class DungeonScene extends Phaser.Scene {
       targets: this.partyToken,
       x: targetX,
       y: targetY,
-      duration,
+      duration: duration / this.walkSpeed,
       ease,
       onComplete,
     });
+  }
+
+  private toggleWalkSpeed(): void {
+    this.walkSpeed = this.walkSpeed === 1 ? 3 : 1;
+    this.ffLabel.setText(`${this.walkSpeed}×`);
+    this.ffBg.setStrokeStyle(2, this.walkSpeed === 3 ? 0x44cc44 : 0x666666);
+    appState.update((s) => ({
+      ...s,
+      preferences: {
+        combatSpeed: s.preferences?.combatSpeed ?? 1,
+        walkSpeed: this.walkSpeed,
+      },
+    }));
   }
 
   private partyTokenPosFor(nodeId: string): { x: number; y: number } {
@@ -399,6 +460,16 @@ export class DungeonScene extends Phaser.Scene {
   private onNodeClicked(nodeId: string): void {
     const run = appState.get().runState;
     if (!run || run.status !== 'in_dungeon') return;
+
+    // Click on the current node when awaiting engage (post walk-in only):
+    // engage combat / open the overlay.
+    if (this.awaitingEngage && nodeId === run.currentNodeId) {
+      this.awaitingEngage = false;
+      this.refreshNodeStates();
+      this.handleArrival();
+      return;
+    }
+
     if (!run.awaitingFork) return;
     const cur = currentNode(run);
     if (!cur.nextNodeIds.includes(nodeId)) return;
@@ -459,7 +530,8 @@ export class DungeonScene extends Phaser.Scene {
       bg.setStrokeStyle(2, NODE_STROKE_BY_STATE[state]);
       glyph.setColor(GLYPH_COLOR_BY_STATE[state]);
       label.setColor(state === 'cleared' ? '#555555' : '#aaaaaa');
-      if (state === 'fork_choice' && !isGhost) {
+      const isAwaitingEngage = this.awaitingEngage && node.id === run.currentNodeId;
+      if ((state === 'fork_choice' && !isGhost) || isAwaitingEngage) {
         bg.setInteractive({ useHandCursor: true });
       } else {
         bg.disableInteractive();

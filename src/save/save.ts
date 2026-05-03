@@ -31,6 +31,7 @@ export interface SaveFile {
 
 export interface Preferences {
   combatSpeed: 1 | 3;
+  walkSpeed?: 1 | 3;
 }
 
 export function save(data: SaveFile, storage: Storage): void {

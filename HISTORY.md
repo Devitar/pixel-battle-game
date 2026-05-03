@@ -29,6 +29,18 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-03 · Map-based dungeon scene — Phase 4 (travel animation) (Cluster B · 30)
+
+- **Why:** TODO #30 Phase 4. Original framing was "heroes walk-tween between nodes; player can fast-forward." After Phase 3's click-to-advance change, the existing `walking_to_next` tween was no longer zero-distance — it already animates real inter-node movement. So Phase 4 was scoped down to: add the speed control + clean up the now-dead `processCombatReturn` snap.
+- **Decisions:**
+  - **Persistent 1×/3× preference over click-to-skip.** Click-to-skip would short-circuit any mid-travel event Phase 6+ adds (surprise encounters, passive HP changes, hero chatter). Persistent speed scales the tween while still letting events fire at proportional points. Mirrors the existing `Preferences.combatSpeed` pattern line-for-line; F key binding consistent with combat for one mental model: "F = fast-forward."
+  - **`walkSpeed` is optional on `Preferences`.** Old saves with no `walkSpeed` read as `undefined`, fall back to 1 via `?? 1` at the read sites. No `normalizeSaveFile` change needed — the field is leaf-level optional.
+  - **Click-to-engage gate after walk-in (added during smoke).** Without it, walking in to the dungeon auto-fired combat the moment the tween finished — jarring "ambushed-on-spawn" feel. New scene-local `awaitingEngage` flag set by `handleWalkInArrival`, cleared when player clicks the start node. Asymmetric by design: subsequent arrivals are reached via the player's own click on a next-row node, so auto-engage on arrival is consent-aligned. Only walk-in needs the extra gate.
+- **Surprises:**
+  - **Phase 4 was already 80% done.** The Phase 1 HISTORY entry called out that the existing tween scaffold "moves zero distance" and flagged Phase 4 as the place to fix it. The fix turned out to be Phase 3's click-to-advance change (chooseNextNode walks from old to new currentNodeId), not Phase 4's job at all. Phase 4 thus shrunk to the speed control plus cleanup.
+  - **The `processCombatReturn` snap was load-bearing, not dead.** Initial impl removed it as "no-op" reasoning the click-to-advance change made currentNodeId-after-combat the same as currentNodeId-before-combat. What I missed: `scene.start('dungeon')` from combat scene rebuilds the party token at PARTY_OFFSCREEN_X. Without the snap, every post-combat result panel anchored at off-screen and the next walk tween "walked the party in from off-screen" instead of from the cleared node. Restored with a comment explaining why it can't go away.
+- **Source:** TODO.md Cluster B · 30 Phase 4. Plan: `docs/superpowers/plans/2026-05-03-map-dungeon-phase-4-travel-animation.md`. Spec is the locked design captured in the plan header plus the smoke-surfaced engage-gate refinement. Test count delta: 1469 → 1471 (+2: walkSpeed roundtrip + old-save default).
+
 ### 2026-05-03 · Map-based dungeon scene — Phase 3 (fog-of-war) (Cluster B · 30)
 
 - **Why:** TODO #30 Phase 3. Replaces the icon-row-era "everything visible" with the locked Q2 cartographer-fog design — N=2 lookahead, total fog beyond, unanchored boss, past nodes stay revealed. The map redesign's narrative payoff: the dungeon stops telling the player what's coming and starts feeling like an unexplored space.
