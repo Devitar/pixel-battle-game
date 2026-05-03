@@ -29,6 +29,19 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-03 · Map-based dungeon scene — Phase 6a (travel scene + per-step HP) (Cluster B · 30)
+
+- **Why:** TODO #30 Phase 6+ decomposed during 2026-05-03 brainstorm into 6a/6b/6c. 6a builds the foundation: a dedicated `'travel'` scene replacing the Phase 4 inline `walking_to_next` tween, with bobbing/rotating hero sprites, per-hero HP bars, and one HP tick per edge as the first per-step event. 6b (chatter) and 6c (surprise encounters with in-corridor combat) layer onto the per-step infrastructure here.
+- **Decisions:**
+  - **New `'travel'` scene over overlay/inline-state.** The travel scene is a substantively different visual surface (corridor with bobbing heroes vs. the map graph). Overlay framing felt wrong — overlays are usually small panels. Inline state would bloat the dungeon scene. New scene keeps `dungeon_scene.ts` focused on the map and the travel scene focused on travel.
+  - **Bob + rotate over walk-cycle frames.** No walk-cycle sprite art exists; rather than an asset detour, vertical bob (±3px sine) + rotation (±5° sine) on existing static paperdolls reads as walking. Phase-offset per hero so they bob/rotate out of sync — looks more natural than synchronized.
+  - **Per-edge ±1 HP, floor at 1, never kills.** User-locked: travel chip damage cannot deliver the killing blow. Wounded hero at 1 HP enters the next combat at 1 HP and is in danger from any hit, but doesn't die from chip alone. Magnitude is small enough to be predictable balance (24 HP per run for a wounded hero ≈ 1 fight's worth).
+  - **State mutation pre-travel, not mid-travel.** `applyTravelTick` runs in `dungeon_scene.ts:onNodeClicked` BEFORE `scene.start('travel')`. Travel scene just animates popups for already-applied deltas. Trade-off: closing mid-travel and reopening shows the post-tick state at destination instead of mid-animation — but state is internally consistent and that's the right priority.
+  - **Walk-in (dungeon entry) does NOT use travel scene.** No "from" node to traverse from. Walk-in keeps the existing tween + Phase 4 `awaitingEngage` gate. Travel scene is only for inter-node transitions.
+- **Surprises:**
+  - **Mid-travel walk-speed toggle does not retroactively change the in-flight tween.** Phaser's `tweens.add` locks duration at start; toggling during a walk affects future travels only. Matches the combat scene's speed-toggle semantics; called out in scene comments so a future implementer doesn't try to "fix" it as a bug.
+- **Source:** TODO.md Cluster B · 30 Phase 6a. Spec: `docs/superpowers/specs/2026-05-03-phase-6a-travel-scene-design.md`. Plan: `docs/superpowers/plans/2026-05-03-phase-6a-travel-scene.md`. Test count delta: 1471 → 1479 (+8: applyTravelTick lifecycle).
+
 ### 2026-05-03 · Map-based dungeon scene — Phase 5 (combat loot rate reduction) (Cluster B · 30)
 
 - **Why:** TODO #30 Phase 5. Treasure rooms (guaranteed drop) shipped in Phase 2a but couldn't fully shine while combat drops fired at 50%. This phase widens the gap so treasure rooms become the predictable loot path and combat drops become an occasional bonus, restoring the strategic value of picking treasure-vs-combat at a fork.

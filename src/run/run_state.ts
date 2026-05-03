@@ -449,3 +449,36 @@ function woundsFromEvents(
   }
   return wounds;
 }
+
+/**
+ * Phase 6a per-edge HP tick. Evaluated once per edge during travel.
+ *
+ * Per hero (binary on wound presence):
+ * - `wounds.length > 0` → take -1 HP, floored at 1 (travel chip damage cannot kill).
+ * - `wounds.length === 0` → gain +1 HP, capped at maxHp.
+ *
+ * Returns the new run state and a `deltas` array indexed parallel to `runState.party`
+ * (each entry is -1, 0, or +1). The travel scene reads `deltas` to render per-hero
+ * popups; entries equal to 0 mean no popup should render.
+ *
+ * Pure: does not mutate the input runState.
+ */
+export function applyTravelTick(runState: RunState): { runState: RunState; deltas: readonly number[] } {
+  const deltas: number[] = [];
+  const newParty = runState.party.map((hero) => {
+    if (hero.wounds.length > 0) {
+      const newHp = Math.max(1, hero.currentHp - 1);
+      const delta = newHp - hero.currentHp;
+      deltas.push(delta);
+      return delta === 0 ? hero : { ...hero, currentHp: newHp };
+    }
+    const newHp = Math.min(hero.maxHp, hero.currentHp + 1);
+    const delta = newHp - hero.currentHp;
+    deltas.push(delta);
+    return delta === 0 ? hero : { ...hero, currentHp: newHp };
+  });
+  return {
+    runState: { ...runState, party: newParty },
+    deltas,
+  };
+}

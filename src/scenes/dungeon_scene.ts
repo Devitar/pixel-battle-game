@@ -9,6 +9,7 @@ import type { Item, Rarity } from '@data/types';
 import type { Hero } from '@heroes/hero';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import {
+  applyTravelTick,
   chooseNextNode,
   completeCombat,
   currentNode,
@@ -17,6 +18,7 @@ import {
 import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 import { consumeCombatResult } from './combat_handoff';
+import { setTravelDeltas } from './travel_handoff';
 
 type DungeonSceneState =
   | 'walking_in'
@@ -169,11 +171,24 @@ export class DungeonScene extends Phaser.Scene {
     const handoff = consumeCombatResult();
     if (handoff) {
       this.processCombatReturn(handoff.result, handoff.rngStateAfter);
-    } else {
+    } else if (state.runState.traversedNodeIds.length === 1) {
+      // First node of the floor — true walk-in from off-screen.
       this.refreshHud();
       this.refreshNodeStates();
       this.refreshStatusBar();
       this.setState('walking_in');
+    } else {
+      // Returning from travel scene — party is already at currentNodeId per
+      // the pre-travel state mutation. Snap the token (no walk-in tween) and
+      // auto-engage; the player chose this node by clicking, so consent is
+      // aligned (no awaitingEngage gate needed).
+      const pos = this.partyTokenPosFor(state.runState.currentNodeId);
+      this.partyToken.x = pos.x;
+      this.partyToken.y = pos.y;
+      this.refreshHud();
+      this.refreshNodeStates();
+      this.refreshStatusBar();
+      this.handleArrival();
     }
   }
 
@@ -473,12 +488,16 @@ export class DungeonScene extends Phaser.Scene {
     if (!run.awaitingFork) return;
     const cur = currentNode(run);
     if (!cur.nextNodeIds.includes(nodeId)) return;
-    appState.update((s) => ({
-      ...s,
-      runState: chooseNextNode(s.runState!, nodeId),
-    }));
-    this.refreshNodeStates();
-    this.setState('walking_to_next');
+
+    // Advance currentNodeId, then apply per-edge HP tick BEFORE handing off to
+    // the travel scene so saved state is consistent if the user closes mid-travel.
+    appState.update((s) => {
+      const advanced = chooseNextNode(s.runState!, nodeId);
+      const { runState: postTick, deltas } = applyTravelTick(advanced);
+      setTravelDeltas(deltas);
+      return { ...s, runState: postTick };
+    });
+    this.scene.start('travel');
   }
 
   private onNodeHover(nodeId: string, hovering: boolean): void {

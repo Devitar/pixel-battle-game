@@ -7,6 +7,7 @@ import type { Encounter, Node } from '@dungeon/node';
 import { createHero, type Hero } from '@heroes/hero';
 import { createRng } from '@util/rng';
 import {
+  applyTravelTick,
   cashout,
   chooseCampNodeEffect,
   chooseNextNode,
@@ -621,6 +622,99 @@ describe('traversedNodeIds (cartographer log)', () => {
       expect(rs.traversedNodeIds[rs.traversedNodeIds.length - 1]).toBe(rs.currentNodeId);
       if (rs.awaitingFork) break;
     }
+  });
+});
+
+describe('applyTravelTick', () => {
+  function makePartyWithStates(states: { hp: number; maxHp: number; wounded: boolean }[]): Hero[] {
+    return states.map((s, i) => {
+      const hero = createHero('knight', `H${i}`, `h${i}`, 'quick', 'body1');
+      return {
+        ...hero,
+        currentHp: s.hp,
+        maxHp: s.maxHp,
+        wounds: s.wounded ? [{ id: 'bruised' as const, runsRemaining: 5 }] : [],
+      };
+    });
+  }
+
+  function makeRunWithParty(party: Hero[]): ReturnType<typeof startRun> {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    return { ...rs, party };
+  }
+
+  it('unwounded hero at half HP gains +1 (heal)', () => {
+    const party = makePartyWithStates([{ hp: 10, maxHp: 20, wounded: false }]);
+    const rs = makeRunWithParty(party);
+    const { runState, deltas } = applyTravelTick(rs);
+    expect(runState.party[0].currentHp).toBe(11);
+    expect(deltas).toEqual([1]);
+  });
+
+  it('unwounded hero at maxHp stays at maxHp (capped, delta=0)', () => {
+    const party = makePartyWithStates([{ hp: 20, maxHp: 20, wounded: false }]);
+    const rs = makeRunWithParty(party);
+    const { runState, deltas } = applyTravelTick(rs);
+    expect(runState.party[0].currentHp).toBe(20);
+    expect(deltas).toEqual([0]);
+  });
+
+  it('wounded hero at half HP takes -1 (damage)', () => {
+    const party = makePartyWithStates([{ hp: 10, maxHp: 20, wounded: true }]);
+    const rs = makeRunWithParty(party);
+    const { runState, deltas } = applyTravelTick(rs);
+    expect(runState.party[0].currentHp).toBe(9);
+    expect(deltas).toEqual([-1]);
+  });
+
+  it('wounded hero at 1 HP stays at 1 (floored — travel cannot kill)', () => {
+    const party = makePartyWithStates([{ hp: 1, maxHp: 20, wounded: true }]);
+    const rs = makeRunWithParty(party);
+    const { runState, deltas } = applyTravelTick(rs);
+    expect(runState.party[0].currentHp).toBe(1);
+    expect(deltas).toEqual([0]);
+  });
+
+  it('multiple wounds still result in -1 (per-hero binary, not per-wound)', () => {
+    const party = makePartyWithStates([{ hp: 15, maxHp: 20, wounded: true }]);
+    const rs = makeRunWithParty(party);
+    rs.party[0].wounds.push({ id: 'hobbled' as const, runsRemaining: 5 });
+    rs.party[0].wounds.push({ id: 'concussed' as const, runsRemaining: 5 });
+    const { runState, deltas } = applyTravelTick(rs);
+    expect(runState.party[0].currentHp).toBe(14);
+    expect(deltas).toEqual([-1]);
+  });
+
+  it('mixed 3-hero party: each evaluated independently', () => {
+    const party = makePartyWithStates([
+      { hp: 5,  maxHp: 20, wounded: false },
+      { hp: 10, maxHp: 20, wounded: true },
+      { hp: 20, maxHp: 20, wounded: false },
+    ]);
+    const rs = makeRunWithParty(party);
+    const { runState, deltas } = applyTravelTick(rs);
+    expect(runState.party[0].currentHp).toBe(6);
+    expect(runState.party[1].currentHp).toBe(9);
+    expect(runState.party[2].currentHp).toBe(20);
+    expect(deltas).toEqual([1, -1, 0]);
+  });
+
+  it('does not mutate the input runState', () => {
+    const party = makePartyWithStates([{ hp: 10, maxHp: 20, wounded: true }]);
+    const rs = makeRunWithParty(party);
+    const before = JSON.stringify(rs);
+    applyTravelTick(rs);
+    expect(JSON.stringify(rs)).toBe(before);
+  });
+
+  it('returns deltas indexed parallel to party (length matches)', () => {
+    const party = makePartyWithStates([
+      { hp: 5,  maxHp: 20, wounded: false },
+      { hp: 10, maxHp: 20, wounded: true },
+    ]);
+    const rs = makeRunWithParty(party);
+    const { deltas } = applyTravelTick(rs);
+    expect(deltas).toHaveLength(rs.party.length);
   });
 });
 
