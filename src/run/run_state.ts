@@ -3,7 +3,7 @@ import { applyLevelUps, levelForXp, xpForBossNode, xpForCombatNode, xpForEliteNo
 import { DEFAULT_WOUND_RUNS_REMAINING } from '@data/wounds';
 import { applyCampNodeEffect, type CampNodeChoice } from '@dungeon/camp_node';
 import { generateFloor } from '@dungeon/floor';
-import { rollLoot, type CombatKind } from '@dungeon/loot';
+import { rollLoot, type LootKind } from '@dungeon/loot';
 import type { Node } from '@dungeon/node';
 import type { CombatEvent, CombatResult } from '@combat/types';
 import type { Hero } from '@heroes/hero';
@@ -24,6 +24,7 @@ export interface RunState {
   readonly status: RunStatus;
   readonly fallen: readonly Hero[];
   readonly lost: readonly Hero[];
+  readonly traversedNodeIds: readonly string[];
 }
 
 export interface CashoutOutcome {
@@ -67,6 +68,7 @@ export function startRun(
     status: 'in_dungeon',
     fallen: [],
     lost: [],
+    traversedNodeIds: [startNodeId],
   };
 }
 
@@ -106,6 +108,7 @@ export function chooseNextNode(runState: RunState, nextNodeId: string): RunState
     ...runState,
     currentNodeId: nextNodeId,
     awaitingFork: false,
+    traversedNodeIds: [...runState.traversedNodeIds, nextNodeId],
   };
 }
 
@@ -124,11 +127,15 @@ export function chooseCampNodeEffect(
   if (choice.kind === 'leave') {
     return cashout(runState);
   }
+  // Non-leave camp choice: apply the effect and stay at the camp node so the
+  // map can light up the next-row choice for the player to click. Same
+  // click-to-advance contract as completeCombat — see the awaitingFork comment
+  // there.
   const newRunState = applyCampNodeEffect(runState, choice, rng);
   return {
     runState: {
       ...newRunState,
-      currentNodeId: cur.nextNodeIds[0],
+      awaitingFork: true,
     },
   };
 }
@@ -207,13 +214,13 @@ export function completeCombat(
   if (
     completedNode.type === 'shop' ||
     completedNode.type === 'camp' ||
-    completedNode.type === 'event'
+    completedNode.type === 'event' ||
+    completedNode.type === 'treasure'
   ) {
     throw new Error(`completeCombat: current node is type '${completedNode.type}', not a combat-bearing node`);
   }
-  const kind: CombatKind = completedNode.type;
+  const kind: LootKind = completedNode.type;
   const isBoss = kind === 'boss';
-  const fanout = completedNode.nextNodeIds;
 
   // XP awards — only on victory, only to surviving heroes.
   const xpReward =
@@ -259,21 +266,12 @@ export function completeCombat(
     };
   }
 
-  // Non-boss victory — advance based on fanout.
-  if (fanout.length === 1) {
-    return {
-      runState: {
-        ...runState,
-        party: partyAfterXp,
-        fallen: [...runState.fallen, ...newFallen],
-        pack: newPack,
-        status: 'in_dungeon',
-        currentNodeId: fanout[0],
-      },
-    };
-  }
-
-  // fanout.length === 2 — fork source. Stay at this node; flag awaitingFork.
+  // Non-boss victory — stay at the just-cleared node and flag awaitingFork
+  // (regardless of fanout). The player clicks the next node on the map to
+  // advance, even when there's only one choice. Auto-advancing combat→combat
+  // felt jarring; the cartographer-feel demands every transition be a click.
+  // The "fork" name is now a slight misnomer — it really means "awaiting any
+  // next-node choice, even a single one" — kept for blast-radius reasons.
   return {
     runState: {
       ...runState,
@@ -299,6 +297,7 @@ export function pressOn(runState: RunState, rng: Rng): RunState {
     currentNodeId: startNodeId,
     awaitingFork: false,
     status: 'in_dungeon',
+    traversedNodeIds: [startNodeId],
   };
 }
 
@@ -365,9 +364,27 @@ export function leaveShop(runState: RunState): RunState {
   if (cur.type !== 'shop') {
     throw new Error(`leaveShop: current node is type '${cur.type}', not 'shop'`);
   }
+  // Stay at the shop and flag awaitingFork — the player clicks the next-row
+  // node to advance. This also fixes the "shop at fork-source silently picks
+  // branch 0" bug; the map now offers both branches as click targets.
   return {
     ...runState,
-    currentNodeId: cur.nextNodeIds[0],
+    awaitingFork: true,
+  };
+}
+
+export function claimTreasure(runState: RunState, item: Item): RunState {
+  if (runState.status !== 'in_dungeon') {
+    throw new Error(`claimTreasure: status must be 'in_dungeon', got '${runState.status}'`);
+  }
+  const cur = currentNode(runState);
+  if (cur.type !== 'treasure') {
+    throw new Error(`claimTreasure: current node is type '${cur.type}', not 'treasure'`);
+  }
+  return {
+    ...runState,
+    pack: addItem(runState.pack, item),
+    awaitingFork: true,
   };
 }
 
@@ -431,4 +448,37 @@ function woundsFromEvents(
     }
   }
   return wounds;
+}
+
+/**
+ * Phase 6a per-edge HP tick. Evaluated once per edge during travel.
+ *
+ * Per hero (binary on wound presence):
+ * - `wounds.length > 0` → take -1 HP, floored at 1 (travel chip damage cannot kill).
+ * - `wounds.length === 0` → gain +1 HP, capped at maxHp.
+ *
+ * Returns the new run state and a `deltas` array indexed parallel to `runState.party`
+ * (each entry is -1, 0, or +1). The travel scene reads `deltas` to render per-hero
+ * popups; entries equal to 0 mean no popup should render.
+ *
+ * Pure: does not mutate the input runState.
+ */
+export function applyTravelTick(runState: RunState): { runState: RunState; deltas: readonly number[] } {
+  const deltas: number[] = [];
+  const newParty = runState.party.map((hero) => {
+    if (hero.wounds.length > 0) {
+      const newHp = Math.max(1, hero.currentHp - 1);
+      const delta = newHp - hero.currentHp;
+      deltas.push(delta);
+      return delta === 0 ? hero : { ...hero, currentHp: newHp };
+    }
+    const newHp = Math.min(hero.maxHp, hero.currentHp + 1);
+    const delta = newHp - hero.currentHp;
+    deltas.push(delta);
+    return delta === 0 ? hero : { ...hero, currentHp: newHp };
+  });
+  return {
+    runState: { ...runState, party: newParty },
+    deltas,
+  };
 }

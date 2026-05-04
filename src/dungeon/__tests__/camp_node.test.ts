@@ -27,6 +27,7 @@ function makeRunState(partyOverrides: Partial<Hero>[] = []): RunState {
     status: 'in_dungeon',
     fallen: [],
     lost: [],
+    traversedNodeIds: [],
   };
 }
 

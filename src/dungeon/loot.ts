@@ -179,16 +179,19 @@ export function rollShopItem(rng: Rng, slot: ItemSlot, floor: number): Item {
   };
 }
 
-export type CombatKind = 'combat' | 'elite' | 'boss';
+export type LootKind = 'combat' | 'elite' | 'boss' | 'treasure';
 
-export function rollLoot(rng: Rng, floorNumber: number, kind: CombatKind): Item | null {
+export function rollLoot(rng: Rng, floorNumber: number, kind: LootKind): Item | null {
   if (kind === 'combat') {
-    if (rng.next() >= 0.5) return null;
+    if (rng.next() >= 0.1) return null;
   }
-  // Boss loot uses next-floor rarity weights but same-floor scaling for affix
-  // values + rare-property values + the floorRolledAt stamp. Elite loot uses
-  // current-floor scaling everywhere and forces rarity = rare. Combat loot
-  // (when it drops) uses current-floor scaling and the per-floor rarity table.
+  // Per-kind policy:
+  //   combat:    10% drop gate (above), current-floor rarity table, current-floor scaling.
+  //              Phase 5 dropped this from 50% → 10% to make treasure rooms the
+  //              predictable loot path; combat drops are now an occasional bonus.
+  //   elite:     guaranteed drop, forced rarity = rare, current-floor scaling.
+  //   boss:      guaranteed drop, NEXT-floor rarity weights, current-floor affix scaling.
+  //   treasure:  guaranteed drop, current-floor rarity table, current-floor scaling.
   const effectiveFloor = kind === 'boss' ? floorNumber + 1 : floorNumber;
 
   const slot = rng.pick(ALL_SLOTS);

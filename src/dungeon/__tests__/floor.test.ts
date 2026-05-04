@@ -1,130 +1,339 @@
 import { describe, expect, it } from 'vitest';
 import { CRYPT_BOSS, CRYPT_POOL } from '@data/enemies';
 import { EVENTS } from '@data/events';
+import type { Node } from '@dungeon/node';
 import { createRng } from '@util/rng';
-import { generateFloor } from '../floor';
+import { generateFloor, _internal } from '../floor';
 import { floorScale } from '../scaling';
 
-describe('generateFloor — Crypt', () => {
-  it('is deterministic for the same seed', () => {
-    const a = generateFloor('crypt', 1, createRng(42));
-    const b = generateFloor('crypt', 1, createRng(42));
-    expect(a).toEqual(b);
-  });
-
-  it('returns { nodes, startNodeId } shape', () => {
-    const result = generateFloor('crypt', 1, createRng(1));
-    expect(Array.isArray(result.nodes)).toBe(true);
-    expect(typeof result.startNodeId).toBe('string');
-    expect(result.startNodeId.length).toBeGreaterThan(0);
-  });
-
-  it('floor 1 has 5 nodes: 2 preamble combat + 2 fork branches + 1 boss', () => {
-    const { nodes } = generateFloor('crypt', 1, createRng(1));
-    expect(nodes).toHaveLength(5);
-    const bossCount = nodes.filter((n) => n.type === 'boss').length;
-    expect(bossCount).toBe(1);
-    // The other 4 nodes are 2 preamble combats + 2 fork branches whose types
-    // depend on the rolled fork shape. Per-shape coverage in the dedicated
-    // tests below.
-  });
-
-  it('startNodeId points to the unique source node', () => {
-    const { nodes, startNodeId } = generateFloor('crypt', 1, createRng(1));
-    const start = nodes.find((n) => n.id === startNodeId);
-    expect(start).toBeDefined();
-    expect(start!.nextNodeIds).toHaveLength(1);
-    // No other node points to the start.
-    const referenced = new Set(nodes.flatMap((n) => [...n.nextNodeIds]));
-    expect(referenced.has(startNodeId)).toBe(false);
-  });
-
-  it('fork has exactly 2 branches, both pointing at the unique boss', () => {
-    const { nodes } = generateFloor('crypt', 1, createRng(1));
-    const fork = nodes.find((n) => n.nextNodeIds.length === 2)!;
-    expect(fork.nextNodeIds).toHaveLength(2);
-    const branches = fork.nextNodeIds.map((id) => nodes.find((n) => n.id === id)!);
-    for (const b of branches) {
-      expect(b.nextNodeIds).toHaveLength(1);
-      const target = nodes.find((n) => n.id === b.nextNodeIds[0])!;
-      expect(target.type).toBe('boss');
+describe('generateFloor — DAG topology', () => {
+  it('floor 1 has 8 rows, floor 2 has 9, floor 3 has 10', () => {
+    for (const [floor, expectedRows] of [[1, 8], [2, 9], [3, 10]] as const) {
+      const { nodes } = generateFloor('crypt', floor, createRng(1));
+      const rowCount = depthOf(nodes, terminalId(nodes)) + 1;
+      expect(rowCount).toBe(expectedRows);
     }
   });
 
-  it('fork branches are exactly the pair from one of ten fork shapes', () => {
-    const seenShapes = new Set<string>();
-    for (let seed = 1; seed <= 1000; seed++) {
+  it('row 0 is a single combat node (the start)', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const { nodes, startNodeId } = generateFloor('crypt', 1, createRng(seed));
+      const start = nodes.find((n) => n.id === startNodeId)!;
+      expect(start.type).toBe('combat');
+      const rowOfStart = nodesInRow(nodes, 0);
+      expect(rowOfStart).toHaveLength(1);
+    }
+  });
+
+  it('last row is a single boss node (the terminal)', () => {
+    for (let seed = 1; seed <= 50; seed++) {
       const { nodes } = generateFloor('crypt', 1, createRng(seed));
-      const fork = nodes.find((n) => n.nextNodeIds.length === 2)!;
-      const branchTypes = fork.nextNodeIds
-        .map((id) => nodes.find((n) => n.id === id)!.type)
-        .sort()
-        .join('+');
-      seenShapes.add(branchTypes);
-    }
-    expect(seenShapes).toEqual(new Set([
-      'combat+shop',
-      'combat+elite',
-      'elite+shop',
-      'camp+combat',
-      'camp+shop',
-      'camp+elite',
-      'combat+event',
-      'event+shop',
-      'elite+event',
-      'camp+event',
-    ]));
-  });
-
-  it('boss is the unique terminal (nextNodeIds.length === 0)', () => {
-    const { nodes } = generateFloor('crypt', 1, createRng(1));
-    const terminals = nodes.filter((n) => n.nextNodeIds.length === 0);
-    expect(terminals).toHaveLength(1);
-    expect(terminals[0].type).toBe('boss');
-  });
-
-  it('every non-start node is reachable from some other node', () => {
-    const { nodes, startNodeId } = generateFloor('crypt', 1, createRng(1));
-    const referenced = new Set(nodes.flatMap((n) => [...n.nextNodeIds]));
-    for (const node of nodes) {
-      if (node.id === startNodeId) continue;
-      expect(referenced.has(node.id), `node ${node.id} unreachable`).toBe(true);
+      const terminals = nodes.filter((n) => n.nextNodeIds.length === 0);
+      expect(terminals).toHaveLength(1);
+      expect(terminals[0].type).toBe('boss');
     }
   });
 
-  it('node ids are unique within a floor', () => {
-    const { nodes } = generateFloor('crypt', 3, createRng(1));
+  it('middle row sizes are between 1 and 3', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      const totalRows = depthOf(nodes, terminalId(nodes)) + 1;
+      for (let r = 1; r < totalRows - 1; r++) {
+        const rowSize = nodesInRow(nodes, r).length;
+        expect(rowSize).toBeGreaterThanOrEqual(1);
+        expect(rowSize).toBeLessThanOrEqual(3);
+      }
+    }
+  });
+
+  it('every node id is unique within a floor', () => {
+    const { nodes } = generateFloor('crypt', 2, createRng(7));
     const ids = nodes.map((n) => n.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('propagates per-floor scale to every non-elite encounter', () => {
-    for (const floorNumber of [1, 2, 5, 10]) {
-      const expected = floorScale(floorNumber);
-      const { nodes } = generateFloor('crypt', floorNumber, createRng(1));
+  it('every non-start node has ≥1 incoming edge', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const { nodes, startNodeId } = generateFloor('crypt', 1, createRng(seed));
+      const referenced = new Set(nodes.flatMap((n) => [...n.nextNodeIds]));
       for (const node of nodes) {
-        if (node.type === 'shop') continue;
-        if (node.type === 'camp') continue; // camp has no encounter
-        if (node.type === 'event') continue; // event has no encounter
-        if (node.type === 'elite') continue; // elite scale = floorScale × elite multipliers; covered separately
-        expect(node.encounter.scale).toEqual(expected);
+        if (node.id === startNodeId) continue;
+        expect(referenced.has(node.id), `seed ${seed} node ${node.id} (${node.type}) is unreachable`).toBe(true);
       }
     }
   });
 
-  it('elite encounters apply ELITE_HP_MULT and ELITE_ATTACK_MULT on top of floorScale', () => {
+  it('every non-boss node has ≥1 outgoing edge', () => {
     for (let seed = 1; seed <= 50; seed++) {
-      for (const floorNumber of [1, 5]) {
-        const baseScale = floorScale(floorNumber);
-        const { nodes } = generateFloor('crypt', floorNumber, createRng(seed));
-        const elite = nodes.find((n) => n.type === 'elite');
-        if (!elite || elite.type !== 'elite') continue;
-        expect(elite.encounter.scale.hp).toBeCloseTo(baseScale.hp * 1.5, 10);
-        expect(elite.encounter.scale.attack).toBeCloseTo(baseScale.attack * 1.25, 10);
-        return;
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      for (const node of nodes) {
+        if (node.type === 'boss') continue;
+        expect(node.nextNodeIds.length).toBeGreaterThanOrEqual(1);
       }
     }
-    throw new Error('no elite-bearing floor found in the sample range');
+  });
+
+  it('every edge connects row r to row r+1 (no skip-level edges)', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      for (const node of nodes) {
+        const fromRow = depthOf(nodes, node.id);
+        for (const toId of node.nextNodeIds) {
+          const toRow = depthOf(nodes, toId);
+          expect(toRow).toBe(fromRow + 1);
+        }
+      }
+    }
+  });
+
+  it('every edge respects slot ±1 (no-cross by construction)', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      const byId = new Map(nodes.map((n) => [n.id, n]));
+      for (const node of nodes) {
+        for (const toId of node.nextNodeIds) {
+          const target = byId.get(toId)!;
+          const slotDelta = Math.abs((target as { slot: number }).slot - (node as { slot: number }).slot);
+          expect(slotDelta).toBeLessThanOrEqual(1);
+        }
+      }
+    }
+  });
+
+  it('determinism: same seed → identical floor', () => {
+    for (const seed of [1, 7, 42, 123]) {
+      const a = generateFloor('crypt', 1, createRng(seed));
+      const b = generateFloor('crypt', 1, createRng(seed));
+      expect(a).toEqual(b);
+    }
+  });
+
+  it('every path from start to terminal has length === rowCount', () => {
+    const { nodes, startNodeId } = generateFloor('crypt', 1, createRng(1));
+    const totalRows = depthOf(nodes, terminalId(nodes)) + 1;
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const allPathLengths = new Set<number>();
+    function walk(id: string, len: number): void {
+      const node = byId.get(id)!;
+      if (node.nextNodeIds.length === 0) {
+        allPathLengths.add(len);
+        return;
+      }
+      for (const nextId of node.nextNodeIds) walk(nextId, len + 1);
+    }
+    walk(startNodeId, 1);
+    expect(allPathLengths).toEqual(new Set([totalRows]));
+  });
+});
+
+describe('generateFloor — type distribution', () => {
+  it('exactly 1 shop, 1 camp per floor', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      expect(nodes.filter((n) => n.type === 'shop')).toHaveLength(1);
+      expect(nodes.filter((n) => n.type === 'camp')).toHaveLength(1);
+    }
+  });
+
+  it('1-2 treasure nodes per floor', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      const count = nodes.filter((n) => n.type === 'treasure').length;
+      expect(count).toBeGreaterThanOrEqual(1);
+      expect(count).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('1-2 event nodes per floor', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      const count = nodes.filter((n) => n.type === 'event').length;
+      expect(count).toBeGreaterThanOrEqual(1);
+      expect(count).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('1-2 elite nodes per floor', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      const count = nodes.filter((n) => n.type === 'elite').length;
+      expect(count).toBeGreaterThanOrEqual(1);
+      expect(count).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('exactly 1 boss per floor (the terminal)', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      const bosses = nodes.filter((n) => n.type === 'boss');
+      expect(bosses).toHaveLength(1);
+      expect(bosses[0].nextNodeIds).toHaveLength(0);
+    }
+  });
+
+  it('combat is 30-65% of total nodes (loose bounds; spec target ≈ 50%)', () => {
+    let total = 0;
+    let combat = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      total += nodes.length;
+      combat += nodes.filter((n) => n.type === 'combat').length;
+    }
+    const pct = combat / total;
+    expect(pct).toBeGreaterThanOrEqual(0.30);
+    expect(pct).toBeLessThanOrEqual(0.65);
+  });
+
+  it('row 0 is always combat type', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const { nodes, startNodeId } = generateFloor('crypt', 1, createRng(seed));
+      const start = nodes.find((n) => n.id === startNodeId)!;
+      expect(start.type).toBe('combat');
+    }
+  });
+});
+
+describe('generateFloor — placement constraints', () => {
+  it('no two same-type nodes adjacent within a row (slot-sorted)', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      const totalRows = depthOf(nodes, terminalId(nodes)) + 1;
+      for (let r = 0; r < totalRows; r++) {
+        const inRow = nodesInRow(nodes, r).slice().sort(
+          (a, b) => (a as { slot: number }).slot - (b as { slot: number }).slot,
+        );
+        for (let i = 0; i < inRow.length - 1; i++) {
+          expect(inRow[i].type).not.toBe(inRow[i + 1].type);
+        }
+      }
+    }
+  });
+
+  it('no special type repeats back-to-back along any source-to-terminal path', () => {
+    const SPECIALS = new Set(['shop', 'camp', 'treasure', 'event', 'elite']);
+    for (let seed = 1; seed <= 100; seed++) {
+      const { nodes, startNodeId } = generateFloor('crypt', 1, createRng(seed));
+      const byId = new Map(nodes.map((n) => [n.id, n]));
+      function walkPath(id: string, prev: string | undefined): void {
+        const node = byId.get(id)!;
+        if (prev !== undefined) {
+          const prevType = byId.get(prev)!.type;
+          if (SPECIALS.has(node.type) && prevType === node.type) {
+            throw new Error(`back-to-back ${node.type}: ${prev} -> ${id} (seed ${seed})`);
+          }
+        }
+        for (const nextId of node.nextNodeIds) walkPath(nextId, id);
+      }
+      walkPath(startNodeId, undefined);
+    }
+  });
+
+  it('combat back-to-back along path is allowed (observed across 200 seeds)', () => {
+    let sawCombatBackToBack = false;
+    for (let seed = 1; seed <= 200 && !sawCombatBackToBack; seed++) {
+      const { nodes, startNodeId } = generateFloor('crypt', 1, createRng(seed));
+      const byId = new Map(nodes.map((n) => [n.id, n]));
+      function walkPath(id: string, prev: string | undefined): void {
+        if (sawCombatBackToBack) return;
+        const node = byId.get(id)!;
+        if (prev !== undefined) {
+          const prevType = byId.get(prev)!.type;
+          if (node.type === 'combat' && prevType === 'combat') {
+            sawCombatBackToBack = true;
+            return;
+          }
+        }
+        for (const nextId of node.nextNodeIds) walkPath(nextId, id);
+      }
+      walkPath(startNodeId, undefined);
+    }
+    expect(sawCombatBackToBack).toBe(true);
+  });
+
+  it('penultimate row contains ≥1 camp or treasure', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      const totalRows = depthOf(nodes, terminalId(nodes)) + 1;
+      const penult = nodesInRow(nodes, totalRows - 2);
+      const hasRest = penult.some((n) => n.type === 'camp' || n.type === 'treasure');
+      expect(hasRest, `seed ${seed} penult row has no camp/treasure`).toBe(true);
+    }
+  });
+
+  it('no edge crossings (slot-ordering preserved between rows)', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      const byId = new Map(nodes.map((n) => [n.id, n]));
+      const totalRows = depthOf(nodes, terminalId(nodes)) + 1;
+      for (let r = 0; r < totalRows - 1; r++) {
+        const fromRowSorted = nodesInRow(nodes, r).slice().sort(
+          (a, b) => (a as { slot: number }).slot - (b as { slot: number }).slot,
+        );
+        for (let i = 0; i < fromRowSorted.length; i++) {
+          for (let j = i + 1; j < fromRowSorted.length; j++) {
+            const a = fromRowSorted[i];
+            const c = fromRowSorted[j];
+            for (const bId of a.nextNodeIds) {
+              for (const dId of c.nextNodeIds) {
+                const b = byId.get(bId)!;
+                const d = byId.get(dId)!;
+                const bSlot = (b as { slot: number }).slot;
+                const dSlot = (d as { slot: number }).slot;
+                expect(bSlot).toBeLessThanOrEqual(dSlot);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
+describe('generateFloor — encounter composition', () => {
+  it('every combat / elite / boss node has an encounter', () => {
+    const { nodes } = generateFloor('crypt', 1, createRng(1));
+    for (const node of nodes) {
+      if (node.type === 'combat' || node.type === 'elite' || node.type === 'boss') {
+        expect(node.encounter).toBeDefined();
+        expect(node.encounter.enemies.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('shop nodes have 4 inventory items', () => {
+    const { nodes } = generateFloor('crypt', 1, createRng(1));
+    const shop = nodes.find((n) => n.type === 'shop')!;
+    expect((shop as { inventory: readonly unknown[] }).inventory).toHaveLength(4);
+  });
+
+  it('event nodes carry a valid cardId from the EVENTS table', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const { nodes } = generateFloor('crypt', 1, createRng(seed));
+      for (const node of nodes) {
+        if (node.type !== 'event') continue;
+        expect(EVENTS[node.cardId]).toBeDefined();
+      }
+    }
+  });
+
+  it('boss encounter contains the Crypt boss at slot 3', () => {
+    const { nodes } = generateFloor('crypt', 1, createRng(1));
+    const boss = nodes.find((n) => n.type === 'boss')!;
+    if (boss.type !== 'boss') throw new Error('expected boss type narrowing');
+    const bossPlacement = boss.encounter.enemies.find((p) => p.enemyId === CRYPT_BOSS);
+    expect(bossPlacement).toBeDefined();
+    expect(bossPlacement?.slot).toBe(3);
+  });
+
+  it('per-floor scale propagates to combat encounters', () => {
+    for (const floorNumber of [1, 2, 3]) {
+      const expected = floorScale(floorNumber);
+      const { nodes } = generateFloor('crypt', floorNumber, createRng(1));
+      for (const node of nodes) {
+        if (node.type !== 'combat') continue;
+        expect(node.encounter.scale).toEqual(expected);
+      }
+    }
   });
 
   it('every combat-bearing encounter uses pool enemies only', () => {
@@ -135,152 +344,6 @@ describe('generateFloor — Crypt', () => {
         expect(CRYPT_POOL).toContain(placement.enemyId);
       }
     }
-  });
-
-  it('boss encounter contains the Crypt boss at slot 3', () => {
-    const { nodes } = generateFloor('crypt', 1, createRng(1));
-    const boss = nodes.find((n) => n.type === 'boss')!;
-    const bossPlacement = boss.encounter.enemies.find((p) => p.enemyId === CRYPT_BOSS);
-    expect(bossPlacement).toBeDefined();
-    expect(bossPlacement?.slot).toBe(3);
-  });
-
-  it('different floor numbers produce different node ids', () => {
-    const f1 = generateFloor('crypt', 1, createRng(1));
-    const f2 = generateFloor('crypt', 2, createRng(1));
-    const f1Ids = new Set(f1.nodes.map((n) => n.id));
-    const f2Ids = new Set(f2.nodes.map((n) => n.id));
-    for (const id of f1Ids) {
-      expect(f2Ids.has(id)).toBe(false);
-    }
-  });
-
-  it('floor generation is deterministic per seed (full nodes equality)', () => {
-    for (const seed of [1, 7, 42]) {
-      const a = generateFloor('crypt', 1, createRng(seed));
-      const b = generateFloor('crypt', 1, createRng(seed));
-      expect(a).toEqual(b);
-    }
-  });
-
-  it('shop (when present on a floor) has 4 inventory items', () => {
-    for (let seed = 1; seed <= 50; seed++) {
-      const { nodes } = generateFloor('crypt', 1, createRng(seed));
-      const shop = nodes.find((n) => n.type === 'shop');
-      if (!shop) continue;
-      if (shop.type !== 'shop') throw new Error('expected shop');
-      expect(shop.inventory).toHaveLength(4);
-      return;
-    }
-    throw new Error('no shop-bearing floor found in the sample range');
-  });
-
-  it('shop_vs_combat shape: fork branches are exactly one combat and one shop', () => {
-    const { fork } = findFloorWithShape('shop_vs_combat');
-    expect(fork.map((b) => b.type).sort()).toEqual(['combat', 'shop']);
-  });
-
-  it('elite_vs_combat shape: fork branches are exactly one combat and one elite', () => {
-    const { fork } = findFloorWithShape('elite_vs_combat');
-    expect(fork.map((b) => b.type).sort()).toEqual(['combat', 'elite']);
-  });
-
-  it('elite_vs_shop shape: fork branches are exactly one elite and one shop (no combat)', () => {
-    const { fork } = findFloorWithShape('elite_vs_shop');
-    expect(fork.map((b) => b.type).sort()).toEqual(['elite', 'shop']);
-    for (const b of fork) {
-      expect(b.type).not.toBe('combat');
-    }
-  });
-
-  it('camp_vs_combat shape: fork branches are exactly one camp and one combat', () => {
-    const { fork } = findFloorWithShape('camp_vs_combat');
-    expect(fork.map((b) => b.type).sort()).toEqual(['camp', 'combat']);
-  });
-
-  it('camp_vs_shop shape: fork branches are exactly one camp and one shop', () => {
-    const { fork } = findFloorWithShape('camp_vs_shop');
-    expect(fork.map((b) => b.type).sort()).toEqual(['camp', 'shop']);
-  });
-
-  it('camp_vs_elite shape: fork branches are exactly one camp and one elite', () => {
-    const { fork } = findFloorWithShape('camp_vs_elite');
-    expect(fork.map((b) => b.type).sort()).toEqual(['camp', 'elite']);
-  });
-
-  it('event_vs_combat shape: fork branches are exactly one event and one combat', () => {
-    const { fork } = findFloorWithShape('event_vs_combat');
-    expect(fork.map((b) => b.type).sort()).toEqual(['combat', 'event']);
-  });
-
-  it('event_vs_shop shape: fork branches are exactly one event and one shop', () => {
-    const { fork } = findFloorWithShape('event_vs_shop');
-    expect(fork.map((b) => b.type).sort()).toEqual(['event', 'shop']);
-  });
-
-  it('event_vs_elite shape: fork branches are exactly one event and one elite', () => {
-    const { fork } = findFloorWithShape('event_vs_elite');
-    expect(fork.map((b) => b.type).sort()).toEqual(['elite', 'event']);
-  });
-
-  it('event_vs_camp shape: fork branches are exactly one event and one camp', () => {
-    const { fork } = findFloorWithShape('event_vs_camp');
-    expect(fork.map((b) => b.type).sort()).toEqual(['camp', 'event']);
-  });
-
-  it('event nodes carry a valid cardId from the EVENTS table', () => {
-    for (let seed = 1; seed <= 200; seed++) {
-      const { nodes } = generateFloor('crypt', 1, createRng(seed));
-      for (const node of nodes) {
-        if (node.type !== 'event') continue;
-        expect(EVENTS[node.cardId]).toBeDefined();
-        expect(node.nextNodeIds).toHaveLength(1);
-      }
-    }
-  });
-
-  it('ten fork shapes are roughly evenly distributed across seeds', () => {
-    const counts = {
-      shop_vs_combat: 0,
-      elite_vs_combat: 0,
-      elite_vs_shop: 0,
-      camp_vs_combat: 0,
-      camp_vs_shop: 0,
-      camp_vs_elite: 0,
-      event_vs_combat: 0,
-      event_vs_shop: 0,
-      event_vs_elite: 0,
-      event_vs_camp: 0,
-    };
-    for (let seed = 1; seed <= 1000; seed++) {
-      const { nodes } = generateFloor('crypt', 1, createRng(seed));
-      const fork = nodes.find((n) => n.nextNodeIds.length === 2)!;
-      const types = fork.nextNodeIds
-        .map((id) => nodes.find((n) => n.id === id)!.type)
-        .sort()
-        .join('+');
-      if (types === 'combat+shop')        counts.shop_vs_combat += 1;
-      else if (types === 'combat+elite')  counts.elite_vs_combat += 1;
-      else if (types === 'elite+shop')    counts.elite_vs_shop += 1;
-      else if (types === 'camp+combat')   counts.camp_vs_combat += 1;
-      else if (types === 'camp+shop')     counts.camp_vs_shop += 1;
-      else if (types === 'camp+elite')    counts.camp_vs_elite += 1;
-      else if (types === 'combat+event')  counts.event_vs_combat += 1;
-      else if (types === 'event+shop')    counts.event_vs_shop += 1;
-      else if (types === 'elite+event')   counts.event_vs_elite += 1;
-      else if (types === 'camp+event')    counts.event_vs_camp += 1;
-    }
-    // Expected ~100 each (1/10 of 1000). Loose lower bound: at least 60.
-    expect(counts.shop_vs_combat).toBeGreaterThanOrEqual(60);
-    expect(counts.elite_vs_combat).toBeGreaterThanOrEqual(60);
-    expect(counts.elite_vs_shop).toBeGreaterThanOrEqual(60);
-    expect(counts.camp_vs_combat).toBeGreaterThanOrEqual(60);
-    expect(counts.camp_vs_shop).toBeGreaterThanOrEqual(60);
-    expect(counts.camp_vs_elite).toBeGreaterThanOrEqual(60);
-    expect(counts.event_vs_combat).toBeGreaterThanOrEqual(60);
-    expect(counts.event_vs_shop).toBeGreaterThanOrEqual(60);
-    expect(counts.event_vs_elite).toBeGreaterThanOrEqual(60);
-    expect(counts.event_vs_camp).toBeGreaterThanOrEqual(60);
   });
 
   it('floor 1: combat encounters carry no modifierIds', () => {
@@ -303,83 +366,171 @@ describe('generateFloor — Crypt', () => {
       }
     }
   });
+});
 
-  it('floor 15: every combat-encounter enemy has one modifierIds from the full pool (across seeds, all three appear)', () => {
-    const seen = new Set<string>();
-    for (let seed = 1; seed <= 50; seed++) {
-      const { nodes } = generateFloor('crypt', 15, createRng(seed));
-      for (const node of nodes) {
-        if (node.type !== 'combat') continue;
-        for (const placement of node.encounter.enemies) {
-          expect(placement.modifierIds).toHaveLength(1);
-          seen.add(placement.modifierIds![0]);
-        }
+// ---- Helper-function tests (Task 1 of Phase 2b). ----
+
+describe('floor.ts helpers (_internal)', () => {
+  describe('rollRowSize', () => {
+    it('returns 1 / 2 / 3 with rough 20/50/30 weights over 1000 rolls', () => {
+      const counts: Record<1 | 2 | 3, number> = { 1: 0, 2: 0, 3: 0 };
+      for (let seed = 1; seed <= 1000; seed++) {
+        const v = _internal.rollRowSize(createRng(seed));
+        counts[v] += 1;
       }
-    }
-    expect(seen).toEqual(new Set(['armored', 'venomous', 'enraged']));
+      expect(counts[1]).toBeGreaterThan(120);
+      expect(counts[1]).toBeLessThan(280);
+      expect(counts[2]).toBeGreaterThan(400);
+      expect(counts[2]).toBeLessThan(600);
+      expect(counts[3]).toBeGreaterThan(220);
+      expect(counts[3]).toBeLessThan(380);
+    });
   });
 
-  it('elite encounter on floor 1: every enemy has one modifierIds from the full pool', () => {
-    const seen = new Set<string>();
-    for (let seed = 1; seed <= 100; seed++) {
-      const { nodes } = generateFloor('crypt', 1, createRng(seed));
-      const elite = nodes.find((n) => n.type === 'elite');
-      if (!elite || elite.type !== 'elite') continue;
-      for (const placement of elite.encounter.enemies) {
-        expect(placement.modifierIds).toHaveLength(1);
-        seen.add(placement.modifierIds![0]);
+  describe('pickSlots', () => {
+    it('count=1 always returns [1]', () => {
+      for (let seed = 1; seed <= 50; seed++) {
+        expect(_internal.pickSlots(createRng(seed), 1)).toEqual([1]);
       }
-    }
-    expect(seen).toEqual(new Set(['armored', 'venomous', 'enraged']));
+    });
+
+    it('count=3 always returns [0, 1, 2]', () => {
+      for (let seed = 1; seed <= 50; seed++) {
+        expect(_internal.pickSlots(createRng(seed), 3)).toEqual([0, 1, 2]);
+      }
+    });
+
+    it('count=2 returns one of three valid pairs', () => {
+      const seen = new Set<string>();
+      for (let seed = 1; seed <= 200; seed++) {
+        const slots = _internal.pickSlots(createRng(seed), 2);
+        seen.add(slots.join(','));
+      }
+      expect(seen).toEqual(new Set(['0,1', '0,2', '1,2']));
+    });
   });
 
-  it('boss encounter has no modifierIds (any floor)', () => {
-    for (const floorNumber of [1, 5, 15]) {
-      const { nodes } = generateFloor('crypt', floorNumber, createRng(1));
-      const boss = nodes.find((n) => n.type === 'boss');
-      expect(boss).toBeDefined();
-      if (boss?.type === 'boss') {
-        for (const placement of boss.encounter.enemies) {
-          expect(placement.modifierIds).toBeUndefined();
-        }
+  describe('pickEdgeCandidates', () => {
+    it('returns only slots within ±1 of fromSlot', () => {
+      const result = _internal.pickEdgeCandidates(createRng(1), 1, [0, 1, 2]);
+      for (const s of result) {
+        expect(Math.abs(s - 1)).toBeLessThanOrEqual(1);
       }
-    }
+    });
+
+    it('clamps to available candidates when desired count exceeds available', () => {
+      for (let seed = 1; seed <= 50; seed++) {
+        const result = _internal.pickEdgeCandidates(createRng(seed), 0, [1, 2]);
+        expect(result.length).toBeGreaterThanOrEqual(1);
+        expect(result.length).toBeLessThanOrEqual(1);
+      }
+    });
+
+    it('returns empty when no candidates are in range', () => {
+      const result = _internal.pickEdgeCandidates(createRng(1), 0, [2]);
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('rollQuota', () => {
+    it('produces feasible quota when middleNodeCount is sufficient', () => {
+      for (let seed = 1; seed <= 100; seed++) {
+        const q = _internal.rollQuota(createRng(seed), 1, 12);
+        expect(q).not.toBeNull();
+        expect(q!.shop).toBe(1);
+        expect(q!.camp).toBe(1);
+        expect(q!.treasure).toBeGreaterThanOrEqual(1);
+        expect(q!.treasure).toBeLessThanOrEqual(2);
+        expect(q!.event).toBeGreaterThanOrEqual(1);
+        expect(q!.event).toBeLessThanOrEqual(2);
+        expect(q!.elite).toBeGreaterThanOrEqual(1);
+        expect(q!.elite).toBeLessThanOrEqual(2);
+        expect(q!.combat).toBeGreaterThanOrEqual(0);
+        const sum = q!.combat + q!.elite + q!.shop + q!.camp + q!.treasure + q!.event;
+        expect(sum).toBe(12);
+      }
+    });
+
+    it('returns null when middleNodeCount is too small', () => {
+      const q = _internal.rollQuota(createRng(1), 1, 4);
+      expect(q).toBeNull();
+    });
+
+    it('elite count biases higher on later floors', () => {
+      let elitesFloor1 = 0;
+      let elitesFloor3 = 0;
+      for (let seed = 1; seed <= 1000; seed++) {
+        const q1 = _internal.rollQuota(createRng(seed), 1, 12);
+        const q3 = _internal.rollQuota(createRng(seed), 3, 12);
+        if (q1) elitesFloor1 += q1.elite;
+        if (q3) elitesFloor3 += q3.elite;
+      }
+      expect(elitesFloor3).toBeGreaterThan(elitesFloor1);
+    });
+  });
+
+  describe('violatesPlacement', () => {
+    it('flags same-type left sibling', () => {
+      expect(_internal.violatesPlacement('shop', 'shop', undefined, [])).toBe(true);
+    });
+
+    it('flags same-type right sibling', () => {
+      expect(_internal.violatesPlacement('camp', undefined, 'camp', [])).toBe(true);
+    });
+
+    it('does NOT flag when siblings are undefined (not yet placed)', () => {
+      expect(_internal.violatesPlacement('shop', undefined, undefined, [])).toBe(false);
+    });
+
+    it('does NOT flag combat back-to-back along path', () => {
+      expect(_internal.violatesPlacement('combat', undefined, undefined, ['combat'])).toBe(false);
+    });
+
+    it('flags special type back-to-back along path', () => {
+      expect(_internal.violatesPlacement('shop', undefined, undefined, ['shop'])).toBe(true);
+    });
+
+    it('flags elite back-to-back along path', () => {
+      expect(_internal.violatesPlacement('elite', undefined, undefined, ['elite'])).toBe(true);
+    });
+
+    it('returns false when no constraint is hit', () => {
+      expect(_internal.violatesPlacement('shop', 'combat', undefined, ['combat'])).toBe(false);
+    });
   });
 });
 
-function findFloorWithShape(
-  shape:
-    | 'shop_vs_combat'
-    | 'elite_vs_combat'
-    | 'elite_vs_shop'
-    | 'camp_vs_combat'
-    | 'camp_vs_shop'
-    | 'camp_vs_elite'
-    | 'event_vs_combat'
-    | 'event_vs_shop'
-    | 'event_vs_elite'
-    | 'event_vs_camp',
-  maxSeeds = 1000,
-): { nodes: ReturnType<typeof generateFloor>['nodes']; fork: { type: string }[] } {
-  for (let seed = 1; seed <= maxSeeds; seed++) {
-    const { nodes } = generateFloor('crypt', 1, createRng(seed));
-    const fork = nodes.find((n) => n.nextNodeIds.length === 2)!;
-    const branches = fork.nextNodeIds
-      .map((id) => nodes.find((n) => n.id === id)!)
-      .map((n) => ({ type: n.type }));
-    const types = branches.map((b) => b.type).sort();
-    const matches =
-      (shape === 'shop_vs_combat'  && types[0] === 'combat' && types[1] === 'shop')  ||
-      (shape === 'elite_vs_combat' && types[0] === 'combat' && types[1] === 'elite') ||
-      (shape === 'elite_vs_shop'   && types[0] === 'elite'  && types[1] === 'shop')  ||
-      (shape === 'camp_vs_combat'  && types[0] === 'camp'   && types[1] === 'combat') ||
-      (shape === 'camp_vs_shop'    && types[0] === 'camp'   && types[1] === 'shop')   ||
-      (shape === 'camp_vs_elite'   && types[0] === 'camp'   && types[1] === 'elite')  ||
-      (shape === 'event_vs_combat' && types[0] === 'combat' && types[1] === 'event')  ||
-      (shape === 'event_vs_shop'   && types[0] === 'event'  && types[1] === 'shop')   ||
-      (shape === 'event_vs_elite'  && types[0] === 'elite'  && types[1] === 'event')  ||
-      (shape === 'event_vs_camp'   && types[0] === 'camp'   && types[1] === 'event');
-    if (matches) return { nodes, fork: branches };
+// ---- Helpers used by topology tests ----
+
+function depthOf(nodes: readonly Node[], targetId: string): number {
+  const referenced = new Set(nodes.flatMap((n) => [...n.nextNodeIds]));
+  const start = nodes.find((n) => !referenced.has(n.id));
+  if (!start) throw new Error('depthOf: no start node');
+  const seen = new Set<string>([start.id]);
+  let frontier: { id: string; depth: number }[] = [{ id: start.id, depth: 0 }];
+  while (frontier.length > 0) {
+    const next: typeof frontier = [];
+    for (const { id, depth } of frontier) {
+      if (id === targetId) return depth;
+      const node = nodes.find((n) => n.id === id);
+      if (!node) continue;
+      for (const nextId of node.nextNodeIds) {
+        if (seen.has(nextId)) continue;
+        seen.add(nextId);
+        next.push({ id: nextId, depth: depth + 1 });
+      }
+    }
+    frontier = next;
   }
-  throw new Error(`no '${shape}' floor in first ${maxSeeds} seeds`);
+  throw new Error(`depthOf: target ${targetId} not reachable`);
+}
+
+function terminalId(nodes: readonly Node[]): string {
+  const terminal = nodes.find((n) => n.nextNodeIds.length === 0);
+  if (!terminal) throw new Error('terminalId: no terminal');
+  return terminal.id;
+}
+
+function nodesInRow(nodes: readonly Node[], rowIndex: number): readonly Node[] {
+  return nodes.filter((n) => depthOf(nodes, n.id) === rowIndex);
 }

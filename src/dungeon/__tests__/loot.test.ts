@@ -3,13 +3,13 @@ import { createRng } from '@util/rng';
 import { rollEventItem, rollLoot } from '../loot';
 
 describe('rollLoot — drop gate', () => {
-  it('returns null roughly half the time at a non-boss combat node', () => {
+  it('drops at roughly 10% on a non-boss combat node (Phase 5 retune from 50%)', () => {
     let drops = 0;
     for (let seed = 1; seed <= 1000; seed++) {
       if (rollLoot(createRng(seed), 1, 'combat') !== null) drops += 1;
     }
-    expect(drops).toBeGreaterThanOrEqual(400);
-    expect(drops).toBeLessThanOrEqual(600);
+    expect(drops).toBeGreaterThanOrEqual(60);
+    expect(drops).toBeLessThanOrEqual(150);
   });
 
   it('always returns an item on a boss node', () => {
@@ -241,11 +241,12 @@ describe('rollLoot — elite kind', () => {
     expect(a).toEqual(b);
   });
 
-  it('exports CombatKind type accepting combat | elite | boss', () => {
+  it('exports LootKind type accepting combat | elite | boss | treasure', () => {
     const r1 = rollLoot(createRng(1), 1, 'combat');
     const r2 = rollLoot(createRng(1), 1, 'elite');
     const r3 = rollLoot(createRng(1), 1, 'boss');
-    expect([r1, r2, r3].every((r) => r === null || typeof r === 'object')).toBe(true);
+    const r4 = rollLoot(createRng(1), 1, 'treasure');
+    expect([r1, r2, r3, r4].every((r) => r === null || typeof r === 'object')).toBe(true);
   });
 });
 
@@ -289,5 +290,55 @@ describe('rollEventItem', () => {
     const a = rollEventItem(createRng(123), 7, 'rare');
     const b = rollEventItem(createRng(123), 7, 'rare');
     expect(a).toEqual(b);
+  });
+});
+
+describe('rollLoot — treasure kind', () => {
+  it('always returns an item (no 50% gate)', () => {
+    let drops = 0;
+    for (let seed = 1; seed <= 1000; seed++) {
+      if (rollLoot(createRng(seed), 1, 'treasure') !== null) drops += 1;
+    }
+    expect(drops).toBe(1000);
+  });
+
+  it('floor 1 treasure never rolls rare (matches combat per-floor weights, not boss-bumped)', () => {
+    let rare = 0;
+    for (let seed = 1; seed <= 1000; seed++) {
+      const item = rollLoot(createRng(seed), 1, 'treasure');
+      if (item?.rarity === 'rare') rare += 1;
+    }
+    expect(rare).toBe(0);
+  });
+
+  it('floor 5 treasure rarity distribution roughly matches the floor-5 table (70/25/5)', () => {
+    const counts: Record<string, number> = { common: 0, uncommon: 0, rare: 0 };
+    for (let seed = 1; seed <= 1000; seed++) {
+      const item = rollLoot(createRng(seed), 5, 'treasure');
+      if (item) counts[item.rarity] += 1;
+    }
+    expect(counts.common).toBeGreaterThan(550);   // ≥55% (table is 70%)
+    expect(counts.uncommon).toBeGreaterThan(150); // ≥15% (table is 25%)
+    expect(counts.rare).toBeGreaterThan(20);      // ≥2%  (table is 5%)
+  });
+
+  it('treasure scaling uses current floor (floorRolledAt === floorNumber, not next-floor)', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const item = rollLoot(createRng(seed), 7, 'treasure');
+      expect(item).not.toBeNull();
+      expect(item!.floorRolledAt).toBe(7);
+    }
+  });
+
+  it('distributes the 4 slots roughly evenly over 1000 treasure rolls at floor 1', () => {
+    const counts: Record<string, number> = { weapon: 0, shield: 0, outfit: 0, hat: 0 };
+    for (let seed = 1; seed <= 1000; seed++) {
+      const item = rollLoot(createRng(seed), 1, 'treasure');
+      if (item) counts[item.slot] += 1;
+    }
+    for (const slot of ['weapon', 'shield', 'outfit', 'hat']) {
+      expect(counts[slot]).toBeGreaterThanOrEqual(150);
+      expect(counts[slot]).toBeLessThanOrEqual(350);
+    }
   });
 });

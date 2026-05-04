@@ -2,14 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { createHeroCombatant } from '@combat/combatant';
 import type { CombatResult, CombatState } from '@combat/types';
 import { xpForEliteNode } from '@data/leveling';
-import type { SlotIndex } from '@data/types';
+import type { Item, SlotIndex } from '@data/types';
 import type { Encounter, Node } from '@dungeon/node';
 import { createHero, type Hero } from '@heroes/hero';
 import { createRng } from '@util/rng';
 import {
+  applyTravelTick,
   cashout,
   chooseCampNodeEffect,
   chooseNextNode,
+  claimTreasure,
   completeCombat,
   currentNode,
   leaveShop,
@@ -48,13 +50,33 @@ function mockCombatResult(
 }
 
 /**
- * Walks the run from the current node to (but not entering) the boss,
- * skipping shops via leaveShop and picking the combat branch at forks
- * so the path always traverses combat-only.
+ * Walks the run from the current node to (but not entering) the boss, picking
+ * a handleable branch at forks. Post-Phase-3-click-to-advance, every node-clear
+ * function (completeCombat, leaveShop, claimTreasure, chooseCampNodeEffect)
+ * sets awaitingFork=true; the helper translates that into chooseNextNode calls.
  */
 function advanceToBossNode(rsArg: ReturnType<typeof startRun>): ReturnType<typeof startRun> {
   let rs = rsArg;
   while (true) {
+    if (rs.awaitingFork) {
+      const node = currentNode(rs);
+      const choices = nextNodeChoices(rs);
+      // Prefer handleable branches the rest of the loop body knows how to
+      // process; combat/elite/shop/camp/treasure/event are all handled below.
+      const branch =
+        choices.find((n) => n.type === 'combat') ??
+        choices.find((n) => n.type === 'elite') ??
+        choices.find((n) => n.type === 'shop') ??
+        choices.find((n) => n.type === 'camp') ??
+        choices.find((n) => n.type === 'treasure') ??
+        choices.find((n) => n.type === 'event') ??
+        choices[0];
+      rs = chooseNextNode(rs, branch.id);
+      // Suppress unused-var warning by referencing node; prevents lint regression
+      // in case future edits move the picker code around.
+      void node;
+      continue;
+    }
     const node = currentNode(rs);
     if (node.type === 'boss') return rs;
     if (node.type === 'shop') {
@@ -65,47 +87,103 @@ function advanceToBossNode(rsArg: ReturnType<typeof startRun>): ReturnType<typeo
       rs = chooseCampNodeEffect(rs, { kind: 'heal_party' }, createRng(99)).runState;
       continue;
     }
+    if (node.type === 'treasure') {
+      // Skip treasure — for tests that only need to reach boss; no item claimed.
+      // (claimTreasure requires an Item parameter; advanceToBossNode is used by
+      // tests that don't care about treasure rooms, so just pick its successor.)
+      rs = chooseNextNode(rs, node.nextNodeIds[0]);
+      continue;
+    }
+    if (node.type === 'event') {
+      rs = chooseNextNode(rs, node.nextNodeIds[0]);
+      continue;
+    }
     // node.type is 'combat' or 'elite' — both go through completeCombat
     rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    if (rs.awaitingFork) {
-      const choices = nextNodeChoices(rs);
-      const combatBranch =
-        choices.find((n) => n.type === 'combat') ??
-        choices.find((n) => n.type === 'elite') ??
-        choices[0];
-      rs = chooseNextNode(rs, combatBranch.id);
-    }
   }
 }
 
 /**
- * Returns a RunState started from a seed whose floor 1 includes a shop on
- * one of the fork branches. After Task 5, fork shape is RNG-rolled per seed,
- * so callers needing a shop must search for a shop-bearing seed.
+ * Walks the run until the current node has ≥2 outgoing edges AND awaitingFork
+ * is set (a real player-facing fork choice). Returns the runState at that point.
+ * Throws if no fork is reached before boss.
+ *
+ * Post-Phase-3-click-to-advance: every completeCombat sets awaitingFork=true,
+ * so this helper has to distinguish "single-fanout pause" (walk through) from
+ * "real fork" (return).
+ */
+function advanceToFork(rsArg: ReturnType<typeof startRun>): ReturnType<typeof startRun> {
+  let rs = rsArg;
+  while (true) {
+    if (rs.awaitingFork) {
+      const node = currentNode(rs);
+      if (node.nextNodeIds.length >= 2) return rs;
+      // Single-fanout pause: advance through the only choice and continue.
+      rs = chooseNextNode(rs, node.nextNodeIds[0]);
+      continue;
+    }
+    const node = currentNode(rs);
+    if (node.type === 'boss') {
+      throw new Error('advanceToFork: walked past boss without finding a fork');
+    }
+    if (node.type === 'shop') {
+      rs = leaveShop(rs);
+      continue;
+    }
+    if (node.type === 'camp') {
+      rs = chooseCampNodeEffect(rs, { kind: 'heal_party' }, createRng(99)).runState;
+      continue;
+    }
+    if (node.type === 'event' || node.type === 'treasure') {
+      rs = chooseNextNode(rs, node.nextNodeIds[0]);
+      continue;
+    }
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+  }
+}
+
+/**
+ * Phase 2b: every floor has exactly one shop. Seed 1 suffices.
  */
 function startRunWithShop(): ReturnType<typeof startRun> {
-  for (let seed = 1; seed <= 50; seed++) {
-    const rs = startRun('crypt', makeParty(), seed, createRng(seed));
-    if (rs.currentFloorNodes.some((n) => n.type === 'shop')) {
-      return rs;
-    }
-  }
-  throw new Error('no shop-bearing seed in [1..50]');
+  return startRun('crypt', makeParty(), 1, createRng(1));
 }
 
 /**
- * Walks to the shop node (whichever fork branch it's on for the seed).
+ * Walks the run to the shop node (wherever it is in the multi-row floor).
+ * Post-Phase-3-click-to-advance, every node-clear function sets awaitingFork=true;
+ * the helper picks the shop-preferred branch when at a fork or the only
+ * available branch otherwise.
  */
 function navigateToShop(rsArg: ReturnType<typeof startRun>): ReturnType<typeof startRun> {
   let rs = rsArg;
-  // Clear n0.
-  rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-  // Clear n1, hit fork.
-  rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-  // Pick the shop branch.
-  const shopBranch = nextNodeChoices(rs).find((n) => n.type === 'shop')!;
-  rs = chooseNextNode(rs, shopBranch.id);
-  return rs;
+  while (true) {
+    if (rs.awaitingFork) {
+      const choices = nextNodeChoices(rs);
+      const branch =
+        choices.find((n) => n.type === 'shop') ??
+        choices.find((n) => n.type === 'combat') ??
+        choices.find((n) => n.type === 'elite') ??
+        choices.find((n) => n.type === 'camp') ??
+        choices[0];
+      rs = chooseNextNode(rs, branch.id);
+      continue;
+    }
+    const node = currentNode(rs);
+    if (node.type === 'shop') return rs;
+    if (node.type === 'boss') {
+      throw new Error('navigateToShop: walked past shop without entering it');
+    }
+    if (node.type === 'camp') {
+      rs = chooseCampNodeEffect(rs, { kind: 'heal_party' }, createRng(99)).runState;
+      continue;
+    }
+    if (node.type === 'event' || node.type === 'treasure') {
+      rs = chooseNextNode(rs, node.nextNodeIds[0]);
+      continue;
+    }
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+  }
 }
 
 describe('startRun', () => {
@@ -115,13 +193,16 @@ describe('startRun', () => {
     expect(rs.currentFloorNumber).toBe(1);
     expect(rs.pack).toEqual({ gold: 0, items: [] });
     expect(rs.fallen).toEqual([]);
-    expect(rs.currentFloorNodes).toHaveLength(5);
+    // Phase 2b: 8-row floor with 1-3 nodes/middle row → ~12-17 total nodes.
+    expect(rs.currentFloorNodes.length).toBeGreaterThanOrEqual(10);
+    expect(rs.currentFloorNodes.length).toBeLessThanOrEqual(20);
     expect(rs.awaitingFork).toBe(false);
   });
 
   it('currentNodeId equals the floor start node id', () => {
     const rs = startRun('crypt', makeParty(), 1, createRng(1));
-    expect(rs.currentNodeId).toBe('crypt-f1-n0');
+    // Phase 2b id format: ${dungeonId}-f${floor}-r${row}-s${slot}. Start is row 0, slot 1.
+    expect(rs.currentNodeId).toBe('crypt-f1-r0-s1');
   });
 
   it('throws on party size != 3', () => {
@@ -157,58 +238,69 @@ describe('currentNode', () => {
 });
 
 describe('nextNodeChoices', () => {
-  it('returns one node from the start (linear)', () => {
+  it('returns one or more nodes matching the start node nextNodeIds', () => {
     const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const start = rs.currentFloorNodes.find((n) => n.id === rs.currentNodeId)!;
     const choices = nextNodeChoices(rs);
-    expect(choices).toHaveLength(1);
-    expect(choices[0].id).toBe('crypt-f1-n1');
+    expect(choices.map((c) => c.id).sort()).toEqual([...start.nextNodeIds].sort());
   });
 
-  it('returns two nodes from the fork source (n1)', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
-    // Clear n0 to advance to n1.
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    expect(rs.currentNodeId).toBe('crypt-f1-n1');
+  it('returns multiple nodes from a fork source', () => {
+    const rs = advanceToFork(startRun('crypt', makeParty(), 1, createRng(1)));
+    const fork = rs.currentFloorNodes.find((n) => n.id === rs.currentNodeId)!;
     const choices = nextNodeChoices(rs);
-    expect(choices).toHaveLength(2);
-    expect(choices.map((c) => c.id).sort()).toEqual(['crypt-f1-n2a', 'crypt-f1-n2b']);
+    expect(choices.length).toBeGreaterThanOrEqual(2);
+    expect(choices.map((c) => c.id).sort()).toEqual([...fork.nextNodeIds].sort());
   });
 });
 
 describe('chooseNextNode', () => {
   it('advances currentNodeId and clears awaitingFork', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    const rs = advanceToFork(startRun('crypt', makeParty(), 1, createRng(1)));
     expect(rs.awaitingFork).toBe(true);
-    rs = chooseNextNode(rs, 'crypt-f1-n2a');
-    expect(rs.currentNodeId).toBe('crypt-f1-n2a');
-    expect(rs.awaitingFork).toBe(false);
+    const fork = rs.currentFloorNodes.find((n) => n.id === rs.currentNodeId)!;
+    const branchId = fork.nextNodeIds[0];
+    const rs2 = chooseNextNode(rs, branchId);
+    expect(rs2.currentNodeId).toBe(branchId);
+    expect(rs2.awaitingFork).toBe(false);
   });
 
   it('throws when chosen id is not in current node nextNodeIds', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    expect(() => chooseNextNode(rs, 'crypt-f1-boss')).toThrow();
+    const rs = advanceToFork(startRun('crypt', makeParty(), 1, createRng(1)));
+    const terminalNode = rs.currentFloorNodes.find((n) => n.nextNodeIds.length === 0)!;
+    expect(() => chooseNextNode(rs, terminalNode.id)).toThrow();
     expect(() => chooseNextNode(rs, 'bogus-id')).toThrow();
   });
 
   it('throws when status is not in_dungeon', () => {
-    const rs = { ...startRun('crypt', makeParty(), 1, createRng(1)), status: 'camp_screen' as const };
-    expect(() => chooseNextNode(rs, 'crypt-f1-n1')).toThrow();
+    const baseRs = startRun('crypt', makeParty(), 1, createRng(1));
+    const start = baseRs.currentFloorNodes.find((n) => n.id === baseRs.currentNodeId)!;
+    const rs = { ...baseRs, status: 'camp_screen' as const };
+    expect(() => chooseNextNode(rs, start.nextNodeIds[0])).toThrow();
   });
 });
 
 describe('completeCombat — victory on linear node', () => {
-  it('advances currentNodeId to the single nextNodeId; awaitingFork stays false', () => {
-    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+  it('does NOT auto-advance; sets awaitingFork=true so the player must click the next node', () => {
+    // Find a seed where the start node has exactly one successor (linear case).
+    let rs: ReturnType<typeof startRun> | undefined;
+    for (let seed = 1; seed <= 50; seed++) {
+      const candidate = startRun('crypt', makeParty(), seed, createRng(seed));
+      const start = candidate.currentFloorNodes.find((n) => n.id === candidate.currentNodeId)!;
+      if (start.nextNodeIds.length === 1) {
+        rs = candidate;
+        break;
+      }
+    }
+    if (!rs) throw new Error('no seed found with single-successor start in 1..50');
+    const startNodeIdBefore = rs.currentNodeId;
     const result = mockCombatResult(rs.party, [18, 10, 12], 'player_victory');
     const { runState: rs2, wipe } = completeCombat(rs, result, createRng(99));
     expect(wipe).toBeUndefined();
-    expect(rs2.currentNodeId).toBe('crypt-f1-n1');
-    expect(rs2.awaitingFork).toBe(false);
+    expect(rs2.currentNodeId).toBe(startNodeIdBefore);
+    expect(rs2.awaitingFork).toBe(true);
     expect(rs2.status).toBe('in_dungeon');
+    expect(rs2.traversedNodeIds).toEqual(rs.traversedNodeIds);
   });
 
   it('drops fallen heroes from the party', () => {
@@ -223,17 +315,14 @@ describe('completeCombat — victory on linear node', () => {
 
 describe('completeCombat — victory at fork source', () => {
   it('keeps currentNodeId at fork source; sets awaitingFork true', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
-    // Clear n0 to position at n1 (fork source).
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    expect(rs.currentNodeId).toBe('crypt-f1-n1');
-    expect(rs.awaitingFork).toBe(false);
-    // Now clear n1.
-    const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
-    const { runState: rs2 } = completeCombat(rs, result, createRng(99));
-    expect(rs2.currentNodeId).toBe('crypt-f1-n1');
-    expect(rs2.awaitingFork).toBe(true);
-    expect(rs2.status).toBe('in_dungeon');
+    // Walk to a node with ≥2 outgoing edges that's a combat node (so we can
+    // resolve combat at it). advanceToFork sets up the post-combat state where
+    // awaitingFork=true at the fork source.
+    const rs = advanceToFork(startRun('crypt', makeParty(), 1, createRng(1)));
+    expect(rs.awaitingFork).toBe(true);
+    expect(rs.status).toBe('in_dungeon');
+    const fork = rs.currentFloorNodes.find((n) => n.id === rs.currentNodeId)!;
+    expect(fork.nextNodeIds.length).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -269,7 +358,8 @@ describe('pressOn', () => {
     const rs2 = pressOn(rs, createRng(99));
     expect(rs2.status).toBe('in_dungeon');
     expect(rs2.currentFloorNumber).toBe(2);
-    expect(rs2.currentNodeId).toBe('crypt-f2-n0');
+    // Phase 2b: floor 2 has 9 rows. Start node is row 0, slot 1.
+    expect(rs2.currentNodeId).toBe('crypt-f2-r0-s1');
     expect(rs2.awaitingFork).toBe(false);
   });
 });
@@ -306,12 +396,14 @@ describe('completeCombat — XP awards', () => {
   it('awards 30×floor XP after a boss victory', () => {
     let rs = startRun('crypt', makeParty(), 1, createRng(1));
     rs = advanceToBossNode(rs);
-    // Path so far = 3 combat clears (n0 + n1 + branch), so each survivor has 15 XP.
+    // Capture per-hero XP after the path walk; advanceToBossNode's path varies
+    // by which fork shape RNG rolled (combat/elite/shop/camp branch). The test
+    // pins the boss-XP delta, not the absolute total.
+    const preBossXp = rs.party.map((h) => h.xp);
     const bossResult = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
     const { runState: rs2 } = completeCombat(rs, bossResult, createRng(99));
-    // 15 (combat) + 30 (boss) = 45.
-    for (const hero of rs2.party) {
-      expect(hero.xp).toBe(45);
+    for (let i = 0; i < rs2.party.length; i++) {
+      expect(rs2.party[i].xp).toBe(preBossXp[i] + 30);
     }
   });
 
@@ -370,9 +462,11 @@ describe('completeCombat — XP awards', () => {
 
 describe('completeCombat — loot drop', () => {
   it('drops items into the pack on victory', () => {
+    // Phase 5 dropped combat-loot rate from 50% to 10%, so attempts bumped
+    // from 30 to 100 to keep this test reliable (P(no drop in 100 @ 10%) ≈ 0.003%).
     let rs = startRun('crypt', makeParty(), 1, createRng(1));
     let foundItem = false;
-    for (let attempt = 0; attempt < 30 && !foundItem; attempt++) {
+    for (let attempt = 0; attempt < 100 && !foundItem; attempt++) {
       const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
       const { runState: next } = completeCombat(rs, result, createRng(attempt + 1));
       if (next.pack.items.length > rs.pack.items.length) {
@@ -380,20 +474,29 @@ describe('completeCombat — loot drop', () => {
       }
       rs = next;
       if (rs.awaitingFork) {
-        // Prefer combat-bearing branches so completeCombat doesn't throw next iteration.
+        // Prefer combat-bearing then handleable branches so completeCombat
+        // doesn't throw next iteration. Every fork shape has at least one
+        // combat/elite/shop/camp branch — never falls through to choices[0].
         const choices = nextNodeChoices(rs);
         const branch =
           choices.find((n) => n.type === 'combat') ??
           choices.find((n) => n.type === 'elite') ??
+          choices.find((n) => n.type === 'shop') ??
+          choices.find((n) => n.type === 'camp') ??
           choices[0];
         rs = chooseNextNode(rs, branch.id);
       }
       // If the current node is non-combat (shop/camp branch), walk past it.
+      // Each clear sets awaitingFork=true; chooseNextNode advances.
       while (rs.status === 'in_dungeon' && currentNode(rs).type === 'shop') {
         rs = leaveShop(rs);
+        const cur = currentNode(rs);
+        rs = chooseNextNode(rs, cur.nextNodeIds[0]);
       }
       while (rs.status === 'in_dungeon' && currentNode(rs).type === 'camp') {
         rs = chooseCampNodeEffect(rs, { kind: 'heal_party' }, createRng(99)).runState;
+        const cur = currentNode(rs);
+        rs = chooseNextNode(rs, cur.nextNodeIds[0]);
       }
       if (rs.status !== 'in_dungeon') {
         rs = startRun('crypt', makeParty(), 1, createRng(attempt + 100));
@@ -419,66 +522,199 @@ describe('completeCombat — loot drop', () => {
 });
 
 describe('playerPath', () => {
-  it('at start node: path goes through branch A (default)', () => {
+  it('at start node: path begins at start, ends at boss', () => {
     const rs = startRun('crypt', makeParty(), 1, createRng(1));
     const path = playerPath(rs);
-    expect(path.map((n) => n.id)).toEqual([
-      'crypt-f1-n0',
-      'crypt-f1-n1',
-      'crypt-f1-n2a',
-      'crypt-f1-boss',
-    ]);
+    expect(path[0].id).toBe(rs.currentNodeId);
+    expect(path[path.length - 1].type).toBe('boss');
   });
 
-  it('at fork source awaiting pick: path defaults to branch A', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    expect(rs.awaitingFork).toBe(true);
+  it('after picking a fork branch: path passes through the picked branch', () => {
+    const rs = advanceToFork(startRun('crypt', makeParty(), 1, createRng(1)));
+    const fork = rs.currentFloorNodes.find((n) => n.id === rs.currentNodeId)!;
+    const branchId = fork.nextNodeIds[1]; // pick the second branch (not the default)
+    const advanced = chooseNextNode(rs, branchId);
+    const path = playerPath(advanced);
+    expect(path.some((n) => n.id === branchId)).toBe(true);
+  });
+
+  it('returns a path of length === rowCount for floor 1 (8 rows)', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
     const path = playerPath(rs);
-    expect(path[2].id).toBe('crypt-f1-n2a');
+    expect(path).toHaveLength(8);
+  });
+});
+
+describe('traversedNodeIds (cartographer log)', () => {
+  it('startRun initializes to [startNodeId]', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(rs.traversedNodeIds).toEqual([rs.currentNodeId]);
   });
 
-  it('after picking branch A: path goes through n2a', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    rs = chooseNextNode(rs, 'crypt-f1-n2a');
-    const path = playerPath(rs);
-    expect(path[2].id).toBe('crypt-f1-n2a');
-  });
-
-  it('after picking branch B: path goes through n2b', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    rs = chooseNextNode(rs, 'crypt-f1-n2b');
-    const path = playerPath(rs);
-    expect(path[2].id).toBe('crypt-f1-n2b');
-  });
-
-  it('at boss after branch B: falls back to branch A (ambiguity)', () => {
-    let rs = startRun('crypt', makeParty(), 1, createRng(1));
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    rs = chooseNextNode(rs, 'crypt-f1-n2b');
-    // n2b's type is seed-dependent — handle both shop and combat cases.
-    const node2b = currentNode(rs);
-    if (node2b.type === 'shop') {
-      rs = leaveShop(rs);
+  it('completeCombat single-fanout victory appends the new currentNodeId', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    const initial = rs.traversedNodeIds;
+    const after = completeCombat(
+      rs,
+      mockCombatResult(rs.party, [20, 14, 15], 'player_victory'),
+      createRng(99),
+    ).runState;
+    if (after.awaitingFork) {
+      // Row-0 → row-1 fanout depends on the seed; if it's a fork source, the
+      // append is skipped (covered by the next test).
+      expect(after.traversedNodeIds).toEqual(initial);
     } else {
-      rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+      expect(after.traversedNodeIds).toEqual([...initial, after.currentNodeId]);
     }
-    expect(rs.currentNodeId).toBe('crypt-f1-boss');
-    const path = playerPath(rs);
-    // Both branches reach boss; defaults to A.
-    expect(path[2].id).toBe('crypt-f1-n2a');
   });
 
-  it('returns 4-node player path for Crypt floor (not the 5-node graph)', () => {
+  it('completeCombat at fork source does NOT append (currentNodeId unchanged)', () => {
+    const rs = advanceToFork(startRun('crypt', makeParty(), 1, createRng(1)));
+    expect(rs.awaitingFork).toBe(true);
+    expect(rs.traversedNodeIds[rs.traversedNodeIds.length - 1]).toBe(rs.currentNodeId);
+  });
+
+  it('chooseNextNode appends the picked branch id', () => {
+    const rs = advanceToFork(startRun('crypt', makeParty(), 1, createRng(1)));
+    const fork = currentNode(rs);
+    const picked = fork.nextNodeIds[1];
+    const after = chooseNextNode(rs, picked);
+    expect(after.traversedNodeIds).toEqual([...rs.traversedNodeIds, picked]);
+  });
+
+  it('completeCombat on boss does NOT append (currentNodeId unchanged on victory)', () => {
+    const rs = advanceToBossNode(startRun('crypt', makeParty(), 1, createRng(1)));
+    const before = rs.traversedNodeIds;
+    const after = completeCombat(
+      rs,
+      mockCombatResult(rs.party, [20, 14, 15], 'player_victory'),
+      createRng(99),
+    ).runState;
+    expect(after.status).toBe('camp_screen');
+    expect(after.traversedNodeIds).toEqual(before);
+  });
+
+  it('pressOn resets traversedNodeIds to the new floor start', () => {
+    let rs = advanceToBossNode(startRun('crypt', makeParty(), 1, createRng(1)));
+    rs = completeCombat(
+      rs,
+      mockCombatResult(rs.party, [20, 14, 15], 'player_victory'),
+      createRng(99),
+    ).runState;
+    expect(rs.status).toBe('camp_screen');
+    const next = pressOn(rs, createRng(2));
+    expect(next.traversedNodeIds).toEqual([next.currentNodeId]);
+    expect(next.traversedNodeIds).toHaveLength(1);
+  });
+
+  it('current node is always the last entry in traversedNodeIds (between forks)', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(rs.traversedNodeIds[rs.traversedNodeIds.length - 1]).toBe(rs.currentNodeId);
+    for (let i = 0; i < 3; i++) {
+      const node = currentNode(rs);
+      if (node.type === 'boss') break;
+      rs = completeCombat(
+        rs,
+        mockCombatResult(rs.party, [20, 14, 15], 'player_victory'),
+        createRng(99),
+      ).runState;
+      if (rs.status !== 'in_dungeon') break;
+      expect(rs.traversedNodeIds[rs.traversedNodeIds.length - 1]).toBe(rs.currentNodeId);
+      if (rs.awaitingFork) break;
+    }
+  });
+});
+
+describe('applyTravelTick', () => {
+  function makePartyWithStates(states: { hp: number; maxHp: number; wounded: boolean }[]): Hero[] {
+    return states.map((s, i) => {
+      const hero = createHero('knight', `H${i}`, `h${i}`, 'quick', 'body1');
+      return {
+        ...hero,
+        currentHp: s.hp,
+        maxHp: s.maxHp,
+        wounds: s.wounded ? [{ id: 'bruised' as const, runsRemaining: 5 }] : [],
+      };
+    });
+  }
+
+  function makeRunWithParty(party: Hero[]): ReturnType<typeof startRun> {
     const rs = startRun('crypt', makeParty(), 1, createRng(1));
-    const path = playerPath(rs);
-    expect(path).toHaveLength(4);
+    return { ...rs, party };
+  }
+
+  it('unwounded hero at half HP gains +1 (heal)', () => {
+    const party = makePartyWithStates([{ hp: 10, maxHp: 20, wounded: false }]);
+    const rs = makeRunWithParty(party);
+    const { runState, deltas } = applyTravelTick(rs);
+    expect(runState.party[0].currentHp).toBe(11);
+    expect(deltas).toEqual([1]);
+  });
+
+  it('unwounded hero at maxHp stays at maxHp (capped, delta=0)', () => {
+    const party = makePartyWithStates([{ hp: 20, maxHp: 20, wounded: false }]);
+    const rs = makeRunWithParty(party);
+    const { runState, deltas } = applyTravelTick(rs);
+    expect(runState.party[0].currentHp).toBe(20);
+    expect(deltas).toEqual([0]);
+  });
+
+  it('wounded hero at half HP takes -1 (damage)', () => {
+    const party = makePartyWithStates([{ hp: 10, maxHp: 20, wounded: true }]);
+    const rs = makeRunWithParty(party);
+    const { runState, deltas } = applyTravelTick(rs);
+    expect(runState.party[0].currentHp).toBe(9);
+    expect(deltas).toEqual([-1]);
+  });
+
+  it('wounded hero at 1 HP stays at 1 (floored — travel cannot kill)', () => {
+    const party = makePartyWithStates([{ hp: 1, maxHp: 20, wounded: true }]);
+    const rs = makeRunWithParty(party);
+    const { runState, deltas } = applyTravelTick(rs);
+    expect(runState.party[0].currentHp).toBe(1);
+    expect(deltas).toEqual([0]);
+  });
+
+  it('multiple wounds still result in -1 (per-hero binary, not per-wound)', () => {
+    const party = makePartyWithStates([{ hp: 15, maxHp: 20, wounded: true }]);
+    const rs = makeRunWithParty(party);
+    rs.party[0].wounds.push({ id: 'hobbled' as const, runsRemaining: 5 });
+    rs.party[0].wounds.push({ id: 'concussed' as const, runsRemaining: 5 });
+    const { runState, deltas } = applyTravelTick(rs);
+    expect(runState.party[0].currentHp).toBe(14);
+    expect(deltas).toEqual([-1]);
+  });
+
+  it('mixed 3-hero party: each evaluated independently', () => {
+    const party = makePartyWithStates([
+      { hp: 5,  maxHp: 20, wounded: false },
+      { hp: 10, maxHp: 20, wounded: true },
+      { hp: 20, maxHp: 20, wounded: false },
+    ]);
+    const rs = makeRunWithParty(party);
+    const { runState, deltas } = applyTravelTick(rs);
+    expect(runState.party[0].currentHp).toBe(6);
+    expect(runState.party[1].currentHp).toBe(9);
+    expect(runState.party[2].currentHp).toBe(20);
+    expect(deltas).toEqual([1, -1, 0]);
+  });
+
+  it('does not mutate the input runState', () => {
+    const party = makePartyWithStates([{ hp: 10, maxHp: 20, wounded: true }]);
+    const rs = makeRunWithParty(party);
+    const before = JSON.stringify(rs);
+    applyTravelTick(rs);
+    expect(JSON.stringify(rs)).toBe(before);
+  });
+
+  it('returns deltas indexed parallel to party (length matches)', () => {
+    const party = makePartyWithStates([
+      { hp: 5,  maxHp: 20, wounded: false },
+      { hp: 10, maxHp: 20, wounded: true },
+    ]);
+    const rs = makeRunWithParty(party);
+    const { deltas } = applyTravelTick(rs);
+    expect(deltas).toHaveLength(rs.party.length);
   });
 });
 
@@ -542,14 +778,14 @@ describe('purchaseItem', () => {
 });
 
 describe('leaveShop', () => {
-  it('advances currentNodeId to next', () => {
+  it('does NOT auto-advance; sets awaitingFork=true so the player must click the next node', () => {
     let rs = startRunWithShop();
     rs = navigateToShop(rs);
-    const shop = currentNode(rs);
     const before = rs.currentNodeId;
     const after = leaveShop(rs);
-    expect(after.currentNodeId).not.toBe(before);
-    expect(after.currentNodeId).toBe(shop.nextNodeIds[0]);
+    expect(after.currentNodeId).toBe(before);
+    expect(after.awaitingFork).toBe(true);
+    expect(after.traversedNodeIds).toEqual(rs.traversedNodeIds);
   });
 
   it('throws when current node is not a shop', () => {
@@ -581,6 +817,7 @@ function makeEliteRun(seed = 1): ReturnType<typeof startRun> {
     type: 'elite',
     encounter: eliteEncounter,
     nextNodeIds: [bossId],
+    slot: 1,
   };
   return {
     ...rs,
@@ -648,6 +885,7 @@ function makeCampRun(seed = 1): ReturnType<typeof startRun> {
     id: campId,
     type: 'camp',
     nextNodeIds: [bossId],
+    slot: 1,
   };
   return {
     ...rs,
@@ -657,14 +895,15 @@ function makeCampRun(seed = 1): ReturnType<typeof startRun> {
 }
 
 describe('chooseCampNodeEffect — heal_party', () => {
-  it('advances currentNodeId and heals every hero by 25% maxHp', () => {
+  it('heals every hero by 25% maxHp; sets awaitingFork=true (player clicks next node to advance)', () => {
     const rs0 = makeCampRun();
     const damaged: ReturnType<typeof startRun> = {
       ...rs0,
       party: rs0.party.map((h) => ({ ...h, currentHp: 1 })),
     };
     const result = chooseCampNodeEffect(damaged, { kind: 'heal_party' }, createRng(1));
-    expect(result.runState.currentNodeId).toBe('crypt-f1-boss');
+    expect(result.runState.currentNodeId).toBe(damaged.currentNodeId);
+    expect(result.runState.awaitingFork).toBe(true);
     for (let i = 0; i < result.runState.party.length; i++) {
       const hero = result.runState.party[i];
       expect(hero.currentHp).toBe(1 + Math.round(hero.maxHp * 0.25));
@@ -679,7 +918,7 @@ describe('chooseCampNodeEffect — heal_party', () => {
 });
 
 describe('chooseCampNodeEffect — treat_wound', () => {
-  it('advances currentNodeId and removes the wound', () => {
+  it('removes the wound; sets awaitingFork=true (player clicks next node to advance)', () => {
     const rs0 = makeCampRun();
     const wounded: ReturnType<typeof startRun> = {
       ...rs0,
@@ -692,7 +931,8 @@ describe('chooseCampNodeEffect — treat_wound', () => {
       { kind: 'treat_wound', heroIndex: 0, woundIndex: 0 },
       createRng(1),
     );
-    expect(result.runState.currentNodeId).toBe('crypt-f1-boss');
+    expect(result.runState.currentNodeId).toBe(wounded.currentNodeId);
+    expect(result.runState.awaitingFork).toBe(true);
     expect(result.runState.party[0].wounds).toEqual([]);
   });
 });
@@ -865,5 +1105,72 @@ describe('completeCombat wipe — Lost vs Fallen separation', () => {
     expect(wipe).toBeDefined();
     expect(wipe!.heroesLost).toEqual([]);
     expect(wipe!.heroesFallen).toHaveLength(3);
+  });
+});
+
+describe('claimTreasure', () => {
+  function makeRunWithTreasureNode(): ReturnType<typeof startRun> {
+    const baseRun = startRun('crypt', makeParty(), 1, createRng(1));
+    // Substitute a synthetic 2-node floor: treasure → boss. Exercises the
+    // helper in isolation regardless of what generateFloor rolled.
+    const treasureNode: Node = { id: 't0', type: 'treasure', nextNodeIds: ['t-boss'], slot: 1 };
+    const bossNode: Node = baseRun.currentFloorNodes.find((n) => n.type === 'boss')!;
+    return {
+      ...baseRun,
+      currentFloorNodes: [treasureNode, { ...bossNode, id: 't-boss' }],
+      currentNodeId: 't0',
+    };
+  }
+
+  function makeItem(): Item {
+    return {
+      id: 'item-test-1',
+      baseId: 'sword_basic',
+      slot: 'weapon',
+      rarity: 'common',
+      weaponType: 'sword',
+      affixes: [],
+      floorRolledAt: 1,
+    };
+  }
+
+  it('adds the item to the pack', () => {
+    const run = makeRunWithTreasureNode();
+    const item = makeItem();
+    const next = claimTreasure(run, item);
+    expect(next.pack.items).toHaveLength(run.pack.items.length + 1);
+    expect(next.pack.items[next.pack.items.length - 1]).toEqual(item);
+  });
+
+  it('does NOT auto-advance; sets awaitingFork=true so the player must click the next node', () => {
+    const run = makeRunWithTreasureNode();
+    const next = claimTreasure(run, makeItem());
+    expect(next.currentNodeId).toBe(run.currentNodeId);
+    expect(next.awaitingFork).toBe(true);
+    expect(next.traversedNodeIds).toEqual(run.traversedNodeIds);
+  });
+
+  it("throws if status is not 'in_dungeon'", () => {
+    const run = { ...makeRunWithTreasureNode(), status: 'camp_screen' as const };
+    expect(() => claimTreasure(run, makeItem())).toThrow(
+      /status must be 'in_dungeon'/,
+    );
+  });
+
+  it("throws if current node is not 'treasure'", () => {
+    const run = makeRunWithTreasureNode();
+    const wrongRun = { ...run, currentNodeId: 't-boss' };
+    expect(() => claimTreasure(wrongRun, makeItem())).toThrow(
+      /not 'treasure'/,
+    );
+  });
+
+  it('does not mutate the input runState', () => {
+    const run = makeRunWithTreasureNode();
+    const beforeNodeId = run.currentNodeId;
+    const beforePackLen = run.pack.items.length;
+    claimTreasure(run, makeItem());
+    expect(run.currentNodeId).toBe(beforeNodeId);
+    expect(run.pack.items).toHaveLength(beforePackLen);
   });
 });

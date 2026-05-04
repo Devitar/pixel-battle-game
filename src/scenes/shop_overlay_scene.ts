@@ -224,6 +224,6 @@ export class ShopOverlayScene extends Phaser.Scene {
       runState: leaveShop(s.runState!),
     }));
     this.scene.stop();
-    this.scene.resume('dungeon');
+    this.scene.resume('corridor');
   }
 }

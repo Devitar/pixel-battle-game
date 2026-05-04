@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import type { EventOutcome } from '@run/event_resolver';
 import { applyEventChoice } from '@run/event_resolver';
-import { chooseNextNode, currentNode } from '@run/run_state';
+import { currentNode } from '@run/run_state';
 import { EVENTS, describePayload, type EventCard, type EventChoice } from '@data/events';
 import type { Item } from '@data/types';
 import { Paperdoll } from '@render/paperdoll';
@@ -281,11 +281,14 @@ export class EventOverlayScene extends Phaser.Scene {
     const args = selectedHeroIndex !== undefined ? { selectedHeroIndex } : {};
     const rng = this.rng();
     const result = applyEventChoice(initialRs, card, choiceIndex, args, rng);
-    const advanced = chooseNextNode(result.runState, node.nextNodeIds[0]);
+    // Click-to-advance: stay at the event node and flag awaitingFork. When the
+    // player dismisses the outcome panel and the dungeon scene resumes, it'll
+    // light up the next-row choice as a click target rather than auto-walking.
+    const awaitingClick = { ...result.runState, awaitingFork: true };
 
     appState.update((s) => ({
       ...s,
-      runState: advanced,
+      runState: awaitingClick,
       runRngState: rng.getState(),
     }));
 
@@ -410,6 +413,6 @@ export class EventOverlayScene extends Phaser.Scene {
 
   private closeAndAdvance(): void {
     this.scene.stop();
-    this.scene.resume('dungeon');
+    this.scene.resume('corridor');
   }
 }

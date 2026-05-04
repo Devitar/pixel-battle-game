@@ -62,6 +62,7 @@ describe('save / load roundtrip', () => {
       status: 'in_dungeon',
       fallen: [],
       lost: [],
+      traversedNodeIds: [''],
     };
     const original: SaveFile = {
       ...makeBaseSave(),
@@ -88,6 +89,7 @@ describe('save / load roundtrip', () => {
       status: 'in_dungeon',
       fallen: [],
       lost: [],
+      traversedNodeIds: [],
     };
     const data: SaveFile = { ...makeBaseSave(), runState: fakeRunState };
     expect(() => save(data, storage)).toThrow();
@@ -108,6 +110,29 @@ describe('save / load roundtrip', () => {
     save(original, storage);
     const loaded = load(storage);
     expect(loaded?.preferences).toEqual({ combatSpeed: 3 });
+  });
+
+  it('round-trips preferences.walkSpeed', () => {
+    const storage = new MemoryStorage();
+    const original: SaveFile = {
+      ...makeBaseSave(),
+      preferences: { combatSpeed: 1, walkSpeed: 3 },
+    };
+    save(original, storage);
+    const loaded = load(storage);
+    expect(loaded?.preferences?.walkSpeed).toBe(3);
+  });
+
+  it('loads an old save with combatSpeed but no walkSpeed (field is optional)', () => {
+    const storage = new MemoryStorage();
+    const original: SaveFile = {
+      ...makeBaseSave(),
+      preferences: { combatSpeed: 3 },
+    };
+    save(original, storage);
+    const loaded = load(storage);
+    expect(loaded?.preferences?.combatSpeed).toBe(3);
+    expect(loaded?.preferences?.walkSpeed).toBeUndefined();
   });
 
   it('loads an old save without preferences (field is optional)', () => {
@@ -341,6 +366,68 @@ describe('save normalizer — runState.lost default', () => {
     const loaded = load(storage);
     expect(loaded!.runState!.lost).toHaveLength(1);
     expect(loaded!.runState!.lost[0].id).toBe('h0');
+  });
+});
+
+describe('save normalizer — runState.traversedNodeIds default', () => {
+  it('defaults missing runState.traversedNodeIds to [currentNodeId]', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({
+      version: CURRENT_SCHEMA_VERSION,
+      roster: { heroes: [], slots: 12 },
+      vault: { gold: 0 },
+      stash: createStash(),
+      unlocks: { classes: [], dungeons: [] },
+      runState: {
+        dungeonId: 'crypt',
+        seed: 1,
+        party: [],
+        pack: { gold: 0, items: [] },
+        currentFloorNumber: 1,
+        currentFloorNodes: [],
+        currentNodeId: 'crypt-f1-r3-s1',
+        awaitingFork: false,
+        status: 'in_dungeon',
+        fallen: [],
+        lost: [],
+        // NOTE: traversedNodeIds intentionally omitted to simulate a pre-Phase-3 save
+      },
+      runRngState: 12345,
+    }));
+    const loaded = load(storage);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.runState).toBeDefined();
+    expect(loaded!.runState!.traversedNodeIds).toEqual(['crypt-f1-r3-s1']);
+  });
+
+  it('preserves an explicit traversedNodeIds array', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({
+      version: CURRENT_SCHEMA_VERSION,
+      roster: { heroes: [], slots: 12 },
+      vault: { gold: 0 },
+      stash: createStash(),
+      unlocks: { classes: [], dungeons: [] },
+      runState: {
+        dungeonId: 'crypt',
+        seed: 1,
+        party: [],
+        pack: { gold: 0, items: [] },
+        currentFloorNumber: 1,
+        currentFloorNodes: [],
+        currentNodeId: 'crypt-f1-r3-s1',
+        awaitingFork: false,
+        status: 'in_dungeon',
+        fallen: [],
+        lost: [],
+        traversedNodeIds: ['crypt-f1-r0-s1', 'crypt-f1-r1-s1', 'crypt-f1-r2-s1', 'crypt-f1-r3-s1'],
+      },
+      runRngState: 12345,
+    }));
+    const loaded = load(storage);
+    expect(loaded!.runState!.traversedNodeIds).toEqual([
+      'crypt-f1-r0-s1', 'crypt-f1-r1-s1', 'crypt-f1-r2-s1', 'crypt-f1-r3-s1',
+    ]);
   });
 });
 

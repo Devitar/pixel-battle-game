@@ -20,4 +20,5 @@ One section per bug. Keep it terse — this is a triage bin, not a formal tracke
 
 <!-- Add bugs below this line. Newest at the top. -->
 
-### Players should only be able to see what the immediate next node is, not the entire dungeon.
+### There isn't a way to see the stats of the currently equipped items from the barracks view. We should unify the equipment swapping/viewing screens between the barracks and mid run scenes as well. Let's brainstorm on the proper flow here.
+I also don't see anywhere in the UI that tells you what abilities will be lost and gained when you change a weapon type on a hero.
