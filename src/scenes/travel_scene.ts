@@ -1,4 +1,5 @@
 import * as Phaser from 'phaser';
+import { CHATTER, computeChatterCondition } from '@data/chatter';
 import type { Hero } from '@heroes/hero';
 import { heroToLoadout } from '@render/hero_loadout';
 import { Paperdoll } from '@render/paperdoll';
@@ -29,6 +30,14 @@ const TOTAL_TRAVEL_MS = STEPS_PER_EDGE * STEP_DURATION_MS; // 7500ms at 1×
 const HP_TICK_STEP = 3;                 // step (1-indexed) at which the HP popup fires
 const HP_TICK_FRACTION = HP_TICK_STEP / STEPS_PER_EDGE;     // 0.6 — fraction of total travel
 const POPUP_DURATION_MS = 500;
+
+const CHATTER_PROBABILITY = 0.7;
+const CHATTER_FADE_IN_MS = 150;
+const CHATTER_HOLD_MS = 2000;
+const CHATTER_FADE_OUT_MS = 250;
+const CHATTER_BUBBLE_BG = 0xf4ecd8;
+const CHATTER_BUBBLE_BORDER = 0x2a2020;
+const CHATTER_TEXT_COLOR = '#2a2020';
 
 const FF_X = 944;
 const FF_Y = 48;
@@ -71,6 +80,7 @@ export class TravelScene extends Phaser.Scene {
     this.buildBackdrop();
     this.buildHud();
     this.buildHeroes(run.party);
+    this.maybeScheduleChatter(run.party);
     this.startWalk();
   }
 
@@ -251,6 +261,85 @@ export class TravelScene extends Phaser.Scene {
       duration: POPUP_DURATION_MS,
       ease: 'Cubic.easeOut',
       onComplete: () => popup.destroy(),
+    });
+  }
+
+  private maybeScheduleChatter(party: readonly Hero[]): void {
+    if (Math.random() >= CHATTER_PROBABILITY) return;
+    if (party.length === 0) return;
+    const step = Math.random() < 0.5 ? 2 : 4;
+    const heroIndex = Math.floor(Math.random() * party.length);
+    const hero = party[heroIndex];
+    const condition = computeChatterCondition(hero);
+    const pool = CHATTER[hero.classId][condition];
+    if (pool.length === 0) return; // safety
+    const line = pool[Math.floor(Math.random() * pool.length)];
+
+    // Step N happens at (N * STEP_DURATION_MS) into the travel; divide by
+    // walkSpeed to scale.
+    const stepTimeMs = (step * STEP_DURATION_MS) / this.walkSpeed;
+    this.time.delayedCall(stepTimeMs, () => this.spawnChatterBubble(heroIndex, line));
+  }
+
+  private spawnChatterBubble(heroIndex: number, line: string): void {
+    const visual = this.heroVisuals[heroIndex];
+    if (!visual) return;
+
+    const text = this.add
+      .text(0, 0, line, {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: CHATTER_TEXT_COLOR,
+        fontStyle: 'italic',
+      })
+      .setOrigin(0.5);
+
+    const padX = 6;
+    const padY = 4;
+    const w = text.width + padX * 2;
+    const h = text.height + padY * 2;
+    // Container is at y=0; children use absolute scene y. Position the bubble
+    // just above the hero's head (head top is at GROUND_Y - HERO_BODY_HALF*2).
+    const bubbleY = GROUND_Y - HERO_BODY_HALF * 2 - 16;
+
+    const bg = this.add.graphics();
+    bg.fillStyle(CHATTER_BUBBLE_BG, 1);
+    bg.fillRoundedRect(-w / 2, bubbleY - h / 2, w, h, 3);
+    bg.lineStyle(1, CHATTER_BUBBLE_BORDER, 1);
+    bg.strokeRoundedRect(-w / 2, bubbleY - h / 2, w, h, 3);
+    // Tail (small triangle pointing down to the hero).
+    bg.fillStyle(CHATTER_BUBBLE_BG, 1);
+    bg.fillTriangle(-3, bubbleY + h / 2, 3, bubbleY + h / 2, 0, bubbleY + h / 2 + 4);
+    bg.lineStyle(1, CHATTER_BUBBLE_BORDER, 1);
+    bg.lineBetween(-3, bubbleY + h / 2, 0, bubbleY + h / 2 + 4);
+    bg.lineBetween(0, bubbleY + h / 2 + 4, 3, bubbleY + h / 2);
+
+    text.setPosition(0, bubbleY);
+
+    // Add as children of the hero's container so the bubble follows the hero.
+    visual.container.add([bg, text]);
+
+    // Fade in → hold (scaled by walkSpeed) → fade out.
+    bg.setAlpha(0);
+    text.setAlpha(0);
+    this.tweens.add({
+      targets: [bg, text],
+      alpha: 1,
+      duration: CHATTER_FADE_IN_MS,
+      ease: 'Cubic.easeOut',
+    });
+    const holdMs = CHATTER_HOLD_MS / this.walkSpeed;
+    this.time.delayedCall(CHATTER_FADE_IN_MS + holdMs, () => {
+      this.tweens.add({
+        targets: [bg, text],
+        alpha: 0,
+        duration: CHATTER_FADE_OUT_MS,
+        ease: 'Cubic.easeIn',
+        onComplete: () => {
+          bg.destroy();
+          text.destroy();
+        },
+      });
     });
   }
 

@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-03 · Map-based dungeon scene — Phase 6b (hero chatter) (Cluster B · 30)
+
+- **Why:** TODO #30 Phase 6b. Layers onto Phase 6a's per-step travel infrastructure with the first non-mechanical event type — class-specific speech bubbles that give each hero a recognizable voice during travel. Pure flavor; no gameplay state mutation.
+- **Decisions:**
+  - **Class-specific + state-aware over generic.** Each class has its own personality (Knight gruff, Priest pious, Mage scholarly, etc.); the cost was 6× the writing surface, but the payoff is recognizing your party's voices, which is exactly what flavor-chatter is for. State-awareness adds a `wounded` and a `critical` bucket per class — the same Knight grumbles differently when hurt than when fresh.
+  - **Three conditions with strict precedence:** `critical` (HP < 30%) > `wounded` (any wound, not critical) > `healthy`. Exact 30% HP is `wounded`/`healthy` (strict `<`) — covered by a boundary test.
+  - **One bubble per edge max, 70% probability.** ~17 chatter events per 24-edge run with ~54 lines means good variety; 30% silent edges are a feature, not a bug — keeps the chatter from feeling scripted.
+  - **`Math.random` not run RNG.** Pure flavor, no save-determinism cost worth threading runRngState through the travel scene. Reload during travel may show different chatter — acceptable.
+  - **Speech bubble as child of hero container.** The bubble follows the hero as they walk left-to-right. Cream rounded-rect + dark border + tail pointing down — reads unambiguously as speech.
+  - **No repeat-avoidance.** Random-with-replacement; pool is large enough that within-run repeats are rare. If playtesting surfaces repetition, a per-run "recent" tracker can be added later.
+- **Surprises:**
+  - **Bubble position math caught at smoke-test, not in plan review.** Initial impl set `bubbleY = -(HERO_BODY_HALF * 2 + 16)` reasoning that the value would be relative to the hero's head. But the hero container is at `y=0` (top of scene) with children using absolute scene coords (paperdoll at y=356, HP bar at y=386, etc.). The negative bubbleY rendered the bubble at absolute y=-64, off-screen above the visible area. Fix: `bubbleY = GROUND_Y - HERO_BODY_HALF * 2 - 16` (= 316), positive scene coord above the hero's head. Worth knowing for the same trap in Phase 6c if surprise encounters add UI elements above heroes.
+- **Source:** TODO.md Cluster B · 30 Phase 6b. Spec: `docs/superpowers/specs/2026-05-03-phase-6b-hero-chatter-design.md`. Plan: `docs/superpowers/plans/2026-05-03-phase-6b-hero-chatter.md`. Test count delta: 1479 → 1486 (+7: chatter table coverage + condition precedence).
+
 ### 2026-05-03 · Map-based dungeon scene — Phase 6a (travel scene + per-step HP) (Cluster B · 30)
 
 - **Why:** TODO #30 Phase 6+ decomposed during 2026-05-03 brainstorm into 6a/6b/6c. 6a builds the foundation: a dedicated `'travel'` scene replacing the Phase 4 inline `walking_to_next` tween, with bobbing/rotating hero sprites, per-hero HP bars, and one HP tick per edge as the first per-step event. 6b (chatter) and 6c (surprise encounters with in-corridor combat) layer onto the per-step infrastructure here.
