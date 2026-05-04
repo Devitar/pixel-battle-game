@@ -92,6 +92,15 @@ export type CombatActorInit = HeroActorInit | EnemyActorInit;
 export class CombatActor extends Phaser.GameObjects.Container {
   readonly combatantId: CombatantId;
   private bodyView: Paperdoll | EnemySprite;
+
+  /** Public access to the inner body visual (paperdoll for heroes, sprite for
+   *  enemies). Used by scenes that need to apply scene-specific tweens to the
+   *  body alone (e.g. corridor scene's bob/rotate split where rotation must not
+   *  affect HP bar). Named `bodyVisual` to avoid collision with Phaser's
+   *  reserved `body` arcade-physics property on GameObject. */
+  get bodyVisual(): Paperdoll | EnemySprite {
+    return this.bodyView;
+  }
   private bodyScale: number;
   private nameText: Phaser.GameObjects.Text;
   private hpBarBg: Phaser.GameObjects.Rectangle;

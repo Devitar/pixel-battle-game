@@ -413,6 +413,6 @@ export class EventOverlayScene extends Phaser.Scene {
 
   private closeAndAdvance(): void {
     this.scene.stop();
-    this.scene.resume('dungeon');
+    this.scene.resume('corridor');
   }
 }

@@ -156,6 +156,6 @@ export class TreasureRoomOverlayScene extends Phaser.Scene {
     });
 
     this.scene.stop();
-    this.scene.resume('dungeon');
+    this.scene.resume('corridor');
   }
 }

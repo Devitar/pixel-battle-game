@@ -460,12 +460,12 @@ export class CampNodeOverlayScene extends Phaser.Scene {
     });
 
     this.scene.stop();
-    this.scene.stop('dungeon');
+    this.scene.stop('corridor');
     this.scene.start('camp');
   }
 
   private closeAndResume(): void {
     this.scene.stop();
-    this.scene.resume('dungeon');
+    this.scene.resume('corridor');
   }
 }
