@@ -29,6 +29,22 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-04 · Map-based dungeon scene — umbrella complete (Cluster B · 30)
+
+- **What shipped:** All 10 sub-phases of the StS-inspired map-based dungeon redesign (Phase 1, 2a, 2b, 3, 4, 5, 6a, 6b, 6c, 6d) — see per-phase entries below for implementation detail. Old icon-row hub layout fully replaced; the map IS the scene; in-dungeon-action lives in a unified `corridor` scene; per-edge HP ticks, hero chatter, and surprise ambushes give travel real texture.
+- **Why:** The icon-row hub had two structural problems (silently picks branch 0 at forks; reveals all future node types) and one gameplay problem (linear preamble with no exploration tension). The map paradigm fixes the visualization honestly *and* delivers on the gdd's "Expeditions" / cartographer-party fiction.
+- **Umbrella decisions** (locked 2026-05-02 brainstorm, applied across phases):
+  - **Per-floor map (3 maps per Crypt run)** over per-run map — preserves gdd §7 press-on/cashout decision; smallest run-state churn.
+  - **N=2 lookahead fog with unanchored boss** over full reveal or strict StS visibility — past nodes stay revealed (cartographer log), current+2 rows show types, beyond is blank space.
+  - **StS-strict edges with explicit predecessors** over loose movement — every node ≥1 outgoing/incoming edge, edges don't cross (visual cleanliness via 3-slot grid + slot ±1 + monotonic-target rules).
+  - **Floor-depth-scaled density** (8/9/10 rows by floor) with quota-based type assignment — 1 shop, 1 camp, 1–2 treasure, 1–2 event, 1–2 elite per floor, rest combat. Penultimate-row guarantee of camp-or-treasure for "rest before boss" cadence.
+  - **Reframe from "layer travel/fog onto icon row" to "replace icon row with map"** — the original idea was incremental; user observed mid-design that the cartographer-party / Expeditions framing fit the genre better than icon-row patching, leading to the multi-phase rewrite.
+- **Surprises / lessons:**
+  - **The Phase 6 sequence reorganized mid-build.** Original 6c was "surprise encounters with in-corridor combat"; smoke-testing 6a/6b made the corridor↔combat scene swap feel wrong, so 6c became "unify everything into one corridor scene" and 6d took over surprise encounters. The unification made 6d trivial — most of the infrastructure was already in place.
+  - **Save schema stayed at version 1 throughout.** Multiple new RunState fields (`traversedNodeIds`, `surprisesThisFloor`) added with default-on-read in `normalizeSaveFile`; no migrations, no version bumps. Pre-launch policy held.
+  - **Folded-in former tasks:** Cluster B · 38 (icon-row fog-of-war / fork visualization) and · 39 (travel animation) and · 46 (loot rooms + linear variance) were absorbed into the umbrella as phases rather than shipped separately.
+- **Source:** TODO.md Cluster B · 30 (now migrated). Originating ideas: ideas.md #1 (map-based dungeon) + #3 (travel as a real moment). Specs: `docs/superpowers/specs/2026-05-02-*` through `2026-05-04-*` (10 phase specs total). See per-phase HISTORY entries below for implementation-level decisions and surprises.
+
 ### 2026-05-04 · Map-based dungeon scene — Phase 6d (surprise encounters) (Cluster B · 30)
 
 - **Why:** Phase 6 framing of "in-corridor events" left non-combat travel feeling too safe. Phase 6d adds RNG-driven mid-corridor ambushes during travel toward shop / camp / event / treasure nodes, paying off the cartographer-party fiction with real corridor risk.
