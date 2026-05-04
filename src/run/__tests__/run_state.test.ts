@@ -1227,12 +1227,23 @@ describe('completeSurpriseCombat', () => {
     }
   }
 
-  it('does NOT advance currentNodeId on victory', () => {
+  it('preserves currentNodeId, awaitingFork, and status on victory', () => {
     const rs = runAtNonCombatNode();
-    const before = rs.currentNodeId;
     const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
     const { runState: after } = completeSurpriseCombat(rs, result, createRng(99));
-    expect(after.currentNodeId).toBe(before);
+    expect(after.currentNodeId).toBe(rs.currentNodeId);
+    expect(after.awaitingFork).toBe(rs.awaitingFork);
+    expect(after.status).toBe('in_dungeon');
+  });
+
+  it('awards combat-node XP to surviving heroes on victory', () => {
+    const rs = runAtNonCombatNode();
+    const xpBeforeById = new Map(rs.party.map((h) => [h.id, h.xp]));
+    const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const { runState: after } = completeSurpriseCombat(rs, result, createRng(99));
+    for (const survivor of after.party) {
+      expect(survivor.xp).toBeGreaterThan(xpBeforeById.get(survivor.id) ?? 0);
+    }
   });
 
   it('adds reduced gold (7g per floor) on victory', () => {

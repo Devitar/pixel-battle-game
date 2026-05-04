@@ -433,6 +433,68 @@ describe('save normalizer — runState.traversedNodeIds default', () => {
   });
 });
 
+describe('save normalizer — runState.surprisesThisFloor default', () => {
+  it('defaults missing runState.surprisesThisFloor to 0', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({
+      version: CURRENT_SCHEMA_VERSION,
+      roster: { heroes: [], slots: 12 },
+      vault: { gold: 0 },
+      stash: createStash(),
+      unlocks: { classes: [], dungeons: [] },
+      runState: {
+        dungeonId: 'crypt',
+        seed: 1,
+        party: [],
+        pack: { gold: 0, items: [] },
+        currentFloorNumber: 1,
+        currentFloorNodes: [],
+        currentNodeId: 'crypt-f1-r3-s1',
+        awaitingFork: false,
+        status: 'in_dungeon',
+        fallen: [],
+        lost: [],
+        traversedNodeIds: ['crypt-f1-r3-s1'],
+        // NOTE: surprisesThisFloor intentionally omitted to simulate a pre-Phase-6d save
+      },
+      runRngState: 12345,
+    }));
+    const loaded = load(storage);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.runState).toBeDefined();
+    expect(loaded!.runState!.surprisesThisFloor).toBe(0);
+  });
+
+  it('preserves an explicit surprisesThisFloor value', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({
+      version: CURRENT_SCHEMA_VERSION,
+      roster: { heroes: [], slots: 12 },
+      vault: { gold: 0 },
+      stash: createStash(),
+      unlocks: { classes: [], dungeons: [] },
+      runState: {
+        dungeonId: 'crypt',
+        seed: 1,
+        party: [],
+        pack: { gold: 0, items: [] },
+        currentFloorNumber: 1,
+        currentFloorNodes: [],
+        currentNodeId: 'crypt-f1-r3-s1',
+        awaitingFork: false,
+        status: 'in_dungeon',
+        fallen: [],
+        lost: [],
+        traversedNodeIds: ['crypt-f1-r3-s1'],
+        surprisesThisFloor: 2,
+      },
+      runRngState: 12345,
+    }));
+    const loaded = load(storage);
+    expect(loaded!.runState!.surprisesThisFloor).toBe(2);
+  });
+});
+
 describe('isSoftlocked', () => {
   function makeState(gold: number, heroCount: number): SaveFile {
     let roster = createRoster();
