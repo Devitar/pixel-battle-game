@@ -63,6 +63,7 @@ describe('save / load roundtrip', () => {
       fallen: [],
       lost: [],
       traversedNodeIds: [''],
+      surprisesThisFloor: 0,
     };
     const original: SaveFile = {
       ...makeBaseSave(),
@@ -90,6 +91,7 @@ describe('save / load roundtrip', () => {
       fallen: [],
       lost: [],
       traversedNodeIds: [],
+      surprisesThisFloor: 0,
     };
     const data: SaveFile = { ...makeBaseSave(), runState: fakeRunState };
     expect(() => save(data, storage)).toThrow();

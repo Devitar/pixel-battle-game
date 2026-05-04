@@ -29,6 +29,19 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-04 · Map-based dungeon scene — Phase 6d (surprise encounters) (Cluster B · 30)
+
+- **Why:** Phase 6 framing of "in-corridor events" left non-combat travel feeling too safe. Phase 6d adds RNG-driven mid-corridor ambushes during travel toward shop / camp / event / treasure nodes, paying off the cartographer-party fiction with real corridor risk.
+- **Decisions:**
+  - **Tax model (destination preserved on surprise win) over replacement model.** Keeps the press-on/cashout decision crisp and avoids punishing the player for path choices. A surprise during travel to a treasure node still delivers the treasure if combat is won.
+  - **Per-edge probability with soft floor cap (F1/F2: 1 max, F3: 2 max) over no-cap or floor-fixed variants.** Bounded pathological strings of ambushes without losing per-edge tension. 15%/20%/25% per edge smoothly scales risk with depth.
+  - **Mini skirmish (1–2 enemies, no modifier stamping) with reduced gold (~7g × floor) and standard 10% combat loot rate.** Differentiates surprises from combat nodes visually and economically. Gold is a small windfall; loot is by standard rules (10% drop rate, unscaled rarity).
+  - **Surprise replaces the per-edge HP tick rather than stacking.** One major corridor event per edge — either surprise OR travel HP damage, not both. Keeps travel screen pacing tight.
+- **Surprises:**
+  - **Front-liner guarantee fallback (mirrors `composeCombatEncounter`) is needed even at size 1.** A single back-line pick gets replaced with a guaranteed front-liner if none are available. Without it, surprise encounters could spawn a Mage into position 0 and get stuck in a broken formation.
+  - **Enemy embedding inside `worldContainer` works for the entrance phase but combat needs enemies in scene-space.** Placeholder actors are torn down at combat start and replaced with scene-space ones so `CombatPlayback`'s damage-popup geometry lines up with hero positions. This is a small gotcha if modifying surprise logic in the future.
+- **Source:** TODO.md Cluster B · 30 Phase 6d. Spec: `docs/superpowers/specs/2026-05-04-phase-6d-surprise-encounters-design.md`. Brainstorm 2026-05-04 (Q1 tax/A, Q2 cap/B, Q3 mini/B, Q4 replace/B). Test count delta: 1506 → 1506 (no new tests; surprise mechanics verified by corridor/travel scene coverage + manual smoke).
+
 ### 2026-05-04 · Map-based dungeon scene — Phase 6c (unified corridor) (Cluster B · 30)
 
 - **Why:** TODO #30 Phase 6c (rescoped during 2026-05-03 brainstorm). Original 6c was "surprise encounters with in-corridor combat." Smoke-testing 6a/6b surfaced that the screen swap from corridor to combat scene was jarring even with matching backdrops; user wanted a unified in-action scene. This phase delivers that — the standalone combat scene is gone; combat, travel, result panels, and overlays all happen in one `'corridor'` scene. The new Phase 6d takes over the original 6c's surprise-encounter scope (now trivial since in-corridor combat infrastructure is built).

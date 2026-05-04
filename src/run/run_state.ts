@@ -25,6 +25,7 @@ export interface RunState {
   readonly fallen: readonly Hero[];
   readonly lost: readonly Hero[];
   readonly traversedNodeIds: readonly string[];
+  readonly surprisesThisFloor: number;
 }
 
 export interface CashoutOutcome {
@@ -69,6 +70,7 @@ export function startRun(
     fallen: [],
     lost: [],
     traversedNodeIds: [startNodeId],
+    surprisesThisFloor: 0,
   };
 }
 
@@ -284,6 +286,103 @@ export function completeCombat(
   };
 }
 
+const SURPRISE_GOLD_BASE = 7;  // half of COMBAT_NODE_GOLD = 15, rounded down
+
+export function completeSurpriseCombat(
+  runState: RunState,
+  result: CombatResult,
+  rng: Rng,
+): { runState: RunState; wipe?: WipeOutcome } {
+  if (runState.status !== 'in_dungeon') {
+    throw new Error(`completeSurpriseCombat: status must be 'in_dungeon', got '${runState.status}'`);
+  }
+
+  const updatedPartyLiving: Hero[] = [];
+  const newFallen: Hero[] = [];
+  for (let i = 0; i < runState.party.length; i++) {
+    const original = runState.party[i];
+    const combatant = result.finalState.combatants.find((c) => c.id === `p${i}`);
+    if (!combatant) {
+      updatedPartyLiving.push(original);
+      continue;
+    }
+    const newWounds = woundsFromEvents(result.events, `p${i}`);
+    const updated: Hero = {
+      ...original,
+      currentHp: Math.max(0, combatant.currentHp),
+      wounds: newWounds.length > 0 ? [...original.wounds, ...newWounds] : original.wounds,
+    };
+    if (combatant.isDead) {
+      newFallen.push(updated);
+    } else {
+      updatedPartyLiving.push(updated);
+    }
+  }
+
+  if (result.outcome === 'player_defeat') {
+    const allLost: Hero[] = [
+      ...runState.fallen,
+      ...newFallen,
+      ...updatedPartyLiving,
+    ];
+    const wipe: WipeOutcome = {
+      packLost: runState.pack,
+      heroesFallen: allLost,
+      heroesLost: runState.lost,
+    };
+    return {
+      runState: {
+        ...runState,
+        party: [],
+        fallen: allLost,
+        pack: createPack(),
+        status: 'ended',
+      },
+      wipe,
+    };
+  }
+
+  // XP awards mirror combat-node policy — surprises ARE combat, just unannounced.
+  const xpReward = xpForCombatNode(runState.currentFloorNumber);
+  const partyAfterXp = updatedPartyLiving.map((hero) => {
+    const newXp = hero.xp + xpReward;
+    const newLevel = levelForXp(newXp);
+    return applyLevelUps({ ...hero, xp: newXp }, hero.level, newLevel);
+  });
+
+  // Reduced gold reward.
+  const reward = SURPRISE_GOLD_BASE * runState.currentFloorNumber;
+  let newPack = addGold(runState.pack, reward);
+
+  // Loot at standard 'combat' kind — same 10% gate.
+  const drop = rollLoot(rng, runState.currentFloorNumber, 'combat');
+  if (drop) {
+    newPack = addItem(newPack, drop);
+  }
+
+  // Fallen-hero gear recovery (mirrors completeCombat).
+  for (const fallen of newFallen) {
+    const eq = fallen.equipment;
+    const items: Item[] = [eq.weapon, eq.shield, eq.outfit, eq.hat].filter(
+      (i): i is Item => i !== undefined,
+    );
+    for (const item of items) {
+      newPack = addItem(newPack, item);
+    }
+  }
+
+  // Critical: do NOT change currentNodeId; do NOT set awaitingFork; do NOT
+  // change status. Heroes still need to walk to the destination after this.
+  return {
+    runState: {
+      ...runState,
+      party: partyAfterXp,
+      fallen: [...runState.fallen, ...newFallen],
+      pack: newPack,
+    },
+  };
+}
+
 export function pressOn(runState: RunState, rng: Rng): RunState {
   if (runState.status !== 'camp_screen') {
     throw new Error(`pressOn: status must be 'camp_screen', got '${runState.status}'`);
@@ -298,6 +397,7 @@ export function pressOn(runState: RunState, rng: Rng): RunState {
     awaitingFork: false,
     status: 'in_dungeon',
     traversedNodeIds: [startNodeId],
+    surprisesThisFloor: 0,
   };
 }
 

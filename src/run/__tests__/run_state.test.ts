@@ -13,6 +13,7 @@ import {
   chooseNextNode,
   claimTreasure,
   completeCombat,
+  completeSurpriseCombat,
   currentNode,
   leaveShop,
   loseHero,
@@ -1172,5 +1173,109 @@ describe('claimTreasure', () => {
     claimTreasure(run, makeItem());
     expect(run.currentNodeId).toBe(beforeNodeId);
     expect(run.pack.items).toHaveLength(beforePackLen);
+  });
+});
+
+describe('surprisesThisFloor field', () => {
+  it('startRun initializes surprisesThisFloor to 0', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(rs.surprisesThisFloor).toBe(0);
+  });
+
+  it('pressOn resets surprisesThisFloor to 0 on floor advance', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    // Force surprisesThisFloor up via direct shape mutation (test-only).
+    rs = { ...rs, surprisesThisFloor: 2 };
+    rs = advanceToBossNode(rs);
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    // Now status === 'camp_screen'.
+    const after = pressOn(rs, createRng(7));
+    expect(after.surprisesThisFloor).toBe(0);
+  });
+});
+
+describe('completeSurpriseCombat', () => {
+  // Build a run state parked at a non-combat destination (e.g., a shop) — i.e.,
+  // currentNodeId points at a shop node. We simulate that by walking the run
+  // until we land on a non-combat node.
+  function runAtNonCombatNode(): ReturnType<typeof startRun> {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    while (true) {
+      const node = currentNode(rs);
+      if (
+        node.type === 'shop' ||
+        node.type === 'camp' ||
+        node.type === 'event' ||
+        node.type === 'treasure'
+      ) {
+        return rs;
+      }
+      if (rs.awaitingFork) {
+        const choices = nextNodeChoices(rs);
+        const nonCombat = choices.find(
+          (n) => n.type === 'shop' || n.type === 'camp' || n.type === 'event' || n.type === 'treasure',
+        );
+        rs = chooseNextNode(rs, (nonCombat ?? choices[0]).id);
+        continue;
+      }
+      if (node.type === 'combat' || node.type === 'elite') {
+        rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+        continue;
+      }
+      // Boss = unreachable here; abort.
+      throw new Error('no non-combat node reached before boss in test setup');
+    }
+  }
+
+  it('does NOT advance currentNodeId on victory', () => {
+    const rs = runAtNonCombatNode();
+    const before = rs.currentNodeId;
+    const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const { runState: after } = completeSurpriseCombat(rs, result, createRng(99));
+    expect(after.currentNodeId).toBe(before);
+  });
+
+  it('adds reduced gold (7g per floor) on victory', () => {
+    const rs = runAtNonCombatNode();
+    const goldBefore = rs.pack.gold;
+    const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const { runState: after } = completeSurpriseCombat(rs, result, createRng(99));
+    // Floor 1 → 7g.
+    expect(after.pack.gold - goldBefore).toBe(7);
+  });
+
+  it('returns wipe and clears party on full defeat', () => {
+    const rs = runAtNonCombatNode();
+    const result = mockCombatResult(rs.party, [0, 0, 0], 'player_defeat');
+    const { runState: after, wipe } = completeSurpriseCombat(rs, result, createRng(99));
+    expect(wipe).toBeDefined();
+    expect(after.party.length).toBe(0);
+    expect(after.status).toBe('ended');
+  });
+
+  it('recovers fallen-hero gear into the pack on victory', () => {
+    let rs = runAtNonCombatNode();
+    // Equip a sword on hero 0 to verify recovery.
+    const sword: Item = {
+      id: 'tst-sword',
+      baseId: 'sword_basic',
+      slot: 'weapon',
+      weaponType: 'sword',
+      rarity: 'common',
+      affixes: [],
+      floorRolledAt: 1,
+    };
+    rs = {
+      ...rs,
+      party: rs.party.map((h, i) =>
+        i === 0 ? { ...h, equipment: { ...h.equipment, weapon: sword } } : h,
+      ),
+    };
+    const itemsBefore = rs.pack.items.length;
+    // Hero 0 dies (0 hp).
+    const result = mockCombatResult(rs.party, [0, 14, 15], 'player_victory');
+    const { runState: after } = completeSurpriseCombat(rs, result, createRng(99));
+    expect(after.pack.items.length).toBeGreaterThan(itemsBefore);
+    expect(after.pack.items.some((i) => i.id === 'tst-sword')).toBe(true);
   });
 });
