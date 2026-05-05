@@ -1,10 +1,22 @@
-let pending: { deltas: readonly number[] } | undefined;
+import type { Encounter } from '@dungeon/node';
 
-export function setCorridorDeltas(deltas: readonly number[]): void {
-  pending = { deltas };
+export interface SurpriseSpec {
+  encounter: Encounter;
+  spawnFraction: number;  // 0.4–0.6 of WORLD_SCROLL_DISTANCE — random per fire
 }
 
-export function consumeCorridorDeltas(): { deltas: readonly number[] } | undefined {
+export interface CorridorHandoffPayload {
+  deltas: readonly number[];
+  surprise: SurpriseSpec | null;
+}
+
+let pending: CorridorHandoffPayload | undefined;
+
+export function setCorridorHandoff(payload: CorridorHandoffPayload): void {
+  pending = payload;
+}
+
+export function consumeCorridorHandoff(): CorridorHandoffPayload | undefined {
   const out = pending;
   pending = undefined;
   return out;

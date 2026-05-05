@@ -14,6 +14,7 @@ import { ENEMY_VISUALS } from '@render/enemy_sprites';
 import { buildCombatState } from '@run/combat_setup';
 import {
   completeCombat,
+  completeSurpriseCombat,
   currentNode,
   type RunState,
   type WipeOutcome,
@@ -21,7 +22,7 @@ import {
 import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 import { CombatPlayback, type CombatPlaybackHud } from './combat_playback';
-import { consumeCorridorDeltas } from './corridor_handoff';
+import { consumeCorridorHandoff, type SurpriseSpec } from './corridor_handoff';
 
 // Mirror combat scene exactly so heroes render identically across travel+combat.
 const ROW_Y = 300;          // CombatActor anchor y; matches combat_scene.ts
@@ -61,6 +62,7 @@ const PILLAR_SPACING = 160;          // every 5 tiles
 
 const COMBAT_NODE_REWARD = 15;
 const BOSS_NODE_REWARD = 100;
+const SURPRISE_GOLD_BASE = 7;
 
 const ENEMY_X_BY_SLOT: readonly number[] = [0, 560, 640, 720, 800];
 const ROUND_COUNTER_Y = 24;
@@ -87,6 +89,8 @@ export class CorridorScene extends Phaser.Scene {
   private combatSpeed: 1 | 3 = 1;
   private heroVisuals: HeroVisual[] = [];
   private deltas: readonly number[] = [];
+  private surprise: SurpriseSpec | null = null;
+  private surpriseEnemyActors: CombatActor[] = [];
   private ffBg!: Phaser.GameObjects.Rectangle;
   private ffLabel!: Phaser.GameObjects.Text;
   private combatFfBg?: Phaser.GameObjects.Rectangle;
@@ -124,6 +128,8 @@ export class CorridorScene extends Phaser.Scene {
     this.playback = undefined;
     this.combatHud = undefined;
     this.combatHudObjects = [];
+    this.surprise = null;
+    this.surpriseEnemyActors = [];
     // Combat FF UI is built/destroyed per-combat; reset refs to undefined in
     // case a previous scene instance left them dangling after a shutdown.
     this.combatFfBg = undefined;
@@ -138,8 +144,9 @@ export class CorridorScene extends Phaser.Scene {
     }
 
     this.walkSpeed = state.preferences?.walkSpeed ?? 1;
-    const handoff = consumeCorridorDeltas();
+    const handoff = consumeCorridorHandoff();
     this.deltas = handoff?.deltas ?? [];
+    this.surprise = handoff?.surprise ?? null;
 
     this.events.on(Phaser.Scenes.Events.RESUME, () => {
       const r = appState.get().runState;
@@ -163,6 +170,8 @@ export class CorridorScene extends Phaser.Scene {
       // the start node on the dungeon map — that WAS the engage signal. Skip
       // the walk (no "from" node to scroll from) and engage immediately.
       this.engageDestination();
+    } else if (this.surprise) {
+      this.startSurpriseWalk();
     } else {
       this.startWalk();
     }
@@ -338,6 +347,356 @@ export class CorridorScene extends Phaser.Scene {
 
     // Schedule the HP-tick popups at step 3.
     this.time.delayedCall(TOTAL_TRAVEL_MS * HP_TICK_FRACTION, () => this.fireHpTick());
+  }
+
+  private startSurpriseWalk(): void {
+    if (!this.surprise) return;
+
+    // Speed control via scene timescale (mirrors startWalk).
+    this.tweens.timeScale = this.walkSpeed;
+    this.time.timeScale = this.walkSpeed;
+
+    // Embed surprise enemies inside the world container at world-relative
+    // x = ENEMY_X_BY_SLOT[slot] + spawnFraction * WORLD_SCROLL_DISTANCE.
+    // After scrolling left by spawnFraction*WORLD_SCROLL_DISTANCE, each enemy
+    // appears on screen at ENEMY_X_BY_SLOT[slot].
+    const fraction = this.surprise.spawnFraction;
+    const enemies = this.surprise.encounter.enemies;
+    const scale = this.surprise.encounter.scale;
+    let enemyIdx = 0;
+    for (const placement of enemies) {
+      const finalScreenX = ENEMY_X_BY_SLOT[placement.slot];
+      const worldRelX = finalScreenX + fraction * WORLD_SCROLL_DISTANCE;
+      const enemyId = placement.enemyId;
+      const isBoss = ENEMIES[enemyId].role === 'boss';
+      const visual = ENEMY_VISUALS[enemyId];
+      const bodyScale = visual.bodyScale ?? (isBoss ? BOSS_BODY_SCALE : 3);
+      const combatantId = `e${enemyIdx++}` as CombatantId;
+      // Pre-scale HP so the placeholder HP bar is full and matches the real
+      // combat-start HP (surprises have no modifiers, so scale is the only
+      // adjustment to base HP).
+      const scaledHp = Math.round(ENEMIES[enemyId].baseStats.hp * scale.hp);
+      const actor = new CombatActor(this, worldRelX, ROW_Y, {
+        kind: 'enemy',
+        combatantId,
+        displayName: ENEMIES[enemyId].name,
+        enemyId,
+        currentHp: scaledHp,
+        maxHp: scaledHp,
+        bodyScale,
+      });
+      this.worldContainer.add(actor);
+      this.surpriseEnemyActors.push(actor);
+    }
+
+    // Schedule chatter only if it would land BEFORE the surprise spawn time.
+    this.maybeScheduleSurpriseChatter(appState.get().runState!.party, fraction);
+
+    // Partial scroll: tween to spawnFraction of the full distance.
+    const distance = fraction * WORLD_SCROLL_DISTANCE;
+    const duration = fraction * TOTAL_TRAVEL_MS;
+    this.tweens.add({
+      targets: this.worldContainer,
+      x: -distance,
+      duration,
+      ease: 'Linear',
+      onComplete: () => this.startSurpriseCombat(),
+    });
+  }
+
+  private maybeScheduleSurpriseChatter(party: readonly Hero[], spawnFraction: number): void {
+    if (Math.random() >= CHATTER_PROBABILITY) return;
+    if (party.length === 0) return;
+    const step = Math.random() < 0.5 ? 2 : 4;
+    const chatterTimeMs = step * STEP_DURATION_MS;
+    const surpriseTimeMs = spawnFraction * TOTAL_TRAVEL_MS;
+    if (chatterTimeMs >= surpriseTimeMs) return;  // chatter would land in/after combat — skip
+    const heroIndex = Math.floor(Math.random() * party.length);
+    const hero = party[heroIndex];
+    const condition = computeChatterCondition(hero);
+    const pool = CHATTER[hero.classId][condition];
+    if (pool.length === 0) return;
+    const line = pool[Math.floor(Math.random() * pool.length)];
+    this.time.delayedCall(chatterTimeMs, () => this.spawnChatterBubble(heroIndex, line));
+  }
+
+  private startSurpriseCombat(): void {
+    if (!this.surprise) return;
+    const state = appState.get();
+    const run = state.runState;
+    if (!run || run.status !== 'in_dungeon') return;
+    if (state.runRngState === undefined) {
+      console.warn('CorridorScene: runRngState missing for surprise combat');
+      return;
+    }
+
+    const encounter = this.surprise.encounter;
+
+    // Stop hero bob/rotate (mirrors startCombatInPlace).
+    for (const visual of this.heroVisuals) {
+      this.tweens.killTweensOf(visual.actor);
+      this.tweens.killTweensOf(visual.actor.bodyVisual);
+      visual.actor.setY(ROW_Y);
+      visual.actor.bodyVisual.setAngle(0);
+    }
+    this.tweens.timeScale = 1;
+    this.time.timeScale = 1;
+
+    const rng = createRngFromState(state.runRngState);
+    const combatState = buildCombatState(run.party, encounter);
+    const result = resolveCombat(combatState, rng);
+
+    // Tear down the placeholder surprise enemy actors — buildEnemyActors will
+    // create the real ones with correct HP / modifiers.
+    for (const a of this.surpriseEnemyActors) a.destroy();
+    this.surpriseEnemyActors = [];
+
+    this.combatSpeed = state.preferences?.combatSpeed ?? 1;
+    this.ffBg.setVisible(false);
+    this.ffLabel.setVisible(false);
+
+    const displayNames = this.buildDisplayNames(run, combatState);
+    this.buildSurpriseEnemyActorsForCombat(combatState, displayNames);
+    this.combatHud = this.buildCombatHud();
+
+    this.playback = new CombatPlayback(
+      this,
+      result.events,
+      this.actors,
+      this.combatHud,
+      combatState,
+      displayNames,
+    );
+    this.playback.setSpeed(this.combatSpeed);
+    this.playback.onComplete = () => {
+      this.processSurpriseCombatResult(result, rng.getState());
+    };
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.playback?.abort();
+      this.tweens.timeScale = 1;
+      this.time.timeScale = 1;
+    });
+
+    // No ENEMY_SLIDE_IN_MS delay — enemies were visible during the partial scroll.
+    void this.playback.run();
+  }
+
+  private buildSurpriseEnemyActorsForCombat(
+    combatState: CombatState,
+    displayNames: Map<CombatantId, string>,
+  ): void {
+    // Place enemies at standard ENEMY_X_BY_SLOT positions (NOT in worldContainer)
+    // — combat happens against the heroes who are at PARTY_X positions; both
+    // sides need to be in scene-space so the bbox calculations in CombatPlayback
+    // line up with damage popups, etc.
+    for (const c of combatState.combatants) {
+      if (c.side !== 'enemy') continue;
+      const finalX = ENEMY_X_BY_SLOT[c.slot];
+      const enemyId = c.enemyId!;
+      const isBoss = ENEMIES[enemyId].role === 'boss';
+      const visual = ENEMY_VISUALS[enemyId];
+      const bodyScale = visual.bodyScale ?? (isBoss ? BOSS_BODY_SCALE : 3);
+      const actor = new CombatActor(this, finalX, ROW_Y, {
+        kind: 'enemy',
+        combatantId: c.id,
+        displayName: displayNames.get(c.id) ?? c.id,
+        enemyId,
+        currentHp: c.currentHp,
+        maxHp: c.maxHp,
+        bodyScale,
+      });
+      this.actors.set(c.id, actor);
+    }
+  }
+
+  private processSurpriseCombatResult(result: CombatResult, rngStateAfter: number): void {
+    const run = appState.get().runState!;
+    this.preCombatParty = [...run.party];
+    const prePackLen = run.pack.items.length;
+
+    const rng = createRngFromState(rngStateAfter);
+    const { runState: nextRun, wipe } = completeSurpriseCombat(run, result, rng);
+    this.combatLoot = nextRun.pack.items.slice(prePackLen);
+
+    appState.update((s) => ({
+      ...s,
+      runState: nextRun,
+      runRngState: rng.getState(),
+    }));
+
+    // Tear down combat HUD (mirrors processCombatResultInline).
+    for (const obj of this.combatHudObjects) obj.destroy();
+    this.combatHudObjects = [];
+    this.combatHud = undefined;
+    this.combatFfBg?.destroy();
+    this.combatFfLabel?.destroy();
+    this.combatFfBg = undefined;
+    this.combatFfLabel = undefined;
+    this.ffBg.setVisible(true);
+    this.ffLabel.setVisible(true);
+    for (const [id, actor] of this.actors) {
+      if (id.startsWith('e')) {
+        actor.destroy();
+        this.actors.delete(id);
+      }
+    }
+
+    if (wipe) {
+      this.wipeOutcome = wipe;
+      this.buildWipePanel();
+    } else {
+      this.buildSurpriseResultPanel();
+    }
+  }
+
+  private buildSurpriseResultPanel(): void {
+    const run = appState.get().runState!;
+    const reward = SURPRISE_GOLD_BASE * run.currentFloorNumber;
+
+    const lootCount = this.combatLoot.length;
+    const lootBlockHeight = lootCount > 0 ? 16 + lootCount * 14 : 0;
+    const bgHeight = 180 + lootBlockHeight;
+    const dismissY = 70 + lootBlockHeight;
+
+    const bg = this.add
+      .rectangle(0, 0, 320, bgHeight, 0x1a1a1a)
+      .setStrokeStyle(2, 0xffaa44);
+    const title = this.add
+      .text(0, -bgHeight / 2 + 25, 'Ambushed!', {
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        color: '#ffaa44',
+      })
+      .setOrigin(0.5);
+    const gold = this.add
+      .text(0, -bgHeight / 2 + 48, `+${reward}g`, {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#ffcc66',
+      })
+      .setOrigin(0.5);
+
+    const lines: Phaser.GameObjects.Text[] = [];
+    let y = -bgHeight / 2 + 72;
+    const survivorsById = new Map(run.party.map((h) => [h.id, h]));
+    for (const preHero of this.preCombatParty) {
+      const survivor = survivorsById.get(preHero.id);
+      const fallen = survivor === undefined;
+      const text = fallen
+        ? `${preHero.name}: Fallen`
+        : (() => {
+            const delta = preHero.currentHp - survivor.currentHp;
+            return delta === 0
+              ? `${survivor.name}: untouched`
+              : `${survivor.name}: -${delta} HP (${survivor.currentHp}/${survivor.maxHp})`;
+          })();
+      lines.push(
+        this.add
+          .text(0, y, text, {
+            fontFamily: 'monospace',
+            fontSize: '10px',
+            color: fallen ? '#cc8888' : '#aaaaaa',
+          })
+          .setOrigin(0.5),
+      );
+      y += 14;
+    }
+
+    if (lootCount > 0) {
+      y += 4;
+      lines.push(
+        this.add
+          .text(0, y, 'Loot:', {
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            color: '#dddddd',
+          })
+          .setOrigin(0.5),
+      );
+      y += 14;
+      for (const item of this.combatLoot) {
+        const name = itemDisplayName(item);
+        const affixes = itemAffixDescription(item);
+        const text = affixes.length > 0 ? `${name} · ${affixes}` : name;
+        lines.push(
+          this.add
+            .text(0, y, text, {
+              fontFamily: 'monospace',
+              fontSize: '10px',
+              color: RARITY_HEX[item.rarity],
+            })
+            .setOrigin(0.5),
+        );
+        y += 14;
+      }
+    }
+
+    const dismiss = this.add
+      .text(0, dismissY, '▸ click to continue', {
+        fontFamily: 'monospace',
+        fontSize: '9px',
+        color: '#888888',
+        fontStyle: 'italic',
+      })
+      .setOrigin(0.5);
+
+    this.resultPanel = this.add.container(480, 270, [bg, title, gold, ...lines, dismiss]);
+
+    bg.setInteractive({ useHandCursor: true });
+    bg.on('pointerdown', () => this.onSurpriseResultDismiss());
+  }
+
+  private onSurpriseResultDismiss(): void {
+    this.resultPanel?.destroy(true);
+    this.resultPanel = undefined;
+    this.resumeScrollToDestination();
+  }
+
+  private resumeScrollToDestination(): void {
+    if (!this.surprise) {
+      this.engageDestination();
+      return;
+    }
+    const fraction = this.surprise.spawnFraction;
+
+    // Restore travel-time hero animations.
+    for (const visual of this.heroVisuals) {
+      const slot = this.heroVisuals.indexOf(visual);
+      const bobPhase = slot * 333;
+      this.tweens.add({
+        targets: visual.actor,
+        y: { from: ROW_Y, to: ROW_Y - 3 },
+        duration: 500,
+        yoyo: true,
+        repeat: -1,
+        delay: bobPhase,
+        ease: 'Sine.easeInOut',
+      });
+      this.tweens.add({
+        targets: visual.actor.bodyVisual,
+        angle: { from: -5, to: 5 },
+        duration: 500,
+        yoyo: true,
+        repeat: -1,
+        delay: bobPhase,
+        ease: 'Sine.easeInOut',
+      });
+    }
+
+    // Apply walk-speed timescale for the resumed scroll.
+    this.tweens.timeScale = this.walkSpeed;
+    this.time.timeScale = this.walkSpeed;
+
+    // Tween the world container the remaining distance to fully-scrolled.
+    const remainingDuration = (1 - fraction) * TOTAL_TRAVEL_MS;
+    this.tweens.add({
+      targets: this.worldContainer,
+      x: -WORLD_SCROLL_DISTANCE,
+      duration: remainingDuration,
+      ease: 'Linear',
+      onComplete: () => this.engageDestination(),
+    });
   }
 
   private fireHpTick(): void {

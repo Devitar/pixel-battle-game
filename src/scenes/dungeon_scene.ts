@@ -1,10 +1,13 @@
 import * as Phaser from 'phaser';
+import { DUNGEONS } from '@data/dungeons';
 import { computeMapLayout, type MapLayout } from '@dungeon/map_layout';
 import type { Node } from '@dungeon/node';
+import { rollSurprise } from '@dungeon/surprise';
 import { computeVisibility, LOOKAHEAD_ROWS, type VisibilityResult } from '@dungeon/visibility';
 import { applyTravelTick, chooseNextNode, currentNode } from '@run/run_state';
+import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
-import { setCorridorDeltas } from './corridor_handoff';
+import { setCorridorHandoff } from './corridor_handoff';
 
 const MAP_LEFT = 120;
 const MAP_TOP = 100;
@@ -242,13 +245,43 @@ export class DungeonScene extends Phaser.Scene {
     const cur = currentNode(run);
     if (!cur.nextNodeIds.includes(nodeId)) return;
 
-    // Advance currentNodeId, then apply per-edge HP tick BEFORE handing off to
-    // the corridor scene so saved state is consistent if the user closes mid-travel.
+    // Advance currentNodeId, then roll for a surprise (or fall back to the
+    // standard HP tick) BEFORE handing off to the corridor scene so saved
+    // state is consistent if the user closes mid-travel.
     appState.update((s) => {
       const advanced = chooseNextNode(s.runState!, nodeId);
+      const dungeon = DUNGEONS[advanced.dungeonId];
+
+      // Roll surprise BEFORE applying tick — surprise replaces tick if it fires.
+      if (s.runRngState === undefined) {
+        // Defensive: should never happen during in_dungeon flow. Fall back to tick.
+        const { runState: postTick, deltas } = applyTravelTick(advanced);
+        setCorridorHandoff({ deltas, surprise: null });
+        return { ...s, runState: postTick };
+      }
+
+      const rng = createRngFromState(s.runRngState);
+      const destNode = currentNode(advanced); // currentNodeId is now the destination
+      const surpriseEnc = rollSurprise(advanced, dungeon, destNode.type, rng);
+
+      if (surpriseEnc !== null) {
+        // Surprise fires: skip tick, increment counter, roll spawn fraction.
+        const spawnFraction = 0.4 + rng.next() * 0.2;  // [0.4, 0.6)
+        setCorridorHandoff({
+          deltas: [0, 0, 0],
+          surprise: { encounter: surpriseEnc, spawnFraction },
+        });
+        return {
+          ...s,
+          runState: { ...advanced, surprisesThisFloor: advanced.surprisesThisFloor + 1 },
+          runRngState: rng.getState(),
+        };
+      }
+
+      // No surprise — standard tick path.
       const { runState: postTick, deltas } = applyTravelTick(advanced);
-      setCorridorDeltas(deltas);
-      return { ...s, runState: postTick };
+      setCorridorHandoff({ deltas, surprise: null });
+      return { ...s, runState: postTick, runRngState: rng.getState() };
     });
     this.scene.start('corridor');
   }

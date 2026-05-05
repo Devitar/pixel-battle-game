@@ -28,6 +28,7 @@ function makeRunState(partyOverrides: Partial<Hero>[] = []): RunState {
     fallen: [],
     lost: [],
     traversedNodeIds: [],
+    surprisesThisFloor: 0,
   };
 }
 

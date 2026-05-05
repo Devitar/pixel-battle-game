@@ -96,3 +96,66 @@ export function describeKitStatus(hero: Hero): string {
 
   return `${weaponName} · Wrong family (basic only)`;
 }
+
+export type BandChange = 'upgrade' | 'downgrade' | 'same';
+
+export interface AbilityDiff {
+  added: readonly AbilityId[];
+  removed: readonly AbilityId[];
+  bandChange: BandChange;
+}
+
+// Band ordering, best to worst. Used to determine upgrade vs downgrade.
+type Band = 'full_kit' | 'off_preferred' | 'no_shield' | 'wrong_family';
+const BAND_RANK: Record<Band, number> = {
+  full_kit: 3,
+  off_preferred: 2,
+  no_shield: 1,
+  wrong_family: 0,
+};
+
+function classifyBand(hero: Hero): Band {
+  const classDef = CLASSES[hero.classId];
+  const weaponType = hero.equipment.weapon.weaponType;
+  if (!weaponType) return 'wrong_family';
+  const preferredFamily = classDef.weaponFamily;
+  const equippedFamily = WEAPON_FAMILY[weaponType];
+  const isPreferred = weaponType === classDef.preferredWeapon;
+
+  if (isPreferred) {
+    const shieldRequiredInClass = classDef.abilities.some(
+      (id) => ABILITIES[id].requiresShield === true,
+    );
+    if (shieldRequiredInClass && hero.equipment.shield === undefined) {
+      return 'no_shield';
+    }
+    return 'full_kit';
+  }
+  if (
+    equippedFamily === preferredFamily &&
+    classDef.swapTarget !== undefined &&
+    classDef.weaponSwaps !== undefined &&
+    classDef.weaponSwaps[weaponType] !== undefined
+  ) {
+    return 'off_preferred';
+  }
+  return 'wrong_family';
+}
+
+export function resolveAbilityDiff(beforeHero: Hero, afterHero: Hero): AbilityDiff {
+  const before = resolveCombatAbilities(beforeHero).abilities;
+  const after = resolveCombatAbilities(afterHero).abilities;
+  const beforeSet = new Set(before);
+  const afterSet = new Set(after);
+  const added: AbilityId[] = after.filter((a) => !beforeSet.has(a));
+  const removed: AbilityId[] = before.filter((a) => !afterSet.has(a));
+
+  const beforeBand = classifyBand(beforeHero);
+  const afterBand = classifyBand(afterHero);
+  let bandChange: BandChange;
+  if (BAND_RANK[afterBand] > BAND_RANK[beforeBand]) bandChange = 'upgrade';
+  else if (BAND_RANK[afterBand] < BAND_RANK[beforeBand]) bandChange = 'downgrade';
+  else bandChange = 'same';
+
+  return { added, removed, bandChange };
+}

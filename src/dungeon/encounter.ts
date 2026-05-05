@@ -9,7 +9,7 @@ const ENCOUNTER_SIZE_WEIGHTS = [
   { value: 4, weight: 20 },
 ];
 
-function isFrontLiner(enemyId: EnemyId): boolean {
+export function isFrontLiner(enemyId: EnemyId): boolean {
   const preferred = ENEMIES[enemyId].preferredSlots;
   return preferred.some((s) => s === 1 || s === 2);
 }

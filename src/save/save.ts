@@ -132,6 +132,7 @@ function normalizeSaveFile(file: SaveFile): SaveFile {
           ...file.runState,
           lost: file.runState.lost ?? [],
           traversedNodeIds: file.runState.traversedNodeIds ?? [file.runState.currentNodeId],
+          surprisesThisFloor: file.runState.surprisesThisFloor ?? 0,
         },
   };
 }

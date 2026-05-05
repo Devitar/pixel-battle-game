@@ -487,7 +487,7 @@ export class BarracksPanelScene extends Phaser.Scene {
       );
       equipBtn.setInteractive({ useHandCursor: true });
       equipBtn.on('pointerdown', () => {
-        this.scene.launch('barracks_equip', { heroId: hero.id });
+        this.scene.launch('equip', { kind: 'barracks', heroId: hero.id });
         this.scene.pause();
       });
 

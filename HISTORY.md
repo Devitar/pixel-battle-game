@@ -29,6 +29,51 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-04 · Equipment flow unification
+
+- **What shipped:** Single unified `equip_scene` replacing both `barracks_equip_scene` and `equip_panel_scene`. Surfaces currently-equipped item stats at-rest via a slot-detail card; presents a clean before/after preview when swapping; shows ability gain/loss diffs with green/red coloring when changing weapon types.
+- **Why:** Player feedback flagged three concrete gaps: barracks at-rest view didn't show item stats; the two equip screens had divergent layouts; weapon-type swaps didn't preview ability changes. Equipment management is the most-touched player workflow that still felt rough post-Tier-2.
+- **Decisions:**
+  - **Hero selector in both modes** over keeping barracks single-hero. Barracks gets a roster list; in-run gets the 3-hero party. Truly unified chrome at the cost of one extra UI element in barracks.
+  - **Slot-detail card as single source of truth.** A dedicated card next to the paperdoll shows the currently-equipped item's full details for the selected slot, and flips to a before/after preview when an item is highlighted. Replaces the prior pattern of "click slot to open picker, find equipped row to read affixes."
+  - **Kit + ability list in the hero header.** Abilities depend on weapon + shield together (not on any single slot), so they live with the hero summary. `describeKitStatus()` already existed; surfacing it cost ~3 lines.
+  - **Two-column layout with stacked right pane** over three columns or a drawer. Each component gets vertical breathing room; the picker stays always-visible.
+  - **Card at-rest scope: weapon only.** No "browse other slots at rest" mode — picker rows already show full affix detail per slot, so adding that affordance was deemed marginal information for state-machine cost. Revisitable if smoke testing reveals it feels weak.
+- **Surprises:**
+  - **Strikethrough on removed-ability tokens** isn't supported by Phaser `Text` directly. The shipped UI uses red color + trailing position to indicate removed abilities. True strikethrough would require a `Phaser.GameObjects.Graphics` line over each token's bounds — left as a follow-up polish.
+  - **`describeKitStatus` and `resolveCombatAbilities` were both already in `kit.ts`** but never surfaced in the UI. Most of the "ability preview" work was just rendering existing data; only `resolveAbilityDiff` (~30 lines) was new.
+  - **`scene.bringToTop('equip')` was needed in `shop_overlay_scene.ts`** because `EquipScene` is registered earlier than `ShopOverlayScene` in `main.ts`, so without the explicit z-order push the equip panel renders beneath the shop. The old `equip_panel` scene had this same call; preserving it was easy to miss during the rename.
+- **Source:** `bugs.md` (equipment-viewing bug, removed on completion). Spec: `docs/superpowers/specs/2026-05-04-equipment-flow-unification-design.md`. Brainstorm 2026-05-04 (Q1 selector/B, Q2 card/D, Q3 kit-in-header/A, Q4 two-column/B). Test count delta: 1509 → 1515 (+6 from `resolveAbilityDiff` cases).
+
+### 2026-05-04 · Map-based dungeon scene — umbrella complete (Cluster B · 30)
+
+- **What shipped:** All 10 sub-phases of the StS-inspired map-based dungeon redesign (Phase 1, 2a, 2b, 3, 4, 5, 6a, 6b, 6c, 6d) — see per-phase entries below for implementation detail. Old icon-row hub layout fully replaced; the map IS the scene; in-dungeon-action lives in a unified `corridor` scene; per-edge HP ticks, hero chatter, and surprise ambushes give travel real texture.
+- **Why:** The icon-row hub had two structural problems (silently picks branch 0 at forks; reveals all future node types) and one gameplay problem (linear preamble with no exploration tension). The map paradigm fixes the visualization honestly *and* delivers on the gdd's "Expeditions" / cartographer-party fiction.
+- **Umbrella decisions** (locked 2026-05-02 brainstorm, applied across phases):
+  - **Per-floor map (3 maps per Crypt run)** over per-run map — preserves gdd §7 press-on/cashout decision; smallest run-state churn.
+  - **N=2 lookahead fog with unanchored boss** over full reveal or strict StS visibility — past nodes stay revealed (cartographer log), current+2 rows show types, beyond is blank space.
+  - **StS-strict edges with explicit predecessors** over loose movement — every node ≥1 outgoing/incoming edge, edges don't cross (visual cleanliness via 3-slot grid + slot ±1 + monotonic-target rules).
+  - **Floor-depth-scaled density** (8/9/10 rows by floor) with quota-based type assignment — 1 shop, 1 camp, 1–2 treasure, 1–2 event, 1–2 elite per floor, rest combat. Penultimate-row guarantee of camp-or-treasure for "rest before boss" cadence.
+  - **Reframe from "layer travel/fog onto icon row" to "replace icon row with map"** — the original idea was incremental; user observed mid-design that the cartographer-party / Expeditions framing fit the genre better than icon-row patching, leading to the multi-phase rewrite.
+- **Surprises / lessons:**
+  - **The Phase 6 sequence reorganized mid-build.** Original 6c was "surprise encounters with in-corridor combat"; smoke-testing 6a/6b made the corridor↔combat scene swap feel wrong, so 6c became "unify everything into one corridor scene" and 6d took over surprise encounters. The unification made 6d trivial — most of the infrastructure was already in place.
+  - **Save schema stayed at version 1 throughout.** Multiple new RunState fields (`traversedNodeIds`, `surprisesThisFloor`) added with default-on-read in `normalizeSaveFile`; no migrations, no version bumps. Pre-launch policy held.
+  - **Folded-in former tasks:** Cluster B · 38 (icon-row fog-of-war / fork visualization) and · 39 (travel animation) and · 46 (loot rooms + linear variance) were absorbed into the umbrella as phases rather than shipped separately.
+- **Source:** TODO.md Cluster B · 30 (now migrated). Originating ideas: ideas.md #1 (map-based dungeon) + #3 (travel as a real moment). Specs: `docs/superpowers/specs/2026-05-02-*` through `2026-05-04-*` (10 phase specs total). See per-phase HISTORY entries below for implementation-level decisions and surprises.
+
+### 2026-05-04 · Map-based dungeon scene — Phase 6d (surprise encounters) (Cluster B · 30)
+
+- **Why:** Phase 6 framing of "in-corridor events" left non-combat travel feeling too safe. Phase 6d adds RNG-driven mid-corridor ambushes during travel toward shop / camp / event / treasure nodes, paying off the cartographer-party fiction with real corridor risk.
+- **Decisions:**
+  - **Tax model (destination preserved on surprise win) over replacement model.** Keeps the press-on/cashout decision crisp and avoids punishing the player for path choices. A surprise during travel to a treasure node still delivers the treasure if combat is won.
+  - **Per-edge probability with soft floor cap (F1/F2: 1 max, F3: 2 max) over no-cap or floor-fixed variants.** Bounded pathological strings of ambushes without losing per-edge tension. 15%/20%/25% per edge smoothly scales risk with depth.
+  - **Mini skirmish (1–2 enemies, no modifier stamping) with reduced gold (~7g × floor) and standard 10% combat loot rate.** Differentiates surprises from combat nodes visually and economically. Gold is a small windfall; loot is by standard rules (10% drop rate, unscaled rarity).
+  - **Surprise replaces the per-edge HP tick rather than stacking.** One major corridor event per edge — either surprise OR travel HP damage, not both. Keeps travel screen pacing tight.
+- **Surprises:**
+  - **Front-liner guarantee fallback (mirrors `composeCombatEncounter`) is needed even at size 1.** A single back-line pick gets replaced with a guaranteed front-liner if none are available. Without it, surprise encounters could spawn a Mage into position 0 and get stuck in a broken formation.
+  - **Enemy embedding inside `worldContainer` works for the entrance phase but combat needs enemies in scene-space.** Placeholder actors are torn down at combat start and replaced with scene-space ones so `CombatPlayback`'s damage-popup geometry lines up with hero positions. This is a small gotcha if modifying surprise logic in the future.
+- **Source:** TODO.md Cluster B · 30 Phase 6d. Spec: `docs/superpowers/specs/2026-05-04-phase-6d-surprise-encounters-design.md`. Brainstorm 2026-05-04 (Q1 tax/A, Q2 cap/B, Q3 mini/B, Q4 replace/B). Test count delta: 1506 → 1506 (no new tests; surprise mechanics verified by corridor/travel scene coverage + manual smoke).
+
 ### 2026-05-04 · Map-based dungeon scene — Phase 6c (unified corridor) (Cluster B · 30)
 
 - **Why:** TODO #30 Phase 6c (rescoped during 2026-05-03 brainstorm). Original 6c was "surprise encounters with in-corridor combat." Smoke-testing 6a/6b surfaced that the screen swap from corridor to combat scene was jarring even with matching backdrops; user wanted a unified in-action scene. This phase delivers that — the standalone combat scene is gone; combat, travel, result panels, and overlays all happen in one `'corridor'` scene. The new Phase 6d takes over the original 6c's surprise-encounter scope (now trivial since in-corridor combat infrastructure is built).

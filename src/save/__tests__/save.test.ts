@@ -63,6 +63,7 @@ describe('save / load roundtrip', () => {
       fallen: [],
       lost: [],
       traversedNodeIds: [''],
+      surprisesThisFloor: 0,
     };
     const original: SaveFile = {
       ...makeBaseSave(),
@@ -90,6 +91,7 @@ describe('save / load roundtrip', () => {
       fallen: [],
       lost: [],
       traversedNodeIds: [],
+      surprisesThisFloor: 0,
     };
     const data: SaveFile = { ...makeBaseSave(), runState: fakeRunState };
     expect(() => save(data, storage)).toThrow();
@@ -428,6 +430,68 @@ describe('save normalizer — runState.traversedNodeIds default', () => {
     expect(loaded!.runState!.traversedNodeIds).toEqual([
       'crypt-f1-r0-s1', 'crypt-f1-r1-s1', 'crypt-f1-r2-s1', 'crypt-f1-r3-s1',
     ]);
+  });
+});
+
+describe('save normalizer — runState.surprisesThisFloor default', () => {
+  it('defaults missing runState.surprisesThisFloor to 0', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({
+      version: CURRENT_SCHEMA_VERSION,
+      roster: { heroes: [], slots: 12 },
+      vault: { gold: 0 },
+      stash: createStash(),
+      unlocks: { classes: [], dungeons: [] },
+      runState: {
+        dungeonId: 'crypt',
+        seed: 1,
+        party: [],
+        pack: { gold: 0, items: [] },
+        currentFloorNumber: 1,
+        currentFloorNodes: [],
+        currentNodeId: 'crypt-f1-r3-s1',
+        awaitingFork: false,
+        status: 'in_dungeon',
+        fallen: [],
+        lost: [],
+        traversedNodeIds: ['crypt-f1-r3-s1'],
+        // NOTE: surprisesThisFloor intentionally omitted to simulate a pre-Phase-6d save
+      },
+      runRngState: 12345,
+    }));
+    const loaded = load(storage);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.runState).toBeDefined();
+    expect(loaded!.runState!.surprisesThisFloor).toBe(0);
+  });
+
+  it('preserves an explicit surprisesThisFloor value', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({
+      version: CURRENT_SCHEMA_VERSION,
+      roster: { heroes: [], slots: 12 },
+      vault: { gold: 0 },
+      stash: createStash(),
+      unlocks: { classes: [], dungeons: [] },
+      runState: {
+        dungeonId: 'crypt',
+        seed: 1,
+        party: [],
+        pack: { gold: 0, items: [] },
+        currentFloorNumber: 1,
+        currentFloorNodes: [],
+        currentNodeId: 'crypt-f1-r3-s1',
+        awaitingFork: false,
+        status: 'in_dungeon',
+        fallen: [],
+        lost: [],
+        traversedNodeIds: ['crypt-f1-r3-s1'],
+        surprisesThisFloor: 2,
+      },
+      runRngState: 12345,
+    }));
+    const loaded = load(storage);
+    expect(loaded!.runState!.surprisesThisFloor).toBe(2);
   });
 });
 
