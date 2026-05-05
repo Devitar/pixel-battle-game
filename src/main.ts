@@ -1,7 +1,6 @@
 import * as Phaser from 'phaser';
 import './style.css';
 import { BarracksPanelScene } from './scenes/barracks_panel_scene';
-import { BarracksEquipScene } from './scenes/barracks_equip_scene';
 import { BlacksmithPanelScene } from './scenes/blacksmith_panel_scene';
 import { BootScene } from './scenes/boot_scene';
 import { CampNodeOverlayScene } from './scenes/camp_node_overlay_scene';
@@ -10,7 +9,7 @@ import { CampScreenScene } from './scenes/camp_screen_scene';
 import { ExplorerScene } from './scenes/dev/explorer_scene';
 import { MainScene } from './scenes/dev/main_scene';
 import { DungeonScene } from './scenes/dungeon_scene';
-import { EquipPanelScene } from './scenes/equip_panel_scene';
+import { EquipScene } from './scenes/equip_scene';
 import { EventOverlayScene } from './scenes/event_overlay_scene';
 import { HospitalPanelScene } from './scenes/hospital_panel_scene';
 import { ExpeditionsPanelScene } from './scenes/expeditions_panel_scene';
@@ -37,14 +36,13 @@ new Phaser.Game({
     CampScene,
     TavernPanelScene,
     BarracksPanelScene,
-    BarracksEquipScene,
     BlacksmithPanelScene,
     HospitalPanelScene,
     ExpeditionsPanelScene,
     DungeonScene,
     CorridorScene,
     CampScreenScene,
-    EquipPanelScene,
+    EquipScene,
     PerkOverlayScene,
     ShopOverlayScene,
     CampNodeOverlayScene,

@@ -29,6 +29,22 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-04 · Equipment flow unification
+
+- **What shipped:** Single unified `equip_scene` replacing both `barracks_equip_scene` and `equip_panel_scene`. Surfaces currently-equipped item stats at-rest via a slot-detail card; presents a clean before/after preview when swapping; shows ability gain/loss diffs with green/red coloring when changing weapon types.
+- **Why:** Player feedback flagged three concrete gaps: barracks at-rest view didn't show item stats; the two equip screens had divergent layouts; weapon-type swaps didn't preview ability changes. Equipment management is the most-touched player workflow that still felt rough post-Tier-2.
+- **Decisions:**
+  - **Hero selector in both modes** over keeping barracks single-hero. Barracks gets a roster list; in-run gets the 3-hero party. Truly unified chrome at the cost of one extra UI element in barracks.
+  - **Slot-detail card as single source of truth.** A dedicated card next to the paperdoll shows the currently-equipped item's full details for the selected slot, and flips to a before/after preview when an item is highlighted. Replaces the prior pattern of "click slot to open picker, find equipped row to read affixes."
+  - **Kit + ability list in the hero header.** Abilities depend on weapon + shield together (not on any single slot), so they live with the hero summary. `describeKitStatus()` already existed; surfacing it cost ~3 lines.
+  - **Two-column layout with stacked right pane** over three columns or a drawer. Each component gets vertical breathing room; the picker stays always-visible.
+  - **Card at-rest scope: weapon only.** No "browse other slots at rest" mode — picker rows already show full affix detail per slot, so adding that affordance was deemed marginal information for state-machine cost. Revisitable if smoke testing reveals it feels weak.
+- **Surprises:**
+  - **Strikethrough on removed-ability tokens** isn't supported by Phaser `Text` directly. The shipped UI uses red color + trailing position to indicate removed abilities. True strikethrough would require a `Phaser.GameObjects.Graphics` line over each token's bounds — left as a follow-up polish.
+  - **`describeKitStatus` and `resolveCombatAbilities` were both already in `kit.ts`** but never surfaced in the UI. Most of the "ability preview" work was just rendering existing data; only `resolveAbilityDiff` (~30 lines) was new.
+  - **`scene.bringToTop('equip')` was needed in `shop_overlay_scene.ts`** because `EquipScene` is registered earlier than `ShopOverlayScene` in `main.ts`, so without the explicit z-order push the equip panel renders beneath the shop. The old `equip_panel` scene had this same call; preserving it was easy to miss during the rename.
+- **Source:** `bugs.md` (equipment-viewing bug, removed on completion). Spec: `docs/superpowers/specs/2026-05-04-equipment-flow-unification-design.md`. Brainstorm 2026-05-04 (Q1 selector/B, Q2 card/D, Q3 kit-in-header/A, Q4 two-column/B). Test count delta: 1509 → 1515 (+6 from `resolveAbilityDiff` cases).
+
 ### 2026-05-04 · Map-based dungeon scene — umbrella complete (Cluster B · 30)
 
 - **What shipped:** All 10 sub-phases of the StS-inspired map-based dungeon redesign (Phase 1, 2a, 2b, 3, 4, 5, 6a, 6b, 6c, 6d) — see per-phase entries below for implementation detail. Old icon-row hub layout fully replaced; the map IS the scene; in-dungeon-action lives in a unified `corridor` scene; per-edge HP ticks, hero chatter, and surprise ambushes give travel real texture.

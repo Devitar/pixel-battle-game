@@ -125,7 +125,7 @@ export class CampScreenScene extends Phaser.Scene {
     if (equipEnabled) {
       equipBg.setInteractive({ useHandCursor: true });
       equipBg.on('pointerdown', () => {
-        this.scene.launch('equip_panel');
+        this.scene.launch('equip', { kind: 'in_run', returnTo: 'camp_screen' });
         this.scene.pause();
       });
     }

@@ -3,7 +3,7 @@ import { BASE_ITEMS } from '@data/items';
 import { CLASSES } from '@data/classes';
 import type { ClassId, Item, ItemBaseId, ItemSlot } from '@data/types';
 import { createHero, type Hero } from '@heroes/hero';
-import { describeKitStatus, resolveCombatAbilities } from '../kit';
+import { describeKitStatus, resolveCombatAbilities, resolveAbilityDiff } from '../kit';
 
 function makeItem(baseId: ItemBaseId, slot: ItemSlot, id: string): Item {
   const def = BASE_ITEMS[baseId];
@@ -297,5 +297,67 @@ describe('describeKitStatus', () => {
   it('Priest + holy_symbol (mace_basic) → full kit', () => {
     const hero = makeHeroWith({ classId: 'priest', weaponBaseId: 'mace_basic' });
     expect(describeKitStatus(hero)).toBe('Holy Symbol · Full kit');
+  });
+});
+
+describe('resolveAbilityDiff — same kit', () => {
+  it('returns empty diff and same band when equipment unchanged', () => {
+    const hero = makeHeroWith({ classId: 'knight', weaponBaseId: 'sword_basic', shieldBaseId: 'shield_basic' });
+    const diff = resolveAbilityDiff(hero, hero);
+    expect(diff.added).toEqual([]);
+    expect(diff.removed).toEqual([]);
+    expect(diff.bandChange).toBe('same');
+  });
+});
+
+describe('resolveAbilityDiff — preferred → off-preferred (same family)', () => {
+  it('Knight sword → Knight axe records 1 ability swap and bandChange downgrade', () => {
+    const before = makeHeroWith({ classId: 'knight', weaponBaseId: 'sword_basic', shieldBaseId: 'shield_basic' });
+    const after = makeHeroWith({ classId: 'knight', weaponBaseId: 'axe_basic', shieldBaseId: 'shield_basic' });
+    const diff = resolveAbilityDiff(before, after);
+    expect(diff.added.length).toBe(1);
+    expect(diff.removed.length).toBe(1);
+    expect(diff.bandChange).toBe('downgrade');
+  });
+});
+
+describe('resolveAbilityDiff — off-preferred → preferred', () => {
+  it('Knight axe → Knight sword records 1 swap and bandChange upgrade', () => {
+    const before = makeHeroWith({ classId: 'knight', weaponBaseId: 'axe_basic', shieldBaseId: 'shield_basic' });
+    const after = makeHeroWith({ classId: 'knight', weaponBaseId: 'sword_basic', shieldBaseId: 'shield_basic' });
+    const diff = resolveAbilityDiff(before, after);
+    expect(diff.added.length).toBe(1);
+    expect(diff.removed.length).toBe(1);
+    expect(diff.bandChange).toBe('upgrade');
+  });
+});
+
+describe('resolveAbilityDiff — preferred → wrong family', () => {
+  it('Knight sword → Knight bow drops to basic-only (large removed list, bandChange downgrade)', () => {
+    const before = makeHeroWith({ classId: 'knight', weaponBaseId: 'sword_basic', shieldBaseId: 'shield_basic' });
+    const after = makeHeroWith({ classId: 'knight', weaponBaseId: 'bow_basic', shieldBaseId: 'shield_basic' });
+    const diff = resolveAbilityDiff(before, after);
+    expect(diff.removed.length).toBeGreaterThan(0);
+    expect(diff.bandChange).toBe('downgrade');
+  });
+});
+
+describe('resolveAbilityDiff — wrong family → preferred', () => {
+  it('Knight bow → Knight sword bandChange upgrade with abilities added', () => {
+    const before = makeHeroWith({ classId: 'knight', weaponBaseId: 'bow_basic', shieldBaseId: 'shield_basic' });
+    const after = makeHeroWith({ classId: 'knight', weaponBaseId: 'sword_basic', shieldBaseId: 'shield_basic' });
+    const diff = resolveAbilityDiff(before, after);
+    expect(diff.added.length).toBeGreaterThan(0);
+    expect(diff.bandChange).toBe('upgrade');
+  });
+});
+
+describe('resolveAbilityDiff — shield removed', () => {
+  it('Knight sword + shield → Knight sword no shield records removed shield-required abilities', () => {
+    const before = makeHeroWith({ classId: 'knight', weaponBaseId: 'sword_basic', shieldBaseId: 'shield_basic' });
+    const noShield: Hero = { ...before, equipment: { weapon: before.equipment.weapon } };
+    const diff = resolveAbilityDiff(before, noShield);
+    expect(diff.removed.length).toBeGreaterThan(0);
+    expect(diff.bandChange).toBe('downgrade');
   });
 });
