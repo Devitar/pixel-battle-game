@@ -24,6 +24,8 @@ import {
   purchaseItem,
   startRun,
 } from '../run_state';
+import { applyPendingMilestones } from '../milestones';
+import type { SaveFile } from '@save/save';
 
 function makeParty(): Hero[] {
   return [
@@ -1295,7 +1297,7 @@ describe('completeSurpriseCombat', () => {
 });
 
 describe('completeCombat — pendingMilestones populate', () => {
-  it('canonical-final-boss defeat exercises the detectBossMilestones path (returns [] in spec 1)', () => {
+  it('canonical-final-boss defeat populates pendingMilestones with first_crypt_clear', () => {
     let rs = startRun('crypt', makeParty(), 1, createRng(1));
     rs = advanceToBossNode(rs);
     while (rs.currentFloorNumber < DUNGEONS.crypt.floorsPerRun) {
@@ -1306,7 +1308,7 @@ describe('completeCombat — pendingMilestones populate', () => {
     }
     const after = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
     expect(after.status).toBe('camp_screen');
-    expect(after.pendingMilestones).toEqual([]);
+    expect(after.pendingMilestones).toEqual(['first_crypt_clear']);  // spec 2: real handler
   });
 
   it('non-canonical (floor 1) boss defeat in a 3-floor dungeon does NOT credit', () => {
@@ -1327,7 +1329,9 @@ describe('completeCombat — pendingMilestones populate', () => {
     expect(rs.currentFloorNumber).toBe(DUNGEONS.crypt.floorsPerRun + 1);
     rs = advanceToBossNode(rs);
     const after = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
-    expect(after.pendingMilestones).toEqual([]);
+    // pendingMilestones already contains 'first_crypt_clear' from the canonical floor-3 kill.
+    // The floor-4 kill must NOT add another entry (it's not canonical).
+    expect(after.pendingMilestones).toEqual(['first_crypt_clear']);  // unchanged from before the floor-4 kill
   });
 });
 
@@ -1372,5 +1376,31 @@ describe('pressOn — pendingMilestones persists across floor advance', () => {
     const before = rs.pendingMilestones;
     const after = pressOn(rs, createRng(99));
     expect(after.pendingMilestones).toEqual(before);
+  });
+});
+
+describe('end-to-end — Crypt clear unlocks Sunken Keep', () => {
+  it('full canonical Crypt run: cashout SaveFile gets sunken_keep unlocked', () => {
+    // Walk a Crypt run to floor 3, defeat the boss, cash out, apply milestones.
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    while (rs.currentFloorNumber < DUNGEONS.crypt.floorsPerRun) {
+      rs = advanceToBossNode(rs);
+      rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+      rs = pressOn(rs, createRng(99));
+    }
+    rs = advanceToBossNode(rs);
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    expect(rs.status).toBe('camp_screen');
+    expect(rs.pendingMilestones).toEqual(['first_crypt_clear']);
+
+    // Cashout
+    const { runState: ended, outcome } = cashout(rs);
+    expect(outcome.milestonesTriggered).toEqual(['first_crypt_clear']);
+    expect(ended.pendingMilestones).toEqual([]);
+
+    // Apply to a SaveFile fixture (only the unlocks slice matters here)
+    const before = { unlocks: { classes: [], dungeons: ['crypt'] } } as unknown as SaveFile;
+    const after = applyPendingMilestones(before, outcome.milestonesTriggered);
+    expect(after.unlocks.dungeons).toContain('sunken_keep');
   });
 });

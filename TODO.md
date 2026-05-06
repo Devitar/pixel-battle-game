@@ -45,24 +45,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 Tier 3 scope from gdd §10. The Crypt is the only dungeon today; Tier 3 adds dungeons 2–4, unlock classes (Paladin, Hunter), unlock buildings (Chapel, Training Grounds), legendary tier, milestone achievements, level-10 perks, NG+. Most Tier 3 unlocks gate on first Sunken Keep clear, so Sunken Keep is the natural first task.
 
-### 1 · Sunken Keep — Spec 2: content + art + first-Crypt-clear handler
-
-- **What:** Drop in the Sunken Keep dungeon now that spec 1's plumbing landed (2026-05-05 HISTORY). All foundation work is done: `DungeonTier`, multi-dungeon Expeditions UI with locked-card path, tier-aware balance, milestone registry. Spec 2 is strictly additive content.
-- **Why:** Activates the Tier 3 cascade. First Sunken Keep clear gates Hunter, Chapel, Training Grounds, and the Sunken Keep gear tier (gdd §9). First Crypt clear unlocks Sunken Keep — handler ships in this spec.
-- **Tier:** 3
-- **Acceptance** (additive — no refactors needed):
-  - Add `'sunken_keep'` to the `DungeonId` union in `src/data/types.ts`.
-  - Add `DUNGEONS['sunken_keep']` entry in `src/data/dungeons.ts`: `tier: 2`, `floorsPerRun: ?`, `rowsPerFloor: ?` (pick density carefully — the Phase 2b quota generator depends on row count), `enemyPool`, `bossId`, `unlockRequirement: 'Defeat the Bone Lich'`.
-  - Add 4 minion `EnemyId`s + 1 boss `EnemyId` to `src/data/types.ts`, definitions to `src/data/enemies.ts`, sprite mappings to `src/render/enemy_sprites.ts`. Boss is bespoke 32×32 per `BOSS_SHEET` pattern.
-  - Pick real values for `TIER_SCALING_SLOPE[2]`, `TIER_RARITY_FLOOR_BONUS[2]`, `TIER_GOLD_MULTIPLIER[2]` in `src/dungeon/scaling.ts` and `src/dungeon/loot.ts`.
-  - Pick the per-tier color palette for the tier badge in `src/scenes/expeditions_panel_scene.ts` (currently a placeholder).
-  - Add `'first_crypt_clear'` to `MilestoneId` in `src/data/types.ts`.
-  - Register `MILESTONES['first_crypt_clear']` handler in `src/run/milestones.ts` that adds `'sunken_keep'` to `state.unlocks.dungeons` (idempotent — checks first).
-  - Update `detectBossMilestones` body: `if (dungeonId === 'crypt' && floorNumber === DUNGEONS.crypt.floorsPerRun) return ['first_crypt_clear']`.
-  - Art can ship with placeholders initially per Cluster C precedent; bespoke sprites are Cluster C follow-up.
-- **Touches:** `src/data/types.ts`, `src/data/dungeons.ts`, `src/data/enemies.ts`, `src/data/abilities.ts` (new boss/minion abilities), `src/dungeon/scaling.ts`, `src/dungeon/loot.ts` (tier-2 numbers), `src/render/enemy_sprites.ts`, `src/run/milestones.ts`, `spritenames.txt` + `npm run generate:names` (for art).
-- **Source:** spec 1 ships at `docs/superpowers/specs/2026-05-05-sunken-keep-foundation-design.md` (Hand-off to spec 2 section). gdd §4 (dungeon table) + §5 (tier-scaling) + §9 (milestone unlocks).
-
 ### 2 · Display-vs-credit mismatch for elite gold in result panel (pre-existing)
 
 - **What:** `corridor_scene.ts:1090` displays `COMBAT_NODE_REWARD × floor` (= 15 × floor) for non-boss combat, including elite nodes. But `completeCombat` actually credits `ELITE_NODE_GOLD × floor` (= 30 × floor). Result panel UI under-reports elite gold.
@@ -103,3 +85,27 @@ Art tasks that aren't blocking gameplay. Enemies, heroes, and rooms already rend
   - Either way: placeholder-guard for these slots in `hero_loadout.ts` is no longer load-bearing (could be removed in a follow-up if both paths land).
 - **Touches:** `public/assets/sprites/base_sprites.png` (if new art), `spritenames.txt` (if new art), `src/render/sprite_names.generated.ts` (regenerated if new art), `src/data/items.ts` (2 spriteId fields, possibly 2 name fields and/or baseId keys if rename).
 - **Source:** Cluster A task 4 HISTORY entry (2026-04-27 · Gear rarity tiers + items foundation), refined by Cluster C · 2 verification (2026-05-01).
+
+### 3 · Bespoke art for the Drowned King boss (high priority)
+
+- **What:** Replace the placeholder `bossSprite: 0` (which reuses Bone Lich's frame) in `ENEMY_VISUALS.drowned_king` with a bespoke 32×32 sprite. Drowned-knight in armor with a crown silhouette per gdd §4 / spec-2 design.
+- **Why:** Marquee art moment for tier 2. Until this ships, the Drowned King visually mirrors Bone Lich, undermining the "different boss, different fight" promise of spec 2.
+- **Tier:** 3 (originally) — non-blocking now that placeholders work, but high priority within Cluster C.
+- **Acceptance:**
+  - New 32×32 frame added to `BOSS_SHEET`.
+  - `ENEMY_VISUALS.drowned_king.bossSprite` updated to point at the new frame.
+  - Optionally: keep `bodyScale: 2` for the same visual size as Bone Lich.
+- **Touches:** `public/assets/sprites/boss_sprites.png`, `spritenames.txt` (if BOSS_SHEET frames are named), `src/render/enemy_sprites.ts`.
+- **Source:** spec 2 (2026-05-06).
+
+### 4 · Bespoke art for Sunken Keep minion bodies (lower priority)
+
+- **What:** Replace placeholder `ENEMY_BODY` reuse in `ENEMY_VISUALS` for `drowned_knight`, `brine_crab`, `drowned_sailor`, `siren` with bespoke 16×16 sprites.
+- **Why:** Sunken Keep currently shares enemy silhouettes with Crypt enemies (skeleton/zombie/cultist palettes). Drowned Knight and skeleton_warrior render visually identically (same body + sword). Bespoke art makes the dungeon visually distinct.
+- **Tier:** 3 (originally) — non-blocking; placeholders work.
+- **Acceptance:**
+  - New `ENEMY_BODY` constants added (`drowned_knight`, `brine_crab`, `drowned_sailor`, `siren`) with new 16×16 frames in the enemy sheet.
+  - `ENEMY_VISUALS` mappings updated to point at the new bodies.
+  - Brine Crab in particular benefits from a non-humanoid silhouette (it's tagged `'beast'` but currently uses zombie body).
+- **Touches:** `public/assets/sprites/enemy_sprites.png`, `src/render/enemy_sprites.ts`.
+- **Source:** spec 2 (2026-05-06).

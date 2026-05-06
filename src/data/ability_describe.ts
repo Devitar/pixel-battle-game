@@ -51,6 +51,7 @@ const STATUS_LABEL: Record<StatusId, string> = {
   vanished: 'vanished',
   slowed: 'slowed',
   burning: 'burning',
+  drowning: 'drowning',
 };
 
 function describeFilter(filter: TargetSelector['filter']): string {

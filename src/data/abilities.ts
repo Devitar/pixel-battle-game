@@ -362,4 +362,44 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     cooldown: 2,
     tags: ['radiant'],
   },
+
+  drowning_embrace: {
+    id: 'drowning_embrace',
+    name: 'Drowning Embrace',
+    canCastFrom: [1, 2, 3],
+    target: { side: 'enemy', slots: [3], pick: 'first' },
+    effects: [
+      { kind: 'pull', slots: 2 },
+      { kind: 'poison', damagePerTurn: 3, duration: 3, statusId: 'drowning' },
+    ],
+    cooldown: 3,
+  },
+
+  tidal_smash: {
+    id: 'tidal_smash',
+    name: 'Tidal Smash',
+    canCastFrom: [1, 2],
+    target: { side: 'enemy', slots: [1], pick: 'first' },
+    effects: [{ kind: 'damage', power: 1.4 }],
+  },
+
+  crushing_wave: {
+    id: 'crushing_wave',
+    name: 'Crushing Wave',
+    canCastFrom: [1, 2, 3],
+    target: { side: 'enemy', slots: 'all' },
+    effects: [{ kind: 'damage', power: 0.6 }],
+    cooldown: 3,
+  },
+
+  drowning_lure: {
+    id: 'drowning_lure',
+    name: 'Drowning Lure',
+    canCastFrom: [3, 4],
+    target: { side: 'enemy', slots: 'all', pick: 'lowestHp' },
+    effects: [
+      { kind: 'poison', damagePerTurn: 2, duration: 2, statusId: 'drowning' },
+    ],
+    cooldown: 2,
+  },
 };

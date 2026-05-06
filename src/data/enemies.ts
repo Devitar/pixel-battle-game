@@ -61,6 +61,56 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     aiPriority: ['curse_of_frailty', 'necrotic_wave', 'lich_strike'],
     preferredSlots: [3, 4],
   },
+  drowned_knight: {
+    id: 'drowned_knight',
+    name: 'Drowned Knight',
+    role: 'minion',
+    baseStats: { hp: 14, attack: 4, defense: 3, speed: 3, mind: 0, crit: 5, dodge: 5 },
+    tags: ['humanoid'],
+    abilities: ['bone_slash', 'bone_throw'],
+    aiPriority: ['bone_slash', 'bone_throw'],
+    preferredSlots: [1, 2],
+  },
+  brine_crab: {
+    id: 'brine_crab',
+    name: 'Brine Crab',
+    role: 'minion',
+    baseStats: { hp: 18, attack: 3, defense: 4, speed: 2, mind: 0, crit: 5, dodge: 0 },
+    tags: ['beast'],
+    abilities: ['rotting_bite', 'lurch'],
+    aiPriority: ['rotting_bite', 'lurch'],
+    preferredSlots: [1, 2],
+  },
+  drowned_sailor: {
+    id: 'drowned_sailor',
+    name: 'Drowned Sailor',
+    role: 'minion',
+    baseStats: { hp: 11, attack: 5, defense: 1, speed: 4, mind: 0, crit: 5, dodge: 5 },
+    tags: ['humanoid'],
+    abilities: ['bone_arrow'],
+    aiPriority: ['bone_arrow'],
+    preferredSlots: [3, 4],
+  },
+  siren: {
+    id: 'siren',
+    name: 'Siren',
+    role: 'minion',
+    baseStats: { hp: 12, attack: 3, defense: 1, speed: 4, mind: 4, crit: 5, dodge: 10 },
+    tags: ['humanoid'],
+    abilities: ['drowning_lure', 'dark_bolt'],
+    aiPriority: ['drowning_lure', 'dark_bolt'],
+    preferredSlots: [3, 4],
+  },
+  drowned_king: {
+    id: 'drowned_king',
+    name: 'The Drowned King',
+    role: 'boss',
+    baseStats: { hp: 50, attack: 6, defense: 4, speed: 2, mind: 0, crit: 10, dodge: 0 },
+    tags: ['humanoid'],
+    abilities: ['drowning_embrace', 'tidal_smash', 'crushing_wave'],
+    aiPriority: ['drowning_embrace', 'crushing_wave', 'tidal_smash'],
+    preferredSlots: [1, 2],
+  },
 };
 
 export const CRYPT_POOL: readonly EnemyId[] = [
@@ -72,3 +122,12 @@ export const CRYPT_POOL: readonly EnemyId[] = [
 ];
 
 export const CRYPT_BOSS: EnemyId = 'bone_lich';
+
+export const SUNKEN_KEEP_POOL: readonly EnemyId[] = [
+  'drowned_knight',
+  'brine_crab',
+  'drowned_sailor',
+  'siren',
+];
+
+export const SUNKEN_KEEP_BOSS: EnemyId = 'drowned_king';

@@ -45,7 +45,7 @@ const RARITY_TABLE: readonly RarityRow[] = [
 
 const TIER_RARITY_FLOOR_BONUS: Record<DungeonTier, number> = {
   1: 0,  // today's behavior (regression-locked)
-  2: 0,  // placeholder; spec 2 picks the real value
+  2: 3,  // Sunken Keep — spec 2 real value
   3: 0,
   4: 0,
 };
@@ -74,6 +74,10 @@ function rarityWeightsAt(floor: number, tier: DungeonTier): { common: number; un
 function pluckWeights(r: RarityRow) { return { common: r.common, uncommon: r.uncommon, rare: r.rare }; }
 function lerp(a: number, b: number, t: number): number { return a + (b - a) * t; }
 
+// Affix values are intentionally tier-agnostic — uses tier-1 slope at every tier.
+// Tier-2 differentiation comes from rarity-distribution shift (TIER_RARITY_FLOOR_BONUS),
+// not from numerically larger affix values. Mirrors the spec-1 Q3 decision that shop
+// prices stay flat at higher tier (gold multiplier applies to grants only).
 function scaleByFloor(baseValue: number, floor: number): number {
   return Math.round(baseValue * floorScale(floor).hp);
 }

@@ -1,32 +1,43 @@
+import { DUNGEONS } from '@data/dungeons';
 import type { DungeonId, MilestoneId } from '@data/types';
 import type { SaveFile } from '@save/save';
 
 export type MilestoneHandler = (state: SaveFile) => SaveFile;
 
 /**
- * Spec 1 ships an empty registry. Spec 2 adds 'first_crypt_clear' here
- * alongside the DUNGEONS['sunken_keep'] entry.
+ * Spec 2 introduces 'first_crypt_clear'. Future class/dungeon specs extend
+ * this registry — e.g., the Paladin spec extends the first_crypt_clear handler
+ * to also append 'paladin' to state.unlocks.classes.
  *
- * The cast is needed because TypeScript can't directly construct
- * Record<never, MilestoneHandler> from {}; this is purely a type-level
- * accommodation and has no runtime effect.
+ * Handlers are responsible for their own idempotency.
  */
-export const MILESTONES: Record<MilestoneId, MilestoneHandler> = {} as Record<MilestoneId, MilestoneHandler>;
+export const MILESTONES: Record<MilestoneId, MilestoneHandler> = {
+  first_crypt_clear: (state) => {
+    if (state.unlocks.dungeons.includes('sunken_keep')) return state;
+    return {
+      ...state,
+      unlocks: {
+        ...state.unlocks,
+        dungeons: [...state.unlocks.dungeons, 'sunken_keep'],
+      },
+    };
+  },
+};
 
 /**
  * Returns the milestone ids triggered by this boss defeat.
- * Called from completeCombat when the defeated encounter's kind is 'boss'
- * AND floorNumber === DUNGEONS[dungeonId].floorsPerRun (canonical final boss only).
- *
- * Handlers are responsible for their own idempotency — e.g., the future
- * 'first_crypt_clear' handler will check if 'sunken_keep' is already in
- * unlocks.dungeons before adding it.
+ * Called from completeCombat when:
+ *   - the defeated encounter's kind is 'boss'
+ *   - AND floorNumber === DUNGEONS[dungeonId].floorsPerRun (canonical final boss only)
  */
 export function detectBossMilestones(
-  _dungeonId: DungeonId,
-  _floorNumber: number,
+  dungeonId: DungeonId,
+  floorNumber: number,
 ): readonly MilestoneId[] {
-  return [];  // empty in spec 1; spec 2 fills in the body
+  if (dungeonId === 'crypt' && floorNumber === DUNGEONS.crypt.floorsPerRun) {
+    return ['first_crypt_clear'];
+  }
+  return [];
 }
 
 /**
@@ -38,7 +49,7 @@ export function applyPendingMilestones(
 ): SaveFile {
   let next = state;
   for (const id of ids) {
-    const handler = (MILESTONES as Record<string, MilestoneHandler | undefined>)[id as string];
+    const handler = MILESTONES[id];
     if (handler) next = handler(next);
   }
   return next;

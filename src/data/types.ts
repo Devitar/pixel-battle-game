@@ -46,9 +46,14 @@ export type AbilityId =
   | 'rogue_riposte'
   | 'rogue_brutal_chop'
   | 'priest_arcane_bolt'
-  | 'mage_holy_light';
+  | 'mage_holy_light'
+  // Sunken Keep
+  | 'drowning_embrace'
+  | 'tidal_smash'
+  | 'crushing_wave'
+  | 'drowning_lure';
 
-export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished' | 'slowed' | 'burning';
+export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished' | 'slowed' | 'burning' | 'drowning';
 
 export type AbilityTag = 'radiant';
 
@@ -219,7 +224,13 @@ export type EnemyId =
   | 'ghost'
   | 'zombie'
   | 'cultist'
-  | 'bone_lich';
+  | 'bone_lich'
+  // Sunken Keep
+  | 'drowned_knight'
+  | 'brine_crab'
+  | 'drowned_sailor'
+  | 'siren'
+  | 'drowned_king';
 
 export type EnemyRole = 'minion' | 'boss';
 
@@ -234,7 +245,7 @@ export interface EnemyDef {
   preferredSlots: readonly SlotIndex[];
 }
 
-export type DungeonId = 'crypt';
+export type DungeonId = 'crypt' | 'sunken_keep';
 
 export type DungeonTier = 1 | 2 | 3 | 4;
 
@@ -250,7 +261,7 @@ export interface DungeonDef {
   unlockRequirement?: string;
 }
 
-export type MilestoneId = never; // empty in spec 1; spec 2 introduces 'first_crypt_clear'
+export type MilestoneId = 'first_crypt_clear';
 
 export type TraitId =
   | 'stout'

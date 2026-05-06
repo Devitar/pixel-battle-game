@@ -51,4 +51,30 @@ export const ENEMY_VISUALS: Record<EnemyId, EnemyVisual> = {
     bossSprite: 0,
     bodyScale: 2,
   },
+  drowned_knight: {
+    bodyFrame: ENEMY_BODY.skeleton,
+    weapon: SPRITE_NAMES.weapon.sword_tier2,
+    shield: SPRITE_NAMES.shield.wood_buckler_tier1,
+  },
+  brine_crab: {
+    bodyFrame: ENEMY_BODY.zombie,
+    legs: SPRITE_NAMES.legs.black,
+    feet: SPRITE_NAMES.feet.black,
+  },
+  drowned_sailor: {
+    bodyFrame: ENEMY_BODY.skeleton,
+    weapon: SPRITE_NAMES.weapon.bow_wood_tier1,
+  },
+  siren: {
+    bodyFrame: ENEMY_BODY.cultist,
+    legs: SPRITE_NAMES.legs.black,
+    feet: SPRITE_NAMES.feet.black,
+    outfit: SPRITE_NAMES.torso.shirt_black_long,
+    hat: SPRITE_NAMES.head.wizardhat_4,
+    weapon: SPRITE_NAMES.weapon.staff_green_tier2,
+  },
+  drowned_king: {
+    bossSprite: 0,
+    bodyScale: 2,
+  },
 };

@@ -50,9 +50,28 @@ describe('goldMultiplier', () => {
     expect(goldMultiplier(1)).toBe(1);
   });
 
-  it('tier 2-4 return 1 in spec 1 baseline (placeholder)', () => {
-    expect(goldMultiplier(2)).toBe(1);
+  it('tier 2 returns 1.5 (Sunken Keep)', () => {
+    expect(goldMultiplier(2)).toBe(1.5);
+  });
+
+  it('tier 3-4 return 1 (unspecified until spec 3)', () => {
     expect(goldMultiplier(3)).toBe(1);
     expect(goldMultiplier(4)).toBe(1);
+  });
+});
+
+describe('floorScale tier 2', () => {
+  it('floor 1 tier 2 is still 1.0× (slope baseline)', () => {
+    expect(floorScale(1, 2).hp).toBeCloseTo(1.0);
+  });
+
+  it('floor 12 tier 2 is ~2.43× (slope 0.13 × 11 + 1)', () => {
+    const s = floorScale(12, 2);
+    expect(s.hp).toBeCloseTo(2.43);
+    expect(s.attack).toBeCloseTo(2.43);
+  });
+
+  it('tier 2 differs from tier 1 at floor > 1', () => {
+    expect(floorScale(5, 2).hp).toBeGreaterThan(floorScale(5, 1).hp);
   });
 });

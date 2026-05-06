@@ -32,3 +32,32 @@ describe('DUNGEONS', () => {
     expect(DUNGEONS['crypt'].tier).toBe(1);
   });
 });
+
+describe('DUNGEONS.sunken_keep', () => {
+  it('is registered with tier 2', () => {
+    expect(DUNGEONS.sunken_keep).toBeDefined();
+    expect(DUNGEONS.sunken_keep.id).toBe('sunken_keep');
+    expect(DUNGEONS.sunken_keep.tier).toBe(2);
+  });
+
+  it('has 3 floors with rowsPerFloor 10', () => {
+    expect(DUNGEONS.sunken_keep.floorsPerRun).toBe(3);
+    expect(DUNGEONS.sunken_keep.rowsPerFloor).toBe(10);
+  });
+
+  it('has the expected unlock requirement string', () => {
+    expect(DUNGEONS.sunken_keep.unlockRequirement).toBe('Defeat the Bone Lich');
+  });
+
+  it('enemyPool references registered enemies', () => {
+    for (const id of DUNGEONS.sunken_keep.enemyPool) {
+      expect(ENEMIES[id], `pool references missing enemy ${id}`).toBeDefined();
+    }
+  });
+
+  it('bossId is a registered boss', () => {
+    const bossId = DUNGEONS.sunken_keep.bossId;
+    expect(ENEMIES[bossId]).toBeDefined();
+    expect(ENEMIES[bossId].role).toBe('boss');
+  });
+});

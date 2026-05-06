@@ -343,6 +343,26 @@ describe('rollLoot — treasure kind', () => {
   });
 });
 
+describe('rollLoot — tier 2 rarity offset', () => {
+  it('tier 2 boss drops roll rare more often than tier 1 boss drops at floor 1', () => {
+    // Tier 1 floor-1 boss: effectiveFloor = 1 + 1 = 2 → rare ≈ 1% (lerp row1 rare:0, row3 rare:2 at t=0.5).
+    // Tier 2 floor-1 boss: effectiveFloor = (1 + 1) + 3 = 5 → rare = 5% per RARITY_TABLE row {floor:5, rare:5}.
+    // Expect tier 2 to roll significantly more rares.
+    let tier1Rare = 0;
+    let tier2Rare = 0;
+    const N = 1000;
+    for (let seed = 1; seed <= N; seed++) {
+      const r1 = rollLoot(createRng(seed), 1, 'boss', 1);
+      const r2 = rollLoot(createRng(seed), 1, 'boss', 2);
+      if (r1?.rarity === 'rare') tier1Rare++;
+      if (r2?.rarity === 'rare') tier2Rare++;
+    }
+    expect(tier2Rare).toBeGreaterThan(tier1Rare * 2);
+    expect(tier2Rare).toBeGreaterThanOrEqual(25);   // ≥2.5%, safely below the ~5% expected
+    expect(tier2Rare).toBeLessThanOrEqual(100);     // ≤10%, safely above
+  });
+});
+
 describe('loot — tier parameter parity (tier=1 default)', () => {
   it('rollLoot(rng, f, kind) ≡ rollLoot(rng, f, kind, 1)', () => {
     for (const seed of [1, 7, 42]) {
