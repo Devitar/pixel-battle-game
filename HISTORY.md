@@ -29,6 +29,18 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-06 · Elite-node gold display fix + dedupe (Cluster D · 2)
+
+- **Why:** `corridor_scene.ts buildResultPanel` displayed `15 × floor` (combat formula) for elite-node victories, but `completeCombat` actually credited `30 × floor`. Display under-reported elite gold by half. Surfaced during Sunken Keep spec 1 review.
+- **Decisions:**
+  - Extracted two pure helpers in `run_state.ts` — `nodeRewardGold(kind, floor, tier)` and `surpriseRewardGold(floor, tier)` — and exported them. Both `completeCombat` (credit) and `corridor_scene` (display) call the helpers, so display-vs-credit drift is now structurally impossible.
+  - Helper `kind` narrows to `'combat' | 'elite' | 'boss'` rather than full `LootKind` (which includes `'treasure'`). `completeCombat`'s pre-existing throws for non-combat-bearing types let the call site narrow naturally, so no cast needed; dropped the redundant `: LootKind` annotation.
+  - Added a defensive `throw` in `buildResultPanel` for non-combat node types — narrowing `completedNode.type` for the helper call. Same throw shape `completeCombat` already uses; matches existing scene-side error handling.
+- **Surprises:**
+  - `SURPRISE_GOLD_BASE = 7` was a third copy-pasted constant duplicated between `run_state.ts` and `corridor_scene.ts` — same drift risk as the elite-gold bug. Folded into the same dedupe pass.
+  - The `LootKind` import in `run_state.ts` became unused after the annotation drop; removed in the same edit.
+- **Source:** TODO Cluster D · 2 (filed 2026-05-05 during spec 1 quality review). Test count delta: 1634 → 1640 (+6 — 4 `nodeRewardGold` cases, 1 `surpriseRewardGold` case, 1 elite-credit integration sanity check).
+
 ### 2026-05-06 · Sunken Keep — Spec 2 (content + first-Crypt-clear handler) (Cluster D · 1)
 
 - **Why:** Spec 1 (2026-05-05) plumbed the dungeon-tier balance API, milestone registry, multi-dungeon Expeditions UI, and locked-card rendering. Spec 2 drops the Sunken Keep into that foundation as additive content. After this lands, defeating the Crypt floor-3 boss unlocks the Sunken Keep dungeon.

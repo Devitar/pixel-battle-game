@@ -19,10 +19,12 @@ import {
   leaveShop,
   loseHero,
   nextNodeChoices,
+  nodeRewardGold,
   playerPath,
   pressOn,
   purchaseItem,
   startRun,
+  surpriseRewardGold,
 } from '../run_state';
 import { applyPendingMilestones } from '../milestones';
 import type { SaveFile } from '@save/save';
@@ -1402,5 +1404,65 @@ describe('end-to-end — Crypt clear unlocks Sunken Keep', () => {
     const before = { unlocks: { classes: [], dungeons: ['crypt'] } } as unknown as SaveFile;
     const after = applyPendingMilestones(before, outcome.milestonesTriggered);
     expect(after.unlocks.dungeons).toContain('sunken_keep');
+  });
+});
+
+describe('nodeRewardGold', () => {
+  it('combat node: 15 × floor × tier-multiplier', () => {
+    expect(nodeRewardGold('combat', 1, 1)).toBe(15);
+    expect(nodeRewardGold('combat', 3, 1)).toBe(45);
+  });
+
+  it('elite node: 30 × floor × tier-multiplier (regression for under-reported elite gold)', () => {
+    // Pre-fix bug: corridor_scene used the combat formula (15×) for elite nodes,
+    // under-reporting by half against the value completeCombat actually credits.
+    expect(nodeRewardGold('elite', 1, 1)).toBe(30);
+    expect(nodeRewardGold('elite', 3, 1)).toBe(90);
+  });
+
+  it('boss node: 100 × floor × tier-multiplier', () => {
+    expect(nodeRewardGold('boss', 1, 1)).toBe(100);
+    expect(nodeRewardGold('boss', 3, 1)).toBe(300);
+  });
+
+  it('applies the tier-2 ×1.5 gold multiplier', () => {
+    expect(nodeRewardGold('combat', 1, 2)).toBe(23);  // round(15 × 1 × 1.5) = 22.5 → 23
+    expect(nodeRewardGold('elite', 1, 2)).toBe(45);   // 30 × 1 × 1.5
+    expect(nodeRewardGold('boss', 5, 2)).toBe(750);   // 100 × 5 × 1.5
+  });
+});
+
+describe('surpriseRewardGold', () => {
+  it('7 × floor × tier-multiplier', () => {
+    expect(surpriseRewardGold(1, 1)).toBe(7);
+    expect(surpriseRewardGold(3, 1)).toBe(21);
+    expect(surpriseRewardGold(2, 2)).toBe(21);  // round(7 × 2 × 1.5) = 21
+  });
+});
+
+describe('completeCombat — credit matches nodeRewardGold for elite nodes', () => {
+  // Sanity check: the value completeCombat banks for an elite kill should equal
+  // what nodeRewardGold reports — historically these had drifted (display showed
+  // combat formula while credit used elite formula).
+  it('elite combat victory credits nodeRewardGold("elite", floor, tier)', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    // Find an elite node on floor 1.
+    const eliteNode = rs.currentFloorNodes.find((n): n is Extract<Node, { type: 'elite' }> => n.type === 'elite');
+    if (!eliteNode) {
+      // Some seeds may not place an elite on floor 1; bail out cleanly.
+      return;
+    }
+    // Manually traverse to the elite node by overwriting currentNodeId. The path
+    // logic isn't under test here; we just need an in_dungeon state at an elite.
+    rs = { ...rs, currentNodeId: eliteNode.id };
+    const tier = DUNGEONS[rs.dungeonId].tier;
+    const expectedReward = nodeRewardGold('elite', rs.currentFloorNumber, tier);
+    const goldBefore = rs.pack.gold;
+    const { runState: after } = completeCombat(
+      rs,
+      mockCombatResult(rs.party, [20, 14, 15], 'player_victory'),
+      createRng(99),
+    );
+    expect(after.pack.gold - goldBefore).toBe(expectedReward);
   });
 });

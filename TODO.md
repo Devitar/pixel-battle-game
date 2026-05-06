@@ -45,19 +45,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 Tier 3 scope from gdd §10. The Crypt is the only dungeon today; Tier 3 adds dungeons 2–4, unlock classes (Paladin, Hunter), unlock buildings (Chapel, Training Grounds), legendary tier, milestone achievements, level-10 perks, NG+. Most Tier 3 unlocks gate on first Sunken Keep clear, so Sunken Keep is the natural first task.
 
-### 2 · Display-vs-credit mismatch for elite gold in result panel (pre-existing)
-
-- **What:** `corridor_scene.ts:1090` displays `COMBAT_NODE_REWARD × floor` (= 15 × floor) for non-boss combat, including elite nodes. But `completeCombat` actually credits `ELITE_NODE_GOLD × floor` (= 30 × floor). Result panel UI under-reports elite gold.
-- **Why:** Surfaced during spec 1's Task 6 review (corridor_scene preview was being threaded with `goldMultiplier`). Fix is small but out of scope for spec 1 (pre-existing, unrelated to tier work).
-- **Tier:** 2 (UI/UX bug)
-- **Acceptance:**
-  - Result-panel reward calc branches on `elite` separately, using `ELITE_NODE_REWARD` (define a const matching `ELITE_NODE_GOLD` in run_state.ts, or import from there).
-  - Spot-check that the duplicated `COMBAT_NODE_REWARD`/`BOSS_NODE_REWARD` constants in corridor_scene.ts vs the `*_NODE_GOLD` originals in run_state.ts are kept in sync (or deduplicated by importing from one source — the cleaner fix).
-- **Touches:** `src/scenes/corridor_scene.ts`.
-- **Source:** spec 1 Task 6 quality review (2026-05-05).
-
----
-
 ## Cluster C — Art polish (non-blocking)
 
 Art tasks that aren't blocking gameplay. Enemies, heroes, and rooms already render with placeholder / reused frames; entries here replace placeholders with bespoke pixel art. Deprioritised relative to Clusters A/B.

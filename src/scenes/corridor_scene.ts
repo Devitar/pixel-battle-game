@@ -8,7 +8,6 @@ import { CHATTER, computeChatterCondition } from '@data/chatter';
 import { DUNGEONS } from '@data/dungeons';
 import { ENEMIES } from '@data/enemies';
 import type { Encounter, Node } from '@dungeon/node';
-import { goldMultiplier } from '@dungeon/scaling';
 import type { Hero } from '@heroes/hero';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { CombatActor } from '@render/combat_actor';
@@ -19,6 +18,8 @@ import {
   completeCombat,
   completeSurpriseCombat,
   currentNode,
+  nodeRewardGold,
+  surpriseRewardGold,
   type RunState,
   type WipeOutcome,
 } from '@run/run_state';
@@ -62,10 +63,6 @@ const PILLAR_W = 8;
 const PILLAR_H = 60;
 const PILLAR_COLOR = 0x3a2a1a;       // placeholder; real torch art replaces later
 const PILLAR_SPACING = 160;          // every 5 tiles
-
-const COMBAT_NODE_REWARD = 15;
-const BOSS_NODE_REWARD = 100;
-const SURPRISE_GOLD_BASE = 7;
 
 const ENEMY_X_BY_SLOT: readonly number[] = [0, 560, 640, 720, 800];
 const ROUND_COUNTER_Y = 24;
@@ -555,7 +552,7 @@ export class CorridorScene extends Phaser.Scene {
 
   private buildSurpriseResultPanel(): void {
     const run = appState.get().runState!;
-    const reward = Math.round(SURPRISE_GOLD_BASE * run.currentFloorNumber * goldMultiplier(DUNGEONS[run.dungeonId].tier));
+    const reward = surpriseRewardGold(run.currentFloorNumber, DUNGEONS[run.dungeonId].tier);
 
     const lootCount = this.combatLoot.length;
     const lootBlockHeight = lootCount > 0 ? 16 + lootCount * 14 : 0;
@@ -1088,11 +1085,13 @@ export class CorridorScene extends Phaser.Scene {
         n.nextNodeIds.includes(run.currentNodeId),
       )!;
     }
-    const gm = goldMultiplier(DUNGEONS[run.dungeonId].tier);
-    const reward = Math.round(
-      (completedNode.type === 'boss'
-        ? BOSS_NODE_REWARD * run.currentFloorNumber
-        : COMBAT_NODE_REWARD * run.currentFloorNumber) * gm,
+    if (completedNode.type !== 'combat' && completedNode.type !== 'elite' && completedNode.type !== 'boss') {
+      throw new Error(`buildResultPanel: completed node has non-combat type '${completedNode.type}'`);
+    }
+    const reward = nodeRewardGold(
+      completedNode.type,
+      run.currentFloorNumber,
+      DUNGEONS[run.dungeonId].tier,
     );
 
     const lootCount = this.combatLoot.length;

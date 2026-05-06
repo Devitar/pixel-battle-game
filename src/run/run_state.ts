@@ -4,7 +4,7 @@ import { DEFAULT_WOUND_RUNS_REMAINING } from '@data/wounds';
 import { DUNGEONS } from '@data/dungeons';
 import { applyCampNodeEffect, type CampNodeChoice } from '@dungeon/camp_node';
 import { generateFloor } from '@dungeon/floor';
-import { rollLoot, type LootKind } from '@dungeon/loot';
+import { rollLoot } from '@dungeon/loot';
 import type { Node } from '@dungeon/node';
 import { goldMultiplier } from '@dungeon/scaling';
 import type { CombatEvent, CombatResult } from '@combat/types';
@@ -57,6 +57,20 @@ function dungeonTierOf(runState: RunState): DungeonTier {
 const COMBAT_NODE_GOLD = 15;
 const ELITE_NODE_GOLD = 30;
 const BOSS_NODE_GOLD = 100;
+const SURPRISE_GOLD_BASE = 7;  // half of COMBAT_NODE_GOLD = 15, rounded down
+
+export function nodeRewardGold(
+  kind: 'combat' | 'elite' | 'boss',
+  floorNumber: number,
+  tier: DungeonTier,
+): number {
+  const base = kind === 'boss' ? BOSS_NODE_GOLD : kind === 'elite' ? ELITE_NODE_GOLD : COMBAT_NODE_GOLD;
+  return Math.round(base * floorNumber * goldMultiplier(tier));
+}
+
+export function surpriseRewardGold(floorNumber: number, tier: DungeonTier): number {
+  return Math.round(SURPRISE_GOLD_BASE * floorNumber * goldMultiplier(tier));
+}
 
 export function startRun(
   dungeonId: DungeonId,
@@ -235,7 +249,7 @@ export function completeCombat(
   ) {
     throw new Error(`completeCombat: current node is type '${completedNode.type}', not a combat-bearing node`);
   }
-  const kind: LootKind = completedNode.type;
+  const kind = completedNode.type;
   const isBoss = kind === 'boss';
 
   // XP awards — only on victory, only to surviving heroes.
@@ -249,11 +263,7 @@ export function completeCombat(
     return applyLevelUps({ ...hero, xp: newXp }, hero.level, newLevel);
   });
 
-  const gm = goldMultiplier(dungeonTierOf(runState));
-  const reward =
-    kind === 'boss'  ? Math.round(BOSS_NODE_GOLD  * runState.currentFloorNumber * gm) :
-    kind === 'elite' ? Math.round(ELITE_NODE_GOLD * runState.currentFloorNumber * gm) :
-                       Math.round(COMBAT_NODE_GOLD * runState.currentFloorNumber * gm);
+  const reward = nodeRewardGold(kind, runState.currentFloorNumber, dungeonTierOf(runState));
   let newPack = addGold(runState.pack, reward);
 
   const drop = rollLoot(rng, runState.currentFloorNumber, kind, dungeonTierOf(runState));
@@ -306,8 +316,6 @@ export function completeCombat(
     },
   };
 }
-
-const SURPRISE_GOLD_BASE = 7;  // half of COMBAT_NODE_GOLD = 15, rounded down
 
 export function completeSurpriseCombat(
   runState: RunState,
@@ -374,7 +382,7 @@ export function completeSurpriseCombat(
   });
 
   // Reduced gold reward.
-  const reward = Math.round(SURPRISE_GOLD_BASE * runState.currentFloorNumber * goldMultiplier(dungeonTierOf(runState)));
+  const reward = surpriseRewardGold(runState.currentFloorNumber, dungeonTierOf(runState));
   let newPack = addGold(runState.pack, reward);
 
   // Loot at standard 'combat' kind — same 10% gate.
