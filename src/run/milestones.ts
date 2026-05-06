@@ -5,22 +5,27 @@ import type { SaveFile } from '@save/save';
 export type MilestoneHandler = (state: SaveFile) => SaveFile;
 
 /**
- * Spec 2 introduces 'first_crypt_clear'. Future class/dungeon specs extend
- * this registry — e.g., the Paladin spec extends the first_crypt_clear handler
- * to also append 'paladin' to state.unlocks.classes.
+ * Spec 2 introduced 'first_crypt_clear' (Sunken Keep dungeon unlock).
+ * Spec 3 (Paladin) extended the handler to also unlock the Paladin class.
  *
  * Handlers are responsible for their own idempotency.
  */
 export const MILESTONES: Record<MilestoneId, MilestoneHandler> = {
   first_crypt_clear: (state) => {
-    if (state.unlocks.dungeons.includes('sunken_keep')) return state;
-    return {
-      ...state,
-      unlocks: {
-        ...state.unlocks,
-        dungeons: [...state.unlocks.dungeons, 'sunken_keep'],
-      },
-    };
+    let next = state;
+    if (!next.unlocks.dungeons.includes('sunken_keep')) {
+      next = {
+        ...next,
+        unlocks: { ...next.unlocks, dungeons: [...next.unlocks.dungeons, 'sunken_keep'] },
+      };
+    }
+    if (!next.unlocks.classes.includes('paladin')) {
+      next = {
+        ...next,
+        unlocks: { ...next.unlocks, classes: [...next.unlocks.classes, 'paladin'] },
+      };
+    }
+    return next;  // identity preserved when both branches no-op
   },
 };
 

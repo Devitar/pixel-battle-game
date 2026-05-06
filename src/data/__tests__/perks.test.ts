@@ -10,6 +10,8 @@ const EXPECTED_IDS: readonly PerkId[] = [
   'berserker', 'tough_skin',
   'lethal', 'evasive',
   'arcane_power', 'quick_cast',
+  // Paladin
+  'righteous', 'vindicator',
 ];
 
 describe('PERKS map', () => {
@@ -44,13 +46,13 @@ describe('PERKS map', () => {
 });
 
 describe('CLASS_PERK_PAIRS', () => {
-  it('has exactly 6 entries (one per ClassId)', () => {
+  it('has exactly 7 entries (one per ClassId)', () => {
     const expectedClasses: ClassId[] =
-      ['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage'];
+      ['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage', 'paladin'];
     expect(Object.keys(CLASS_PERK_PAIRS).sort()).toEqual([...expectedClasses].sort());
   });
 
-  describe.each(['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage'] as ClassId[])(
+  describe.each(['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage', 'paladin'] as ClassId[])(
     'class %s pair',
     (classId) => {
       it('has exactly 2 distinct perks', () => {

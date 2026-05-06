@@ -29,6 +29,23 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-06 · Paladin class — first unlockable (Cluster D · 3)
+
+- **Why:** Spec 2 (Sunken Keep) carved Paladin out as a "future spec extending the same first_crypt_clear handler." This is that spec — Paladin is the player's reward for clearing the Crypt. After this lands, the Crypt floor-3 boss defeat unlocks both Sunken Keep (dungeon) AND Paladin (class).
+- **Decisions** (Q1–Q6 in spec):
+  - **Q1 — Share smite, don't duplicate.** Paladin's `abilities` array references the existing `smite` id Priest uses. Required widening `smite.canCastFrom` from `[2, 3]` to `[1, 2, 3]` so Paladin in slot 1 can cast it. Monotonic change; Priest unaffected.
+  - **Q2 — Knight chassis with mind=4.** `{ hp: 20, attack: 3, defense: 4, speed: 3, mind: 4, crit: 5, dodge: 5 }`. Hybrid identity comes from *what abilities do*, not *how durable they are* — avoids making Paladin a strict-better Knight.
+  - **Q3 — Each ability owns one role.** paladin_strike (basic), shared smite (burst), lay_on_hands (single-target burst heal cd 3), consecrate (party HoT cd 4). Distinct from Priest's Mend (chip heal) and Bless (single-ally buff).
+  - **Q4 — primaryStat=mind, no swapTarget.** Sword-or-bust thematically; axe/dagger Paladin reads weird. Off-preferred melee weapons leave the kit unchanged (Archer pattern).
+  - **Q5 — `righteous` (+3 mind) / `vindicator` (+2 attack).** Forces a meaningful identity fork. Avoids defense/HP perks because chassis already matches Knight.
+  - **Q6 — Handler does both appends idempotently.** Refactored from spec 2's short-circuit pattern (which only checked dungeons) to two independent branches. Identity-return preserved when both already unlocked.
+- **Surprises:**
+  - Engine had no native heal-over-time effect kind. Negative-poison-damage worked mechanically but emitted `damage_applied` events with negative amounts and ignored maxHp cap. Added a proper `regen` effect kind in `combat/statuses.ts` + `combat/effects.ts` mirroring poison's structure but capping at maxHp and emitting `heal_applied`. Spec flagged this as the highest-risk decision; turned out small (~30 LOC + tests).
+  - During Task 1 review, code reviewer flagged that `regen` lacked a `chance?: number` field while every other effect variant has one. Added during Task 2 because `effects.ts` accesses `effect.chance` unconditionally before the kind switch.
+  - Two extra cascade points the plan didn't list surfaced from Task 1's type-union widening: `ability_describe.ts` STATUS_LABEL needed a `consecrated` entry, and `chatter.ts` + `kit.test.ts` fixture both needed paladin entries. All folded inline as they surfaced (Tasks 2 and 6).
+  - `CLASS_PERK_PAIRS` is `Record<ClassId, ...>` so adding `'paladin'` to ClassId forced the perk pair entry to land in lockstep — exactly the kind of drift-prevention the type system pays for.
+- **Source:** spec `docs/superpowers/specs/2026-05-06-paladin-class-design.md`; plan `docs/superpowers/plans/2026-05-06-paladin-class.md`. Test count delta: 1640 → 1694.
+
 ### 2026-05-06 · Elite-node gold display fix + dedupe (Cluster D · 2)
 
 - **Why:** `corridor_scene.ts buildResultPanel` displayed `15 × floor` (combat formula) for elite-node victories, but `completeCombat` actually credited `30 × floor`. Display under-reported elite gold by half. Surfaced during Sunken Keep spec 1 review.

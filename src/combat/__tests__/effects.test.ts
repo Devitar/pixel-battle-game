@@ -624,6 +624,33 @@ describe('poison effect', () => {
   });
 });
 
+describe('regen effect', () => {
+  it('stores a "consecrated" status on the target with regen shape', () => {
+    const p0 = makeHeroCombatant('priest', 2, 'p0', {
+      baseStats: { hp: 20, attack: 1, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+    });
+    const state = makeTestState([p0], []);
+    const ability = {
+      id: 'consecrate' as const,
+      name: 'Consecrate',
+      canCastFrom: [1, 2, 3] as const,
+      target: { side: 'ally' as const, slots: 'all' as const },
+      effects: [{ kind: 'regen' as const, healPerTurn: 3, duration: 3, statusId: 'consecrated' as const }],
+    };
+    const events: CombatEvent[] = [];
+    applyAbility(ability, p0, ['p0'], state, rng, events);
+    const target = state.combatants.find((c) => c.id === 'p0')!;
+    expect(target.statuses['consecrated']).toBeDefined();
+    expect(target.statuses['consecrated'].remainingTurns).toBe(3);
+    expect(target.statuses['consecrated'].effect).toMatchObject({
+      kind: 'regen',
+      healPerTurn: 3,
+      duration: 3,
+      statusId: 'consecrated',
+    });
+  });
+});
+
 describe('chance field', () => {
   it('chance: 0 always skips the effect', () => {
     const p0 = makeHeroCombatant('knight', 1, 'p0', {

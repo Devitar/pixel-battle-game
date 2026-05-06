@@ -1404,6 +1404,7 @@ describe('end-to-end — Crypt clear unlocks Sunken Keep', () => {
     const before = { unlocks: { classes: [], dungeons: ['crypt'] } } as unknown as SaveFile;
     const after = applyPendingMilestones(before, outcome.milestonesTriggered);
     expect(after.unlocks.dungeons).toContain('sunken_keep');
+    expect(after.unlocks.classes).toContain('paladin');
   });
 });
 

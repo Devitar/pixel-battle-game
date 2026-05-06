@@ -1,6 +1,6 @@
 import type { Stats } from '@combat/types';
 
-export type ClassId = 'knight' | 'archer' | 'priest' | 'barbarian' | 'rogue' | 'mage';
+export type ClassId = 'knight' | 'archer' | 'priest' | 'barbarian' | 'rogue' | 'mage' | 'paladin';
 
 export type AbilityId =
   | 'knight_slash'
@@ -51,9 +51,13 @@ export type AbilityId =
   | 'drowning_embrace'
   | 'tidal_smash'
   | 'crushing_wave'
-  | 'drowning_lure';
+  | 'drowning_lure'
+  // Paladin
+  | 'paladin_strike'
+  | 'lay_on_hands'
+  | 'consecrate';
 
-export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished' | 'slowed' | 'burning' | 'drowning';
+export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished' | 'slowed' | 'burning' | 'drowning' | 'consecrated';
 
 export type AbilityTag = 'radiant';
 
@@ -155,7 +159,8 @@ export type AbilityEffect =
   | { kind: 'buff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean; chance?: number }
   | { kind: 'debuff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean; chance?: number }
   | { kind: 'mark'; damageBonus: number; duration: number; statusId: StatusId; chance?: number }
-  | { kind: 'taunt'; duration: number; statusId: StatusId; chance?: number };
+  | { kind: 'taunt'; duration: number; statusId: StatusId; chance?: number }
+  | { kind: 'regen'; healPerTurn: number; duration: number; statusId: StatusId; chance?: number };
 
 export type AiCondition =
   | { kind: 'minTargets'; n: number }
@@ -307,7 +312,9 @@ export type PerkId =
   | 'devout' | 'steadfast'
   | 'berserker' | 'tough_skin'
   | 'lethal' | 'evasive'
-  | 'arcane_power' | 'quick_cast';
+  | 'arcane_power' | 'quick_cast'
+  // Paladin
+  | 'righteous' | 'vindicator';
 
 export interface PerkDef {
   id: PerkId;

@@ -3,7 +3,7 @@ import { ABILITIES } from '../abilities';
 import { CLASSES } from '../classes';
 import type { ClassId } from '../types';
 
-const EXPECTED_IDS: readonly ClassId[] = ['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage'];
+const EXPECTED_IDS: readonly ClassId[] = ['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage', 'paladin'];
 const STATS: readonly ('hp' | 'attack' | 'defense' | 'speed')[] = [
   'hp',
   'attack',
@@ -153,4 +153,40 @@ describe('class primaryStat', () => {
       expect(VALID_PRIMARIES).toContain(def.primaryStat);
     });
   }
+});
+
+describe('Paladin', () => {
+  it('has the expected stat profile (Knight chassis with mind=4)', () => {
+    const p = CLASSES.paladin;
+    expect(p.baseStats.hp).toBe(20);
+    expect(p.baseStats.attack).toBe(3);
+    expect(p.baseStats.defense).toBe(4);
+    expect(p.baseStats.mind).toBe(4);
+  });
+
+  it('has primaryStat=mind, preferredWeapon=sword, weaponFamily=melee', () => {
+    expect(CLASSES.paladin.primaryStat).toBe('mind');
+    expect(CLASSES.paladin.preferredWeapon).toBe('sword');
+    expect(CLASSES.paladin.weaponFamily).toBe('melee');
+  });
+
+  it('has the 4 expected abilities including shared smite', () => {
+    expect([...CLASSES.paladin.abilities].sort()).toEqual(
+      ['consecrate', 'lay_on_hands', 'paladin_strike', 'smite'].sort(),
+    );
+  });
+
+  it('AI prioritizes consecrate > lay_on_hands > smite > basic', () => {
+    expect(CLASSES.paladin.aiPriority).toEqual(['consecrate', 'lay_on_hands', 'smite', 'paladin_strike']);
+  });
+
+  it('starter loadout matches Knight pattern (sword + shield)', () => {
+    expect(CLASSES.paladin.starterLoadout.weapon).toBe('sword_basic');
+    expect(CLASSES.paladin.starterLoadout.shield).toBe('shield_basic');
+  });
+
+  it('declares no swapTarget or weaponSwaps (Archer pattern)', () => {
+    expect(CLASSES.paladin.swapTarget).toBeUndefined();
+    expect(CLASSES.paladin.weaponSwaps).toBeUndefined();
+  });
 });

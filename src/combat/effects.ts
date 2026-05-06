@@ -212,6 +212,9 @@ function applyEffect(
     case 'poison':
       storeStatus(caster, target, effect.statusId, effect, effect.duration, events);
       return;
+    case 'regen':
+      storeStatus(caster, target, effect.statusId, effect, effect.duration, events);
+      return;
     case 'shove':
       shove(target, effect.slots, state, events);
       return;

@@ -305,3 +305,71 @@ describe('tickStatuses — poison', () => {
     expect(dmg).toMatchObject({ lethal: true });
   });
 });
+
+describe('tickStatuses — regen', () => {
+  it('increments target HP by healPerTurn each tick (capped at maxHp)', () => {
+    const c = makeHeroCombatant('priest', 2, 'p0', {
+      baseStats: { hp: 20, attack: 1, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 10,
+      maxHp: 20,
+    });
+    c.statuses['consecrated'] = status(
+      { kind: 'regen', healPerTurn: 3, duration: 3, statusId: 'consecrated' },
+      3,
+    );
+    const events: CombatEvent[] = [];
+    tickStatuses(c, events);
+    expect(c.currentHp).toBe(13);
+    expect(events.find((e) => e.kind === 'heal_applied')).toBeDefined();
+  });
+
+  it('regen is capped at maxHp (no overheal)', () => {
+    const c = makeHeroCombatant('priest', 2, 'p0', {
+      baseStats: { hp: 20, attack: 1, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 19,
+      maxHp: 20,
+    });
+    c.statuses['consecrated'] = status(
+      { kind: 'regen', healPerTurn: 5, duration: 3, statusId: 'consecrated' },
+      3,
+    );
+    const events: CombatEvent[] = [];
+    tickStatuses(c, events);
+    expect(c.currentHp).toBe(20);  // capped, not 24
+  });
+
+  it('regen expires after duration ticks', () => {
+    const c = makeHeroCombatant('priest', 2, 'p0', {
+      baseStats: { hp: 20, attack: 1, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 10,
+      maxHp: 20,
+    });
+    c.statuses['consecrated'] = status(
+      { kind: 'regen', healPerTurn: 3, duration: 3, statusId: 'consecrated' },
+      3,
+    );
+    const events: CombatEvent[] = [];
+    tickStatuses(c, events);
+    tickStatuses(c, events);
+    tickStatuses(c, events);
+    expect(c.statuses['consecrated']).toBeUndefined();
+    expect(c.currentHp).toBe(19);  // 10 + 3 + 3 + 3
+  });
+
+  it('regen does NOT tick on dead combatants', () => {
+    const c = makeHeroCombatant('priest', 2, 'p0', {
+      baseStats: { hp: 20, attack: 1, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+      currentHp: 0,
+      maxHp: 20,
+      isDead: true,
+    });
+    c.statuses['consecrated'] = status(
+      { kind: 'regen', healPerTurn: 3, duration: 3, statusId: 'consecrated' },
+      3,
+    );
+    const events: CombatEvent[] = [];
+    tickStatuses(c, events);
+    expect(c.currentHp).toBe(0);  // unchanged
+    expect(events.find((e) => e.kind === 'heal_applied')).toBeUndefined();
+  });
+});

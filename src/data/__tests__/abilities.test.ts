@@ -52,6 +52,10 @@ const EXPECTED_IDS: readonly AbilityId[] = [
   'tidal_smash',
   'crushing_wave',
   'drowning_lure',
+  // Paladin
+  'paladin_strike',
+  'lay_on_hands',
+  'consecrate',
 ];
 
 const KEBAB_CASE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -196,6 +200,65 @@ describe('tidal_smash and crushing_wave', () => {
     const dmg = a.effects.find(e => e.kind === 'damage');
     if (dmg && dmg.kind === 'damage') {
       expect(dmg.power).toBeCloseTo(0.6);
+    }
+  });
+});
+
+describe('smite (shared by Priest and Paladin)', () => {
+  it('canCastFrom includes slot 1 (Paladin frontline can cast)', () => {
+    expect(ABILITIES.smite.canCastFrom).toContain(1);
+    expect(ABILITIES.smite.canCastFrom).toContain(2);
+    expect(ABILITIES.smite.canCastFrom).toContain(3);
+  });
+});
+
+describe('paladin_strike', () => {
+  it('is registered as an attack-scaling basic', () => {
+    const a = ABILITIES.paladin_strike;
+    expect(a.id).toBe('paladin_strike');
+    expect(a.canCastFrom).toEqual([1, 2]);
+    expect(a.cooldown).toBeUndefined();  // basic, no cooldown
+    const dmg = a.effects.find((e) => e.kind === 'damage');
+    expect(dmg).toBeDefined();
+    if (dmg && dmg.kind === 'damage') {
+      expect(dmg.power).toBeCloseTo(1.0);
+      expect(dmg.scalingStat).toBe('attack');
+    }
+  });
+});
+
+describe('lay_on_hands', () => {
+  it('is registered as a Mind-scaling burst heal with cooldown 3', () => {
+    const a = ABILITIES.lay_on_hands;
+    expect(a.id).toBe('lay_on_hands');
+    expect(a.canCastFrom).toEqual([1, 2, 3]);
+    expect(a.cooldown).toBe(3);
+    expect(a.target.side).toBe('ally');
+    expect(a.target.pick).toBe('lowestHp');
+    const heal = a.effects.find((e) => e.kind === 'heal');
+    expect(heal).toBeDefined();
+    if (heal && heal.kind === 'heal') {
+      expect(heal.power).toBeCloseTo(3.0);
+      expect(heal.scalingStat).toBe('mind');
+    }
+  });
+});
+
+describe('consecrate', () => {
+  it('is registered as a party-wide regen with cooldown 4 and radiant tag', () => {
+    const a = ABILITIES.consecrate;
+    expect(a.id).toBe('consecrate');
+    expect(a.canCastFrom).toEqual([1, 2, 3]);
+    expect(a.cooldown).toBe(4);
+    expect(a.target.side).toBe('ally');
+    expect(a.target.slots).toBe('all');
+    expect(a.tags).toContain('radiant');
+    const regen = a.effects.find((e) => e.kind === 'regen');
+    expect(regen).toBeDefined();
+    if (regen && regen.kind === 'regen') {
+      expect(regen.healPerTurn).toBe(3);
+      expect(regen.duration).toBe(3);
+      expect(regen.statusId).toBe('consecrated');
     }
   });
 });
