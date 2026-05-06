@@ -20,7 +20,7 @@ const PANEL_W = 920;
 const PANEL_H = 460;
 
 const TITLE_Y = 60;
-const CLOSE_X = 933;
+const CLOSE_X = 918;
 const CLOSE_Y = 63;
 
 const LEFT_PANE_CX = 155;

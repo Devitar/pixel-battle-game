@@ -27,18 +27,18 @@ const PANEL_CY = 270;
 const PANEL_W = 920;
 const PANEL_H = 460;
 
-const LIST_PANE_CX = 245;
+const LIST_PANE_CX = 230;
 const LIST_PANE_CY = 270;
 const LIST_PANE_W = 380;
 const LIST_PANE_H = 360;
 
-const DETAIL_PANE_CX = 715;
+const DETAIL_PANE_CX = 700;
 const DETAIL_PANE_CY = 270;
 const DETAIL_PANE_W = 440;
 const DETAIL_PANE_H = 360;
 
-const SLOT_X_LEFT = 150;
-const SLOT_X_RIGHT = 340;
+const SLOT_X_LEFT = 135;
+const SLOT_X_RIGHT = 325;
 const SLOT_BG_W = 184;
 const SLOT_BG_H = 60;
 
@@ -62,11 +62,11 @@ function slotStride(cap: number): number {
   return (SLOT_Y_BOTTOM - SLOT_Y_TOP) / (rows - 1);
 }
 
-const DETAIL_PAPERDOLL_X = 540;
+const DETAIL_PAPERDOLL_X = 525;
 const DETAIL_PAPERDOLL_Y = 145;
-const DETAIL_TEXT_X = 590;
+const DETAIL_TEXT_X = 575;
 
-const ABILITY_X = 515;
+const ABILITY_X = 500;
 const ABILITY_HEADER_Y = 215;
 const ABILITY_BLOCK_START_Y = 235;
 const ABILITY_NAME_LINE_HEIGHT = 16;
@@ -177,10 +177,10 @@ export class BarracksPanelScene extends Phaser.Scene {
 
   private buildCloseButton(): void {
     const closeBg = this.add
-      .rectangle(933, 63, 28, 28, 0x553333)
+      .rectangle(918, 63, 28, 28, 0x553333)
       .setStrokeStyle(1, 0x885555);
     this.add
-      .text(933, 63, '×', {
+      .text(918, 63, '×', {
         fontFamily: 'monospace',
         fontSize: '20px',
         color: '#ffffff',

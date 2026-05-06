@@ -24,7 +24,7 @@ const PANEL_H = 460;
 
 const TITLE_Y = 60;
 const SUBTITLE_Y = 88;
-const CLOSE_X_X = 933;
+const CLOSE_X_X = 918;
 const CLOSE_X_Y = 63;
 
 // Stage 2 — slot row. Slot 1 (front) on the right to match combat scene's

@@ -13,17 +13,17 @@ const PANEL_CY = 270;
 const PANEL_W = 920;
 const PANEL_H = 460;
 
-const LIST_PANE_CX = 245;
+const LIST_PANE_CX = 230;
 const LIST_PANE_CY = 270;
 const LIST_PANE_W = 380;
 const LIST_PANE_H = 360;
 
-const DETAIL_PANE_CX = 715;
+const DETAIL_PANE_CX = 700;
 const DETAIL_PANE_CY = 270;
 const DETAIL_PANE_W = 440;
 const DETAIL_PANE_H = 360;
 
-const SLOT_X = 245;
+const SLOT_X = 230;
 const SLOT_Y_BASE = 130;
 const SLOT_STRIDE = 60;
 const SLOT_BG_W = 360;
@@ -140,10 +140,10 @@ export class HospitalPanelScene extends Phaser.Scene {
 
   private buildCloseButton(): void {
     const closeBg = this.add
-      .rectangle(933, 63, 28, 28, 0x553333)
+      .rectangle(918, 63, 28, 28, 0x553333)
       .setStrokeStyle(1, 0x885555);
     this.add
-      .text(933, 63, '×', {
+      .text(918, 63, '×', {
         fontFamily: 'monospace',
         fontSize: '20px',
         color: '#ffffff',

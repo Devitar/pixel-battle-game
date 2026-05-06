@@ -37,3 +37,6 @@ One section per idea. A sentence is fine for seeds; a paragraph or two for more 
 
 ### 4. Package app for app store use with Capacitor
 This also will allow us to force landscape on mobile with a plugin. On the web, direct the user to download the app instead of playing in the browser.
+
+### 5. Update UI to use pixui UI Library for Phaser
+https://github.com/skhoroshavin/phaser-pixui
