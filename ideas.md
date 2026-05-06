@@ -37,6 +37,3 @@ One section per idea. A sentence is fine for seeds; a paragraph or two for more 
 
 ### 4. Package app for app store use with Capacitor
 This also will allow us to force landscape on mobile with a plugin. On the web, direct the user to download the app instead of playing in the browser.
-
-### 5. Create a "start screen" that playes the newly added music public/assets/audio/darkane_times.ogg
-It should have a banner with the title "Darkane Times" and a gently flashing "Tap anywhere to start". For now, this can just take you to the camp scene. It should support a background, but we don't have one yet so just a placeholder works for now.
