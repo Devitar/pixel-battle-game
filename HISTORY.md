@@ -29,6 +29,26 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-06 · Sunken Keep — Spec 2 (content + first-Crypt-clear handler) (Cluster D · 1)
+
+- **Why:** Spec 1 (2026-05-05) plumbed the dungeon-tier balance API, milestone registry, multi-dungeon Expeditions UI, and locked-card rendering. Spec 2 drops the Sunken Keep into that foundation as additive content. After this lands, defeating the Crypt floor-3 boss unlocks the Sunken Keep dungeon.
+- **Decisions** (Q1–Q7 + sub-questions in spec):
+  - Paladin out of scope — separate future spec, extends the same `first_crypt_clear` handler.
+  - Hybrid abilities — boss gets 3 bespoke abilities + new `drowning` status; minions reuse the Crypt pool with one new minion ability (`drowning_lure` on the Siren).
+  - Floor density: `floorsPerRun: 3, rowsPerFloor: 10` → 10/11/12 rows. Same run length as Crypt; ~22% more nodes per floor.
+  - Tier-2 multipliers: slope `0.13`, rarity floor-bonus `+3`, gold multiplier `×1.5`.
+  - Boss is the Drowned King (front-line bruiser) — mechanical foil to Bone Lich (back-line caster). Drowning Embrace pulls a back-line hero forward + applies `drowning` DoT (cooldown 3).
+  - Boss `tags: ['humanoid']` (not `'undead'`) — Priest's Smite anti-undead doesn't auto-trivialize tier-2.
+  - Art: placeholders reusing existing frames per Cluster C precedent. Drowned King reuses Bone Lich's `bossSprite: 0` until bespoke art lands.
+  - `applyPendingMilestones` cast simplified — `MilestoneId` is now a real string union, so `MILESTONES[id]()` typechecks cleanly without spec 1's workaround.
+  - Affix values stay tier-agnostic (mirrors spec 1's "shop prices stay flat" decision); only rarity distribution shifts at higher tier.
+- **Surprises:**
+  - `EXPECTED_IDS` arrays in `enemies.test.ts` and `abilities.test.ts` use `.toEqual` against an exact list — adding new ids requires updating the fixture in lockstep, not just appending data.
+  - `ability_describe.ts` has a `STATUS_LABEL: Record<StatusId, string>` registry that the plan didn't list — surfaced via typecheck cascade after Task 1, fixed inline (one new entry for `drowning`).
+  - Spec 1's "post-canonical floor 4+ boss does NOT credit" test had a subtle bug: the test loop kills the canonical floor-3 boss BEFORE pressing on to floor 4, so `pendingMilestones` already contains `['first_crypt_clear']` when the floor-4 kill happens. The new assertion checks the array stays at length 1 (no new entry added by the post-canonical kill), not that it's empty.
+  - Drowned Knight visually identical to skeleton_warrior under placeholder mapping (same body + sword); Drowned King reuses Bone Lich's boss sprite. Both flagged in new Cluster C entries.
+- **Source:** spec `docs/superpowers/specs/2026-05-06-sunken-keep-content-design.md`; plan `docs/superpowers/plans/2026-05-06-sunken-keep-content.md`. Test count delta: 1543 → 1634 (+91).
+
 ### 2026-05-05 · Sunken Keep — Spec 1 (foundation + milestone plumbing) (Cluster D · 1)
 
 - **Why:** The Tier 3 cascade gates on Sunken Keep, which requires a `tier` concept, multi-dungeon Expeditions UI, and a milestone-unlock system that didn't exist. Decomposed during brainstorm into spec 1 (this — pure plumbing, no visible content) + spec 2 (Sunken Keep dungeon def + enemies + boss + art + first-Crypt-clear handler).
