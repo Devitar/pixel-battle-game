@@ -18,18 +18,18 @@ const PANEL_CY = 270;
 const PANEL_W = 920;
 const PANEL_H = 460;
 
-const LIST_PANE_CX = 245;
-const LIST_PANE_CY = 270;
+const LIST_PANE_CX = 230;
+const LIST_PANE_CY = 285;
 const LIST_PANE_W = 380;
-const LIST_PANE_H = 360;
+const LIST_PANE_H = 330;
 
-const DETAIL_PANE_CX = 715;
-const DETAIL_PANE_CY = 270;
+const DETAIL_PANE_CX = 700;
+const DETAIL_PANE_CY = 285;
 const DETAIL_PANE_W = 440;
-const DETAIL_PANE_H = 360;
+const DETAIL_PANE_H = 330;
 
 const ROW_X = LIST_PANE_CX;
-const ROW_Y_BASE = 130;
+const ROW_Y_BASE = 145;
 const ROW_STRIDE = 56;
 const ROW_W = 360;
 const ROW_H = 50;
@@ -95,8 +95,8 @@ export class BlacksmithPanelScene extends Phaser.Scene {
   private buildModeToggle(): void {
     // Anchored above the list pane (LIST_PANE top edge ~ y=90).
     const y = 100;
-    const upgradeX = 175;
-    const sellX = 315;
+    const upgradeX = LIST_PANE_CX - 70;
+    const sellX = LIST_PANE_CX + 70;
     const w = 120;
     const h = 26;
 
@@ -189,10 +189,10 @@ export class BlacksmithPanelScene extends Phaser.Scene {
 
   private buildCloseButton(): void {
     const closeBg = this.add
-      .rectangle(933, 63, 28, 28, 0x553333)
+      .rectangle(918, 63, 28, 28, 0x553333)
       .setStrokeStyle(1, 0x885555);
     this.add
-      .text(933, 63, '×', {
+      .text(918, 63, '×', {
         fontFamily: 'monospace',
         fontSize: '20px',
         color: '#ffffff',
@@ -419,14 +419,14 @@ export class BlacksmithPanelScene extends Phaser.Scene {
     const iconX = ROW_X - ROW_W / 2 + 24;
     const sprite = this.add
       .sprite(iconX, y, 'sprites', parseInt(BASE_ITEMS[entry.item.baseId].spriteId, 10))
-      .setScale(2);
+      .setScale(1.5);
     this.listContainer.add(sprite);
 
     // Display name + rarity color.
     const name = itemDisplayName(entry.item);
     this.listContainer.add(
       this.add
-        .text(iconX + 22, y - 10, `${name}  [${entry.item.rarity}]`, {
+        .text(iconX + 28, y - 10, `${name}  [${entry.item.rarity}]`, {
           fontFamily: 'monospace',
           fontSize: '12px',
           color: RARITY_HEX[entry.item.rarity],
@@ -440,7 +440,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
     const subtitle = affixDesc.length > 0 ? `${affixDesc}  ·  ${locLabel}` : locLabel;
     this.listContainer.add(
       this.add
-        .text(iconX + 22, y + 8, subtitle, {
+        .text(iconX + 28, y + 8, subtitle, {
           fontFamily: 'monospace',
           fontSize: '10px',
           color: '#999999',
@@ -496,13 +496,13 @@ export class BlacksmithPanelScene extends Phaser.Scene {
     const iconX = ROW_X - ROW_W / 2 + 24;
     const sprite = this.add
       .sprite(iconX, y, 'sprites', parseInt(BASE_ITEMS[item.baseId].spriteId, 10))
-      .setScale(2);
+      .setScale(1.5);
     this.listContainer.add(sprite);
 
     const name = itemDisplayName(item);
     this.listContainer.add(
       this.add
-        .text(iconX + 22, y - 10, `${name}  [${item.rarity}]`, {
+        .text(iconX + 28, y - 10, `${name}  [${item.rarity}]`, {
           fontFamily: 'monospace',
           fontSize: '12px',
           color: RARITY_HEX[item.rarity],
@@ -514,7 +514,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
     const subtitle = affixDesc.length > 0 ? affixDesc : 'no affixes';
     this.listContainer.add(
       this.add
-        .text(iconX + 22, y + 8, subtitle, {
+        .text(iconX + 28, y + 8, subtitle, {
           fontFamily: 'monospace',
           fontSize: '10px',
           color: '#999999',
@@ -560,7 +560,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
 
     this.detailContainer.add(
       this.add
-        .text(DETAIL_PANE_CX, 110, itemDisplayName(item), {
+        .text(DETAIL_PANE_CX, 140, itemDisplayName(item), {
           fontFamily: 'monospace',
           fontSize: '16px',
           color: RARITY_HEX[item.rarity],
@@ -570,7 +570,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
 
     this.detailContainer.add(
       this.add
-        .text(DETAIL_PANE_CX, 138, item.rarity, {
+        .text(DETAIL_PANE_CX, 168, item.rarity, {
           fontFamily: 'monospace',
           fontSize: '13px',
           color: '#cccccc',
@@ -582,7 +582,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
     if (affixes.length > 0) {
       this.detailContainer.add(
         this.add
-          .text(DETAIL_PANE_CX, 170, affixes, {
+          .text(DETAIL_PANE_CX, 200, affixes, {
             fontFamily: 'monospace',
             fontSize: '12px',
             color: '#bbbbbb',
@@ -595,7 +595,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
 
     this.detailContainer.add(
       this.add
-        .text(DETAIL_PANE_CX, 220, `Sell value: ${itemSellValue(item)}g`, {
+        .text(DETAIL_PANE_CX, 250, `Sell value: ${itemSellValue(item)}g`, {
           fontFamily: 'monospace',
           fontSize: '14px',
           color: '#ffcc66',
@@ -749,7 +749,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
     // Display name.
     this.detailContainer.add(
       this.add
-        .text(DETAIL_PANE_CX, 110, itemDisplayName(item), {
+        .text(DETAIL_PANE_CX, 140, itemDisplayName(item), {
           fontFamily: 'monospace',
           fontSize: '16px',
           color: RARITY_HEX[item.rarity],
@@ -760,7 +760,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
     // Rarity transition.
     this.detailContainer.add(
       this.add
-        .text(DETAIL_PANE_CX, 138, `${item.rarity}  →  ${target}`, {
+        .text(DETAIL_PANE_CX, 168, `${item.rarity}  →  ${target}`, {
           fontFamily: 'monospace',
           fontSize: '13px',
           color: '#cccccc',
@@ -771,14 +771,14 @@ export class BlacksmithPanelScene extends Phaser.Scene {
     // What this changes.
     this.detailContainer.add(
       this.add
-        .text(DETAIL_PANE_CX - 180, 180, 'What this changes:', {
+        .text(DETAIL_PANE_CX - 180, 210, 'What this changes:', {
           fontFamily: 'monospace',
           fontSize: '13px',
           color: '#dddddd',
         })
         .setOrigin(0, 0.5),
     );
-    let cursorY = 204;
+    let cursorY = 234;
     this.detailContainer.add(
       this.add
         .text(DETAIL_PANE_CX - 160, cursorY, '+1 random affix', {

@@ -1,6 +1,7 @@
 import { AFFIXES, RARE_PROPERTIES } from '@data/items';
 import type {
   AffixId,
+  DungeonTier,
   ItemBaseId,
   ItemSlot,
   Item,
@@ -42,16 +43,24 @@ const RARITY_TABLE: readonly RarityRow[] = [
   { floor: 15, common: 30, uncommon: 40, rare: 30 },
 ];
 
-function rarityWeightsAt(floor: number): { common: number; uncommon: number; rare: number } {
-  if (floor <= RARITY_TABLE[0].floor) return pluckWeights(RARITY_TABLE[0]);
-  if (floor >= RARITY_TABLE[RARITY_TABLE.length - 1].floor) {
+const TIER_RARITY_FLOOR_BONUS: Record<DungeonTier, number> = {
+  1: 0,  // today's behavior (regression-locked)
+  2: 3,  // Sunken Keep — spec 2 real value
+  3: 0,
+  4: 0,
+};
+
+function rarityWeightsAt(floor: number, tier: DungeonTier): { common: number; uncommon: number; rare: number } {
+  const effectiveFloor = floor + TIER_RARITY_FLOOR_BONUS[tier];
+  if (effectiveFloor <= RARITY_TABLE[0].floor) return pluckWeights(RARITY_TABLE[0]);
+  if (effectiveFloor >= RARITY_TABLE[RARITY_TABLE.length - 1].floor) {
     return pluckWeights(RARITY_TABLE[RARITY_TABLE.length - 1]);
   }
   for (let i = 0; i < RARITY_TABLE.length - 1; i++) {
     const lo = RARITY_TABLE[i];
     const hi = RARITY_TABLE[i + 1];
-    if (floor >= lo.floor && floor <= hi.floor) {
-      const t = (floor - lo.floor) / (hi.floor - lo.floor);
+    if (effectiveFloor >= lo.floor && effectiveFloor <= hi.floor) {
+      const t = (effectiveFloor - lo.floor) / (hi.floor - lo.floor);
       return {
         common: lerp(lo.common, hi.common, t),
         uncommon: lerp(lo.uncommon, hi.uncommon, t),
@@ -65,12 +74,16 @@ function rarityWeightsAt(floor: number): { common: number; uncommon: number; rar
 function pluckWeights(r: RarityRow) { return { common: r.common, uncommon: r.uncommon, rare: r.rare }; }
 function lerp(a: number, b: number, t: number): number { return a + (b - a) * t; }
 
+// Affix values are intentionally tier-agnostic — uses tier-1 slope at every tier.
+// Tier-2 differentiation comes from rarity-distribution shift (TIER_RARITY_FLOOR_BONUS),
+// not from numerically larger affix values. Mirrors the spec-1 Q3 decision that shop
+// prices stay flat at higher tier (gold multiplier applies to grants only).
 function scaleByFloor(baseValue: number, floor: number): number {
   return Math.round(baseValue * floorScale(floor).hp);
 }
 
-function pickRarity(rng: Rng, floor: number): Rarity {
-  const w = rarityWeightsAt(floor);
+function pickRarity(rng: Rng, floor: number, tier: DungeonTier = 1): Rarity {
+  const w = rarityWeightsAt(floor, tier);
   const opts: WeightedOption<Rarity>[] = [
     { value: 'common', weight: w.common },
     { value: 'uncommon', weight: w.uncommon },
@@ -127,9 +140,11 @@ function pickBaseId(rng: Rng, slot: ItemSlot): { baseId: ItemBaseId; weaponType?
   }
 }
 
-export function rollEventItem(rng: Rng, floorNumber: number, rarity: Rarity): Item {
+export function rollEventItem(rng: Rng, floorNumber: number, rarity: Rarity, tier: DungeonTier = 1): Item {
   // Always-drop, forced-rarity item. Slot picked uniformly. Affixes / rare-property
   // scaled at current floor. Used by the event-resolver's add_item payload.
+  // tier accepted for API uniformity; rarity is forced so tier doesn't affect output today.
+  void tier;
   const slot = rng.pick(ALL_SLOTS);
   const base = pickBaseId(rng, slot);
   const affixIds = pickAffixes(rng, affixCount(rarity, slot));
@@ -151,12 +166,12 @@ export function rollEventItem(rng: Rng, floorNumber: number, rarity: Rarity): It
   };
 }
 
-export function rollShopItem(rng: Rng, slot: ItemSlot, floor: number): Item {
+export function rollShopItem(rng: Rng, slot: ItemSlot, floor: number, tier: DungeonTier = 1): Item {
   // Used by shops: uses `floor` uniformly for rarity weights, affix values,
   // rare property values, and `floorRolledAt`. (Boss loot uses a different
   // policy — see rollLoot — so it doesn't delegate here.)
   const base = pickBaseId(rng, slot);
-  const rarity = pickRarity(rng, floor);
+  const rarity = pickRarity(rng, floor, tier);
 
   const affixIds = pickAffixes(rng, affixCount(rarity, slot));
   const affixes: RolledAffix[] = affixIds.map((id) => ({
@@ -181,7 +196,7 @@ export function rollShopItem(rng: Rng, slot: ItemSlot, floor: number): Item {
 
 export type LootKind = 'combat' | 'elite' | 'boss' | 'treasure';
 
-export function rollLoot(rng: Rng, floorNumber: number, kind: LootKind): Item | null {
+export function rollLoot(rng: Rng, floorNumber: number, kind: LootKind, tier: DungeonTier = 1): Item | null {
   if (kind === 'combat') {
     if (rng.next() >= 0.1) return null;
   }
@@ -193,10 +208,12 @@ export function rollLoot(rng: Rng, floorNumber: number, kind: LootKind): Item | 
   //   boss:      guaranteed drop, NEXT-floor rarity weights, current-floor affix scaling.
   //   treasure:  guaranteed drop, current-floor rarity table, current-floor scaling.
   const effectiveFloor = kind === 'boss' ? floorNumber + 1 : floorNumber;
+  // Note: tier's TIER_RARITY_FLOOR_BONUS is applied inside rarityWeightsAt (via pickRarity),
+  // on top of the boss +1 effective floor. They compose additively; tier=1 has bonus=0.
 
   const slot = rng.pick(ALL_SLOTS);
   const base = pickBaseId(rng, slot);
-  const rarity: Rarity = kind === 'elite' ? 'rare' : pickRarity(rng, effectiveFloor);
+  const rarity: Rarity = kind === 'elite' ? 'rare' : pickRarity(rng, effectiveFloor, tier);
 
   const affixIds = pickAffixes(rng, affixCount(rarity, slot));
   const affixes: RolledAffix[] = affixIds.map((id) => ({

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '@util/rng';
-import { rollEventItem, rollLoot } from '../loot';
+import { rollEventItem, rollLoot, rollShopItem } from '../loot';
 
 describe('rollLoot — drop gate', () => {
   it('drops at roughly 10% on a non-boss combat node (Phase 5 retune from 50%)', () => {
@@ -339,6 +339,56 @@ describe('rollLoot — treasure kind', () => {
     for (const slot of ['weapon', 'shield', 'outfit', 'hat']) {
       expect(counts[slot]).toBeGreaterThanOrEqual(150);
       expect(counts[slot]).toBeLessThanOrEqual(350);
+    }
+  });
+});
+
+describe('rollLoot — tier 2 rarity offset', () => {
+  it('tier 2 boss drops roll rare more often than tier 1 boss drops at floor 1', () => {
+    // Tier 1 floor-1 boss: effectiveFloor = 1 + 1 = 2 → rare ≈ 1% (lerp row1 rare:0, row3 rare:2 at t=0.5).
+    // Tier 2 floor-1 boss: effectiveFloor = (1 + 1) + 3 = 5 → rare = 5% per RARITY_TABLE row {floor:5, rare:5}.
+    // Expect tier 2 to roll significantly more rares.
+    let tier1Rare = 0;
+    let tier2Rare = 0;
+    const N = 1000;
+    for (let seed = 1; seed <= N; seed++) {
+      const r1 = rollLoot(createRng(seed), 1, 'boss', 1);
+      const r2 = rollLoot(createRng(seed), 1, 'boss', 2);
+      if (r1?.rarity === 'rare') tier1Rare++;
+      if (r2?.rarity === 'rare') tier2Rare++;
+    }
+    expect(tier2Rare).toBeGreaterThan(tier1Rare * 2);
+    expect(tier2Rare).toBeGreaterThanOrEqual(25);   // ≥2.5%, safely below the ~5% expected
+    expect(tier2Rare).toBeLessThanOrEqual(100);     // ≤10%, safely above
+  });
+});
+
+describe('loot — tier parameter parity (tier=1 default)', () => {
+  it('rollLoot(rng, f, kind) ≡ rollLoot(rng, f, kind, 1)', () => {
+    for (const seed of [1, 7, 42]) {
+      for (const floor of [1, 5, 10]) {
+        for (const kind of ['combat', 'elite', 'boss', 'treasure'] as const) {
+          const a = rollLoot(createRng(seed), floor, kind);
+          const b = rollLoot(createRng(seed), floor, kind, 1);
+          expect(a).toEqual(b);
+        }
+      }
+    }
+  });
+
+  it('rollShopItem(rng, slot, f) ≡ rollShopItem(rng, slot, f, 1)', () => {
+    for (const seed of [1, 7, 42]) {
+      const a = rollShopItem(createRng(seed), 'weapon', 5);
+      const b = rollShopItem(createRng(seed), 'weapon', 5, 1);
+      expect(a).toEqual(b);
+    }
+  });
+
+  it('rollEventItem(rng, f, rarity) ≡ rollEventItem(rng, f, rarity, 1)', () => {
+    for (const seed of [1, 7, 42]) {
+      const a = rollEventItem(createRng(seed), 5, 'rare');
+      const b = rollEventItem(createRng(seed), 5, 'rare', 1);
+      expect(a).toEqual(b);
     }
   });
 });

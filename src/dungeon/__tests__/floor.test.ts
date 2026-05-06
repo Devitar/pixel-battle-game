@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CRYPT_BOSS, CRYPT_POOL } from '@data/enemies';
+import { DUNGEONS } from '@data/dungeons';
 import { EVENTS } from '@data/events';
 import type { Node } from '@dungeon/node';
 import { createRng } from '@util/rng';
@@ -534,3 +535,81 @@ function terminalId(nodes: readonly Node[]): string {
 function nodesInRow(nodes: readonly Node[], rowIndex: number): readonly Node[] {
   return nodes.filter((n) => depthOf(nodes, n.id) === rowIndex);
 }
+
+describe('generateFloor — rowsPerFloor', () => {
+  it('default (rowsPerFloor unset) produces 8 + (floor − 1) rows', () => {
+    const { nodes } = generateFloor('crypt', 1, createRng(1));
+    const rows = new Set(nodes.map(n => n.id.match(/-r(\d+)-/)?.[1])).size;
+    expect(rows).toBe(8);
+  });
+
+  it('default (rowsPerFloor unset) on floor 3 produces 10 rows', () => {
+    const { nodes } = generateFloor('crypt', 3, createRng(1));
+    const rows = new Set(nodes.map(n => n.id.match(/-r(\d+)-/)?.[1])).size;
+    expect(rows).toBe(10);
+  });
+
+  it('honors rowsPerFloor when set on a dungeon def', () => {
+    // Mutate the Crypt def temporarily for the duration of this test.
+    const original = DUNGEONS.crypt.rowsPerFloor;
+    (DUNGEONS.crypt as any).rowsPerFloor = 10;
+    try {
+      const { nodes } = generateFloor('crypt', 1, createRng(1));
+      const rows = new Set(nodes.map(n => n.id.match(/-r(\d+)-/)?.[1])).size;
+      expect(rows).toBe(10);
+    } finally {
+      (DUNGEONS.crypt as any).rowsPerFloor = original;
+    }
+  });
+});
+
+describe('generateFloor — Sunken Keep', () => {
+  it('floor 1 Sunken Keep produces 10 rows', () => {
+    const { nodes } = generateFloor('sunken_keep', 1, createRng(1));
+    const rows = new Set(nodes.map(n => n.id.match(/-r(\d+)-/)?.[1])).size;
+    expect(rows).toBe(10);
+  });
+
+  it('floor 3 Sunken Keep produces 12 rows', () => {
+    const { nodes } = generateFloor('sunken_keep', 3, createRng(1));
+    const rows = new Set(nodes.map(n => n.id.match(/-r(\d+)-/)?.[1])).size;
+    expect(rows).toBe(12);
+  });
+
+  it('Sunken Keep encounters reference Sunken Keep enemies', () => {
+    const { nodes } = generateFloor('sunken_keep', 1, createRng(1));
+    const combatNodes = nodes.filter(n => n.type === 'combat');
+    expect(combatNodes.length).toBeGreaterThan(0);
+    for (const node of combatNodes) {
+      if (node.type === 'combat') {
+        for (const enemy of node.encounter.enemies) {
+          expect(['drowned_knight', 'brine_crab', 'drowned_sailor', 'siren']).toContain(enemy.enemyId);
+        }
+      }
+    }
+  });
+
+  it('Sunken Keep boss is the Drowned King', () => {
+    const { nodes } = generateFloor('sunken_keep', 1, createRng(1));
+    const bossNode = nodes.find(n => n.type === 'boss');
+    expect(bossNode).toBeDefined();
+    if (bossNode && bossNode.type === 'boss') {
+      const hasKing = bossNode.encounter.enemies.some(e => e.enemyId === 'drowned_king');
+      expect(hasKing).toBe(true);
+    }
+  });
+
+  it('quota generator succeeds across many seeds (no infeasibility)', () => {
+    let failures = 0;
+    for (let seed = 1; seed <= 100; seed++) {
+      try {
+        for (let f = 1; f <= 3; f++) {
+          generateFloor('sunken_keep', f, createRng(seed * 1000 + f));
+        }
+      } catch {
+        failures++;
+      }
+    }
+    expect(failures).toBe(0);
+  });
+});

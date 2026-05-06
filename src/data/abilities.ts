@@ -83,7 +83,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
   smite: {
     id: 'smite',
     name: 'Smite',
-    canCastFrom: [2, 3],
+    canCastFrom: [1, 2, 3],
     target: { side: 'enemy', slots: [1] },
     effects: [{ kind: 'damage', power: 1.1, scalingStat: 'mind' }],
     tags: ['radiant'],
@@ -360,6 +360,93 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     target: { side: 'enemy', slots: [1] },
     effects: [{ kind: 'damage', power: 1.0, scalingStat: 'mind' }],
     cooldown: 2,
+    tags: ['radiant'],
+  },
+
+  drowning_embrace: {
+    id: 'drowning_embrace',
+    name: 'Drowning Embrace',
+    canCastFrom: [1, 2, 3],
+    target: { side: 'enemy', slots: [3], pick: 'first' },
+    effects: [
+      { kind: 'pull', slots: 2 },
+      { kind: 'poison', damagePerTurn: 3, duration: 3, statusId: 'drowning' },
+    ],
+    cooldown: 3,
+  },
+
+  tidal_smash: {
+    id: 'tidal_smash',
+    name: 'Tidal Smash',
+    canCastFrom: [1, 2],
+    target: { side: 'enemy', slots: [1], pick: 'first' },
+    effects: [{ kind: 'damage', power: 1.4 }],
+  },
+
+  crushing_wave: {
+    id: 'crushing_wave',
+    name: 'Crushing Wave',
+    canCastFrom: [1, 2, 3],
+    target: { side: 'enemy', slots: 'all' },
+    effects: [{ kind: 'damage', power: 0.6 }],
+    cooldown: 3,
+  },
+
+  drowning_lure: {
+    id: 'drowning_lure',
+    name: 'Drowning Lure',
+    canCastFrom: [3, 4],
+    target: { side: 'enemy', slots: 'all', pick: 'lowestHp' },
+    effects: [
+      { kind: 'poison', damagePerTurn: 2, duration: 2, statusId: 'drowning' },
+    ],
+    cooldown: 2,
+  },
+
+  paladin_strike: {
+    id: 'paladin_strike',
+    name: 'Strike',
+    canCastFrom: [1, 2],
+    target: { side: 'enemy', slots: [1], pick: 'first' },
+    effects: [{ kind: 'damage', power: 1.0, scalingStat: 'attack' }],
+  },
+
+  lay_on_hands: {
+    id: 'lay_on_hands',
+    name: 'Lay on Hands',
+    canCastFrom: [1, 2, 3],
+    target: { side: 'ally', filter: { kind: 'hurt' }, pick: 'lowestHp' },
+    effects: [{ kind: 'heal', power: 3.0, scalingStat: 'mind' }],
+    cooldown: 3,
+  },
+
+  consecrate: {
+    id: 'consecrate',
+    name: 'Consecrate',
+    canCastFrom: [1, 2, 3],
+    target: { side: 'ally', slots: 'all', includeCaster: true },
+    effects: [{ kind: 'regen', healPerTurn: 3, duration: 3, statusId: 'consecrated' }],
+    cooldown: 4,
+    tags: ['radiant'],
+  },
+
+  paladin_cleaving_smite: {
+    id: 'paladin_cleaving_smite',
+    name: 'Cleaving Smite',
+    canCastFrom: [1, 2],
+    target: { side: 'enemy', slots: [1, 2] },
+    effects: [{ kind: 'damage', power: 0.7, scalingStat: 'mind' }],
+    cooldown: 2,
+    tags: ['radiant'],
+    aiCondition: { kind: 'minTargets', n: 2 },
+  },
+
+  paladin_quick_smite: {
+    id: 'paladin_quick_smite',
+    name: 'Quick Smite',
+    canCastFrom: [1, 2],
+    target: { side: 'enemy', slots: [1] },
+    effects: [{ kind: 'damage', power: 1.0, scalingStat: 'mind', bonusCrit: 10 }],
     tags: ['radiant'],
   },
 };

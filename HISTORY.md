@@ -29,6 +29,87 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-06 · Start scene — title + theme music (Cluster B · 43)
+
+- **Why:** `darkane_times.ogg` was committed but unwired — boot routed silently into camp/dungeon/camp_screen with no title moment. Pre-launch, the right time to overshoot on presentation. New `StartScene` intercepts boot's route, plays the theme on loop, shows "Darkane Times" + a fading "Tap anywhere to start" prompt, then forwards to whatever boot would have routed to.
+- **Decisions** (Q1–Q2 in spec):
+  - **Q1 — Stop music at tap.** Start scene fully owns its audio. No other scene has music yet, so cross-scene audio surface area pays no benefit. Camp/dungeon stay silent (matches today's behavior).
+  - **Q2 — Show on every boot.** Title + music play on every page load. Resume-from-save players see the title briefly, tap, land in their saved state. The 1-tap pause IS the brand moment.
+  - **Architecture:** boot computes `nextSceneId` from save state and dispatches via `scene.start('start', { nextSceneId })`. Start scene is save-agnostic. No app_state changes, no save changes, no unit tests (matches existing scene pattern — `src/scenes/__tests__/` only contains pure-helper tests).
+  - **Input:** pointerdown OR Enter OR Space all advance. Esc intentionally NOT bound — semantically "go back," but there's nowhere to go back to.
+- **Surprises:** None at implementation. Browser autoplay-policy gotcha was anticipated in the spec — the tap-anywhere prompt elegantly serves as the user gesture that unlocks the audio context. On first ever load the music may not play until tap; on subsequent loads it plays immediately. Acceptable v1 behavior.
+- **Source:** spec `docs/superpowers/specs/2026-05-06-start-scene-design.md`; plan `docs/superpowers/plans/2026-05-06-start-scene.md`. Test count: 1716 → 1716 (no test changes — Phaser scenes aren't unit-tested in this codebase).
+
+### 2026-05-06 · Paladin class — first unlockable (Cluster D · 3)
+
+- **Why:** Spec 2 (Sunken Keep) carved Paladin out as a "future spec extending the same first_crypt_clear handler." This is that spec — Paladin is the player's reward for clearing the Crypt. After this lands, the Crypt floor-3 boss defeat unlocks both Sunken Keep (dungeon) AND Paladin (class).
+- **Decisions** (Q1–Q6 in spec):
+  - **Q1 — Share smite, don't duplicate.** Paladin's `abilities` array references the existing `smite` id Priest uses. Required widening `smite.canCastFrom` from `[2, 3]` to `[1, 2, 3]` so Paladin in slot 1 can cast it. Monotonic change; Priest unaffected.
+  - **Q2 — Knight chassis with mind=4.** `{ hp: 20, attack: 3, defense: 4, speed: 3, mind: 4, crit: 5, dodge: 5 }`. Hybrid identity comes from *what abilities do*, not *how durable they are* — avoids making Paladin a strict-better Knight.
+  - **Q3 — Each ability owns one role.** paladin_strike (basic), shared smite (burst), lay_on_hands (single-target burst heal cd 3), consecrate (party HoT cd 4). Distinct from Priest's Mend (chip heal) and Bless (single-ally buff).
+  - **Q4 — primaryStat=mind, no swapTarget.** Sword-or-bust thematically; axe/dagger Paladin reads weird. Off-preferred melee weapons leave the kit unchanged (Archer pattern).
+  - **Q5 — `righteous` (+3 mind) / `vindicator` (+2 attack).** Forces a meaningful identity fork. Avoids defense/HP perks because chassis already matches Knight.
+  - **Q6 — Handler does both appends idempotently.** Refactored from spec 2's short-circuit pattern (which only checked dungeons) to two independent branches. Identity-return preserved when both already unlocked.
+- **Surprises:**
+  - Engine had no native heal-over-time effect kind. Negative-poison-damage worked mechanically but emitted `damage_applied` events with negative amounts and ignored maxHp cap. Added a proper `regen` effect kind in `combat/statuses.ts` + `combat/effects.ts` mirroring poison's structure but capping at maxHp and emitting `heal_applied`. Spec flagged this as the highest-risk decision; turned out small (~30 LOC + tests).
+  - During Task 1 review, code reviewer flagged that `regen` lacked a `chance?: number` field while every other effect variant has one. Added during Task 2 because `effects.ts` accesses `effect.chance` unconditionally before the kind switch.
+  - Two extra cascade points the plan didn't list surfaced from Task 1's type-union widening: `ability_describe.ts` STATUS_LABEL needed a `consecrated` entry, and `chatter.ts` + `kit.test.ts` fixture both needed paladin entries. All folded inline as they surfaced (Tasks 2 and 6).
+  - `CLASS_PERK_PAIRS` is `Record<ClassId, ...>` so adding `'paladin'` to ClassId forced the perk pair entry to land in lockstep — exactly the kind of drift-prevention the type system pays for.
+  - Whole-implementation review (Opus, post-commit) surfaced four follow-ups: (1) `STATUS_GLYPHS` in `combat_actor.ts` was missing both `consecrated` (new) and `drowning` (pre-existing miss from spec 2) — added. (2) Paladin + axe/daggers actually drops to Band 3 (basic-only), not "kit unchanged" as the spec's Q4 claimed via the "Archer pattern" — Archer never hits the same-family-without-swap path because no other ranged weapon exists, so its behavior didn't generalize. (3) Consecrate actually heals 18 HP party total (2 allies, caster excluded by `side: 'ally'` engine convention), not the spec's optimistic 27 HP. (4) `describeEffect` regen wording flipped from third-person "Heals" to imperative "Heal" matching sibling cases.
+  - Second pass on the user's direction reversed the conservative landing of (2) and (3): added `swapTarget: 'smite'` + `weaponSwaps: { axe: 'paladin_cleaving_smite', daggers: 'paladin_quick_smite' }` to Paladin (mirrors Priest's per-class smite-swap pattern; flavor reads as "smite channeled through the weapon"); added 2 new ability variants (radiant + mind-scaling). For the caster-exclusion gap, extended `TargetSelector` with an optional `includeCaster?: boolean` flag and set `consecrate.target.includeCaster = true` so the party HoT actually hits the full party (27 HP/cast as designed). Both engine and data changes are additive — no other ability or class affected.
+- **Source:** spec `docs/superpowers/specs/2026-05-06-paladin-class-design.md`; plan `docs/superpowers/plans/2026-05-06-paladin-class.md`. Test count delta: 1640 → 1694 in the initial commit; +22 across follow-up sweeps (STATUS_GLYPHS, regen wording, paladin Band 2 swap tests, Consecrate caster-targeting now-includes-caster, includeCaster engine test, 2 new paladin smite variant ability tests, plus consecrate.includeCaster assertion and revised classes-test swap-class membership). Final: 1716.
+
+### 2026-05-06 · Elite-node gold display fix + dedupe (Cluster D · 2)
+
+- **Why:** `corridor_scene.ts buildResultPanel` displayed `15 × floor` (combat formula) for elite-node victories, but `completeCombat` actually credited `30 × floor`. Display under-reported elite gold by half. Surfaced during Sunken Keep spec 1 review.
+- **Decisions:**
+  - Extracted two pure helpers in `run_state.ts` — `nodeRewardGold(kind, floor, tier)` and `surpriseRewardGold(floor, tier)` — and exported them. Both `completeCombat` (credit) and `corridor_scene` (display) call the helpers, so display-vs-credit drift is now structurally impossible.
+  - Helper `kind` narrows to `'combat' | 'elite' | 'boss'` rather than full `LootKind` (which includes `'treasure'`). `completeCombat`'s pre-existing throws for non-combat-bearing types let the call site narrow naturally, so no cast needed; dropped the redundant `: LootKind` annotation.
+  - Added a defensive `throw` in `buildResultPanel` for non-combat node types — narrowing `completedNode.type` for the helper call. Same throw shape `completeCombat` already uses; matches existing scene-side error handling.
+- **Surprises:**
+  - `SURPRISE_GOLD_BASE = 7` was a third copy-pasted constant duplicated between `run_state.ts` and `corridor_scene.ts` — same drift risk as the elite-gold bug. Folded into the same dedupe pass.
+  - The `LootKind` import in `run_state.ts` became unused after the annotation drop; removed in the same edit.
+- **Source:** TODO Cluster D · 2 (filed 2026-05-05 during spec 1 quality review). Test count delta: 1634 → 1640 (+6 — 4 `nodeRewardGold` cases, 1 `surpriseRewardGold` case, 1 elite-credit integration sanity check).
+
+### 2026-05-06 · Sunken Keep — Spec 2 (content + first-Crypt-clear handler) (Cluster D · 1)
+
+- **Why:** Spec 1 (2026-05-05) plumbed the dungeon-tier balance API, milestone registry, multi-dungeon Expeditions UI, and locked-card rendering. Spec 2 drops the Sunken Keep into that foundation as additive content. After this lands, defeating the Crypt floor-3 boss unlocks the Sunken Keep dungeon.
+- **Decisions** (Q1–Q7 + sub-questions in spec):
+  - Paladin out of scope — separate future spec, extends the same `first_crypt_clear` handler.
+  - Hybrid abilities — boss gets 3 bespoke abilities + new `drowning` status; minions reuse the Crypt pool with one new minion ability (`drowning_lure` on the Siren).
+  - Floor density: `floorsPerRun: 3, rowsPerFloor: 10` → 10/11/12 rows. Same run length as Crypt; ~22% more nodes per floor.
+  - Tier-2 multipliers: slope `0.13`, rarity floor-bonus `+3`, gold multiplier `×1.5`.
+  - Boss is the Drowned King (front-line bruiser) — mechanical foil to Bone Lich (back-line caster). Drowning Embrace pulls a back-line hero forward + applies `drowning` DoT (cooldown 3).
+  - Boss `tags: ['humanoid']` (not `'undead'`) — Priest's Smite anti-undead doesn't auto-trivialize tier-2.
+  - Art: placeholders reusing existing frames per Cluster C precedent. Drowned King reuses Bone Lich's `bossSprite: 0` until bespoke art lands.
+  - `applyPendingMilestones` cast simplified — `MilestoneId` is now a real string union, so `MILESTONES[id]()` typechecks cleanly without spec 1's workaround.
+  - Affix values stay tier-agnostic (mirrors spec 1's "shop prices stay flat" decision); only rarity distribution shifts at higher tier.
+- **Surprises:**
+  - `EXPECTED_IDS` arrays in `enemies.test.ts` and `abilities.test.ts` use `.toEqual` against an exact list — adding new ids requires updating the fixture in lockstep, not just appending data.
+  - `ability_describe.ts` has a `STATUS_LABEL: Record<StatusId, string>` registry that the plan didn't list — surfaced via typecheck cascade after Task 1, fixed inline (one new entry for `drowning`).
+  - Spec 1's "post-canonical floor 4+ boss does NOT credit" test had a subtle bug: the test loop kills the canonical floor-3 boss BEFORE pressing on to floor 4, so `pendingMilestones` already contains `['first_crypt_clear']` when the floor-4 kill happens. The new assertion checks the array stays at length 1 (no new entry added by the post-canonical kill), not that it's empty.
+  - Drowned Knight visually identical to skeleton_warrior under placeholder mapping (same body + sword); Drowned King reuses Bone Lich's boss sprite. Both flagged in new Cluster C entries.
+- **Source:** spec `docs/superpowers/specs/2026-05-06-sunken-keep-content-design.md`; plan `docs/superpowers/plans/2026-05-06-sunken-keep-content.md`. Test count delta: 1543 → 1634 (+91).
+
+### 2026-05-05 · Sunken Keep — Spec 1 (foundation + milestone plumbing) (Cluster D · 1)
+
+- **Why:** The Tier 3 cascade gates on Sunken Keep, which requires a `tier` concept, multi-dungeon Expeditions UI, and a milestone-unlock system that didn't exist. Decomposed during brainstorm into spec 1 (this — pure plumbing, no visible content) + spec 2 (Sunken Keep dungeon def + enemies + boss + art + first-Crypt-clear handler).
+- **Decisions** (Q1–Q6 in spec doc + sub-questions):
+  - Registry pattern with no handlers wired (`MilestoneId = never`); spec 2 adds the first id and handler.
+  - `floorLength` → `floorsPerRun` rename for clarity; new `rowsPerFloor?` knob defaults to 8 (Crypt unchanged).
+  - All four tier-balance dimensions plumbed at tier=1 baseline (rows, scaling slope, rarity floor-bonus, gold multiplier). Tier=1 is byte-identical to today; spec 2 picks tier-2 numbers.
+  - `cashout` stays pure of SaveFile — `outcome.milestonesTriggered` is the new field; scene-level orchestration applies milestones via `applyPendingMilestones`.
+  - Milestones fire on canonical-final-boss defeat (`floor === floorsPerRun`); `pendingMilestones` persists across `pressOn` so press-on-after-clear-then-wipe still credits.
+  - Shop prices stay flat at higher tier (gold multiplier applies to grants only).
+  - Locked-card silhouettes via `EnemySprite.setLocked` (tint `0x000000` + alpha 0.7).
+- **Surprises:**
+  - Surprise gold is computed in TWO sites (`run_state.ts` and `corridor_scene.ts` preview) — both threaded with `goldMultiplier(tier)`. The corridor preview wasn't in the original tier-threading catalogue.
+  - Treasure-room overlay scene's `rollLoot` call and the combat result panel's gold display were both initial misses caught by reviewers — display-side gold sites the plan didn't list. Both fixed in lockstep.
+  - `event_resolver.ts`'s `gold_delta` payload applies the multiplier to absolute amounts (not floor-scaled), and to negative penalties symmetrically. Tier=1 is identity so no behavior change; spec 2 should consciously confirm or override the symmetric-penalty semantics.
+  - Pre-existing bug noticed but NOT fixed (out of scope): `corridor_scene.ts:1090` displays `COMBAT_NODE_REWARD × floor` for non-boss combat, including elite — but `completeCombat` actually credits `ELITE_NODE_GOLD × floor`. Display-vs-credit mismatch for elite nodes today. Worth filing.
+  - `MilestoneId = never` triggers `TS2349` ("never has no call signatures") on `MILESTONES[id]()` in `applyPendingMilestones`. Worked around with a local cast; cast becomes unnecessary once spec 2 introduces a real id.
+- **Source:** spec `docs/superpowers/specs/2026-05-05-sunken-keep-foundation-design.md`; plan `docs/superpowers/plans/2026-05-05-sunken-keep-foundation.md`. Test count delta: 1515 → 1543 (+28).
+
 ### 2026-05-04 · Equipment flow unification
 
 - **What shipped:** Single unified `equip_scene` replacing both `barracks_equip_scene` and `equip_panel_scene`. Surfaces currently-equipped item stats at-rest via a slot-detail card; presents a clean before/after preview when swapping; shows ability gain/loss diffs with green/red coloring when changing weapon types.

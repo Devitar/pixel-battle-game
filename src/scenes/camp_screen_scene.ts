@@ -3,6 +3,7 @@ import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels'
 import { removeHero, tickRosterWounds, updateHero } from '@camp/roster';
 import { addItems } from '@camp/stash';
 import { credit } from '@camp/vault';
+import { applyPendingMilestones } from '@run/milestones';
 import { cashout, pressOn, type RunState } from '@run/run_state';
 import { HeroCard } from '@ui/hero_card';
 import { createRngFromState } from '@util/rng';
@@ -193,7 +194,7 @@ export class CampScreenScene extends Phaser.Scene {
         }
       }
       roster = tickRosterWounds(roster, hospitalTickAmount(s.buildingLevels.hospital));
-      return {
+      const next = {
         ...s,
         vault,
         stash,
@@ -202,6 +203,7 @@ export class CampScreenScene extends Phaser.Scene {
         runState: undefined,
         runRngState: undefined,
       };
+      return applyPendingMilestones(next, outcome.milestonesTriggered);
     });
 
     this.scene.start('camp');

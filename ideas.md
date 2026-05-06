@@ -35,5 +35,8 @@ One section per idea. A sentence is fine for seeds; a paragraph or two for more 
 
 - The travel between rooms should not be instant, instead it should take some time, and the heroes should bob back and forth in a primitive "walking animation". There should be some sort of mechanical thing to traveling between rooms. Maybe there could be a random % chance every 1/4 step between rooms that a surprise encounter happens whether it's combat, a merchant, a ? room, etc can pop up, similarly to how in pokemon you get random encounters while in tall grass. This chance should be low but it does mean that the dungeon isn't immediately predictable. Heroes should also passively heal (or even take damage, if they're wounded or sick or have some ailment) during the trek between rooms. The goal is to make it so that the entire dungeon isn't just essentially the combat screen. This is also where some charm and personality could be added in the future polish passes where your heroes chatter amongst themselves during this section.
 
-### Package app for app store use with Capacitor
+### 4. Package app for app store use with Capacitor
 This also will allow us to force landscape on mobile with a plugin. On the web, direct the user to download the app instead of playing in the browser.
+
+### 5. Update UI to use pixui UI Library for Phaser
+https://github.com/skhoroshavin/phaser-pixui

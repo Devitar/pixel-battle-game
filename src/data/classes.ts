@@ -83,4 +83,18 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     aiPriority: ['frost_nova', 'firebolt', 'arc_shock', 'mage_zap'],
     starterLoadout: { weapon: 'staff_basic' },
   },
+  paladin: {
+    id: 'paladin',
+    name: 'Paladin',
+    baseStats: { hp: 20, attack: 3, defense: 4, speed: 3, mind: 4, crit: 5, dodge: 5 },
+    primaryStat: 'mind',
+    preferredWeapon: 'sword',
+    weaponFamily: 'melee',
+    basicAbility: 'paladin_strike',
+    swapTarget: 'smite',
+    weaponSwaps: { axe: 'paladin_cleaving_smite', daggers: 'paladin_quick_smite' },
+    abilities: ['paladin_strike', 'smite', 'lay_on_hands', 'consecrate'],
+    aiPriority: ['consecrate', 'lay_on_hands', 'smite', 'paladin_strike'],
+    starterLoadout: { weapon: 'sword_basic', shield: 'shield_basic' },
+  },
 };

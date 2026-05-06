@@ -28,6 +28,7 @@ export class BootScene extends Phaser.Scene {
       margin: BOSS_SHEET.margin,
       spacing: BOSS_SHEET.spacing,
     });
+    this.load.audio('theme', 'assets/audio/darkane_times.ogg');
   }
 
   create(): void {
@@ -35,12 +36,10 @@ export class BootScene extends Phaser.Scene {
     const { saveFile } = resolveSaveState(window.localStorage, rng);
     appState.init(saveFile, window.localStorage);
 
-    if (saveFile.runState?.status === 'camp_screen') {
-      this.scene.start('camp_screen');
-    } else if (saveFile.runState) {
-      this.scene.start('dungeon');
-    } else {
-      this.scene.start('camp');
-    }
+    const nextSceneId =
+      saveFile.runState?.status === 'camp_screen' ? 'camp_screen' :
+      saveFile.runState                            ? 'dungeon' :
+                                                     'camp';
+    this.scene.start('start', { nextSceneId });
   }
 }

@@ -5,6 +5,7 @@ import type { Item, Rarity } from '@data/types';
 import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels';
 import { removeHero, tickRosterWounds } from '@camp/roster';
 import { CHATTER, computeChatterCondition } from '@data/chatter';
+import { DUNGEONS } from '@data/dungeons';
 import { ENEMIES } from '@data/enemies';
 import type { Encounter, Node } from '@dungeon/node';
 import type { Hero } from '@heroes/hero';
@@ -12,10 +13,13 @@ import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { CombatActor } from '@render/combat_actor';
 import { ENEMY_VISUALS } from '@render/enemy_sprites';
 import { buildCombatState } from '@run/combat_setup';
+import { applyPendingMilestones } from '@run/milestones';
 import {
   completeCombat,
   completeSurpriseCombat,
   currentNode,
+  nodeRewardGold,
+  surpriseRewardGold,
   type RunState,
   type WipeOutcome,
 } from '@run/run_state';
@@ -59,10 +63,6 @@ const PILLAR_W = 8;
 const PILLAR_H = 60;
 const PILLAR_COLOR = 0x3a2a1a;       // placeholder; real torch art replaces later
 const PILLAR_SPACING = 160;          // every 5 tiles
-
-const COMBAT_NODE_REWARD = 15;
-const BOSS_NODE_REWARD = 100;
-const SURPRISE_GOLD_BASE = 7;
 
 const ENEMY_X_BY_SLOT: readonly number[] = [0, 560, 640, 720, 800];
 const ROUND_COUNTER_Y = 24;
@@ -552,7 +552,7 @@ export class CorridorScene extends Phaser.Scene {
 
   private buildSurpriseResultPanel(): void {
     const run = appState.get().runState!;
-    const reward = SURPRISE_GOLD_BASE * run.currentFloorNumber;
+    const reward = surpriseRewardGold(run.currentFloorNumber, DUNGEONS[run.dungeonId].tier);
 
     const lootCount = this.combatLoot.length;
     const lootBlockHeight = lootCount > 0 ? 16 + lootCount * 14 : 0;
@@ -1085,10 +1085,14 @@ export class CorridorScene extends Phaser.Scene {
         n.nextNodeIds.includes(run.currentNodeId),
       )!;
     }
-    const reward =
-      completedNode.type === 'boss'
-        ? BOSS_NODE_REWARD * run.currentFloorNumber
-        : COMBAT_NODE_REWARD * run.currentFloorNumber;
+    if (completedNode.type !== 'combat' && completedNode.type !== 'elite' && completedNode.type !== 'boss') {
+      throw new Error(`buildResultPanel: completed node has non-combat type '${completedNode.type}'`);
+    }
+    const reward = nodeRewardGold(
+      completedNode.type,
+      run.currentFloorNumber,
+      DUNGEONS[run.dungeonId].tier,
+    );
 
     const lootCount = this.combatLoot.length;
     const lootBlockHeight = lootCount > 0 ? 16 + lootCount * 14 : 0;
@@ -1290,8 +1294,9 @@ export class CorridorScene extends Phaser.Scene {
   }
 
   private onWipeReturn(): void {
-    const fallenIds = new Set(this.wipeOutcome!.heroesFallen.map((h) => h.id));
-    const lostIds = new Set(this.wipeOutcome!.heroesLost.map((h) => h.id));
+    const wipe = this.wipeOutcome!;
+    const fallenIds = new Set(wipe.heroesFallen.map((h) => h.id));
+    const lostIds = new Set(wipe.heroesLost.map((h) => h.id));
 
     appState.update((s) => {
       let roster = s.roster;
@@ -1306,13 +1311,14 @@ export class CorridorScene extends Phaser.Scene {
         }
       }
       roster = tickRosterWounds(roster, hospitalTickAmount(s.buildingLevels.hospital));
-      return {
+      const next = {
         ...s,
         roster,
         hospitalTreatmentsRemaining: hospitalTreatmentCap(s.buildingLevels.hospital),
         runState: undefined,
         runRngState: undefined,
       };
+      return applyPendingMilestones(next, wipe.milestonesTriggered);
     });
 
     this.scene.start('camp');

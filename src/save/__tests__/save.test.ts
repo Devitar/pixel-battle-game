@@ -64,6 +64,7 @@ describe('save / load roundtrip', () => {
       lost: [],
       traversedNodeIds: [''],
       surprisesThisFloor: 0,
+      pendingMilestones: [],
     };
     const original: SaveFile = {
       ...makeBaseSave(),
@@ -92,6 +93,7 @@ describe('save / load roundtrip', () => {
       lost: [],
       traversedNodeIds: [],
       surprisesThisFloor: 0,
+      pendingMilestones: [],
     };
     const data: SaveFile = { ...makeBaseSave(), runState: fakeRunState };
     expect(() => save(data, storage)).toThrow();
@@ -492,6 +494,75 @@ describe('save normalizer — runState.surprisesThisFloor default', () => {
     }));
     const loaded = load(storage);
     expect(loaded!.runState!.surprisesThisFloor).toBe(2);
+  });
+});
+
+describe('save normalizer — runState.pendingMilestones default', () => {
+  it('defaults pendingMilestones to [] for legacy in-flight saves', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({
+      version: CURRENT_SCHEMA_VERSION,
+      roster: { heroes: [], slots: 12 },
+      vault: { gold: 0 },
+      stash: createStash(),
+      unlocks: { classes: [], dungeons: [] },
+      runState: {
+        dungeonId: 'crypt',
+        seed: 1,
+        party: [],
+        pack: { gold: 0, items: [] },
+        currentFloorNumber: 1,
+        currentFloorNodes: [],
+        currentNodeId: 'crypt-f1-r0-s1',
+        awaitingFork: false,
+        status: 'in_dungeon',
+        fallen: [],
+        lost: [],
+        traversedNodeIds: ['crypt-f1-r0-s1'],
+        surprisesThisFloor: 0,
+        // NOTE: pendingMilestones intentionally omitted to simulate a pre-Task-2 save
+      },
+      runRngState: 12345,
+    }));
+    const loaded = load(storage);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.runState).toBeDefined();
+    expect(loaded!.runState!.pendingMilestones).toEqual([]);
+  });
+
+  it('preserves an explicit pendingMilestones array', () => {
+    // NOTE: in spec 1, MilestoneId = never, so [] is the only valid value
+    // — this test asserts the ?? [] pass-through doesn't accidentally clobber
+    // an explicit array. When spec 2 introduces real ids, replace [] with a
+    // populated literal here for a more meaningful assertion.
+    const storage = new MemoryStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({
+      version: CURRENT_SCHEMA_VERSION,
+      roster: { heroes: [], slots: 12 },
+      vault: { gold: 0 },
+      stash: createStash(),
+      unlocks: { classes: [], dungeons: [] },
+      runState: {
+        dungeonId: 'crypt',
+        seed: 1,
+        party: [],
+        pack: { gold: 0, items: [] },
+        currentFloorNumber: 1,
+        currentFloorNodes: [],
+        currentNodeId: 'crypt-f1-r0-s1',
+        awaitingFork: false,
+        status: 'in_dungeon',
+        fallen: [],
+        lost: [],
+        traversedNodeIds: ['crypt-f1-r0-s1'],
+        surprisesThisFloor: 0,
+        pendingMilestones: [],
+      },
+      runRngState: 12345,
+    }));
+    const loaded = load(storage);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.runState!.pendingMilestones).toEqual([]);
   });
 });
 

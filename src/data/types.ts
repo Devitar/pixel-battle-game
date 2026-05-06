@@ -1,6 +1,6 @@
 import type { Stats } from '@combat/types';
 
-export type ClassId = 'knight' | 'archer' | 'priest' | 'barbarian' | 'rogue' | 'mage';
+export type ClassId = 'knight' | 'archer' | 'priest' | 'barbarian' | 'rogue' | 'mage' | 'paladin';
 
 export type AbilityId =
   | 'knight_slash'
@@ -46,9 +46,20 @@ export type AbilityId =
   | 'rogue_riposte'
   | 'rogue_brutal_chop'
   | 'priest_arcane_bolt'
-  | 'mage_holy_light';
+  | 'mage_holy_light'
+  // Sunken Keep
+  | 'drowning_embrace'
+  | 'tidal_smash'
+  | 'crushing_wave'
+  | 'drowning_lure'
+  // Paladin
+  | 'paladin_strike'
+  | 'lay_on_hands'
+  | 'consecrate'
+  | 'paladin_cleaving_smite'
+  | 'paladin_quick_smite';
 
-export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished' | 'slowed' | 'burning';
+export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished' | 'slowed' | 'burning' | 'drowning' | 'consecrated';
 
 export type AbilityTag = 'radiant';
 
@@ -137,6 +148,9 @@ export interface TargetSelector {
   slots?: readonly SlotIndex[] | 'all' | 'furthest';
   filter?: TargetFilter;
   pick?: 'first' | 'random' | 'lowestHp' | 'highestHp';
+  // When true with side: 'ally', includes the caster in the candidate set.
+  // Default behavior excludes the caster (matches Bless/Mend convention).
+  includeCaster?: boolean;
 }
 
 export type AbilityEffect =
@@ -150,7 +164,8 @@ export type AbilityEffect =
   | { kind: 'buff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean; chance?: number }
   | { kind: 'debuff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean; chance?: number }
   | { kind: 'mark'; damageBonus: number; duration: number; statusId: StatusId; chance?: number }
-  | { kind: 'taunt'; duration: number; statusId: StatusId; chance?: number };
+  | { kind: 'taunt'; duration: number; statusId: StatusId; chance?: number }
+  | { kind: 'regen'; healPerTurn: number; duration: number; statusId: StatusId; chance?: number };
 
 export type AiCondition =
   | { kind: 'minTargets'; n: number }
@@ -219,7 +234,13 @@ export type EnemyId =
   | 'ghost'
   | 'zombie'
   | 'cultist'
-  | 'bone_lich';
+  | 'bone_lich'
+  // Sunken Keep
+  | 'drowned_knight'
+  | 'brine_crab'
+  | 'drowned_sailor'
+  | 'siren'
+  | 'drowned_king';
 
 export type EnemyRole = 'minion' | 'boss';
 
@@ -234,16 +255,23 @@ export interface EnemyDef {
   preferredSlots: readonly SlotIndex[];
 }
 
-export type DungeonId = 'crypt';
+export type DungeonId = 'crypt' | 'sunken_keep';
+
+export type DungeonTier = 1 | 2 | 3 | 4;
 
 export interface DungeonDef {
   id: DungeonId;
   name: string;
   theme: string;
-  floorLength: number;
+  tier: DungeonTier;
+  floorsPerRun: number;
+  rowsPerFloor?: number;
   enemyPool: readonly EnemyId[];
   bossId: EnemyId;
+  unlockRequirement?: string;
 }
+
+export type MilestoneId = 'first_crypt_clear';
 
 export type TraitId =
   | 'stout'
@@ -289,7 +317,9 @@ export type PerkId =
   | 'devout' | 'steadfast'
   | 'berserker' | 'tough_skin'
   | 'lethal' | 'evasive'
-  | 'arcane_power' | 'quick_cast';
+  | 'arcane_power' | 'quick_cast'
+  // Paladin
+  | 'righteous' | 'vindicator';
 
 export interface PerkDef {
   id: PerkId;

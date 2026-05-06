@@ -51,6 +51,8 @@ const STATUS_LABEL: Record<StatusId, string> = {
   vanished: 'vanished',
   slowed: 'slowed',
   burning: 'burning',
+  drowning: 'drowning',
+  consecrated: 'consecrated',
 };
 
 function describeFilter(filter: TargetSelector['filter']): string {
@@ -149,5 +151,7 @@ function describeEffect(e: AbilityEffect): string {
       return `Move to slot ${e.slot}`;
     case 'poison':
       return `Poison target for ${e.damagePerTurn} dmg/turn (${e.duration} ${turnWord(e.duration)})`;
+    case 'regen':
+      return `Heal ${e.healPerTurn} HP per turn for ${e.duration} ${turnWord(e.duration)}`;
   }
 }

@@ -137,3 +137,12 @@ describe('generateStarterRoster', () => {
     expect(a).toEqual(b);
   });
 });
+
+describe('generateCandidate — paladin in unlocked pool', () => {
+  it('produces a paladin candidate when paladin is in unlockedClasses', () => {
+    const rng = createRng(1);
+    const unlocked: ClassId[] = ['paladin'];  // single-class pool guarantees the roll
+    const hero = generateCandidate(rng, unlocked);
+    expect(hero.classId).toBe('paladin');
+  });
+});

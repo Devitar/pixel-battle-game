@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ABILITIES } from '../abilities';
-import { CRYPT_BOSS, CRYPT_POOL, ENEMIES } from '../enemies';
+import { CRYPT_BOSS, CRYPT_POOL, ENEMIES, SUNKEN_KEEP_BOSS, SUNKEN_KEEP_POOL } from '../enemies';
 import type { EnemyId } from '../types';
 
 const EXPECTED_IDS: readonly EnemyId[] = [
@@ -10,6 +10,12 @@ const EXPECTED_IDS: readonly EnemyId[] = [
   'zombie',
   'cultist',
   'bone_lich',
+  // Sunken Keep
+  'drowned_knight',
+  'brine_crab',
+  'drowned_sailor',
+  'siren',
+  'drowned_king',
 ];
 
 const STATS: readonly ('hp' | 'attack' | 'defense' | 'speed')[] = [
@@ -84,19 +90,9 @@ describe('ENEMIES', () => {
     });
   });
 
-  it('exactly one enemy has role boss, and it equals CRYPT_BOSS', () => {
-    const bosses = Object.values(ENEMIES).filter((e) => e.role === 'boss');
-    expect(bosses).toHaveLength(1);
-    expect(bosses[0].id).toBe(CRYPT_BOSS);
-  });
-
-  it('every minion appears in CRYPT_POOL and vice-versa', () => {
-    const minionIds = Object.values(ENEMIES)
-      .filter((e) => e.role === 'minion')
-      .map((e) => e.id)
-      .sort();
-    const poolIds = [...CRYPT_POOL].sort();
-    expect(poolIds).toEqual(minionIds);
+  it('CRYPT_BOSS is registered as boss', () => {
+    expect(ENEMIES[CRYPT_BOSS]).toBeDefined();
+    expect(ENEMIES[CRYPT_BOSS].role).toBe('boss');
   });
 
   it('CRYPT_POOL entries are all registered as minions', () => {
@@ -104,5 +100,45 @@ describe('ENEMIES', () => {
       expect(ENEMIES[id], `pool references missing enemy ${id}`).toBeDefined();
       expect(ENEMIES[id].role).toBe('minion');
     }
+  });
+});
+
+describe('SUNKEN_KEEP_POOL', () => {
+  it('contains exactly the 4 expected minions', () => {
+    expect([...SUNKEN_KEEP_POOL].sort()).toEqual(
+      ['brine_crab', 'drowned_knight', 'drowned_sailor', 'siren'].sort()
+    );
+  });
+
+  it('every entry is a registered minion', () => {
+    for (const id of SUNKEN_KEEP_POOL) {
+      expect(ENEMIES[id]).toBeDefined();
+      expect(ENEMIES[id].role).toBe('minion');
+    }
+  });
+});
+
+describe('SUNKEN_KEEP_BOSS', () => {
+  it('points to drowned_king and is a registered boss', () => {
+    expect(SUNKEN_KEEP_BOSS).toBe('drowned_king');
+    expect(ENEMIES[SUNKEN_KEEP_BOSS]).toBeDefined();
+    expect(ENEMIES[SUNKEN_KEEP_BOSS].role).toBe('boss');
+  });
+});
+
+describe('Drowned King', () => {
+  it('has the 3 boss abilities and front-line preferred slots', () => {
+    const e = ENEMIES.drowned_king;
+    expect([...e.abilities].sort()).toEqual(['crushing_wave', 'drowning_embrace', 'tidal_smash']);
+    expect(e.preferredSlots).toEqual([1, 2]);
+    expect(e.tags).toContain('humanoid');
+    expect(e.tags).not.toContain('undead');  // Smite-decoupling
+  });
+});
+
+describe('Siren', () => {
+  it('uses drowning_lure (introduces drowning to minion combat)', () => {
+    const e = ENEMIES.siren;
+    expect(e.abilities).toContain('drowning_lure');
   });
 });

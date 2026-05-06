@@ -1,4 +1,5 @@
 import * as Phaser from 'phaser';
+import { DUNGEONS } from '@data/dungeons';
 import type { Item, Rarity } from '@data/types';
 import { rollLoot } from '@dungeon/loot';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
@@ -98,7 +99,7 @@ export class TreasureRoomOverlayScene extends Phaser.Scene {
     }
     const rng = createRngFromState(rngState);
     const run = appState.get().runState!;
-    const item = rollLoot(rng, run.currentFloorNumber, 'treasure');
+    const item = rollLoot(rng, run.currentFloorNumber, 'treasure', DUNGEONS[run.dungeonId].tier);
     if (!item) {
       throw new Error('TreasureRoomOverlayScene: rollLoot returned null for treasure kind');
     }

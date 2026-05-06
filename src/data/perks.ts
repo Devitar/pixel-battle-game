@@ -85,6 +85,20 @@ export const PERKS: Record<PerkId, PerkDef> = {
     classId: 'mage',
     statEffects: [{ stat: 'speed', delta: 1 }],
   },
+  righteous: {
+    id: 'righteous',
+    name: 'Righteous',
+    description: '+3 Mind. Smite hits harder; Lay on Hands heals more.',
+    classId: 'paladin',
+    statEffects: [{ stat: 'mind', delta: 3 }],
+  },
+  vindicator: {
+    id: 'vindicator',
+    name: 'Vindicator',
+    description: '+2 Attack. Hit harder with Strike and basic melee.',
+    classId: 'paladin',
+    statEffects: [{ stat: 'attack', delta: 2 }],
+  },
 };
 
 export const CLASS_PERK_PAIRS: Record<ClassId, readonly [PerkId, PerkId]> = {
@@ -94,4 +108,5 @@ export const CLASS_PERK_PAIRS: Record<ClassId, readonly [PerkId, PerkId]> = {
   barbarian: ['berserker',    'tough_skin'],
   rogue:     ['lethal',       'evasive'],
   mage:      ['arcane_power', 'quick_cast'],
+  paladin:   ['righteous',    'vindicator'],
 };

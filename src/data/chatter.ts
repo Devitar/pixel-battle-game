@@ -53,4 +53,9 @@ export const CHATTER: Record<ClassId, Record<ChatterCondition, readonly string[]
     wounded:  ['My focus wavers.', 'The pain disrupts the threads.', 'Concentrate...'],
     critical: ['The spell fades...', 'My mind slips...', 'Hold me, I cannot...'],
   },
+  paladin: {
+    healthy:  ['The light is with us.', 'Righteousness is our shield.', 'Stand firm in faith.'],
+    wounded:  ['I am tested, not broken.', 'The light sustains me.', 'Pain tempers the soul.'],
+    critical: ['Light... do not forsake me...', 'I cannot... protect them...', 'Forgive my failure.'],
+  },
 };

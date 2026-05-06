@@ -245,10 +245,10 @@ export class TavernPanelScene extends Phaser.Scene {
 
   private buildCloseButton(): void {
     const closeBg = this.add
-      .rectangle(933, 113, 28, 28, 0x553333)
+      .rectangle(918, 113, 28, 28, 0x553333)
       .setStrokeStyle(1, 0x885555);
     this.add
-      .text(933, 113, '×', {
+      .text(918, 113, '×', {
         fontFamily: 'monospace',
         fontSize: '20px',
         color: '#ffffff',

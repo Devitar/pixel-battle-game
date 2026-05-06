@@ -156,7 +156,7 @@ function tryGenerateFloor(
   const dungeon = DUNGEONS[dungeonId];
   const scale = floorScale(floorNumber);
 
-  const rowCount = 8 + (floorNumber - 1);
+  const rowCount = (dungeon.rowsPerFloor ?? 8) + (floorNumber - 1);
   const idPrefix = `${dungeonId}-f${floorNumber}`;
   const idFor = (r: number, slot: 0 | 1 | 2): string => `${idPrefix}-r${r}-s${slot}`;
 
@@ -365,7 +365,7 @@ function tryGenerateFloor(
       const enc = composeBossEncounter(dungeon.bossId, dungeon.enemyPool, scale, rng);
       builtNodes.push({ id: stub.id, type, encounter: enc, nextNodeIds: stub.nextNodeIds.slice(), slot: stub.slot });
     } else if (type === 'shop') {
-      const inv = generateShop(floorNumber, rng).inventory;
+      const inv = generateShop(floorNumber, dungeon.tier, rng).inventory;
       builtNodes.push({ id: stub.id, type, inventory: inv, nextNodeIds: stub.nextNodeIds.slice(), slot: stub.slot });
     } else if (type === 'camp') {
       builtNodes.push({ id: stub.id, type, nextNodeIds: stub.nextNodeIds.slice(), slot: stub.slot });

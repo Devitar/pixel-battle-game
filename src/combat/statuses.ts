@@ -66,6 +66,10 @@ export function tickStatuses(combatant: Combatant, events: CombatEvent[]): void 
     if (status.effect.kind === 'poison' && !combatant.isDead) {
       applyPoisonDamage(combatant, status.effect.damagePerTurn, status.sourceId, events);
     }
+    // Regen mirrors poison's tick-before-decrement semantics so it fires every turn including the expiry turn.
+    if (status.effect.kind === 'regen' && !combatant.isDead) {
+      applyRegenHeal(combatant, status.effect.healPerTurn, status.sourceId, events);
+    }
 
     status.remainingTurns -= 1;
     if (status.remainingTurns <= 0) {
@@ -98,5 +102,24 @@ function applyPoisonDamage(
   if (lethal) {
     target.isDead = true;
     events.push({ kind: 'death', combatantId: target.id });
+  }
+}
+
+function applyRegenHeal(
+  target: Combatant,
+  healPerTurn: number,
+  sourceId: CombatantId,
+  events: CombatEvent[],
+): void {
+  const before = target.currentHp;
+  target.currentHp = Math.min(target.currentHp + healPerTurn, target.maxHp);
+  const actual = target.currentHp - before;
+  if (actual > 0) {
+    events.push({
+      kind: 'heal_applied',
+      sourceId,
+      targetId: target.id,
+      amount: actual,
+    });
   }
 }
