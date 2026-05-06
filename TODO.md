@@ -27,6 +27,25 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
+### 45 · Migrate UI to phaser-pixui library
+
+- **What:** Evaluate and (if a fit) migrate the panel/scene UI from hand-rolled Phaser primitives (Rectangle + Text + Container) to [phaser-pixui](https://github.com/skhoroshavin/phaser-pixui) — a UI component library for Phaser. Currently every panel hand-rolls layout via hardcoded x/y constants (the Cluster B · 44 mispositioning bug surfaced how brittle this is); pixui presumably provides a layout system + reusable widgets.
+- **Why:** The hand-rolled approach has produced systemic layout bugs (asymmetric padding, widget clipping, hidden tabs — all addressed in Cluster B · 44 by manually shifting constants). A proper UI library with layout primitives (containers, anchors, flex/stack layouts, themed widgets) would make these bugs structurally hard to write. Also reduces per-scene boilerplate (every panel currently re-implements close-button / title strip / list-pane / detail-pane patterns from scratch).
+- **Tier:** 2 (UX infrastructure)
+- **Acceptance:**
+  - **Needs brainstorming first.** This is a cross-cutting refactor touching every panel scene; design decisions need discussion before implementation. Open questions to resolve in brainstorming:
+    - Is phaser-pixui actually a fit? Read the repo, check maintenance status, evaluate API ergonomics, check Phaser-version compatibility (game uses Phaser 3.x — confirm pixui supports it).
+    - Are there better alternatives? (rex-ui plugins, dat.gui, building our own layout helpers, etc.)
+    - Migration scope: all-at-once, or incremental panel-by-panel? Incremental likely safer.
+    - Which scenes migrate first? (Probably blacksmith / barracks / hospital — the ones with the most repeated boilerplate from Cluster B · 44.)
+    - What's the bundle-size impact? Currently the game ships a slim Phaser build; adding a UI library adds weight.
+  - **If pixui is the right fit** (post-brainstorm): incremental migration plan with one panel at a time. Each panel commit should leave the game in a working state.
+  - **If pixui isn't the right fit** but the underlying problem is real (layout brittleness): consider building a small in-repo layout helper instead — `src/render/panel_layout.ts` with primitives like `panelContainer({ width, height })`, `headerStrip({ title, gold, closeButton })`, `splitPane({ left, right })`. Cluster B · 44's manual constant-shifting is evidence this would pay off.
+- **Touches:** every file under `src/scenes/` that builds UI (panel scenes, overlay scenes, the start scene). Likely a new dependency in `package.json` if pixui is chosen. Possibly new shared helpers in `src/render/`.
+- **Source:** `ideas.md` #5 (2026-05-06), promoted in response to the Cluster B · 44 systemic UI mispositioning bug that exposed the cost of hand-rolled layouts.
+
+---
+
 ### 44 · UI mispositioned across the whole game (panels off-center, widgets clipped)
 
 - **What:** Panels render shifted right, with elements clipped or overlapping. Specifically observed in the Blacksmith panel (screenshot 2026-05-06), but the user reports the issue is general across the whole game.
