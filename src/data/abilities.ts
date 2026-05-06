@@ -424,9 +424,29 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     id: 'consecrate',
     name: 'Consecrate',
     canCastFrom: [1, 2, 3],
-    target: { side: 'ally', slots: 'all' },
+    target: { side: 'ally', slots: 'all', includeCaster: true },
     effects: [{ kind: 'regen', healPerTurn: 3, duration: 3, statusId: 'consecrated' }],
     cooldown: 4,
+    tags: ['radiant'],
+  },
+
+  paladin_cleaving_smite: {
+    id: 'paladin_cleaving_smite',
+    name: 'Cleaving Smite',
+    canCastFrom: [1, 2],
+    target: { side: 'enemy', slots: [1, 2] },
+    effects: [{ kind: 'damage', power: 0.7, scalingStat: 'mind' }],
+    cooldown: 2,
+    tags: ['radiant'],
+    aiCondition: { kind: 'minTargets', n: 2 },
+  },
+
+  paladin_quick_smite: {
+    id: 'paladin_quick_smite',
+    name: 'Quick Smite',
+    canCastFrom: [1, 2],
+    target: { side: 'enemy', slots: [1] },
+    effects: [{ kind: 'damage', power: 1.0, scalingStat: 'mind', bonusCrit: 10 }],
     tags: ['radiant'],
   },
 };

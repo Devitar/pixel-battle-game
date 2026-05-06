@@ -55,7 +55,9 @@ export type AbilityId =
   // Paladin
   | 'paladin_strike'
   | 'lay_on_hands'
-  | 'consecrate';
+  | 'consecrate'
+  | 'paladin_cleaving_smite'
+  | 'paladin_quick_smite';
 
 export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished' | 'slowed' | 'burning' | 'drowning' | 'consecrated';
 
@@ -146,6 +148,9 @@ export interface TargetSelector {
   slots?: readonly SlotIndex[] | 'all' | 'furthest';
   filter?: TargetFilter;
   pick?: 'first' | 'random' | 'lowestHp' | 'highestHp';
+  // When true with side: 'ally', includes the caster in the candidate set.
+  // Default behavior excludes the caster (matches Bless/Mend convention).
+  includeCaster?: boolean;
 }
 
 export type AbilityEffect =

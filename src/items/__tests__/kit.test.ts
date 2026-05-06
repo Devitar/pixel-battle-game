@@ -132,6 +132,23 @@ describe('resolveCombatAbilities — Band 2 (same-family swap)', () => {
     expect(result.abilities).toContain('mage_holy_light');
     expect(result.abilities).not.toContain('firebolt');
   });
+
+  it('Paladin + axe → swap smite to paladin_cleaving_smite', () => {
+    const hero = makeHeroWith({ classId: 'paladin', weaponBaseId: 'axe_basic' });
+    const result = resolveCombatAbilities(hero);
+    expect(result.abilities).toContain('paladin_cleaving_smite');
+    expect(result.abilities).not.toContain('smite');
+    expect(result.abilities).toContain('paladin_strike');
+    expect(result.abilities).toContain('lay_on_hands');
+    expect(result.abilities).toContain('consecrate');
+  });
+
+  it('Paladin + daggers → swap smite to paladin_quick_smite', () => {
+    const hero = makeHeroWith({ classId: 'paladin', weaponBaseId: 'daggers_basic' });
+    const result = resolveCombatAbilities(hero);
+    expect(result.abilities).toContain('paladin_quick_smite');
+    expect(result.abilities).not.toContain('smite');
+  });
 });
 
 describe('resolveCombatAbilities — Band 3 (wholly wrong)', () => {
@@ -159,6 +176,7 @@ describe('resolveCombatAbilities — Band 3 (wholly wrong)', () => {
     const result = resolveCombatAbilities(hero);
     expect(result.abilities).toEqual(['rogue_strike']);
   });
+
 });
 
 describe('resolveCombatAbilities — Archer special case', () => {

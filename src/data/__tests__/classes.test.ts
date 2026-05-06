@@ -100,7 +100,7 @@ describe('CLASSES', () => {
 });
 
 describe('swap mappings', () => {
-  const SWAP_CLASSES: readonly ClassId[] = ['knight', 'priest', 'barbarian', 'rogue', 'mage'];
+  const SWAP_CLASSES: readonly ClassId[] = ['knight', 'priest', 'barbarian', 'rogue', 'mage', 'paladin'];
 
   it('Archer has no swapTarget or weaponSwaps', () => {
     expect(CLASSES.archer.swapTarget).toBeUndefined();
@@ -185,8 +185,11 @@ describe('Paladin', () => {
     expect(CLASSES.paladin.starterLoadout.shield).toBe('shield_basic');
   });
 
-  it('declares no swapTarget or weaponSwaps (Archer pattern)', () => {
-    expect(CLASSES.paladin.swapTarget).toBeUndefined();
-    expect(CLASSES.paladin.weaponSwaps).toBeUndefined();
+  it('declares smite as swapTarget with axe + daggers variants', () => {
+    expect(CLASSES.paladin.swapTarget).toBe('smite');
+    expect(CLASSES.paladin.weaponSwaps).toEqual({
+      axe: 'paladin_cleaving_smite',
+      daggers: 'paladin_quick_smite',
+    });
   });
 });

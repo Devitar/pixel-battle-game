@@ -56,6 +56,8 @@ const EXPECTED_IDS: readonly AbilityId[] = [
   'paladin_strike',
   'lay_on_hands',
   'consecrate',
+  'paladin_cleaving_smite',
+  'paladin_quick_smite',
 ];
 
 const KEBAB_CASE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -252,6 +254,7 @@ describe('consecrate', () => {
     expect(a.cooldown).toBe(4);
     expect(a.target.side).toBe('ally');
     expect(a.target.slots).toBe('all');
+    expect(a.target.includeCaster).toBe(true);
     expect(a.tags).toContain('radiant');
     const regen = a.effects.find((e) => e.kind === 'regen');
     expect(regen).toBeDefined();
@@ -259,6 +262,39 @@ describe('consecrate', () => {
       expect(regen.healPerTurn).toBe(3);
       expect(regen.duration).toBe(3);
       expect(regen.statusId).toBe('consecrated');
+    }
+  });
+});
+
+describe('paladin_cleaving_smite (axe swap variant of smite)', () => {
+  it('is a Mind-scaling AoE radiant strike on enemy slots 1-2 with cd 2', () => {
+    const a = ABILITIES.paladin_cleaving_smite;
+    expect(a.id).toBe('paladin_cleaving_smite');
+    expect(a.canCastFrom).toEqual([1, 2]);
+    expect(a.target.slots).toEqual([1, 2]);
+    expect(a.cooldown).toBe(2);
+    expect(a.tags).toContain('radiant');
+    const dmg = a.effects.find((e) => e.kind === 'damage');
+    if (dmg && dmg.kind === 'damage') {
+      expect(dmg.power).toBeCloseTo(0.7);
+      expect(dmg.scalingStat).toBe('mind');
+    }
+  });
+});
+
+describe('paladin_quick_smite (daggers swap variant of smite)', () => {
+  it('is a Mind-scaling single-target radiant strike with bonus crit', () => {
+    const a = ABILITIES.paladin_quick_smite;
+    expect(a.id).toBe('paladin_quick_smite');
+    expect(a.canCastFrom).toEqual([1, 2]);
+    expect(a.target.slots).toEqual([1]);
+    expect(a.cooldown).toBeUndefined();
+    expect(a.tags).toContain('radiant');
+    const dmg = a.effects.find((e) => e.kind === 'damage');
+    if (dmg && dmg.kind === 'damage') {
+      expect(dmg.power).toBeCloseTo(1.0);
+      expect(dmg.scalingStat).toBe('mind');
+      expect(dmg.bonusCrit).toBe(10);
     }
   });
 });

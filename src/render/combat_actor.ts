@@ -25,6 +25,8 @@ const STATUS_GLYPHS: Partial<Record<StatusId, { letter: string; color: string }>
   poisoned: { letter: 'P', color: '#88cc44' },
   slowed: { letter: 's', color: '#88ccff' },
   burning: { letter: 'b', color: '#ff6633' },
+  drowning: { letter: 'D', color: '#4488dd' },
+  consecrated: { letter: 'h', color: '#ffeebb' },
 };
 const STATUS_FALLBACK = { letter: '?', color: '#888888' };
 

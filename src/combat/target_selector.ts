@@ -30,7 +30,9 @@ export function resolveTargetSelector(
   if (selector.side === 'self') {
     candidates = [caster];
   } else if (selector.side === 'ally') {
-    candidates = state.combatants.filter((c) => c.side === caster.side && c.id !== caster.id);
+    candidates = selector.includeCaster
+      ? state.combatants.filter((c) => c.side === caster.side)
+      : state.combatants.filter((c) => c.side === caster.side && c.id !== caster.id);
   } else {
     candidates = state.combatants.filter((c) => c.side === opposingSide(caster.side));
   }

@@ -91,6 +91,8 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     preferredWeapon: 'sword',
     weaponFamily: 'melee',
     basicAbility: 'paladin_strike',
+    swapTarget: 'smite',
+    weaponSwaps: { axe: 'paladin_cleaving_smite', daggers: 'paladin_quick_smite' },
     abilities: ['paladin_strike', 'smite', 'lay_on_hands', 'consecrate'],
     aiPriority: ['consecrate', 'lay_on_hands', 'smite', 'paladin_strike'],
     starterLoadout: { weapon: 'sword_basic', shield: 'shield_basic' },

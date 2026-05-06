@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ABILITIES } from '@data/abilities';
 import { createRng } from '@util/rng';
 import { applyAbility } from '../effects';
+import { resolveTargetSelector } from '../target_selector';
 import type { CombatEvent, StatusInstance } from '../types';
 import { makeEnemyCombatant, makeHeroCombatant, makeTestState } from './helpers';
 
@@ -621,6 +622,31 @@ describe('poison effect', () => {
     expect(e0.statuses['poisoned'].remainingTurns).toBe(3);
     const statusEvent = events.find((e) => e.kind === 'status_applied' && e.statusId === 'poisoned');
     expect(statusEvent).toBeDefined();
+  });
+});
+
+describe('Consecrate caster targeting', () => {
+  // Consecrate's target selector uses `includeCaster: true`, so the party HoT
+  // hits ALL 3 allies in a 3-hero formation (caster + 2 others), giving the
+  // designed 27 HP party total per cast (3 heal × 3 turns × 3 allies).
+  it('applies consecrated status to ALL allies including the caster', () => {
+    const caster = makeHeroCombatant('paladin', 1, 'p0', {
+      baseStats: { hp: 20, attack: 3, defense: 4, speed: 3, mind: 4, crit: 5, dodge: 5 },
+    });
+    const ally1 = makeHeroCombatant('knight', 2, 'p1');
+    const ally2 = makeHeroCombatant('priest', 3, 'p2');
+    const state = makeTestState([caster, ally1, ally2], []);
+
+    const consecrate = ABILITIES.consecrate;
+    const targetIds = resolveTargetSelector(consecrate.target, caster, state, rng);
+    expect([...targetIds].sort()).toEqual(['p0', 'p1', 'p2']);
+
+    const events: CombatEvent[] = [];
+    applyAbility(consecrate, caster, targetIds, state, rng, events);
+
+    expect(state.combatants.find((c) => c.id === 'p0')!.statuses['consecrated']).toBeDefined();
+    expect(state.combatants.find((c) => c.id === 'p1')!.statuses['consecrated']).toBeDefined();
+    expect(state.combatants.find((c) => c.id === 'p2')!.statuses['consecrated']).toBeDefined();
   });
 });
 

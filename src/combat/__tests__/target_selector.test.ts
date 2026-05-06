@@ -29,6 +29,15 @@ describe('resolveTargetSelector', () => {
     expect(resolveTargetSelector({ side: 'ally' }, p0, state, rng)).toEqual(['p1']);
   });
 
+  it('side: ally with includeCaster: true returns the caster too', () => {
+    const p0 = makeHeroCombatant('paladin', 1, 'p0');
+    const p1 = makeHeroCombatant('knight', 2, 'p1');
+    const p2 = makeHeroCombatant('priest', 3, 'p2');
+    const state = makeTestState([p0, p1, p2], []);
+    expect(resolveTargetSelector({ side: 'ally', includeCaster: true }, p0, state, rng).sort())
+      .toEqual(['p0', 'p1', 'p2']);
+  });
+
   it('side: enemy returns opposite-side combatants', () => {
     const p0 = makeHeroCombatant('knight', 1, 'p0');
     const e0 = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
