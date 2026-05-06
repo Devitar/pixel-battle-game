@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CRYPT_BOSS, CRYPT_POOL } from '@data/enemies';
+import { DUNGEONS } from '@data/dungeons';
 import { EVENTS } from '@data/events';
 import type { Node } from '@dungeon/node';
 import { createRng } from '@util/rng';
@@ -534,3 +535,30 @@ function terminalId(nodes: readonly Node[]): string {
 function nodesInRow(nodes: readonly Node[], rowIndex: number): readonly Node[] {
   return nodes.filter((n) => depthOf(nodes, n.id) === rowIndex);
 }
+
+describe('generateFloor — rowsPerFloor', () => {
+  it('default (rowsPerFloor unset) produces 8 + (floor − 1) rows', () => {
+    const { nodes } = generateFloor('crypt', 1, createRng(1));
+    const rows = new Set(nodes.map(n => n.id.match(/-r(\d+)-/)?.[1])).size;
+    expect(rows).toBe(8);
+  });
+
+  it('default (rowsPerFloor unset) on floor 3 produces 10 rows', () => {
+    const { nodes } = generateFloor('crypt', 3, createRng(1));
+    const rows = new Set(nodes.map(n => n.id.match(/-r(\d+)-/)?.[1])).size;
+    expect(rows).toBe(10);
+  });
+
+  it('honors rowsPerFloor when set on a dungeon def', () => {
+    // Mutate the Crypt def temporarily for the duration of this test.
+    const original = DUNGEONS.crypt.rowsPerFloor;
+    (DUNGEONS.crypt as any).rowsPerFloor = 10;
+    try {
+      const { nodes } = generateFloor('crypt', 1, createRng(1));
+      const rows = new Set(nodes.map(n => n.id.match(/-r(\d+)-/)?.[1])).size;
+      expect(rows).toBe(10);
+    } finally {
+      (DUNGEONS.crypt as any).rowsPerFloor = original;
+    }
+  });
+});

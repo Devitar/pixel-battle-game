@@ -45,22 +45,34 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 Tier 3 scope from gdd §10. The Crypt is the only dungeon today; Tier 3 adds dungeons 2–4, unlock classes (Paladin, Hunter), unlock buildings (Chapel, Training Grounds), legendary tier, milestone achievements, level-10 perks, NG+. Most Tier 3 unlocks gate on first Sunken Keep clear, so Sunken Keep is the natural first task.
 
-### 1 · Sunken Keep (2nd dungeon)
+### 1 · Sunken Keep — Spec 2: content + art + first-Crypt-clear handler
 
-- **What:** Build the second-tier dungeon per gdd §4 — flooded castle theme, 4 nodes per floor (currently The Crypt has 3-floor runs; verify floor structure semantics), drowned knights + sea-beasts enemy pool, themed boss.
-- **Why:** Marquee Tier 3 task. Activates Tier 2 infrastructure that's been waiting for a 2nd dungeon to become meaningful (tier label deferred from B · 18; signature-enemy preview comparison; modifier visibility across new enemies). Unlocks the downstream Tier 3 cascade — Paladin class (gates on first Crypt clear, but the milestone-unlock plumbing doesn't exist yet); Chapel + Training Grounds + Hunter class (gate on first Sunken Keep clear).
+- **What:** Drop in the Sunken Keep dungeon now that spec 1's plumbing landed (2026-05-05 HISTORY). All foundation work is done: `DungeonTier`, multi-dungeon Expeditions UI with locked-card path, tier-aware balance, milestone registry. Spec 2 is strictly additive content.
+- **Why:** Activates the Tier 3 cascade. First Sunken Keep clear gates Hunter, Chapel, Training Grounds, and the Sunken Keep gear tier (gdd §9). First Crypt clear unlocks Sunken Keep — handler ships in this spec.
 - **Tier:** 3
+- **Acceptance** (additive — no refactors needed):
+  - Add `'sunken_keep'` to the `DungeonId` union in `src/data/types.ts`.
+  - Add `DUNGEONS['sunken_keep']` entry in `src/data/dungeons.ts`: `tier: 2`, `floorsPerRun: ?`, `rowsPerFloor: ?` (pick density carefully — the Phase 2b quota generator depends on row count), `enemyPool`, `bossId`, `unlockRequirement: 'Defeat the Bone Lich'`.
+  - Add 4 minion `EnemyId`s + 1 boss `EnemyId` to `src/data/types.ts`, definitions to `src/data/enemies.ts`, sprite mappings to `src/render/enemy_sprites.ts`. Boss is bespoke 32×32 per `BOSS_SHEET` pattern.
+  - Pick real values for `TIER_SCALING_SLOPE[2]`, `TIER_RARITY_FLOOR_BONUS[2]`, `TIER_GOLD_MULTIPLIER[2]` in `src/dungeon/scaling.ts` and `src/dungeon/loot.ts`.
+  - Pick the per-tier color palette for the tier badge in `src/scenes/expeditions_panel_scene.ts` (currently a placeholder).
+  - Add `'first_crypt_clear'` to `MilestoneId` in `src/data/types.ts`.
+  - Register `MILESTONES['first_crypt_clear']` handler in `src/run/milestones.ts` that adds `'sunken_keep'` to `state.unlocks.dungeons` (idempotent — checks first).
+  - Update `detectBossMilestones` body: `if (dungeonId === 'crypt' && floorNumber === DUNGEONS.crypt.floorsPerRun) return ['first_crypt_clear']`.
+  - Art can ship with placeholders initially per Cluster C precedent; bespoke sprites are Cluster C follow-up.
+- **Touches:** `src/data/types.ts`, `src/data/dungeons.ts`, `src/data/enemies.ts`, `src/data/abilities.ts` (new boss/minion abilities), `src/dungeon/scaling.ts`, `src/dungeon/loot.ts` (tier-2 numbers), `src/render/enemy_sprites.ts`, `src/run/milestones.ts`, `spritenames.txt` + `npm run generate:names` (for art).
+- **Source:** spec 1 ships at `docs/superpowers/specs/2026-05-05-sunken-keep-foundation-design.md` (Hand-off to spec 2 section). gdd §4 (dungeon table) + §5 (tier-scaling) + §9 (milestone unlocks).
+
+### 2 · Display-vs-credit mismatch for elite gold in result panel (pre-existing)
+
+- **What:** `corridor_scene.ts:1090` displays `COMBAT_NODE_REWARD × floor` (= 15 × floor) for non-boss combat, including elite nodes. But `completeCombat` actually credits `ELITE_NODE_GOLD × floor` (= 30 × floor). Result panel UI under-reports elite gold.
+- **Why:** Surfaced during spec 1's Task 6 review (corridor_scene preview was being threaded with `goldMultiplier`). Fix is small but out of scope for spec 1 (pre-existing, unrelated to tier work).
+- **Tier:** 2 (UI/UX bug)
 - **Acceptance:**
-  - **Needs decomposition during brainstorming** — likely sub-tasks:
-    - **Pre-task:** add `tier` field to `DungeonDef` + render in Expeditions card (deferred from B · 18 HISTORY — explicitly noted as "land it together with the 2nd dungeon when tier 1 vs tier 2 becomes meaningful").
-    - **Data layer:** dungeon def, 4 minion enemies + 1 boss with stats / abilities / preferred slots / tags. Boss is bespoke (32×32 frame per `BOSS_SHEET` pattern).
-    - **Balance:** scaling tweaks per gdd §5 — richer loot pool, gold multiplier, steeper scaling rate. May need a `tier` parameter threaded through `rollLoot` / `pickRarity` / `floorScale`.
-    - **Art:** new enemy + boss sprites in `spritenames.txt`, regenerate, update `enemy_sprites.ts` visual mappings. Could ship with placeholders initially per Cluster C precedent.
-    - **Milestone-unlock plumbing:** event-emit + handler for "first Crypt clear" and "first Sunken Keep clear" — currently no infrastructure exists for this. May warrant its own task.
-  - Per gdd §4: 4 nodes per floor (verify whether "floor length" in current `DungeonDef.floorLength` field means nodes-per-floor or floors-per-run; the Crypt has `floorLength: 3` and the dungeon scene shows 3 floors per run).
-  - Boss visually distinguishable, themed (sea-creature / drowned knight silhouette per gdd §4).
-- **Touches:** `src/data/dungeons.ts`, `src/data/types.ts` (`DungeonDef.tier`), `src/data/enemies.ts`, `src/data/abilities.ts`, `src/dungeon/*` (scaling), `spritenames.txt` + `npm run generate:names`, `src/render/enemy_sprites.ts`, `src/scenes/expeditions_panel_scene.ts` (tier label render), possibly new `src/run/milestones.ts` for unlock plumbing.
-- **Source:** gdd §4 (dungeon table) + §5 (tier-scaling) + §9 (milestone unlocks).
+  - Result-panel reward calc branches on `elite` separately, using `ELITE_NODE_REWARD` (define a const matching `ELITE_NODE_GOLD` in run_state.ts, or import from there).
+  - Spot-check that the duplicated `COMBAT_NODE_REWARD`/`BOSS_NODE_REWARD` constants in corridor_scene.ts vs the `*_NODE_GOLD` originals in run_state.ts are kept in sync (or deduplicated by importing from one source — the cleaner fix).
+- **Touches:** `src/scenes/corridor_scene.ts`.
+- **Source:** spec 1 Task 6 quality review (2026-05-05).
 
 ---
 

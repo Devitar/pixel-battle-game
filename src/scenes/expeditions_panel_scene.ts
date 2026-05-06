@@ -1,13 +1,14 @@
 import * as Phaser from 'phaser';
 import { listHeroes } from '@camp/roster';
 import { DUNGEONS } from '@data/dungeons';
-import type { EnemyId } from '@data/types';
+import type { DungeonDef, DungeonId, EnemyId } from '@data/types';
 import type { Hero } from '@heroes/hero';
 import { EnemySprite } from '@render/enemy_sprite';
 import { startRun } from '@run/run_state';
 import { HeroCard } from '@ui/hero_card';
 import { createRng } from '@util/rng';
 import { appState } from './app_state';
+import { computeCardPositions } from './expeditions_layout';
 
 type Stage = 'dungeon_list' | 'party_picker';
 
@@ -25,15 +26,6 @@ const TITLE_Y = 60;
 const SUBTITLE_Y = 88;
 const CLOSE_X_X = 933;
 const CLOSE_X_Y = 63;
-
-// Stage 1
-const DUNGEON_CARD_W = 460;
-const DUNGEON_CARD_H = 220;
-const PREVIEW_SCALE = 2;
-const PREVIEW_GROUND_Y = 337;
-const PREVIEW_GAP = 12;
-const ENEMY_FRAME_W = 16;  // ENEMY_SHEET.frameWidth
-const BOSS_FRAME_W = 32;   // BOSS_SHEET.frameWidth
 
 // Stage 2 — slot row. Slot 1 (front) on the right to match combat scene's
 // party layout (party on left of combat, slot 1 closest to enemies on the right).
@@ -65,6 +57,7 @@ export class ExpeditionsPanelScene extends Phaser.Scene {
   private stage: Stage = 'dungeon_list';
   private stageContainer!: Phaser.GameObjects.Container;
   private titleText!: Phaser.GameObjects.Text;
+  private selectedDungeonId: DungeonId = 'crypt';
 
   private formation: (Hero | null)[] = [null, null, null];
   private eligibleHeroes: Hero[] = [];
@@ -152,7 +145,8 @@ export class ExpeditionsPanelScene extends Phaser.Scene {
       this.titleText.setText('Expeditions');
       this.buildDungeonListStage();
     } else {
-      this.titleText.setText('The Crypt — Pick Your Party');
+      const def = DUNGEONS[this.selectedDungeonId];
+      this.titleText.setText(`${def.name} — Pick Your Party`);
       this.formation = [null, null, null];
       this.eligibleHeroes = listHeroes(appState.get().roster).filter((h) => h.currentHp > 0);
       this.buildPartyPickerStage();
@@ -171,77 +165,122 @@ export class ExpeditionsPanelScene extends Phaser.Scene {
         .setOrigin(0.5),
     );
 
-    const cardBorder = 0x444444;
+    const allDungeons = Object.values(DUNGEONS);
+    const unlockedIds = new Set(appState.get().unlocks.dungeons);
+    const cards = allDungeons.map(def => ({ def, locked: !unlockedIds.has(def.id) }));
+
+    const CARD_W = 820;
+    const CARD_H = 96;
+    const GAP = 12;
+    const positions = computeCardPositions(cards.length, PANEL_H, CARD_H, GAP);
+    const panelTop = PANEL_CY - PANEL_H / 2;
+
+    for (let i = 0; i < cards.length; i++) {
+      const { def, locked } = cards[i];
+      const cardY = panelTop + positions[i];
+      this.renderDungeonCard(PANEL_CX, cardY, CARD_W, CARD_H, def, locked);
+    }
+  }
+
+  private renderDungeonCard(
+    cx: number,
+    cy: number,
+    w: number,
+    h: number,
+    def: DungeonDef,
+    locked: boolean,
+  ): void {
+    const cardBorder = locked ? 0x333333 : 0x444444;
     const cardBg = this.add
-      .rectangle(PANEL_CX, PANEL_CY, DUNGEON_CARD_W, DUNGEON_CARD_H, 0x1a1a1a)
+      .rectangle(cx, cy, w, h, locked ? 0x141414 : 0x1a1a1a)
       .setStrokeStyle(2, cardBorder);
     this.stageContainer.add(cardBg);
 
-    const def = DUNGEONS.crypt;
+    // Title (top-left)
+    const title = locked ? '???' : def.name;
+    const titleObj = this.add
+      .text(cx - w / 2 + 16, cy - h / 2 + 12, title, {
+        fontFamily: 'monospace',
+        fontSize: '18px',
+        color: locked ? '#666666' : '#ffffff',
+      })
+      .setOrigin(0, 0);
+    this.stageContainer.add(titleObj);
+
+    // Tier badge — placeholder palette in spec 1; spec 2 picks real per-tier colors.
+    const TIER_COLOR: Record<number, number> = { 1: 0xccaa44, 2: 0x4488cc, 3: 0xcc4444, 4: 0x8844cc };
+    const badgeColor = TIER_COLOR[def.tier] ?? 0x666666;
+    const badgeX = titleObj.x + titleObj.width + 8;
+    const badgeY = titleObj.y + titleObj.height / 2;
+    const badgeBg = this.add
+      .rectangle(badgeX, badgeY, 36, 18, badgeColor)
+      .setOrigin(0, 0.5);
+    this.stageContainer.add(badgeBg);
     this.stageContainer.add(
       this.add
-        .text(PANEL_CX, 195, def.name, {
+        .text(badgeX + 18, badgeY, `T${def.tier}`, {
           fontFamily: 'monospace',
-          fontSize: '22px',
+          fontSize: '11px',
           color: '#ffffff',
         })
-        .setOrigin(0.5, 0),
-    );
-    this.stageContainer.add(
-      this.add
-        .text(PANEL_CX, 225, def.theme, {
-          fontFamily: 'monospace',
-          fontSize: '13px',
-          color: '#aaaaaa',
-        })
-        .setOrigin(0.5, 0),
-    );
-    this.stageContainer.add(
-      this.add
-        .text(PANEL_CX, 250, `${def.floorLength} floors`, {
-          fontFamily: 'monospace',
-          fontSize: '13px',
-          color: '#aaaaaa',
-        })
-        .setOrigin(0.5, 0),
-    );
-    this.stageContainer.add(
-      this.add
-        .text(PANEL_CX, 350, '▸ Click to plan an expedition', {
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: '#ffcc66',
-        })
-        .setOrigin(0.5, 0),
+        .setOrigin(0.5),
     );
 
-    // Signature-enemy preview row — minions then boss, bottom-aligned on
-    // PREVIEW_GROUND_Y. Boss is naturally larger via its 32-px frame.
+    // Theme + floor count (top-right) OR unlock requirement (locked)
+    const themeText = locked
+      ? `Unlock by: ${def.unlockRequirement ?? 'Locked'}`
+      : `${def.theme} · ${def.floorsPerRun} floors`;
+    this.stageContainer.add(
+      this.add
+        .text(cx + w / 2 - 16, cy - h / 2 + 16, themeText, {
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          color: '#aaaaaa',
+        })
+        .setOrigin(1, 0),
+    );
+
+    // Signature enemy strip (bottom-left)
     const ids: readonly EnemyId[] = [...def.enemyPool, def.bossId];
-    const totalWidth =
-      def.enemyPool.length * ENEMY_FRAME_W * PREVIEW_SCALE
-      + BOSS_FRAME_W * PREVIEW_SCALE
-      + def.enemyPool.length * PREVIEW_GAP;
-    let cursor = PANEL_CX - totalWidth / 2;
+    const SCALE = 1.5;
+    const FRAME_W = 16;
+    const BOSS_W = 32;
+    const GAP_PX = 6;
+    let cursor = cx - w / 2 + 16;
+    const stripGroundY = cy + h / 2 - 8;
 
     for (const enemyId of ids) {
       const isBoss = enemyId === def.bossId;
-      const frameW = isBoss ? BOSS_FRAME_W : ENEMY_FRAME_W;
-      const fullSize = frameW * PREVIEW_SCALE;
+      const frameW = isBoss ? BOSS_W : FRAME_W;
+      const fullSize = frameW * SCALE;
       const centerX = cursor + fullSize / 2;
-      // Phaser containers ignore setOrigin — bottom-align by computing center
-      // from the desired bottom edge.
-      const centerY = PREVIEW_GROUND_Y - fullSize / 2;
+      const centerY = stripGroundY - fullSize / 2;
       const sprite = new EnemySprite(this, centerX, centerY, enemyId);
-      sprite.setScale(PREVIEW_SCALE);
+      sprite.setScale(SCALE);
+      if (locked) sprite.setLocked(true);
       this.stageContainer.add(sprite);
-      cursor += fullSize + PREVIEW_GAP;
+      cursor += fullSize + GAP_PX;
     }
 
-    cardBg.setInteractive({ useHandCursor: true });
-    cardBg.on('pointerover', () => cardBg.setStrokeStyle(2, 0xffcc66));
-    cardBg.on('pointerout', () => cardBg.setStrokeStyle(2, cardBorder));
-    cardBg.on('pointerdown', () => this.setStage('party_picker'));
+    // Click prompt (bottom-right) — unlocked only
+    if (!locked) {
+      this.stageContainer.add(
+        this.add
+          .text(cx + w / 2 - 16, cy + h / 2 - 12, '▸ Click to plan', {
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            color: '#ffcc66',
+          })
+          .setOrigin(1, 1),
+      );
+      cardBg.setInteractive({ useHandCursor: true });
+      cardBg.on('pointerover', () => cardBg.setStrokeStyle(2, 0xffcc66));
+      cardBg.on('pointerout', () => cardBg.setStrokeStyle(2, cardBorder));
+      cardBg.on('pointerdown', () => {
+        this.selectedDungeonId = def.id;
+        this.setStage('party_picker');
+      });
+    }
   }
 
   private buildPartyPickerStage(): void {
@@ -507,7 +546,7 @@ export class ExpeditionsPanelScene extends Phaser.Scene {
 
     const seed = Date.now();
     const rng = createRng(seed);
-    const runState = startRun('crypt', party, seed, rng);
+    const runState = startRun(this.selectedDungeonId, party, seed, rng);
 
     appState.update((s) => ({
       ...s,

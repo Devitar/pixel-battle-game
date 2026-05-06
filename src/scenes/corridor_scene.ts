@@ -5,13 +5,16 @@ import type { Item, Rarity } from '@data/types';
 import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels';
 import { removeHero, tickRosterWounds } from '@camp/roster';
 import { CHATTER, computeChatterCondition } from '@data/chatter';
+import { DUNGEONS } from '@data/dungeons';
 import { ENEMIES } from '@data/enemies';
 import type { Encounter, Node } from '@dungeon/node';
+import { goldMultiplier } from '@dungeon/scaling';
 import type { Hero } from '@heroes/hero';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { CombatActor } from '@render/combat_actor';
 import { ENEMY_VISUALS } from '@render/enemy_sprites';
 import { buildCombatState } from '@run/combat_setup';
+import { applyPendingMilestones } from '@run/milestones';
 import {
   completeCombat,
   completeSurpriseCombat,
@@ -552,7 +555,7 @@ export class CorridorScene extends Phaser.Scene {
 
   private buildSurpriseResultPanel(): void {
     const run = appState.get().runState!;
-    const reward = SURPRISE_GOLD_BASE * run.currentFloorNumber;
+    const reward = Math.round(SURPRISE_GOLD_BASE * run.currentFloorNumber * goldMultiplier(DUNGEONS[run.dungeonId].tier));
 
     const lootCount = this.combatLoot.length;
     const lootBlockHeight = lootCount > 0 ? 16 + lootCount * 14 : 0;
@@ -1085,10 +1088,12 @@ export class CorridorScene extends Phaser.Scene {
         n.nextNodeIds.includes(run.currentNodeId),
       )!;
     }
-    const reward =
-      completedNode.type === 'boss'
+    const gm = goldMultiplier(DUNGEONS[run.dungeonId].tier);
+    const reward = Math.round(
+      (completedNode.type === 'boss'
         ? BOSS_NODE_REWARD * run.currentFloorNumber
-        : COMBAT_NODE_REWARD * run.currentFloorNumber;
+        : COMBAT_NODE_REWARD * run.currentFloorNumber) * gm,
+    );
 
     const lootCount = this.combatLoot.length;
     const lootBlockHeight = lootCount > 0 ? 16 + lootCount * 14 : 0;
@@ -1290,8 +1295,9 @@ export class CorridorScene extends Phaser.Scene {
   }
 
   private onWipeReturn(): void {
-    const fallenIds = new Set(this.wipeOutcome!.heroesFallen.map((h) => h.id));
-    const lostIds = new Set(this.wipeOutcome!.heroesLost.map((h) => h.id));
+    const wipe = this.wipeOutcome!;
+    const fallenIds = new Set(wipe.heroesFallen.map((h) => h.id));
+    const lostIds = new Set(wipe.heroesLost.map((h) => h.id));
 
     appState.update((s) => {
       let roster = s.roster;
@@ -1306,13 +1312,14 @@ export class CorridorScene extends Phaser.Scene {
         }
       }
       roster = tickRosterWounds(roster, hospitalTickAmount(s.buildingLevels.hospital));
-      return {
+      const next = {
         ...s,
         roster,
         hospitalTreatmentsRemaining: hospitalTreatmentCap(s.buildingLevels.hospital),
         runState: undefined,
         runRngState: undefined,
       };
+      return applyPendingMilestones(next, wipe.milestonesTriggered);
     });
 
     this.scene.start('camp');

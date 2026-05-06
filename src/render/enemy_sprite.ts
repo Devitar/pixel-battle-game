@@ -25,4 +25,15 @@ export class EnemySprite extends Phaser.GameObjects.Container {
     }
     scene.add.existing(this);
   }
+
+  setLocked(locked: boolean): void {
+    const tint = locked ? 0x000000 : 0xffffff;
+    const alpha = locked ? 0.7 : 1.0;
+    this.list.forEach((child) => {
+      if (child instanceof Phaser.GameObjects.Image) {
+        child.setTint(tint);
+        child.setAlpha(alpha);
+      }
+    });
+  }
 }

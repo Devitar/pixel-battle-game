@@ -236,14 +236,21 @@ export interface EnemyDef {
 
 export type DungeonId = 'crypt';
 
+export type DungeonTier = 1 | 2 | 3 | 4;
+
 export interface DungeonDef {
   id: DungeonId;
   name: string;
   theme: string;
-  floorLength: number;
+  tier: DungeonTier;
+  floorsPerRun: number;
+  rowsPerFloor?: number;
   enemyPool: readonly EnemyId[];
   bossId: EnemyId;
+  unlockRequirement?: string;
 }
+
+export type MilestoneId = never; // empty in spec 1; spec 2 introduces 'first_crypt_clear'
 
 export type TraitId =
   | 'stout'

@@ -1,14 +1,17 @@
-import type { DungeonId, Item, Wound } from '@data/types';
+import type { DungeonId, DungeonTier, Item, MilestoneId, Wound } from '@data/types';
 import { applyLevelUps, levelForXp, xpForBossNode, xpForCombatNode, xpForEliteNode } from '@data/leveling';
 import { DEFAULT_WOUND_RUNS_REMAINING } from '@data/wounds';
+import { DUNGEONS } from '@data/dungeons';
 import { applyCampNodeEffect, type CampNodeChoice } from '@dungeon/camp_node';
 import { generateFloor } from '@dungeon/floor';
 import { rollLoot, type LootKind } from '@dungeon/loot';
 import type { Node } from '@dungeon/node';
+import { goldMultiplier } from '@dungeon/scaling';
 import type { CombatEvent, CombatResult } from '@combat/types';
 import type { Hero } from '@heroes/hero';
 import type { Rng } from '@util/rng';
 import { addGold, addItem, createPack, spendGold, type Pack, totalGold } from './pack';
+import { detectBossMilestones } from './milestones';
 
 export type RunStatus = 'in_dungeon' | 'camp_screen' | 'ended';
 
@@ -26,6 +29,7 @@ export interface RunState {
   readonly lost: readonly Hero[];
   readonly traversedNodeIds: readonly string[];
   readonly surprisesThisFloor: number;
+  readonly pendingMilestones: readonly MilestoneId[];
 }
 
 export interface CashoutOutcome {
@@ -34,15 +38,22 @@ export interface CashoutOutcome {
   heroesReturned: readonly Hero[];
   heroesFallen: readonly Hero[];   // died in combat this run
   heroesLost: readonly Hero[];     // narratively Lost via event/hazard during this run
+  milestonesTriggered: readonly MilestoneId[];
 }
 
 export interface WipeOutcome {
   packLost: Pack;
   heroesFallen: readonly Hero[];   // died in combat (including the wiping fight)
   heroesLost: readonly Hero[];     // narratively Lost prior to the wipe
+  milestonesTriggered: readonly MilestoneId[];
 }
 
 export const PARTY_SIZE = 3;
+
+function dungeonTierOf(runState: RunState): DungeonTier {
+  return DUNGEONS[runState.dungeonId].tier;
+}
+
 const COMBAT_NODE_GOLD = 15;
 const ELITE_NODE_GOLD = 30;
 const BOSS_NODE_GOLD = 100;
@@ -71,6 +82,7 @@ export function startRun(
     lost: [],
     traversedNodeIds: [startNodeId],
     surprisesThisFloor: 0,
+    pendingMilestones: [],
   };
 }
 
@@ -199,6 +211,7 @@ export function completeCombat(
       packLost: runState.pack,
       heroesFallen: allLost,
       heroesLost: runState.lost,
+      milestonesTriggered: runState.pendingMilestones,
     };
     return {
       runState: {
@@ -207,6 +220,7 @@ export function completeCombat(
         fallen: allLost,
         pack: createPack(),
         status: 'ended',
+        pendingMilestones: [],
       },
       wipe,
     };
@@ -235,13 +249,14 @@ export function completeCombat(
     return applyLevelUps({ ...hero, xp: newXp }, hero.level, newLevel);
   });
 
+  const gm = goldMultiplier(dungeonTierOf(runState));
   const reward =
-    kind === 'boss'  ? BOSS_NODE_GOLD  * runState.currentFloorNumber :
-    kind === 'elite' ? ELITE_NODE_GOLD * runState.currentFloorNumber :
-                       COMBAT_NODE_GOLD * runState.currentFloorNumber;
+    kind === 'boss'  ? Math.round(BOSS_NODE_GOLD  * runState.currentFloorNumber * gm) :
+    kind === 'elite' ? Math.round(ELITE_NODE_GOLD * runState.currentFloorNumber * gm) :
+                       Math.round(COMBAT_NODE_GOLD * runState.currentFloorNumber * gm);
   let newPack = addGold(runState.pack, reward);
 
-  const drop = rollLoot(rng, runState.currentFloorNumber, kind);
+  const drop = rollLoot(rng, runState.currentFloorNumber, kind, dungeonTierOf(runState));
   if (drop) {
     newPack = addItem(newPack, drop);
   }
@@ -257,6 +272,11 @@ export function completeCombat(
   }
 
   if (isBoss) {
+    const def = DUNGEONS[runState.dungeonId];
+    const isCanonicalFinal = runState.currentFloorNumber === def.floorsPerRun;
+    const triggered = isCanonicalFinal
+      ? detectBossMilestones(runState.dungeonId, runState.currentFloorNumber)
+      : [];
     return {
       runState: {
         ...runState,
@@ -264,6 +284,7 @@ export function completeCombat(
         fallen: [...runState.fallen, ...newFallen],
         pack: newPack,
         status: 'camp_screen',
+        pendingMilestones: [...runState.pendingMilestones, ...triggered],
       },
     };
   }
@@ -329,6 +350,7 @@ export function completeSurpriseCombat(
       packLost: runState.pack,
       heroesFallen: allLost,
       heroesLost: runState.lost,
+      milestonesTriggered: runState.pendingMilestones,
     };
     return {
       runState: {
@@ -337,6 +359,7 @@ export function completeSurpriseCombat(
         fallen: allLost,
         pack: createPack(),
         status: 'ended',
+        pendingMilestones: [],
       },
       wipe,
     };
@@ -351,11 +374,11 @@ export function completeSurpriseCombat(
   });
 
   // Reduced gold reward.
-  const reward = SURPRISE_GOLD_BASE * runState.currentFloorNumber;
+  const reward = Math.round(SURPRISE_GOLD_BASE * runState.currentFloorNumber * goldMultiplier(dungeonTierOf(runState)));
   let newPack = addGold(runState.pack, reward);
 
   // Loot at standard 'combat' kind — same 10% gate.
-  const drop = rollLoot(rng, runState.currentFloorNumber, 'combat');
+  const drop = rollLoot(rng, runState.currentFloorNumber, 'combat', dungeonTierOf(runState));
   if (drop) {
     newPack = addItem(newPack, drop);
   }
@@ -413,9 +436,10 @@ export function cashout(runState: RunState): { runState: RunState; outcome: Cash
     heroesReturned: runState.party,
     heroesFallen: runState.fallen,
     heroesLost: runState.lost,
+    milestonesTriggered: runState.pendingMilestones,
   };
   return {
-    runState: { ...runState, status: 'ended' },
+    runState: { ...runState, status: 'ended', pendingMilestones: [] },
     outcome,
   };
 }

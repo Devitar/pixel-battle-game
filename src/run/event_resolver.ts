@@ -1,6 +1,8 @@
 import type { EventCard, EventPayload } from '@data/events';
-import type { Item } from '@data/types';
+import type { DungeonTier, Item } from '@data/types';
+import { DUNGEONS } from '@data/dungeons';
 import { rollEventItem } from '@dungeon/loot';
+import { goldMultiplier } from '@dungeon/scaling';
 import type { Hero } from '@heroes/hero';
 import type { Rng } from '@util/rng';
 import { addGold, addItem, spendGold } from './pack';
@@ -37,11 +39,13 @@ export function applyEventChoice(
     }
   }
 
+  const tier = DUNGEONS[runState.dungeonId].tier;
+
   let rs = runState;
   const outcome: EventOutcome = {};
 
   for (const payload of choice.payloads) {
-    const result = applyPayload(rs, payload, args, rng);
+    const result = applyPayload(rs, payload, args, rng, tier);
     rs = result.runState;
     Object.assign(outcome, result.outcomeDelta);
   }
@@ -54,6 +58,7 @@ function applyPayload(
   payload: EventPayload,
   args: EventChoiceArgs,
   rng: Rng,
+  tier: DungeonTier,
 ): { runState: RunState; outcomeDelta: Partial<EventOutcome> } {
   switch (payload.kind) {
     case 'hp_delta_party': {
@@ -72,9 +77,10 @@ function applyPayload(
     }
     case 'gold_delta': {
       const before = rs.pack.gold;
-      const newPack = payload.amount >= 0
-        ? addGold(rs.pack, payload.amount)
-        : spendGold(rs.pack, Math.min(rs.pack.gold, -payload.amount));
+      const scaledAmount = Math.round(payload.amount * goldMultiplier(tier));
+      const newPack = scaledAmount >= 0
+        ? addGold(rs.pack, scaledAmount)
+        : spendGold(rs.pack, Math.min(rs.pack.gold, -scaledAmount));
       const delta = newPack.gold - before;
       return {
         runState: { ...rs, pack: newPack },
@@ -82,7 +88,7 @@ function applyPayload(
       };
     }
     case 'add_item': {
-      const item = rollEventItem(rng, rs.currentFloorNumber, payload.rarity);
+      const item = rollEventItem(rng, rs.currentFloorNumber, payload.rarity, tier);
       return {
         runState: { ...rs, pack: addItem(rs.pack, item) },
         outcomeDelta: { itemAdded: item },

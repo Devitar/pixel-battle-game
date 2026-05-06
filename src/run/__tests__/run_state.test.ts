@@ -3,6 +3,7 @@ import { createHeroCombatant } from '@combat/combatant';
 import type { CombatResult, CombatState } from '@combat/types';
 import { xpForEliteNode } from '@data/leveling';
 import type { Item, SlotIndex } from '@data/types';
+import { DUNGEONS } from '@data/dungeons';
 import type { Encounter, Node } from '@dungeon/node';
 import { createHero, type Hero } from '@heroes/hero';
 import { createRng } from '@util/rng';
@@ -1262,6 +1263,8 @@ describe('completeSurpriseCombat', () => {
     expect(wipe).toBeDefined();
     expect(after.party.length).toBe(0);
     expect(after.status).toBe('ended');
+    expect(wipe!.milestonesTriggered).toEqual(rs.pendingMilestones);
+    expect(after.pendingMilestones).toEqual([]);
   });
 
   it('recovers fallen-hero gear into the pack on victory', () => {
@@ -1288,5 +1291,86 @@ describe('completeSurpriseCombat', () => {
     const { runState: after } = completeSurpriseCombat(rs, result, createRng(99));
     expect(after.pack.items.length).toBeGreaterThan(itemsBefore);
     expect(after.pack.items.some((i) => i.id === 'tst-sword')).toBe(true);
+  });
+});
+
+describe('completeCombat — pendingMilestones populate', () => {
+  it('canonical-final-boss defeat exercises the detectBossMilestones path (returns [] in spec 1)', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = advanceToBossNode(rs);
+    while (rs.currentFloorNumber < DUNGEONS.crypt.floorsPerRun) {
+      rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+      expect(rs.status).toBe('camp_screen');
+      rs = pressOn(rs, createRng(99));
+      rs = advanceToBossNode(rs);
+    }
+    const after = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    expect(after.status).toBe('camp_screen');
+    expect(after.pendingMilestones).toEqual([]);
+  });
+
+  it('non-canonical (floor 1) boss defeat in a 3-floor dungeon does NOT credit', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = advanceToBossNode(rs);
+    expect(rs.currentFloorNumber).toBe(1);
+    const after = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    expect(after.pendingMilestones).toEqual([]);
+  });
+
+  it('post-canonical (floor 4+) boss defeat does NOT credit', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    for (let f = 1; f <= DUNGEONS.crypt.floorsPerRun; f++) {
+      rs = advanceToBossNode(rs);
+      rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+      rs = pressOn(rs, createRng(99));
+    }
+    expect(rs.currentFloorNumber).toBe(DUNGEONS.crypt.floorsPerRun + 1);
+    rs = advanceToBossNode(rs);
+    const after = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    expect(after.pendingMilestones).toEqual([]);
+  });
+});
+
+describe('cashout — pendingMilestones drain', () => {
+  it('returns outcome.milestonesTriggered and zeros runState.pendingMilestones', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    while (rs.currentFloorNumber < DUNGEONS.crypt.floorsPerRun) {
+      rs = advanceToBossNode(rs);
+      rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+      rs = pressOn(rs, createRng(99));
+    }
+    rs = advanceToBossNode(rs);
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    expect(rs.status).toBe('camp_screen');
+
+    const { runState: ended, outcome } = cashout(rs);
+    expect(outcome.milestonesTriggered).toEqual(rs.pendingMilestones);
+    expect(ended.pendingMilestones).toEqual([]);
+    expect(ended.status).toBe('ended');
+  });
+});
+
+describe('completeCombat wipe path — pendingMilestones drain', () => {
+  it('wipe outcome includes milestonesTriggered and zeros runState.pendingMilestones', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    if (rs.awaitingFork) rs = chooseNextNode(rs, currentNode(rs).nextNodeIds[0]);
+    const wipeResult = mockCombatResult(rs.party, [0, 0, 0], 'player_defeat');
+    const { runState: ended, wipe } = completeCombat(rs, wipeResult, createRng(99));
+    expect(wipe).toBeDefined();
+    expect(wipe!.milestonesTriggered).toEqual(rs.pendingMilestones);
+    expect(ended.pendingMilestones).toEqual([]);
+    expect(ended.status).toBe('ended');
+  });
+});
+
+describe('pressOn — pendingMilestones persists across floor advance', () => {
+  it('pressOn carries pendingMilestones forward unchanged', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = advanceToBossNode(rs);
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    expect(rs.status).toBe('camp_screen');
+    const before = rs.pendingMilestones;
+    const after = pressOn(rs, createRng(99));
+    expect(after.pendingMilestones).toEqual(before);
   });
 });

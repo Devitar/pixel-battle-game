@@ -11,7 +11,8 @@ const CRYPT: DungeonDef = {
   id: 'crypt',
   name: 'The Crypt',
   theme: '',
-  floorLength: 3,
+  tier: 1,
+  floorsPerRun: 3,
   enemyPool: CRYPT_POOL,
   bossId: CRYPT_BOSS,
 };

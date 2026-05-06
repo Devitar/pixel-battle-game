@@ -29,6 +29,25 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-05 · Sunken Keep — Spec 1 (foundation + milestone plumbing) (Cluster D · 1)
+
+- **Why:** The Tier 3 cascade gates on Sunken Keep, which requires a `tier` concept, multi-dungeon Expeditions UI, and a milestone-unlock system that didn't exist. Decomposed during brainstorm into spec 1 (this — pure plumbing, no visible content) + spec 2 (Sunken Keep dungeon def + enemies + boss + art + first-Crypt-clear handler).
+- **Decisions** (Q1–Q6 in spec doc + sub-questions):
+  - Registry pattern with no handlers wired (`MilestoneId = never`); spec 2 adds the first id and handler.
+  - `floorLength` → `floorsPerRun` rename for clarity; new `rowsPerFloor?` knob defaults to 8 (Crypt unchanged).
+  - All four tier-balance dimensions plumbed at tier=1 baseline (rows, scaling slope, rarity floor-bonus, gold multiplier). Tier=1 is byte-identical to today; spec 2 picks tier-2 numbers.
+  - `cashout` stays pure of SaveFile — `outcome.milestonesTriggered` is the new field; scene-level orchestration applies milestones via `applyPendingMilestones`.
+  - Milestones fire on canonical-final-boss defeat (`floor === floorsPerRun`); `pendingMilestones` persists across `pressOn` so press-on-after-clear-then-wipe still credits.
+  - Shop prices stay flat at higher tier (gold multiplier applies to grants only).
+  - Locked-card silhouettes via `EnemySprite.setLocked` (tint `0x000000` + alpha 0.7).
+- **Surprises:**
+  - Surprise gold is computed in TWO sites (`run_state.ts` and `corridor_scene.ts` preview) — both threaded with `goldMultiplier(tier)`. The corridor preview wasn't in the original tier-threading catalogue.
+  - Treasure-room overlay scene's `rollLoot` call and the combat result panel's gold display were both initial misses caught by reviewers — display-side gold sites the plan didn't list. Both fixed in lockstep.
+  - `event_resolver.ts`'s `gold_delta` payload applies the multiplier to absolute amounts (not floor-scaled), and to negative penalties symmetrically. Tier=1 is identity so no behavior change; spec 2 should consciously confirm or override the symmetric-penalty semantics.
+  - Pre-existing bug noticed but NOT fixed (out of scope): `corridor_scene.ts:1090` displays `COMBAT_NODE_REWARD × floor` for non-boss combat, including elite — but `completeCombat` actually credits `ELITE_NODE_GOLD × floor`. Display-vs-credit mismatch for elite nodes today. Worth filing.
+  - `MilestoneId = never` triggers `TS2349` ("never has no call signatures") on `MILESTONES[id]()` in `applyPendingMilestones`. Worked around with a local cast; cast becomes unnecessary once spec 2 introduces a real id.
+- **Source:** spec `docs/superpowers/specs/2026-05-05-sunken-keep-foundation-design.md`; plan `docs/superpowers/plans/2026-05-05-sunken-keep-foundation.md`. Test count delta: 1515 → 1543 (+28).
+
 ### 2026-05-04 · Equipment flow unification
 
 - **What shipped:** Single unified `equip_scene` replacing both `barracks_equip_scene` and `equip_panel_scene`. Surfaces currently-equipped item stats at-rest via a slot-detail card; presents a clean before/after preview when swapping; shows ability gain/loss diffs with green/red coloring when changing weapon types.

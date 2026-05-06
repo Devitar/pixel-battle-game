@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '@util/rng';
-import { rollEventItem, rollLoot } from '../loot';
+import { rollEventItem, rollLoot, rollShopItem } from '../loot';
 
 describe('rollLoot — drop gate', () => {
   it('drops at roughly 10% on a non-boss combat node (Phase 5 retune from 50%)', () => {
@@ -339,6 +339,36 @@ describe('rollLoot — treasure kind', () => {
     for (const slot of ['weapon', 'shield', 'outfit', 'hat']) {
       expect(counts[slot]).toBeGreaterThanOrEqual(150);
       expect(counts[slot]).toBeLessThanOrEqual(350);
+    }
+  });
+});
+
+describe('loot — tier parameter parity (tier=1 default)', () => {
+  it('rollLoot(rng, f, kind) ≡ rollLoot(rng, f, kind, 1)', () => {
+    for (const seed of [1, 7, 42]) {
+      for (const floor of [1, 5, 10]) {
+        for (const kind of ['combat', 'elite', 'boss', 'treasure'] as const) {
+          const a = rollLoot(createRng(seed), floor, kind);
+          const b = rollLoot(createRng(seed), floor, kind, 1);
+          expect(a).toEqual(b);
+        }
+      }
+    }
+  });
+
+  it('rollShopItem(rng, slot, f) ≡ rollShopItem(rng, slot, f, 1)', () => {
+    for (const seed of [1, 7, 42]) {
+      const a = rollShopItem(createRng(seed), 'weapon', 5);
+      const b = rollShopItem(createRng(seed), 'weapon', 5, 1);
+      expect(a).toEqual(b);
+    }
+  });
+
+  it('rollEventItem(rng, f, rarity) ≡ rollEventItem(rng, f, rarity, 1)', () => {
+    for (const seed of [1, 7, 42]) {
+      const a = rollEventItem(createRng(seed), 5, 'rare');
+      const b = rollEventItem(createRng(seed), 5, 'rare', 1);
+      expect(a).toEqual(b);
     }
   });
 });

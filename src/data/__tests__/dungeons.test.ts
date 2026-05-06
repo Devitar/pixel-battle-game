@@ -8,8 +8,8 @@ describe('DUNGEONS', () => {
     expect(DUNGEONS['crypt'].id).toBe('crypt');
   });
 
-  it('crypt has positive finite floorLength', () => {
-    const len = DUNGEONS['crypt'].floorLength;
+  it('crypt has positive finite floorsPerRun', () => {
+    const len = DUNGEONS['crypt'].floorsPerRun;
     expect(len).toBeGreaterThan(0);
     expect(Number.isFinite(len)).toBe(true);
   });
@@ -26,5 +26,9 @@ describe('DUNGEONS', () => {
     const bossId = DUNGEONS['crypt'].bossId;
     expect(ENEMIES[bossId]).toBeDefined();
     expect(ENEMIES[bossId].role).toBe('boss');
+  });
+
+  it('crypt is tier 1', () => {
+    expect(DUNGEONS['crypt'].tier).toBe(1);
   });
 });

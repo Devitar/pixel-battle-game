@@ -29,6 +29,7 @@ function makeRunState(partyOverrides: Partial<Hero>[] = []): RunState {
     lost: [],
     traversedNodeIds: [],
     surprisesThisFloor: 0,
+    pendingMilestones: [],
   };
 }
 
