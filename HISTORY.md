@@ -29,6 +29,17 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-06 · Start scene — title + theme music (Cluster B · 43)
+
+- **Why:** `darkane_times.ogg` was committed but unwired — boot routed silently into camp/dungeon/camp_screen with no title moment. Pre-launch, the right time to overshoot on presentation. New `StartScene` intercepts boot's route, plays the theme on loop, shows "Darkane Times" + a fading "Tap anywhere to start" prompt, then forwards to whatever boot would have routed to.
+- **Decisions** (Q1–Q2 in spec):
+  - **Q1 — Stop music at tap.** Start scene fully owns its audio. No other scene has music yet, so cross-scene audio surface area pays no benefit. Camp/dungeon stay silent (matches today's behavior).
+  - **Q2 — Show on every boot.** Title + music play on every page load. Resume-from-save players see the title briefly, tap, land in their saved state. The 1-tap pause IS the brand moment.
+  - **Architecture:** boot computes `nextSceneId` from save state and dispatches via `scene.start('start', { nextSceneId })`. Start scene is save-agnostic. No app_state changes, no save changes, no unit tests (matches existing scene pattern — `src/scenes/__tests__/` only contains pure-helper tests).
+  - **Input:** pointerdown OR Enter OR Space all advance. Esc intentionally NOT bound — semantically "go back," but there's nowhere to go back to.
+- **Surprises:** None at implementation. Browser autoplay-policy gotcha was anticipated in the spec — the tap-anywhere prompt elegantly serves as the user gesture that unlocks the audio context. On first ever load the music may not play until tap; on subsequent loads it plays immediately. Acceptable v1 behavior.
+- **Source:** spec `docs/superpowers/specs/2026-05-06-start-scene-design.md`; plan `docs/superpowers/plans/2026-05-06-start-scene.md`. Test count: 1716 → 1716 (no test changes — Phaser scenes aren't unit-tested in this codebase).
+
 ### 2026-05-06 · Paladin class — first unlockable (Cluster D · 3)
 
 - **Why:** Spec 2 (Sunken Keep) carved Paladin out as a "future spec extending the same first_crypt_clear handler." This is that spec — Paladin is the player's reward for clearing the Crypt. After this lands, the Crypt floor-3 boss defeat unlocks both Sunken Keep (dungeon) AND Paladin (class).

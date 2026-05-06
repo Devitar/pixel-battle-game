@@ -27,25 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 43 · Start screen with title + theme music
-
-- **What:** New "start" Phaser scene shown after `boot_scene.ts` finishes loading. Displays a title banner ("Darkane Times"), a gently-flashing "Tap anywhere to start" prompt, and plays `public/assets/audio/darkane_times.ogg` as background music. Tapping anywhere advances to whatever scene `boot_scene` would have transitioned to (camp / dungeon / camp_screen depending on save state).
-- **Why:** Theme music exists in `public/assets/audio/darkane_times.ogg` but isn't wired into any scene yet. A start screen is the natural first listen and gives the game a proper "boot moment" — currently boot drops the player straight into camp with no title or audio establishing.
-- **Tier:** 2 (UX polish; not gdd-promised but high-value first-impression work).
-- **Acceptance:**
-  - New `src/scenes/start_scene.ts` registered in `main.ts`'s scene array.
-  - `boot_scene.ts` routes to `'start'` instead of directly to camp/dungeon/camp_screen; the start scene receives (or computes) the next-scene id and stores it for the tap handler.
-  - Music: `boot_scene.preload` loads `darkane_times.ogg` via `this.load.audio(...)`. Start scene plays it on enter (looping) and stops on tap before transitioning. Browser autoplay policy means audio may fail to start until the user interacts — a tap-anywhere screen sidesteps this elegantly.
-  - Title banner: large pixel-font text "Darkane Times" centered upper-half. Use the existing monospace font + scaling for now; bespoke title art is a future polish.
-  - "Tap anywhere to start": smaller text centered lower-half, alpha-tween between (e.g., 0.4 ↔ 1.0) over ~1.2s with yoyo for the gentle flash.
-  - Click/tap anywhere on the canvas advances. Escape/Enter keyboard fallback is nice-to-have.
-  - Background: solid color or subtle gradient placeholder until art lands; size to scene dimensions.
-  - **Open question** for implementation: does music continue into camp/dungeon (cross-scene audio survival), or stop at the tap? Default proposal: **stop at tap** so each scene owns its audio. Cross-scene music can be a future task.
-- **Touches:** new `src/scenes/start_scene.ts`; `src/main.ts` (scene registration); `src/scenes/boot_scene.ts` (route to 'start' instead of next scene; load audio).
-- **Source:** `ideas.md` #5 (2026-05-06).
-
----
-
 ### 42 · Tavern: pre-leveled hero candidates at higher cost (deferred)
 
 - **What:** Tavern hires are always level-1 fresh recruits regardless of when in the run progression you visit. User suggested higher-level pre-leveled candidates appearing at proportionally higher cost.
