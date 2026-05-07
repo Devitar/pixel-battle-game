@@ -29,6 +29,34 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-06 · pixui adoption — Hello-World on hospital (Cluster B · 45 sub-spec 2)
+
+- **Why:** Cluster B · 44 (UI mispositioning) revealed that hand-rolled layout drifts; sub-spec 1 attacked layout. Sub-spec 2 attacks the second axis: 60+ hand-rolled button/widget chains across 6 panel scenes. Adopt phaser-pixui (a Phaser 4 UI framework with sprite-art widgets) starting with hospital as the proof of concept. User had the canonical `tinyRPG_manaSoulGUI` + `tinyRPG_fontKit02` assets that match pixui's example, eliminating the art barrier.
+- **Decisions** (Q1–Q2 in spec; revised mid-brainstorm):
+  - **Q1.1 — Adopt pixui fully.** Even though pixui's `insert` DSL displaces sub-spec 1's helpers for migrated panels, the framework's value is worth the architectural pivot. Sub-spec 1's helpers stay relevant for unmigrated panels.
+  - **Q1.3 — pixel-tools build pipeline.** pixui example uses `pixel-tools` (npm dev dep) + YAML manifests. Build-time codegen — no manual atlas packing or BMFont generation. Adopted as-is.
+  - **Q2 — Hello-World scope.** Migrate one small panel (hospital). Mirrors sub-spec 1's pattern. Sub-spec 3 covers the rest.
+  - **Asset reorganization.** PNGs moved from `public/assets/sprites/tinyRPG_manaSoulGUI_v_1_0/` → `assets/ui/`; font sheets renamed to drop date prefixes (`mana_roots.png` etc.). Matches pixui example layout. Inputs at `assets/`, build output at `public/packed_assets/` (gitignored).
+- **Surprises:**
+  - **Windows shim required for pixel-tools.** `spawnSync('fontpack')` doesn't resolve npm `.cmd` shims without `shell: true`. Fix in `vite.config.ts`: at module-load time (before pixui's plugins run), copy platform binaries to `node_modules/.cache/pixel-tools-shims/{fontpack,atlaspack}.exe` and prepend that dir to PATH. Gated on `process.platform === 'win32'`. Linux/Mac unaffected.
+  - **pixui viewport mismatch (load-bearing).** `ResponsiveScene._getCanvasWidth/Height` reads `window.innerWidth/Height` (browser dims), not the Phaser game canvas. Wrong for embedded fixed-resolution games. Fix: in our `create()` BEFORE `super.create()`, monkey-patch the private accessors on `this` to return `this.game.scale.width/height` and re-run `_updateViewport()`. Constructor-time `_updateViewport` ran with bad numbers but never reached a render — re-running here corrects it. Sub-spec 3 starts by extracting this into a shared `fixPixuiCanvasViewport()` helper.
+  - **No dynamic UI rebuild in pixui.** Frames are immutable; state changes require `scene.restart()`. Hospital uses module-level `_pendingSelectedHeroId` to survive restart. Pattern works but every interaction triggers full UI teardown + rebuild — should monitor performance under rapid clicking.
+  - **Two visual regressions accepted.** No paperdoll/HeroCard per list slot (pixui can't host arbitrary Phaser GameObjects in Frames). No `selected` button-style highlight (no theme entry yet). Both filed for sub-spec 3.
+  - **Strategic concern surfaced.** Most remaining panels embed Phaser GameObjects (paperdolls in Barracks/Tavern/Equip/Expeditions, item sprites in Blacksmith). Sub-spec 3 should NOT commit to full pixui migration without a paper survey first; otherwise we'd hit pixui's no-GameObjects wall mid-migration.
+- **Source:** spec `docs/superpowers/specs/2026-05-06-pixui-adoption-design.md`; plan `docs/superpowers/plans/2026-05-06-pixui-adoption.md`. Test count: 1730 → 1730 (no new tests; pixui itself trusted, scenes not unit-tested in this codebase).
+
+### 2026-05-06 · Panel layout helpers — foundation + blacksmith migration (Cluster B · 45 sub-spec 1)
+
+- **Why:** Cluster B · 44 (UI mispositioning bug) showed that hand-rolled layout constants drift across files — 17 hardcoded x/y values across 5 panel scenes had to be manually shifted to fix asymmetric padding, close-button overflow, and tab/list-pane overlap. Pure-function layout helpers prevent this by construction: symmetric margins are computed, not specified; close buttons can't overflow because the helper enforces padding from the panel-right edge. Foundation for sub-spec 2 (pixui) and sub-spec 3 (remaining-panel migrations).
+- **Decisions** (Q1–Q5 in spec):
+  - **Q2 — Pure-function helpers (option A).** Coordinate-returning functions over container-builders (B) or declarative trees (C). Trade-off: less per-scene boilerplate reduction than B, but no upfront API design pressure, no escape-hatch friction, trivially testable. A → B is an additive evolution available later when patterns prove themselves.
+  - **Q3 — Three helpers in first cut.** `panelLayout`, `splitPaneLayout`, `headerStripLayout` — exactly what blacksmith needs. Tab-strip, row-list, slot-grid helpers wait for the third use case (Rule of Three).
+  - **Q4 — Migration shape preserves existing constant names** in blacksmith (`PANEL_CX`, `LIST_PANE_CX`, etc.). Values now derived from helpers; downstream code unchanged. Pixel-identical migration.
+- **Surprises:**
+  - **Spec's `marginV: 65` was mathematically wrong** — would have produced `listCy=270`, but blacksmith's actual layout has `listCy=285` (asymmetric: 80 above pane, 50 below). Implementer extended `splitPaneLayout` with optional `marginVTop` / `marginVBottom` to preserve pixel identity. Backward-compatible — symmetric callers ignore the new fields.
+  - **Code reviewer caught two doc gaps in blacksmith call-site:** `marginV: 0` looked like real input but was overridden by `marginVTop`/`marginVBottom`; the `80/50` numbers had no rationale at the call site. Fixed inline with one comment block explaining the asymmetric vertical layout (header strip ~80px above, panel chrome ~50px below).
+- **Source:** spec `docs/superpowers/specs/2026-05-06-panel-layout-helpers-design.md`; plan `docs/superpowers/plans/2026-05-06-panel-layout-helpers.md`. Test count: 1716 → 1730 (+14 helper unit tests).
+
 ### 2026-05-06 · Start scene — title + theme music (Cluster B · 43)
 
 - **Why:** `darkane_times.ogg` was committed but unwired — boot routed silently into camp/dungeon/camp_screen with no title moment. Pre-launch, the right time to overshoot on presentation. New `StartScene` intercepts boot's route, plays the theme on loop, shows "Darkane Times" + a fading "Tap anywhere to start" prompt, then forwards to whatever boot would have routed to.
