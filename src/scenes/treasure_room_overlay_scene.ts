@@ -1,95 +1,82 @@
-import * as Phaser from 'phaser';
+import { ConstraintMode, UiScene } from 'phaser-pixui';
 import { DUNGEONS } from '@data/dungeons';
-import type { Item, Rarity } from '@data/types';
+import type { Item } from '@data/types';
 import { rollLoot } from '@dungeon/loot';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { claimTreasure, currentNode } from '@run/run_state';
+import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
+import { uiTheme } from '@render/ui_theme';
 import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 
-const PANEL_CX = 480;
-const PANEL_CY = 270;
-const PANEL_W = 340;
-const PANEL_H = 220;
+// Persists across scene.restart() so the opened state survives the rebuild.
+let _pendingState: 'closed' | 'opened' = 'closed';
+let _pendingItem: Item | undefined;
+let _pendingRngStateAfter: number | undefined;
 
-const TITLE_Y = PANEL_CY - PANEL_H / 2 + 30;
-const CHEST_Y = PANEL_CY - 10;
-const ITEM_NAME_Y = PANEL_CY + 30;
-const ITEM_AFFIX_Y = PANEL_CY + 50;
-const PROMPT_Y = PANEL_CY + PANEL_H / 2 - 28;
-
-const RARITY_HEX: Record<Rarity, string> = {
-  common: '#cccccc',
-  uncommon: '#4488ff',
-  rare: '#ffcc66',
-};
-
-type OverlayState = 'closed' | 'opened';
-
-export class TreasureRoomOverlayScene extends Phaser.Scene {
-  private state: OverlayState = 'closed';
-  private rolledItem?: Item;
-  private chestText!: Phaser.GameObjects.Text;
-  private promptText!: Phaser.GameObjects.Text;
-  private rngStateAfterRoll?: number;
-
+export class TreasureRoomOverlayScene extends UiScene {
   constructor() {
-    super('treasure_room_overlay');
+    super({
+      key: 'treasure_room_overlay',
+      viewportConstraints: { mode: ConstraintMode.Maximum, width: 960, height: 540 },
+      theme: uiTheme,
+    });
   }
 
   create(): void {
-    this.state = 'closed';
-    this.rolledItem = undefined;
-    this.rngStateAfterRoll = undefined;
+    fixPixuiCanvasViewport(this);
+    super.create();
 
-    // Dim backdrop captures clicks so they don't leak through to the dungeon.
-    this.add
-      .rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.6)
-      .setOrigin(0, 0)
-      .setInteractive();
+    const opened = _pendingState === 'opened';
 
-    this.add
-      .rectangle(PANEL_CX, PANEL_CY, PANEL_W, PANEL_H, 0x222222)
-      .setStrokeStyle(2, 0xffcc66);
+    // Header
+    this.insert.top.textArea({ y: 28, text: 'Treasure!' });
+    this.insert.topRight.button({
+      x: 4,
+      y: 4,
+      width: 48,
+      text: 'X',
+      onClick: () => this.close(),
+    });
 
-    this.add
-      .text(PANEL_CX, TITLE_Y, 'Treasure!', {
-        fontFamily: 'monospace',
-        fontSize: '18px',
-        color: '#ffcc66',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
+    // Central content frame (top-anchored so y is from canvas top)
+    const panel = this.insert.topLeft.frame({
+      x: 260,
+      y: 60,
+      width: 440,
+      height: 360,
+    });
 
-    this.chestText = this.add
-      .text(PANEL_CX, CHEST_Y, '📦', {
-        fontFamily: 'monospace',
-        fontSize: '48px',
-      })
-      .setOrigin(0.5);
-
-    this.promptText = this.add
-      .text(PANEL_CX, PROMPT_Y, '▸ click to open', {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#888888',
-        fontStyle: 'italic',
-      })
-      .setOrigin(0.5);
-
-    const clickTarget = this.add
-      .rectangle(PANEL_CX, PANEL_CY, PANEL_W, PANEL_H, 0x000000, 0)
-      .setStrokeStyle(0)
-      .setInteractive({ useHandCursor: true });
-    clickTarget.on('pointerdown', () => this.onClick());
-  }
-
-  private onClick(): void {
-    if (this.state === 'closed') {
-      this.openChest();
+    if (!opened) {
+      panel.insert.center.textArea({ text: 'A chest awaits.' });
+      panel.insert.bottom.button({
+        y: 12,
+        width: 160,
+        text: 'Open',
+        onClick: () => this.openChest(),
+      });
     } else {
-      this.takeAndAdvance();
+      const item = _pendingItem!;
+      const name = itemDisplayName(item);
+      const affixes = itemAffixDescription(item);
+      const rarityLabel = item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1);
+
+      panel.insert.top.textArea({ y: 20, text: rarityLabel });
+      panel.insert.top.textArea({ y: 60, text: name });
+
+      if (affixes.length > 0) {
+        panel.insert.top.textArea({ y: 100, text: affixes });
+      }
+
+      panel.insert.bottom.button({
+        y: 12,
+        width: 160,
+        text: 'Take',
+        onClick: () => this.takeAndAdvance(),
+      });
     }
+
+    this.input.keyboard?.on('keydown-ESC', () => this.close());
   }
 
   private openChest(): void {
@@ -103,44 +90,18 @@ export class TreasureRoomOverlayScene extends Phaser.Scene {
     if (!item) {
       throw new Error('TreasureRoomOverlayScene: rollLoot returned null for treasure kind');
     }
-    this.rolledItem = item;
-    this.rngStateAfterRoll = rng.getState();
-
-    this.chestText.setText('📭');
-    this.add
-      .circle(PANEL_CX, CHEST_Y, 38, 0xffcc66, 0.0)
-      .setStrokeStyle(2, 0xffcc66, 0.8);
-
-    const name = itemDisplayName(item);
-    const affixes = itemAffixDescription(item);
-    this.add
-      .text(PANEL_CX, ITEM_NAME_Y, name, {
-        fontFamily: 'monospace',
-        fontSize: '13px',
-        color: RARITY_HEX[item.rarity],
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
-    if (affixes.length > 0) {
-      this.add
-        .text(PANEL_CX, ITEM_AFFIX_Y, affixes, {
-          fontFamily: 'monospace',
-          fontSize: '10px',
-          color: '#aaaaaa',
-        })
-        .setOrigin(0.5);
-    }
-
-    this.promptText.setText('▸ click to take');
-    this.state = 'opened';
+    _pendingState = 'opened';
+    _pendingItem = item;
+    _pendingRngStateAfter = rng.getState();
+    this.scene.restart();
   }
 
   private takeAndAdvance(): void {
-    if (!this.rolledItem || this.rngStateAfterRoll === undefined) {
+    if (!_pendingItem || _pendingRngStateAfter === undefined) {
       throw new Error('TreasureRoomOverlayScene: takeAndAdvance with no rolled item');
     }
-    const item = this.rolledItem;
-    const rngStateAfter = this.rngStateAfterRoll;
+    const item = _pendingItem;
+    const rngStateAfter = _pendingRngStateAfter;
 
     appState.update((s) => {
       const node = currentNode(s.runState!);
@@ -156,6 +117,13 @@ export class TreasureRoomOverlayScene extends Phaser.Scene {
       };
     });
 
+    this.close();
+  }
+
+  private close(): void {
+    _pendingState = 'closed';
+    _pendingItem = undefined;
+    _pendingRngStateAfter = undefined;
     this.scene.stop();
     this.scene.resume('corridor');
   }

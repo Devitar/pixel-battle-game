@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-07 · pixui easy panels migration (Cluster B · 45 sub-spec 3b)
+
+- **Why:** Mechanical application of sub-spec 3a's pattern to the 4 panels that don't embed HeroCard/Paperdoll: TreasureRoomOverlay, ShopOverlay, CampNodeOverlay, Blacksmith. After 3b, 6 of 11 panels run on pixui; only HeroCard-dependent panels remain (3c). Validates `pixui.Dialog` (Blacksmith sell-confirm — first use in codebase) and inline `pixui.Image` for item icons before 3c needs them.
+- **Decisions** (Q1–Q2 in spec):
+  - **Q1 — Adopt `pixui.Dialog` directly** for Blacksmith sell-confirm. No wrapper. Theme already configured (`frame: 'frame_bright', backdropAlpha: 0.5`). If 3c surfaces 3+ confirm-dialog sites, extract `confirmDialog()` then.
+  - **Q2 — Inline `pixui.Image` for item icons.** Defer `pixuiItemIcon()` extraction until Equip slot strip (3c) is the 3rd use site, so the helper API is informed by real callers.
+  - **Migration order:** smallest first (Treasure → Shop → CampNode → Blacksmith) so the pattern settled before Blacksmith + Dialog adoption hit together.
+- **Surprises:**
+  - **`pixui.Dialog` API shape:** extends Frame; `{width, height, style, x?, y?}` config; starts `visible: false` (hardcoded); children via `dialog.insert.X(...)`; **dismissal is `dialog.visible = false`** (no `.close()` method); backdrop built-in. Pattern adopted: only construct when state field is non-null, set `visible = true` immediately, dismiss via clear-state + `scene.restart()`. Cleaner than create-and-destroy.
+  - **`pixui.TextArea` has no `.internal`** — it's `StyledComponent`, not `Renderable`. No color tint. Tasks 1–3 worked around with plain rarity-label text. Blacksmith rows kept raw Phaser for row backgrounds + colored cost text + Upgrade/Sell button (selection highlight + cost-affordability tint + disabled state all need per-row tinting that pixui can't express today). Articulable workaround filed as Cluster B · 57 to revisit when tintable text or a `'selected'` theme style (Cluster B · 48) lands.
+  - **pixui bitmap fonts can't render emoji** — TreasureRoomOverlay dropped 📦/📭 in favor of plain text. Constant upstream limitation.
+  - **`this` vs `this.scene` inside UiScene** — `this` IS the Scene; `this.scene` is the ScenePlugin manager. Pass `this` to pixui widget constructors (`new Image(this, {...})`). Spec doc's example had this backwards — would have failed typecheck if followed literally. Fixed inline in the spec post-review.
+  - **`panel_layout.ts` is now orphaned** — zero consumers across `src/` after Blacksmith stopped importing it. Clean retirement candidate for sub-spec 3c cleanup.
+- **Source:** spec `docs/superpowers/specs/2026-05-06-pixui-easy-panels-design.md`; plan `docs/superpowers/plans/2026-05-06-pixui-easy-panels.md`. Test count: 1730 → 1730 (no new tests; pixui scenes/widgets not unit-tested). Follow-up filed: Cluster B · 57.
+
 ### 2026-05-06 · pixui foundation + Tavern PoC (Cluster B · 45 sub-spec 3a)
 
 - **Why:** Sub-spec 2's whole-impl review identified a strategic risk — most remaining panels embed Phaser GameObjects (HeroCard, Paperdoll), which pixui can't host directly. Brainstorm surfaced Path D: re-implement Paperdoll/HeroCard as pixui Container compositions of Image + BitmapText + Rectangle. This sub-spec lands the foundation: extracted viewport helper, `PixuiPaperdoll`, `PixuiHeroCard`, and Tavern as the proof-of-concept panel migration.

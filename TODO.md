@@ -27,6 +27,20 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
+### 57 · Blacksmith rows pixui-ification (gated on tintable text or theme `selected` style)
+
+- **What:** `blacksmith_panel_scene.ts` `buildUpgradeRow()` (lines ~283-358) and `buildSellRow()` (lines ~360-424) construct row chrome — background rectangle, name/affix/cost text, Upgrade/Sell button — entirely with raw Phaser `this.add.rectangle/.text/.existing` at absolute canvas coordinates rather than the pixui insert DSL. The item icon already uses `pixui.Image` correctly. The rest is intentional workaround.
+- **Why:** Selection highlight requires per-row tinting of background fill (`0x2a2418` selected vs `0x1a1a1a`) and stroke (`0xffcc66` vs `0x222222`); cost-text colors flip on affordability (`#ffcc66` vs `#cc6666`); button bg/border/text all flip on canAfford. pixui's `TextArea` is `StyledComponent` (no `.internal`, no color tint), and pixui's theme has no `'selected'` button style yet (Cluster B · 48). Doing this in pixui today means dropping all three visual cues — meaningful UX regression for a sub-spec whose explicit goal was "no behavior changes." ShopOverlay's row pattern is achievable in pixui because it has none of these per-row tint needs.
+- **Tier:** 2 (consistency cleanup; not blocking)
+- **Acceptance:**
+  - Triggered when ANY of: (a) Cluster B · 48 lands a `'selected'` button theme style usable for row backgrounds, (b) pixui exposes tintable text via a future `Renderable`-based label primitive, or (c) we extract a project-side `pixuiTintableText()` / `pixuiTintableRow()` helper.
+  - Once a trigger fires: rewrite both row methods using `panel.insert.topLeft.frame(...)` row containers + pixui labels, matching ShopOverlay's row pattern.
+  - Functional parity required — selection highlight, cost-affordability text color, and button-disabled visual must all remain visible after migration.
+- **Touches:** `src/scenes/blacksmith_panel_scene.ts` (~140 LOC across two methods).
+- **Source:** Cluster B · 45 sub-spec 3b spec compliance review (2026-05-07). Implementer chose raw Phaser as articulated workaround; reviewer flagged as partial migration; user accepted with this follow-up filed.
+
+---
+
 ### 56 · Tavern RNG seeding audit — replace `createRng(Date.now())`
 
 - **What:** `tavern_panel_scene.ts:51, 158, 178` use `createRng(Date.now())` for hire-replacement and reroll candidate generation. This is determinism-hostile (rerolling the same frame twice can give identical candidates if `Date.now()` resolution permits) and may diverge from how the rest of the codebase seeds RNG.
@@ -182,23 +196,23 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 ---
 
-### 45 · Migrate UI to phaser-pixui library — sub-specs 3a/3b/3c remaining
+### 45 · Migrate UI to phaser-pixui library — sub-spec 3c remaining
 
-- **What:** Cross-cutting UI refactor adopting [phaser-pixui](https://github.com/skhoroshavin/phaser-pixui). Decomposed into three sub-specs at brainstorm time; first two complete, third decomposed further at the 2026-05-06 sub-spec-3 brainstorm.
+- **What:** Cross-cutting UI refactor adopting [phaser-pixui](https://github.com/skhoroshavin/phaser-pixui). Decomposed into three sub-specs at brainstorm time; first two complete, third decomposed further at the 2026-05-06 sub-spec-3 brainstorm. After 3b (2026-05-07), 6 of 11 panels run on pixui; only HeroCard-dependent panels remain.
 - **Why:** Hand-rolled Phaser primitives produced systemic layout bugs (Cluster B · 44) and 60+ duplicated widget chains across panels. pixui provides a sprite-themed widget framework + asset pipeline. Path D chosen for the final migration: re-implement Paperdoll/HeroCard as pixui Container compositions so all panels can use one uniform pattern.
 - **Tier:** 2 (UX infrastructure)
-- **Status (2026-05-06):**
-  - **Sub-spec 1 — Layout helpers + blacksmith migration: ✓ DONE.** See [HISTORY](HISTORY.md). Built `src/render/panel_layout.ts` (3 pure functions, 14 tests); migrated blacksmith. Helpers will likely retire after sub-spec 3c finishes (or stay as utilities for non-pixui contexts).
-  - **Sub-spec 2 — pixui Hello-World on hospital: ✓ DONE.** See [HISTORY](HISTORY.md). Added `phaser-pixui` + `pixel-tools` deps, asset pipeline (YAML manifests + Vite plugin), Windows shim, theme module, hospital migrated to UiScene. 7 follow-ups filed (Cluster B · 46–52).
-  - **Sub-spec 3a — Foundation + PoC panel: ✓ DONE.** See [HISTORY](HISTORY.md). Extracted `fixPixuiCanvasViewport()` helper; built `PixuiPaperdoll` + `PixuiHeroCard` (pixui Container compositions); migrated Tavern. Discovered + fixed scene.restart() viewport corruption (pixui's `_root._initialized` issue) and `insert.left/right` origin gotcha (origin Center, should be topLeft/topRight for top-anchored Y).
-  - **Sub-spec 3b — Easy panels (no HeroCard): ⏳ NEXT.** Migrate CampNodeOverlay, TreasureRoomOverlay, Blacksmith (item icons via pixui.Image), ShopOverlay (item icons via pixui.Image). 4 panels, mechanical apply-the-pattern. Estimated ~1-2 days.
-  - **Sub-spec 3c — Remaining HeroCard panels + cleanup: ⏳ pending 3b.** Migrate Barracks (HeroCard + paperdoll detail), Equip (Paperdoll + slot strip), Expeditions (HeroCard formation), EventOverlay (HeroCard), PerkOverlay (Paperdoll). Plus cleanup decision on `panel_layout.ts` and final README polish. Estimated ~3-5 days.
+- **Status (2026-05-07):**
+  - **Sub-spec 1 — Layout helpers + blacksmith migration: ✓ DONE.** See [HISTORY](HISTORY.md). Built `src/render/panel_layout.ts`; migrated blacksmith. After 3b, helpers have zero consumers — clean retirement candidate for 3c cleanup.
+  - **Sub-spec 2 — pixui Hello-World on hospital: ✓ DONE.** See [HISTORY](HISTORY.md). Added pixui + pixel-tools, asset pipeline, Windows shim, theme module, hospital migrated. 7 follow-ups filed (Cluster B · 46–52).
+  - **Sub-spec 3a — Foundation + Tavern PoC: ✓ DONE.** See [HISTORY](HISTORY.md). Extracted `fixPixuiCanvasViewport()`; built `PixuiPaperdoll` + `PixuiHeroCard`; migrated Tavern. Discovered + fixed scene.restart() viewport corruption and `insert.left/right` origin gotcha. 4 follow-ups filed (Cluster B · 53–56).
+  - **Sub-spec 3b — Easy panels (no HeroCard): ✓ DONE.** See [HISTORY](HISTORY.md). Migrated TreasureRoomOverlay, ShopOverlay, CampNodeOverlay, Blacksmith. Validated `pixui.Dialog` (sell-confirm) and inline `pixui.Image` for item icons. `panel_layout.ts` orphaned. 1 follow-up filed (Cluster B · 57 — Blacksmith rows kept raw Phaser pending tintable-text support).
+  - **Sub-spec 3c — Remaining HeroCard panels + cleanup: ⏳ NEXT.** Migrate Barracks (HeroCard + paperdoll detail), Equip (Paperdoll + slot strip), Expeditions (HeroCard formation), EventOverlay (HeroCard), PerkOverlay (Paperdoll). Plus retire `panel_layout.ts` and legacy `paperdoll.ts` / `hero_card.ts` once their consumers migrate. Final README polish. Gated on Cluster B · 53 (PixuiHeroCard tooltip parity) before Barracks. Estimated ~3-5 days.
 - **Acceptance:**
-  - All 11 panel scenes (Hospital ✓, CampNodeOverlay, TreasureRoomOverlay, Blacksmith, ShopOverlay, Tavern, Barracks, Equip, Expeditions, EventOverlay, PerkOverlay) extend `UiScene` and use pixui `insert` DSL + theme.
+  - All 11 panel scenes (Hospital ✓, TreasureRoomOverlay ✓, ShopOverlay ✓, CampNodeOverlay ✓, Blacksmith ✓, Tavern ✓, Barracks, Equip, Expeditions, EventOverlay, PerkOverlay) extend `UiScene` and use pixui `insert` DSL + theme.
   - `PixuiPaperdoll` and `PixuiHeroCard` exist as reusable pixui Container compositions.
-  - Sub-spec 1's layout helpers either retire or are repurposed for non-pixui scenes (decision in 3c cleanup).
-  - The 7 follow-ups in Cluster B · 46–52 are addressed inline during 3b/3c migrations or filed forward.
-- **Source:** `ideas.md` #5 (2026-05-06); brainstorm history captured in specs `2026-05-06-panel-layout-helpers-design.md` (sub-spec 1), `2026-05-06-pixui-adoption-design.md` (sub-spec 2). Sub-spec 3 brainstorm 2026-05-06 produced Path D decomposition (3a/3b/3c). Combat / Dungeon / Corridor scenes are out of scope (not panel-shaped).
+  - Sub-spec 1's `panel_layout.ts` retires (zero consumers after 3b); legacy `paperdoll.ts` / `hero_card.ts` retire once 3c finishes.
+  - The follow-ups in Cluster B · 46–57 are addressed inline during 3c or filed forward.
+- **Source:** `ideas.md` #5 (2026-05-06); brainstorm specs in `docs/superpowers/specs/`. Combat / Dungeon / Corridor scenes are out of scope (not panel-shaped).
 
 ---
 
