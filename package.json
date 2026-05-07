@@ -16,12 +16,14 @@
   "devDependencies": {
     "@types/node": "^25.6.0",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "pixel-tools": "^0.9.11",
     "tsx": "^4.21.0",
     "typescript": "~6.0.2",
     "vite": "^8.0.9",
     "vitest": "^4.1.5"
   },
   "dependencies": {
-    "phaser": "^4.0.0"
+    "phaser": "^4.0.0",
+    "phaser-pixui": "^0.2.1"
   }
 }

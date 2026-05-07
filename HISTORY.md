@@ -29,6 +29,78 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-07 · pixui easy panels migration (Cluster B · 45 sub-spec 3b)
+
+- **Why:** Mechanical application of sub-spec 3a's pattern to the 4 panels that don't embed HeroCard/Paperdoll: TreasureRoomOverlay, ShopOverlay, CampNodeOverlay, Blacksmith. After 3b, 6 of 11 panels run on pixui; only HeroCard-dependent panels remain (3c). Validates `pixui.Dialog` (Blacksmith sell-confirm — first use in codebase) and inline `pixui.Image` for item icons before 3c needs them.
+- **Decisions** (Q1–Q2 in spec):
+  - **Q1 — Adopt `pixui.Dialog` directly** for Blacksmith sell-confirm. No wrapper. Theme already configured (`frame: 'frame_bright', backdropAlpha: 0.5`). If 3c surfaces 3+ confirm-dialog sites, extract `confirmDialog()` then.
+  - **Q2 — Inline `pixui.Image` for item icons.** Defer `pixuiItemIcon()` extraction until Equip slot strip (3c) is the 3rd use site, so the helper API is informed by real callers.
+  - **Migration order:** smallest first (Treasure → Shop → CampNode → Blacksmith) so the pattern settled before Blacksmith + Dialog adoption hit together.
+- **Surprises:**
+  - **`pixui.Dialog` API shape:** extends Frame; `{width, height, style, x?, y?}` config; starts `visible: false` (hardcoded); children via `dialog.insert.X(...)`; **dismissal is `dialog.visible = false`** (no `.close()` method); backdrop built-in. Pattern adopted: only construct when state field is non-null, set `visible = true` immediately, dismiss via clear-state + `scene.restart()`. Cleaner than create-and-destroy.
+  - **`pixui.TextArea` has no `.internal`** — it's `StyledComponent`, not `Renderable`. No color tint. Tasks 1–3 worked around with plain rarity-label text. Blacksmith rows kept raw Phaser for row backgrounds + colored cost text + Upgrade/Sell button (selection highlight + cost-affordability tint + disabled state all need per-row tinting that pixui can't express today). Articulable workaround filed as Cluster B · 57 to revisit when tintable text or a `'selected'` theme style (Cluster B · 48) lands.
+  - **pixui bitmap fonts can't render emoji** — TreasureRoomOverlay dropped 📦/📭 in favor of plain text. Constant upstream limitation.
+  - **`this` vs `this.scene` inside UiScene** — `this` IS the Scene; `this.scene` is the ScenePlugin manager. Pass `this` to pixui widget constructors (`new Image(this, {...})`). Spec doc's example had this backwards — would have failed typecheck if followed literally. Fixed inline in the spec post-review.
+  - **`panel_layout.ts` is now orphaned** — zero consumers across `src/` after Blacksmith stopped importing it. Clean retirement candidate for sub-spec 3c cleanup.
+- **Source:** spec `docs/superpowers/specs/2026-05-06-pixui-easy-panels-design.md`; plan `docs/superpowers/plans/2026-05-06-pixui-easy-panels.md`. Test count: 1730 → 1730 (no new tests; pixui scenes/widgets not unit-tested). Follow-up filed: Cluster B · 57.
+
+### 2026-05-06 · pixui foundation + Tavern PoC (Cluster B · 45 sub-spec 3a)
+
+- **Why:** Sub-spec 2's whole-impl review identified a strategic risk — most remaining panels embed Phaser GameObjects (HeroCard, Paperdoll), which pixui can't host directly. Brainstorm surfaced Path D: re-implement Paperdoll/HeroCard as pixui Container compositions of Image + BitmapText + Rectangle. This sub-spec lands the foundation: extracted viewport helper, `PixuiPaperdoll`, `PixuiHeroCard`, and Tavern as the proof-of-concept panel migration.
+- **Decisions** (Q1–Q3 in spec):
+  - **Q1 — Match existing Paperdoll API.** `equip` / `unequip` / `currentLoadout` drop-in. Internal rebuild via `pixui.Container.attach()` since pixui has no clear/replace primitive.
+  - **Q2 — Match existing HeroCard API; reuse existing `createTooltip()`.** Discovered during impl that the existing tooltip is wound-badge-tap-to-toggle, not hover-on-card — and Tavern candidates have no wounds, so the tooltip is never visible there. Implementer correctly deferred tooltip wiring to sub-spec 3b+ when Barracks (which has wounded heroes) gets migrated.
+  - **Q3 — Full Tavern feature parity.** Hire (with free-when-softlocked path), reroll, upgrade, close (X + ESC), all preserved. `scene.restart()` for state changes (already established by hospital).
+- **Surprises:**
+  - **`.internal` is the proper public accessor on pixui Renderable** — not the `_internal` private my spec drafts had assumed. Replaced all `as unknown as` escape-hatch casts with direct `.internal.destroy()` / `.internal.setScale()`. `tint` is a public setter on Renderable too. Per Task 2 implementer's source-reading.
+  - **`pixui.TextArea` and `pixui.Progress` require an `InsertContext`, not a Scene** — only usable via `this.insert.X.textArea(...)` from inside a UiScene. Standalone Container subclasses (PixuiHeroCard) substitute `BitmapText` + `Rectangle` for one-line labels and HP bars.
+  - **`Clickable` hover events** via `clickable.events.on('pointerover'/'pointerout', fn)`. No `onPointerOver` config field; the events EventEmitter is the canonical path.
+  - **`scene.restart()` corrupted pixui's `_root` state** — `_initialized` stays `true` from prior run, so `_root.initialize()` becomes a no-op on restart, leaving newly-attached children un-positioned (default 0,0). Fix in `pixui_canvas_fix.ts` resets `_initialized = false; _children = []`, gated on `if (_root._initialized)` so it only fires on actual restarts (preserves first-open behavior where the constructor's clean state would otherwise be wiped). Took two iterations to land — first fix broke first-open rendering; second fix added the guard.
+  - **`insert.left` and `insert.right` have origin `(Left, Center)` / `(Right, Center)`** — y values are offsets from canvas CENTER, not top. Hospital's `y: 80, height: -80` rendered the frame anchored at y=350 with bottom at y=580 (40px past canvas bottom). Switched hospital to `insert.topLeft` / `insert.topRight` (origin `Left/Right, Top`) so y is top-anchored. Bug existed in sub-spec 2's hospital too but was masked by content always filling the visible portion — the empty "All heroes are healthy" state surfaced it.
+- **Source:** spec `docs/superpowers/specs/2026-05-06-pixui-foundation-tavern-design.md`; plan `docs/superpowers/plans/2026-05-06-pixui-foundation-tavern.md`. Test count: 1730 → 1730 (no new tests; pixui scenes/widgets not unit-tested in this codebase). Patterns established for sub-spec 3b (4 easy panels) and 3c (5 HeroCard panels + cleanup).
+
+### 2026-05-06 · UI mispositioning fixes across all panels (Cluster B · 44)
+
+- **Why:** User screenshot of Blacksmith panel showed systemic layout issues: panel content shifted right (asymmetric padding 35L/5R), close button (×) clipped 7px past panel boundary, tabs hidden behind item-list top edge, oversized item-icon placeholder boxes overlapping text. Reported as a general issue affecting the whole game, not just blacksmith.
+- **Decisions** (all five symptoms diagnosed via systematic-debugging skill before fixing):
+  - **Asymmetric content padding.** `LIST_PANE_CX 245→230`, `DETAIL_PANE_CX 715→700` across blacksmith/barracks/hospital. PANEL_W=920 with content totaling 880px should distribute the 40px margin as 20/20, not 35/5. Replicated to barracks and hospital (same shared pattern); tab x-positions in blacksmith re-derived as `LIST_PANE_CX ± 70`.
+  - **Close button overflow.** `(933, 63) → (918, 63)` across blacksmith, barracks, hospital, tavern, equip, expeditions. Panel right edge at x=940; old x=933 with 28-wide button overflowed to x=947. New x=918 leaves 8px padding from panel right.
+  - **Tab/list overlap (blacksmith-specific).** Tabs at y=100 (span 87-113) overlapped list pane top at y=90. Fix: lowered both panes' top to y=120 by adjusting `LIST_PANE_CY 270→285`, `LIST_PANE_H 360→330`, `ROW_Y_BASE 130→145`. Detail-pane content y-positions shifted by +30 in lockstep.
+  - **Item icon size + padding (blacksmith).** `setScale(2)` was 32×32 displayed; reduced to `setScale(1.5)` (24×24) and bumped text x-offset from `iconX+22` to `iconX+28` for clear separation.
+- **Surprises:**
+  - The bugs were NOT a recent regression — constants had been the same since the original commit (`cc2bbfb`, 2026-04-30). The user simply hadn't noticed until that screenshot.
+  - The "stray Upgrade button" (top-left of panel) and duplicate "Gold:" display the user noticed turned out to be intentional — the upgrade-building button lives there by design, and the dim 0.6-alpha overlay lets the camp HUD's gold counter bleed through. Documented but not changed.
+  - Equip panel's right pane has its own asymmetry (right edge overflows by 10px) — flagged but deferred since it has a different layout pattern from the other panels.
+- **Source:** TODO Cluster B · 44 (filed 2026-05-06 with user screenshot at `Downloads/Screenshot 2026-05-06 132936.png`). Test count delta: unchanged (visual-only fixes; no scene tests in the codebase).
+
+### 2026-05-06 · pixui adoption — Hello-World on hospital (Cluster B · 45 sub-spec 2)
+
+- **Why:** Cluster B · 44 (UI mispositioning) revealed that hand-rolled layout drifts; sub-spec 1 attacked layout. Sub-spec 2 attacks the second axis: 60+ hand-rolled button/widget chains across 6 panel scenes. Adopt phaser-pixui (a Phaser 4 UI framework with sprite-art widgets) starting with hospital as the proof of concept. User had the canonical `tinyRPG_manaSoulGUI` + `tinyRPG_fontKit02` assets that match pixui's example, eliminating the art barrier.
+- **Decisions** (Q1–Q2 in spec; revised mid-brainstorm):
+  - **Q1.1 — Adopt pixui fully.** Even though pixui's `insert` DSL displaces sub-spec 1's helpers for migrated panels, the framework's value is worth the architectural pivot. Sub-spec 1's helpers stay relevant for unmigrated panels.
+  - **Q1.3 — pixel-tools build pipeline.** pixui example uses `pixel-tools` (npm dev dep) + YAML manifests. Build-time codegen — no manual atlas packing or BMFont generation. Adopted as-is.
+  - **Q2 — Hello-World scope.** Migrate one small panel (hospital). Mirrors sub-spec 1's pattern. Sub-spec 3 covers the rest.
+  - **Asset reorganization.** PNGs moved from `public/assets/sprites/tinyRPG_manaSoulGUI_v_1_0/` → `assets/ui/`; font sheets renamed to drop date prefixes (`mana_roots.png` etc.). Matches pixui example layout. Inputs at `assets/`, build output at `public/packed_assets/` (gitignored).
+- **Surprises:**
+  - **Windows shim required for pixel-tools.** `spawnSync('fontpack')` doesn't resolve npm `.cmd` shims without `shell: true`. Fix in `vite.config.ts`: at module-load time (before pixui's plugins run), copy platform binaries to `node_modules/.cache/pixel-tools-shims/{fontpack,atlaspack}.exe` and prepend that dir to PATH. Gated on `process.platform === 'win32'`. Linux/Mac unaffected.
+  - **pixui viewport mismatch (load-bearing).** `ResponsiveScene._getCanvasWidth/Height` reads `window.innerWidth/Height` (browser dims), not the Phaser game canvas. Wrong for embedded fixed-resolution games. Fix: in our `create()` BEFORE `super.create()`, monkey-patch the private accessors on `this` to return `this.game.scale.width/height` and re-run `_updateViewport()`. Constructor-time `_updateViewport` ran with bad numbers but never reached a render — re-running here corrects it. Sub-spec 3 starts by extracting this into a shared `fixPixuiCanvasViewport()` helper.
+  - **No dynamic UI rebuild in pixui.** Frames are immutable; state changes require `scene.restart()`. Hospital uses module-level `_pendingSelectedHeroId` to survive restart. Pattern works but every interaction triggers full UI teardown + rebuild — should monitor performance under rapid clicking.
+  - **Two visual regressions accepted.** No paperdoll/HeroCard per list slot (pixui can't host arbitrary Phaser GameObjects in Frames). No `selected` button-style highlight (no theme entry yet). Both filed for sub-spec 3.
+  - **Strategic concern surfaced.** Most remaining panels embed Phaser GameObjects (paperdolls in Barracks/Tavern/Equip/Expeditions, item sprites in Blacksmith). Sub-spec 3 should NOT commit to full pixui migration without a paper survey first; otherwise we'd hit pixui's no-GameObjects wall mid-migration.
+- **Source:** spec `docs/superpowers/specs/2026-05-06-pixui-adoption-design.md`; plan `docs/superpowers/plans/2026-05-06-pixui-adoption.md`. Test count: 1730 → 1730 (no new tests; pixui itself trusted, scenes not unit-tested in this codebase).
+
+### 2026-05-06 · Panel layout helpers — foundation + blacksmith migration (Cluster B · 45 sub-spec 1)
+
+- **Why:** Cluster B · 44 (UI mispositioning bug) showed that hand-rolled layout constants drift across files — 17 hardcoded x/y values across 5 panel scenes had to be manually shifted to fix asymmetric padding, close-button overflow, and tab/list-pane overlap. Pure-function layout helpers prevent this by construction: symmetric margins are computed, not specified; close buttons can't overflow because the helper enforces padding from the panel-right edge. Foundation for sub-spec 2 (pixui) and sub-spec 3 (remaining-panel migrations).
+- **Decisions** (Q1–Q5 in spec):
+  - **Q2 — Pure-function helpers (option A).** Coordinate-returning functions over container-builders (B) or declarative trees (C). Trade-off: less per-scene boilerplate reduction than B, but no upfront API design pressure, no escape-hatch friction, trivially testable. A → B is an additive evolution available later when patterns prove themselves.
+  - **Q3 — Three helpers in first cut.** `panelLayout`, `splitPaneLayout`, `headerStripLayout` — exactly what blacksmith needs. Tab-strip, row-list, slot-grid helpers wait for the third use case (Rule of Three).
+  - **Q4 — Migration shape preserves existing constant names** in blacksmith (`PANEL_CX`, `LIST_PANE_CX`, etc.). Values now derived from helpers; downstream code unchanged. Pixel-identical migration.
+- **Surprises:**
+  - **Spec's `marginV: 65` was mathematically wrong** — would have produced `listCy=270`, but blacksmith's actual layout has `listCy=285` (asymmetric: 80 above pane, 50 below). Implementer extended `splitPaneLayout` with optional `marginVTop` / `marginVBottom` to preserve pixel identity. Backward-compatible — symmetric callers ignore the new fields.
+  - **Code reviewer caught two doc gaps in blacksmith call-site:** `marginV: 0` looked like real input but was overridden by `marginVTop`/`marginVBottom`; the `80/50` numbers had no rationale at the call site. Fixed inline with one comment block explaining the asymmetric vertical layout (header strip ~80px above, panel chrome ~50px below).
+- **Source:** spec `docs/superpowers/specs/2026-05-06-panel-layout-helpers-design.md`; plan `docs/superpowers/plans/2026-05-06-panel-layout-helpers.md`. Test count: 1716 → 1730 (+14 helper unit tests).
+
 ### 2026-05-06 · Start scene — title + theme music (Cluster B · 43)
 
 - **Why:** `darkane_times.ogg` was committed but unwired — boot routed silently into camp/dungeon/camp_screen with no title moment. Pre-launch, the right time to overshoot on presentation. New `StartScene` intercepts boot's route, plays the theme on loop, shows "Darkane Times" + a fading "Tap anywhere to start" prompt, then forwards to whatever boot would have routed to.

@@ -28,3 +28,6 @@ dist-ssr
 
 # Superpowers brainstorming session files
 .superpowers/
+
+# Generated asset pipeline output
+public/packed_assets/

@@ -1,0 +1,39 @@
+- name: frame_light
+  image: ui/20250420manaSoul9SlicesA-Sheet.png
+  nineslice: { x: 30, y: 20, w: 36, h: 60 }
+- name: frame_dark
+  image: ui/20250420manaSoul9SlicesB-Sheet.png
+  nineslice: { x: 32, y: 32, w: 32, h: 32 }
+- name: frame_bright
+  image: ui/20250420manaSoul9SlicesC-Sheet.png
+  nineslice: { x: 32, y: 32, w: 32, h: 32 }
+- name: header_scroll
+  image: ui/20250420manaSoulHeaderA-Sheet.png
+  nineslice: { x: 30, y: 13, w: 38, h: 9 }
+- name: progress_curly
+  image: ui/20250421barA-Sheet.png
+  nineslice: { x: 22, y: 4, w: 51, h: 3 }
+- name: bar_green
+  image: ui/bar_green.png
+  nineslice: { x: 2, y: 2, w: 4, h: 4 }
+- name: button
+  image: ui/20250421manaSoulButtonB-Sheet.png
+  nineslice: { x: 10, y: 0, w: 70, h: 22 }
+  spritesheet:
+    sprite_width: 96
+    sprite_height: 22
+    sprite_names:
+      up: 0
+      hover: 1
+      down: 2
+      disabled: 3
+- name: button_settings
+  image: ui/20250425optionsButton-Sheet.png
+  spritesheet:
+    sprite_width: 32
+    sprite_height: 32
+    sprite_names:
+      up: 0
+      hover: 1
+      down: 2
+      disabled: 3

@@ -1,204 +1,151 @@
+import { ConstraintMode, Image, OriginX, OriginY, UiScene } from 'phaser-pixui';
+import type { Frame } from 'phaser-pixui';
 import * as Phaser from 'phaser';
 import { BASE_ITEMS } from '@data/items';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { currentNode, leaveShop, purchaseItem } from '@run/run_state';
 import type { ShopItem } from '@dungeon/node';
+import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
+import { uiTheme } from '@render/ui_theme';
 import { appState } from './app_state';
 
-const PANEL_CX = 480;
-const PANEL_CY = 270;
+const PANEL_X = 140;
+const PANEL_Y = 60;
 const PANEL_W = 680;
-const PANEL_H = 360;
+const PANEL_H = 400;
 
-const HEADER_Y = 105;
-const HEADER_TITLE_X = 160;
-const HEADER_GOLD_X = 800;
+const ROW_H = 52;
+const ROW_STRIDE = 56;
+const ROW_Y_FIRST = 20;
+const ICON_SCALE = 2;
 
-const ROW_FIRST_Y = 175;
-const ROW_HEIGHT = 52;
-const ROW_SPRITE_X = 175;
-const ROW_NAME_X = 215;
-const ROW_PRICE_X = 790;
-const ROW_BG_X = PANEL_CX;
-const ROW_BG_W = PANEL_W - 40;
-
-const FOOTER_Y = 425;
-const MANAGE_GEAR_X = 380;
-const LEAVE_X = 580;
-const FOOTER_BUTTON_W = 140;
-const FOOTER_BUTTON_H = 32;
-
-const RARITY_COLOR: Record<'common' | 'uncommon' | 'rare', string> = {
-  common: '#cccccc',
-  uncommon: '#4488ff',
-  rare: '#ffcc66',
-};
-
-export class ShopOverlayScene extends Phaser.Scene {
-  private contentContainer!: Phaser.GameObjects.Container;
-
+export class ShopOverlayScene extends UiScene {
   constructor() {
-    super('shop_overlay');
+    super({
+      key: 'shop_overlay',
+      viewportConstraints: { mode: ConstraintMode.Maximum, width: 960, height: 540 },
+      theme: uiTheme,
+    });
   }
 
   create(): void {
-    this.buildBackgroundAndPanel();
-    this.contentContainer = this.add.container(0, 0);
-    this.rerender();
+    fixPixuiCanvasViewport(this);
+    super.create();
 
-    this.events.on(Phaser.Scenes.Events.RESUME, () => this.rerender());
-  }
-
-  private buildBackgroundAndPanel(): void {
-    // Dim full canvas, click-blocking.
-    this.add
-      .rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.6)
-      .setOrigin(0, 0)
-      .setInteractive();
-    // Panel chrome.
-    this.add
-      .rectangle(PANEL_CX, PANEL_CY, PANEL_W, PANEL_H, 0x222222)
-      .setStrokeStyle(2, 0x666666);
-  }
-
-  private rerender(): void {
-    this.contentContainer.removeAll(true);
-    this.buildHeader();
-    this.buildRows();
-    this.buildFooter();
-  }
-
-  private buildHeader(): void {
-    const run = appState.get().runState!;
-    this.contentContainer.add(
-      this.add.text(HEADER_TITLE_X, HEADER_Y, 'Shop', {
-        fontFamily: 'monospace',
-        fontSize: '18px',
-        color: '#ffffff',
-      }),
-    );
-    this.contentContainer.add(
-      this.add
-        .text(HEADER_GOLD_X, HEADER_Y, `Pack: ${run.pack.gold}g`, {
-          fontFamily: 'monospace',
-          fontSize: '14px',
-          color: '#ffcc66',
-        })
-        .setOrigin(1, 0),
-    );
-  }
-
-  private buildRows(): void {
     const run = appState.get().runState!;
     const node = currentNode(run);
-    if (node.type !== 'shop') {
-      // Defensive — shouldn't happen given dungeon scene's gate.
-      return;
-    }
+    if (node.type !== 'shop') return;
+
+    // Header
+    this.insert.top.textArea({ y: 28, text: 'Shop' });
+    this.insert.topRight.button({
+      x: 4,
+      y: 4,
+      width: 48,
+      text: 'X',
+      onClick: () => this.onLeave(),
+    });
+    this.insert.topRight.textArea({
+      x: 60,
+      y: 28,
+      text: `Pack: ${run.pack.gold}g`,
+    });
+
+    // Main panel
+    const panel = this.insert.topLeft.frame({
+      x: PANEL_X,
+      y: PANEL_Y,
+      width: PANEL_W,
+      height: PANEL_H,
+    });
+
+    // Item rows
     for (let i = 0; i < node.inventory.length; i++) {
       const slot = node.inventory[i];
-      const y = ROW_FIRST_Y + i * ROW_HEIGHT;
-      this.buildRow(slot, y, run.pack.gold);
+      const rowY = ROW_Y_FIRST + i * ROW_STRIDE;
+      this.buildRow(panel, slot, rowY, run.pack.gold);
     }
+
+    // Footer buttons
+    const footerY = PANEL_Y + PANEL_H + 12;
+    this.insert.topLeft.button({
+      x: PANEL_X + 60,
+      y: footerY,
+      width: 160,
+      text: 'Manage Gear',
+      onClick: () => this.onManageGear(),
+    });
+    this.insert.topLeft.button({
+      x: PANEL_X + 280,
+      y: footerY,
+      width: 120,
+      text: 'Leave',
+      onClick: () => this.onLeave(),
+    });
+
+    this.input.keyboard?.on('keydown-ESC', () => this.onLeave());
+
+    // Restart on RESUME so equip-scene changes are reflected immediately.
+    this.events.once(Phaser.Scenes.Events.RESUME, () => this.scene.restart());
   }
 
-  private buildRow(slot: ShopItem, y: number, packGold: number): void {
+  private buildRow(
+    panel: Frame,
+    slot: ShopItem,
+    rowY: number,
+    packGold: number,
+  ): void {
     const sold = slot.sold;
     const canAfford = packGold >= slot.price;
-    const interactive = !sold && canAfford;
 
-    // Background — invisible but interactive when allowed.
-    const bg = this.add
-      .rectangle(ROW_BG_X, y, ROW_BG_W, ROW_HEIGHT - 4, 0x000000, 0)
-      .setStrokeStyle(0, 0xffcc66);
-    this.contentContainer.add(bg);
-
-    // Sprite.
-    const spriteFrame = parseInt(BASE_ITEMS[slot.item.baseId].spriteId, 10);
-    const sprite = this.add
-      .sprite(ROW_SPRITE_X, y, 'sprites', spriteFrame)
-      .setScale(2);
-    if (sold) sprite.setAlpha(0.4);
-    this.contentContainer.add(sprite);
-
-    // Name (rarity color, dimmed if sold).
-    const nameColor = sold ? '#666666' : RARITY_COLOR[slot.item.rarity];
-    const nameText = this.add.text(ROW_NAME_X, y - 8, itemDisplayName(slot.item), {
-      fontFamily: 'monospace',
-      fontSize: '14px',
-      color: nameColor,
+    // Row frame
+    const row = panel.insert.topLeft.frame({
+      x: 8,
+      y: rowY,
+      width: -16,
+      height: ROW_H,
     });
-    this.contentContainer.add(nameText);
 
-    // Affix line (skip if empty).
+    // Item icon via inline pixui.Image
+    const itemSprite = new Image(this, {
+      texture: 'sprites',
+      frame: BASE_ITEMS[slot.item.baseId].spriteId,
+    });
+    itemSprite.internal.setScale(ICON_SCALE);
+    if (sold) itemSprite.internal.setAlpha(0.4);
+    row.attach(itemSprite, OriginX.Left, OriginY.Center);
+
+    // Item name (rarity indicated by text suffix since TextArea has no tint)
+    const rarityTag = sold ? '' : ` [${slot.item.rarity}]`;
+    const nameText = itemDisplayName(slot.item) + rarityTag;
+    row.insert.topLeft.textArea({ x: 48, y: 4, text: nameText });
+
+    // Affix line
     const affixLine = itemAffixDescription(slot.item);
     if (affixLine.length > 0) {
-      const affixText = this.add.text(ROW_NAME_X, y + 10, affixLine, {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: sold ? '#555555' : '#aaaaaa',
-      });
-      this.contentContainer.add(affixText);
+      row.insert.topLeft.textArea({ x: 48, y: 26, text: affixLine });
     }
 
-    // Price / state.
-    let priceColor: string;
+    // Price / state (right-aligned)
     let priceText: string;
     if (sold) {
-      priceColor = '#666666';
       priceText = 'SOLD';
     } else if (!canAfford) {
-      priceColor = '#cc6666';
-      priceText = `${slot.price}g`;
+      priceText = `${slot.price}g (need more)`;
     } else {
-      priceColor = '#ffcc66';
       priceText = `${slot.price}g`;
     }
-    this.contentContainer.add(
-      this.add
-        .text(ROW_PRICE_X, y, priceText, {
-          fontFamily: 'monospace',
-          fontSize: '14px',
-          color: priceColor,
-        })
-        .setOrigin(1, 0.5),
-    );
+    row.insert.topRight.textArea({ x: 8, y: 16, text: priceText });
 
-    if (interactive) {
-      bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerover', () => bg.setStrokeStyle(1, 0xffcc66));
-      bg.on('pointerout', () => bg.setStrokeStyle(0, 0xffcc66));
-      bg.on('pointerdown', () => this.onBuy(slot.item.id));
+    // Buy button (only when purchasable)
+    if (!sold && canAfford) {
+      row.insert.right.button({
+        x: 8,
+        width: 80,
+        text: 'Buy',
+        onClick: () => this.onBuy(slot.item.id),
+      });
     }
-  }
-
-  private buildFooter(): void {
-    this.buildFooterButton(MANAGE_GEAR_X, 'Manage Gear', 0x555555, () =>
-      this.onManageGear(),
-    );
-    this.buildFooterButton(LEAVE_X, 'Leave', 0xffcc66, () => this.onLeave());
-  }
-
-  private buildFooterButton(
-    x: number,
-    label: string,
-    strokeColor: number,
-    onClick: () => void,
-  ): void {
-    const bg = this.add
-      .rectangle(x, FOOTER_Y, FOOTER_BUTTON_W, FOOTER_BUTTON_H, 0x333333)
-      .setStrokeStyle(2, strokeColor);
-    const text = this.add
-      .text(x, FOOTER_Y, label, {
-        fontFamily: 'monospace',
-        fontSize: '13px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerdown', onClick);
-    this.contentContainer.add(bg);
-    this.contentContainer.add(text);
   }
 
   private onBuy(itemId: string): void {
@@ -206,14 +153,11 @@ export class ShopOverlayScene extends Phaser.Scene {
       ...s,
       runState: purchaseItem(s.runState!, itemId),
     }));
-    this.rerender();
+    this.scene.restart();
   }
 
   private onManageGear(): void {
     this.scene.launch('equip', { kind: 'in_run', returnTo: 'shop_overlay' });
-    // EquipScene is registered earlier than ShopOverlayScene in main.ts, so
-    // by default it renders BENEATH the shop overlay. Bring it to top so the
-    // player can see and interact with it.
     this.scene.bringToTop('equip');
     this.scene.pause();
   }
