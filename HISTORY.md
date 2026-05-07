@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-06 · pixui foundation + Tavern PoC (Cluster B · 45 sub-spec 3a)
+
+- **Why:** Sub-spec 2's whole-impl review identified a strategic risk — most remaining panels embed Phaser GameObjects (HeroCard, Paperdoll), which pixui can't host directly. Brainstorm surfaced Path D: re-implement Paperdoll/HeroCard as pixui Container compositions of Image + BitmapText + Rectangle. This sub-spec lands the foundation: extracted viewport helper, `PixuiPaperdoll`, `PixuiHeroCard`, and Tavern as the proof-of-concept panel migration.
+- **Decisions** (Q1–Q3 in spec):
+  - **Q1 — Match existing Paperdoll API.** `equip` / `unequip` / `currentLoadout` drop-in. Internal rebuild via `pixui.Container.attach()` since pixui has no clear/replace primitive.
+  - **Q2 — Match existing HeroCard API; reuse existing `createTooltip()`.** Discovered during impl that the existing tooltip is wound-badge-tap-to-toggle, not hover-on-card — and Tavern candidates have no wounds, so the tooltip is never visible there. Implementer correctly deferred tooltip wiring to sub-spec 3b+ when Barracks (which has wounded heroes) gets migrated.
+  - **Q3 — Full Tavern feature parity.** Hire (with free-when-softlocked path), reroll, upgrade, close (X + ESC), all preserved. `scene.restart()` for state changes (already established by hospital).
+- **Surprises:**
+  - **`.internal` is the proper public accessor on pixui Renderable** — not the `_internal` private my spec drafts had assumed. Replaced all `as unknown as` escape-hatch casts with direct `.internal.destroy()` / `.internal.setScale()`. `tint` is a public setter on Renderable too. Per Task 2 implementer's source-reading.
+  - **`pixui.TextArea` and `pixui.Progress` require an `InsertContext`, not a Scene** — only usable via `this.insert.X.textArea(...)` from inside a UiScene. Standalone Container subclasses (PixuiHeroCard) substitute `BitmapText` + `Rectangle` for one-line labels and HP bars.
+  - **`Clickable` hover events** via `clickable.events.on('pointerover'/'pointerout', fn)`. No `onPointerOver` config field; the events EventEmitter is the canonical path.
+  - **`scene.restart()` corrupted pixui's `_root` state** — `_initialized` stays `true` from prior run, so `_root.initialize()` becomes a no-op on restart, leaving newly-attached children un-positioned (default 0,0). Fix in `pixui_canvas_fix.ts` resets `_initialized = false; _children = []`, gated on `if (_root._initialized)` so it only fires on actual restarts (preserves first-open behavior where the constructor's clean state would otherwise be wiped). Took two iterations to land — first fix broke first-open rendering; second fix added the guard.
+  - **`insert.left` and `insert.right` have origin `(Left, Center)` / `(Right, Center)`** — y values are offsets from canvas CENTER, not top. Hospital's `y: 80, height: -80` rendered the frame anchored at y=350 with bottom at y=580 (40px past canvas bottom). Switched hospital to `insert.topLeft` / `insert.topRight` (origin `Left/Right, Top`) so y is top-anchored. Bug existed in sub-spec 2's hospital too but was masked by content always filling the visible portion — the empty "All heroes are healthy" state surfaced it.
+- **Source:** spec `docs/superpowers/specs/2026-05-06-pixui-foundation-tavern-design.md`; plan `docs/superpowers/plans/2026-05-06-pixui-foundation-tavern.md`. Test count: 1730 → 1730 (no new tests; pixui scenes/widgets not unit-tested in this codebase). Patterns established for sub-spec 3b (4 easy panels) and 3c (5 HeroCard panels + cleanup).
+
 ### 2026-05-06 · UI mispositioning fixes across all panels (Cluster B · 44)
 
 - **Why:** User screenshot of Blacksmith panel showed systemic layout issues: panel content shifted right (asymmetric padding 35L/5R), close button (×) clipped 7px past panel boundary, tabs hidden behind item-list top edge, oversized item-icon placeholder boxes overlapping text. Reported as a general issue affecting the whole game, not just blacksmith.

@@ -27,6 +27,63 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
+### 56 · Tavern RNG seeding audit — replace `createRng(Date.now())`
+
+- **What:** `tavern_panel_scene.ts:51, 158, 178` use `createRng(Date.now())` for hire-replacement and reroll candidate generation. This is determinism-hostile (rerolling the same frame twice can give identical candidates if `Date.now()` resolution permits) and may diverge from how the rest of the codebase seeds RNG.
+- **Why:** Determinism matters for save-load consistency (in-progress runs that depend on RNG outputs) and for testing. The original Phaser-based Tavern may have used a different seeding approach; the pixui rewrite carried `Date.now()` forward without auditing.
+- **Tier:** 2 (correctness)
+- **Acceptance:**
+  - Audit how the rest of the codebase seeds RNG for camp-side actions (`@util/rng.ts`, save state, etc.). Look for a project-canonical pattern.
+  - If the project uses `state.rngSeed` or similar persisted seed, Tavern should too — replace `Date.now()` with the canonical source.
+  - If the project uses ad-hoc seeding everywhere (the existing pattern), confirm Tavern is consistent and document the rationale.
+- **Touches:** `src/scenes/tavern_panel_scene.ts` (3 call sites). Possibly `@util/rng.ts` if a new `createCampRng()` helper is justified.
+- **Source:** Cluster B · 45 sub-spec 3a Opus whole-impl review (2026-05-06).
+
+---
+
+### 55 · `fixPixuiCanvasViewport` runtime sanity check + pixui version pin
+
+- **What:** Two robustness improvements for `src/render/pixui_canvas_fix.ts`:
+  - **(a) Runtime sanity check.** The fix monkey-patches pixui's private `_root._initialized` and `_root._children`. If pixui v0.3+ renames these fields or restructures the initialize state machine, the cast goes silent (`as unknown as` → `any` for missing fields) and the symptom is render-blank with no compile-time warning. Add a load-time check that `typeof internal._root._initialized === 'boolean'`; throw with a clear "pixui internals changed; pixui_canvas_fix.ts needs review" error if the assertion fails.
+  - **(b) Version pin.** Verify `package.json` constrains `phaser-pixui` to `^0.2.x` (caret on a 0.x version pins to bug fixes only — minor bumps don't auto-apply). If currently `*` or unbounded, tighten.
+- **Why:** Convert a latent fragility into an obvious load-time failure. pixui is a 0.x dep with a thin API surface; a minor bump that breaks our private-field reach would be very expensive to debug from a render-blank symptom alone.
+- **Tier:** 2 (robustness; non-blocking until a real pixui upgrade scenario)
+- **Acceptance:**
+  - `pixui_canvas_fix.ts` throws a descriptive error if `_root._initialized` isn't a boolean (or other private-field assumptions don't hold).
+  - `package.json` `phaser-pixui` constraint is `^0.2.1` (or whatever current; caret-on-0.x prevents minor bumps).
+- **Touches:** `src/render/pixui_canvas_fix.ts`, `package.json`.
+- **Source:** Cluster B · 45 sub-spec 3a Opus whole-impl review (2026-05-06).
+
+---
+
+### 54 · pixui `insert.left/right` origin gotcha — wrapper or doc
+
+- **What:** pixui's `insert.left` returns origin `(Left, Center)` and `insert.right` returns `(Right, Center)`. The Center y-anchor means a y-offset like `y: 80` is from CANVAS CENTER (y=270 for our 540-tall canvas), not from canvas top. Hospital's `insert.left.frame({ y: 80, height: -80 })` rendered with bottom at y=580 — 40px past canvas bottom. Fixed by switching to `insert.topLeft` / `insert.topRight` (origin `(Left|Right, Top)`).
+- **Why:** A real pixui API design pitfall. Sub-spec 3b (Blacksmith, ShopOverlay, CampNodeOverlay, TreasureRoomOverlay) and sub-spec 3c (Barracks, Equip, Expeditions, EventOverlay, PerkOverlay) will reach for `insert.left`/`right` naturally and re-discover the bug. Document or wrap before the next round of debugging.
+- **Tier:** 2 (DX; prevents repeated re-discovery)
+- **Acceptance:**
+  - **Option A — Project-side wrapper.** Add `insertTopLeft` / `insertTopRight` helpers (or similar shape) in `src/render/pixui_canvas_fix.ts` (or new sibling file) that scenes call instead of pixui's `insert.left/right` for top-anchored layouts.
+  - **Option B — Documentation.** Add a prominent comment block in `src/render/pixui_canvas_fix.ts` (or a notes file at `src/render/pixui_notes.md`) listing the API gotchas: `insert.left/right` origin, `insert.center.frame` y-offset semantics, `Container.attach` is append-only, `.internal` access pattern.
+  - Decision in implementation: A or B based on whether wrapping pays off (probably B — cheaper, doesn't add an abstraction layer).
+- **Touches:** `src/render/pixui_canvas_fix.ts`, possibly new `src/render/pixui_notes.md`.
+- **Source:** Cluster B · 45 sub-spec 3a (hospital regression debug, 2026-05-06).
+
+---
+
+### 53 · PixuiHeroCard tooltip parity (wound-badge tap-to-toggle)
+
+- **What:** Existing `HeroCard` (legacy Phaser implementation) has a wound-badge tap-to-toggle tooltip that shows wound details. `PixuiHeroCard` skips this — onPointerOver/onPointerOut are no-ops with a TODO comment. Tavern doesn't need it (fresh-hire candidates have no wounds), but Barracks (sub-spec 3c) does and will block on this work.
+- **Why:** Without this tooltip, players in Barracks can't see wound details on a hero card (only the badge "🩸 N" is visible). Functional parity required before legacy `HeroCard` can be deleted in 3c.
+- **Tier:** 2 (UX parity; required before sub-spec 3c Barracks migration)
+- **Acceptance:**
+  - PixuiHeroCard exposes a wound-badge widget when `hero.wounds.length > 0 && !isDead`.
+  - Tap (or hover, depending on platform — match existing HeroCard's toggle behavior) shows tooltip with `WOUNDS[w.id].name — describeWoundEffect(...)` for each wound.
+  - Tooltip rendering: reuse `createTooltip()` if practical (note: createTooltip requires a `Phaser.GameObjects.Container` parent for lifecycle binding — may need a transient scene-level parent since PixuiHeroCard is a pixui Container, not Phaser). Or build a pixui-native tooltip pattern (Frame + textArea anchored at scene root).
+- **Touches:** `src/ui/pixui_hero_card.ts`, possibly `src/ui/tooltip.ts` (if signature needs adjustment to support non-Phaser-Container callers).
+- **Source:** Cluster B · 45 sub-spec 3a Opus whole-impl review (2026-05-06). Implementer deferred during sub-spec 3a since Tavern doesn't surface the need.
+
+---
+
 ### 52 · Cleanup stale boss_sprites_candidate_*.png in public/assets/sprites/temp/
 
 - **What:** Remove the leftover `boss_sprites_candidate_*.png` files in `public/assets/sprites/temp/`. These predate the pixui adoption work but were noticed during the Cluster B · 45 sub-spec 2 whole-implementation review.
@@ -133,9 +190,9 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 - **Status (2026-05-06):**
   - **Sub-spec 1 — Layout helpers + blacksmith migration: ✓ DONE.** See [HISTORY](HISTORY.md). Built `src/render/panel_layout.ts` (3 pure functions, 14 tests); migrated blacksmith. Helpers will likely retire after sub-spec 3c finishes (or stay as utilities for non-pixui contexts).
   - **Sub-spec 2 — pixui Hello-World on hospital: ✓ DONE.** See [HISTORY](HISTORY.md). Added `phaser-pixui` + `pixel-tools` deps, asset pipeline (YAML manifests + Vite plugin), Windows shim, theme module, hospital migrated to UiScene. 7 follow-ups filed (Cluster B · 46–52).
-  - **Sub-spec 3a — Foundation + PoC panel: ⏳ NEXT.** Extract `fixPixuiCanvasViewport()` helper from hospital; build `PixuiPaperdoll` + `PixuiHeroCard` (pixui Container compositions of pixui.Image + TextArea + Progress); refactor hospital to use the helper; migrate Tavern as proof of concept (smallest HeroCard-using panel). Estimated ~2-3 days. Brainstorm + spec doc next.
-  - **Sub-spec 3b — Easy panels (no HeroCard): ⏳ pending 3a.** Migrate CampNodeOverlay, TreasureRoomOverlay, Blacksmith (item icons via pixui.Image), ShopOverlay (item icons via pixui.Image). 4 panels, mechanical apply-the-pattern. Estimated ~1-2 days.
-  - **Sub-spec 3c — Remaining HeroCard panels + cleanup: ⏳ pending 3a.** Migrate Barracks (HeroCard + paperdoll detail), Equip (Paperdoll + slot strip), Expeditions (HeroCard formation), EventOverlay (HeroCard), PerkOverlay (Paperdoll). Plus cleanup decision on `panel_layout.ts` and final README polish. Estimated ~3-5 days.
+  - **Sub-spec 3a — Foundation + PoC panel: ✓ DONE.** See [HISTORY](HISTORY.md). Extracted `fixPixuiCanvasViewport()` helper; built `PixuiPaperdoll` + `PixuiHeroCard` (pixui Container compositions); migrated Tavern. Discovered + fixed scene.restart() viewport corruption (pixui's `_root._initialized` issue) and `insert.left/right` origin gotcha (origin Center, should be topLeft/topRight for top-anchored Y).
+  - **Sub-spec 3b — Easy panels (no HeroCard): ⏳ NEXT.** Migrate CampNodeOverlay, TreasureRoomOverlay, Blacksmith (item icons via pixui.Image), ShopOverlay (item icons via pixui.Image). 4 panels, mechanical apply-the-pattern. Estimated ~1-2 days.
+  - **Sub-spec 3c — Remaining HeroCard panels + cleanup: ⏳ pending 3b.** Migrate Barracks (HeroCard + paperdoll detail), Equip (Paperdoll + slot strip), Expeditions (HeroCard formation), EventOverlay (HeroCard), PerkOverlay (Paperdoll). Plus cleanup decision on `panel_layout.ts` and final README polish. Estimated ~3-5 days.
 - **Acceptance:**
   - All 11 panel scenes (Hospital ✓, CampNodeOverlay, TreasureRoomOverlay, Blacksmith, ShopOverlay, Tavern, Barracks, Equip, Expeditions, EventOverlay, PerkOverlay) extend `UiScene` and use pixui `insert` DSL + theme.
   - `PixuiPaperdoll` and `PixuiHeroCard` exist as reusable pixui Container compositions.

@@ -1,6 +1,7 @@
 import { ConstraintMode, UiScene } from 'phaser-pixui';
 import type { Frame } from 'phaser-pixui';
 import { hospitalTreatmentCap, nextLevel } from '@camp/building_levels';
+import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
 import { applyBuildingUpgrade } from '@camp/building_upgrade';
 import { listHeroes, treatHeroWound, updateHero } from '@camp/roster';
 import { balance, spend } from '@camp/vault';
@@ -29,24 +30,7 @@ export class HospitalPanelScene extends UiScene {
   }
 
   create(): void {
-    // pixui's ResponsiveScene reads window.innerWidth/innerHeight to size its
-    // viewport — wrong for our embedded fixed-resolution game (canvas is always
-    // 960×540; Phaser.Scale.FIT handles browser fitting). Patch the private
-    // canvas-dim methods on this instance to use Phaser's logical canvas size,
-    // then recompute the viewport before super.create() builds the UI tree.
-    // Constructor-time _updateViewport ran with bad numbers but never reached
-    // a render — re-running here corrects it.
-    const self = this as unknown as {
-      _getCanvasWidth: () => number;
-      _getCanvasHeight: () => number;
-      _getDevicePixelRatio: () => number;
-      _updateViewport: () => void;
-    };
-    self._getCanvasWidth = () => this.game.scale.width;
-    self._getCanvasHeight = () => this.game.scale.height;
-    self._getDevicePixelRatio = () => 1;
-    self._updateViewport();
-
+    fixPixuiCanvasViewport(this);
     super.create();
 
     const state = appState.get();
@@ -95,7 +79,10 @@ export class HospitalPanelScene extends UiScene {
     }
 
     // Left pane — wounded hero list
-    const listPane = this.insert.left.frame({
+    // insert.topLeft (not insert.left) — origin (Left, Top) so y=80 means
+    // 80px from canvas top. insert.left has origin (Left, Center) which
+    // anchors y from center, causing the frame to overflow past canvas bottom.
+    const listPane = this.insert.topLeft.frame({
       x: 8,
       y: 80,
       width: 380,
@@ -114,7 +101,7 @@ export class HospitalPanelScene extends UiScene {
           y: slotY,
           width: -16,
           height: 48,
-          // 'selected' style not in theme yet — no highlight renders. Deferred to sub-spec 3.
+          // 'selected' style not in theme yet — no highlight renders. See Cluster B · 48.
           style: isSelected ? 'selected' : undefined,
           text: `${hero.name}  (${woundText})`,
           onClick: () => {
@@ -125,8 +112,8 @@ export class HospitalPanelScene extends UiScene {
       }
     }
 
-    // Right pane — detail for selected hero
-    const detailPane = this.insert.right.frame({
+    // Right pane — detail for selected hero (topRight for top-anchored y; see listPane note)
+    const detailPane = this.insert.topRight.frame({
       x: 8,
       y: 80,
       width: 440,
