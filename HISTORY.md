@@ -29,6 +29,22 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-07 · PixuiHeroCard foundation — wound badge + tooltip + draggable (Cluster B · 45 sub-spec 3c-i; closes Cluster B · 53)
+
+- **Why:** Two functional gaps deferred from sub-spec 3a were blocking 3c-ii panel migrations. Barracks (and the post-boss `camp_screen_scene`) need PixuiHeroCard's wound-badge tap-to-toggle tooltip; Expeditions needs draggable HeroCards. Foundation work isolated into 3c-i so contracts (tooltip lifecycle, drag-event surface) get validated before rippling through 5 panels — mirrors the 3a→3b precedent.
+- **Decisions** (Q1–Q5 in spec):
+  - **Q1 — Include `camp_screen_scene` in 3c-ii.** Not in TODO's 11-panel count but a `HeroCard` consumer; without it, `hero_card.ts` can't fully retire.
+  - **Q2 — Tooltip path A (Phaser-rooted, reuse `createTooltip()`).** PixuiHeroCard owns a single scene-rooted Phaser `GameObjects.Container` (`phaserOverlay`) parented to scene root; tooltip is a child of phaserOverlay so destruction cascades. Position synced via override of pixui's `Component.updatePosition()`.
+  - **Q3 — Draggable mode A (PixuiHeroCard gains `draggable` option + public `events` getter).** Card itself is the drag handle. Drop-target ID via Phaser's per-GameObject `drop` event — no leaky pixui-internals exposure needed.
+  - **Q4 — Split foundation (3c-i) from migrations (3c-ii).** 3c-ii will be a separate brainstorm informed by what 3c-i actually shipped.
+  - **Q5 — Wound badge: Phaser-native `scene.add.text` with emoji.** Bitmap fonts can't render emoji (per 3b discovery); architectural shape matches the tooltip's Phaser-rooted impurity.
+- **Surprises:**
+  - **pixui's `Interactive` hit area is `scene.make.container({})` at (0,0)** — not a positioned Phaser GameObject. Phaser drag's `dragX/dragY` reflect the hit-area container's drag delta from (0,0), NOT canvas-world coords. Smoke-test draggable demo initially used `dragX/dragY` and snapped the card to top-left. Fix: use `pointer.x`/`pointer.y` (true canvas-world) and compute `card.localX = pointer.x - parentCenterX`. **Critical: 3c-ii Expeditions migration must use the pointer-based pattern, not dragX/dragY.**
+  - **Dev-scene verification was unworkable.** Plan initially proposed extending `src/scenes/dev/main_scene.ts`, but it's a plain `Phaser.Scene` and PixuiHeroCard's `attach()` requires a pixui-rooted parent — full UiScene migration of the dev scene is disproportionate work. Spec amended mid-plan: verify via temporary mutation of `tavern_panel_scene.ts` (inject mock wounds + `draggable: true` on first candidate, smoke-test, revert). Pattern available for 3c-ii if needed.
+  - **`Wound` requires `runsRemaining: number`.** Plan's mock-wound shape `{id: 'bruised' as const}` was incomplete — full shape is `{id, runsRemaining}`. Caught at typecheck during smoke-test setup.
+  - **`onPointerOver`/`onPointerOut` no-op methods deleted.** They were placeholder hover hooks from 3a that never resolved into real behavior; Cluster B · 53 lives on the wound badge specifically (tap-to-toggle), not card hover.
+- **Source:** spec `docs/superpowers/specs/2026-05-07-pixui-hero-card-foundation-design.md`; plan `docs/superpowers/plans/2026-05-07-pixui-hero-card-foundation.md`. Test count: 1730 → 1730 (no new tests; pixui widgets not unit-tested). Follow-ups: Cluster B · 53 closes; 3c-ii (HeroCard panel migrations + cleanup) needs its own brainstorm.
+
 ### 2026-05-07 · pixui easy panels migration (Cluster B · 45 sub-spec 3b)
 
 - **Why:** Mechanical application of sub-spec 3a's pattern to the 4 panels that don't embed HeroCard/Paperdoll: TreasureRoomOverlay, ShopOverlay, CampNodeOverlay, Blacksmith. After 3b, 6 of 11 panels run on pixui; only HeroCard-dependent panels remain (3c). Validates `pixui.Dialog` (Blacksmith sell-confirm — first use in codebase) and inline `pixui.Image` for item icons before 3c needs them.
