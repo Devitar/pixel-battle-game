@@ -27,6 +27,104 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
+### 52 · Cleanup stale boss_sprites_candidate_*.png in public/assets/sprites/temp/
+
+- **What:** Remove the leftover `boss_sprites_candidate_*.png` files in `public/assets/sprites/temp/`. These predate the pixui adoption work but were noticed during the Cluster B · 45 sub-spec 2 whole-implementation review.
+- **Why:** Dead files in a tracked directory cause confusion ("are these used? safe to delete?"). Each new contributor hits the same question.
+- **Tier:** 2 (cleanup)
+- **Acceptance:** Files deleted; verify no source code references them via grep before deletion.
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
+
+---
+
+### 51 · README + asset-pipeline docs update for pixui
+
+- **What:** Update `README.md` to document the new asset layout (`assets/` root for pixui inputs, `public/packed_assets/` for build outputs), the `pixel-tools` Vite pipeline, and the Windows shim in `vite.config.ts`. Currently the README still describes the pre-pixui asset structure.
+- **Why:** Fresh contributors will be confused by `assets/` (build-time inputs) vs `public/assets/` (existing game assets, served as-is) without an explanation. The Windows shim looks like dark magic without context.
+- **Tier:** 2 (docs polish)
+- **Acceptance:**
+  - README section explains `assets/` (pixel-tools inputs, YAML-described, build-time-packed) vs `public/assets/` (existing game audio + Phaser spritesheets).
+  - README references `vite.config.ts` and explains the Windows shim's purpose in 2-3 lines.
+  - `vite/assets.mjs` gets brief field comments (one line per `source_path` / `destination_path` / `fonts` / `atlases`) for non-pixel-tools-familiar maintainers.
+- **Touches:** `README.md`, `vite/assets.mjs`.
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
+
+---
+
+### 50 · Windows shim robustness in vite.config.ts
+
+- **What:** Two robustness improvements for the pixel-tools Windows shim block in `vite.config.ts`:
+  - **Arch detection.** Currently hardcodes `win32-x64` binary name. Will throw with a descriptive message on win32-arm64 (per the existsSync guard added during Cluster B · 45 sub-spec 2 review), but the message points at "the shim strategy" without explaining how to fix it. Detect `process.arch` and select the right binary suffix; fall back to a clearer error if pixel-tools doesn't ship that arch.
+  - **Read-only `node_modules/.cache/` fallback.** Some CI runners (Bazel, Nix hermetic builds) have read-only node_modules. The current `mkdirSync` + `copyFileSync` will throw raw EACCES errors. Wrap in try/catch with a contextual error: "pixel-tools Windows shim needs writable `node_modules/.cache/`; configure your CI to allow this OR run on a non-Windows runner."
+- **Why:** Both are latent issues. Today's setup works on x64 Windows + writable cache. Future ARM Windows laptops or hermetic CI will hit cryptic errors with no clear path forward.
+- **Tier:** 2 (robustness; non-blocking until a real ARM/CI scenario hits)
+- **Acceptance:**
+  - Use `process.arch` to compute binary suffix (`win32-${arch}`).
+  - Wrap `mkdirSync`/`copyFileSync` in try/catch; throw with actionable message on failure.
+  - Manual test: confirm dev server still starts cleanly on win32-x64 (no regression).
+- **Touches:** `vite.config.ts`.
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
+
+---
+
+### 49 · scene.restart() performance check on hospital under rapid clicking
+
+- **What:** pixui Frames are immutable, so hospital uses `scene.restart()` for every state change (hero selection, treat, upgrade). Each restart triggers full UI teardown + rebuild. Verify there's no perceptible lag, dropped frames, or memory growth under rapid clicking — particularly when the wounded list is at `LIST_MAX` and the player rapidly clicks through heroes + treats.
+- **Why:** The architecture is "correct but expensive." Per-interaction full rebuilds may bite at scale or on lower-end devices. Worth quantifying before sub-spec 3 commits more panels to the same pattern.
+- **Tier:** 2 (perf check; informs sub-spec 3 strategy)
+- **Acceptance:**
+  - Manual test: Open hospital with 6 wounded heroes. Rapidly click between heroes for 30s. Observe FPS counter (Phaser dev tools or browser perf panel). Verify no drops below 30fps, no growing memory.
+  - If perf is fine: file a HISTORY-style note confirming.
+  - If perf is bad: brainstorm in-place update strategy or cap restart frequency. May influence sub-spec 3's "should we keep using pixui everywhere?" decision.
+- **Touches:** none (measurement task; results may trigger follow-up code change).
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
+
+---
+
+### 48 · pixui `selected` button style + remove dead branch
+
+- **What:** Hospital's wounded-hero list passes `style: isSelected ? 'selected' : undefined` on each row button (`hospital_panel_scene.ts:118`-ish). The pixui theme has no `'selected'` style entry, so pixui silently falls back to the default — no visual selection indicator renders. Either:
+  - **(A)** Add a `selected` style to `ui_theme.ts` (e.g., gold-outlined variant of the default button frame) so selection actually renders.
+  - **(B)** Remove the `style: isSelected ? ...` branch entirely and rely on the inline comment to explain why selection isn't visualized.
+- **Why:** Currently this is dead code that LOOKS like a working selection highlight. A maintainer reading the file will assume selection is visualized; debugging "why doesn't selected hero glow?" wastes time.
+- **Tier:** 2 (UX polish + code clarity)
+- **Acceptance:**
+  - Decision in implementation: A (add style + theme entry) or B (remove branch).
+  - If A: themed selected style renders distinctly from default; visible across all pixui list-button consumers (sub-spec 3 panels too).
+  - If B: branch removed, inline comment explains intentional gap.
+- **Touches:** `src/scenes/hospital_panel_scene.ts`, `src/render/ui_theme.ts` (if A).
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
+
+---
+
+### 47 · pixui theme palette to match game's gold/dark-gray identity
+
+- **What:** Current `ui_theme.ts` adopts pixui example's `mana_soul` palette as-is: cream (`0xfbe4af`) / dark blue (`0x111343`) / cyan (`0x7bb6bc`). Our game's existing palette is gold (`#ffcc66`) accent on dark gray (`#222222`) panel. Hospital now looks visually distinct from Tavern/Barracks/Blacksmith/etc. — jarring for a player opening multiple panels in one camp session.
+- **Why:** Visual consistency. Pixui's palette is used as tints over the sprite art; the underlying mana_soul art is themed (blue gradient frames, gold curly accents) so the color shift is more nuanced than just "switch hex codes." May require either custom theme tints or a visual-design judgment call about which palette to standardize on.
+- **Tier:** 2 (visual polish)
+- **Acceptance:**
+  - Decision in implementation: retheme pixui to match existing game (gold/dark-gray) OR commit to mana_soul palette across the whole game (means migrating Tavern/Barracks/etc. visuals too).
+  - If rethemed: hospital looks visually consistent with Tavern when opened back-to-back.
+  - May reveal sprite-art constraints (mana_soul art is hardcoded blue frames; tinting can recolor but shape stays).
+- **Touches:** `src/render/ui_theme.ts`. Possibly `assets/ui.yaml` if sprite swaps are needed.
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
+
+---
+
+### 46 · Hospital wounded list pagination / overflow indicator
+
+- **What:** `hospital_panel_scene.ts` caps the wounded list at `LIST_MAX = 6`. With 7+ wounded heroes, the rest are silently dropped — no scrollbar, no "+N more" indicator. Combined with the pixui no-selection-highlight regression (Cluster B · 48), a player can't tell if/which heroes are missing.
+- **Why:** Real UX bug at the edge case. Late-game with many heroes wounded across runs, the player may be unable to access some of them via the hospital UI.
+- **Tier:** 2 (UX bug)
+- **Acceptance:**
+  - Either pagination (matching blacksmith's pattern from sub-spec 1 era) OR a visible "+N more" text row when `wounded.length > LIST_MAX`.
+  - Pagination preferred for parity with other panels; but pixui's `insert` DSL may not have a clean pagination primitive — implementer evaluates.
+  - Cap-edge state: when exactly `LIST_MAX` heroes are wounded, no overflow indicator should appear.
+- **Touches:** `src/scenes/hospital_panel_scene.ts`.
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
+
+---
+
 ### 45 · Migrate UI to phaser-pixui library
 
 - **What:** Evaluate and (if a fit) migrate the panel/scene UI from hand-rolled Phaser primitives (Rectangle + Text + Container) to [phaser-pixui](https://github.com/skhoroshavin/phaser-pixui) — a UI component library for Phaser. Currently every panel hand-rolls layout via hardcoded x/y constants (the Cluster B · 44 mispositioning bug surfaced how brittle this is); pixui presumably provides a layout system + reusable widgets.
