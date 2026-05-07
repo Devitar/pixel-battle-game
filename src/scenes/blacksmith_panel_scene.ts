@@ -10,23 +10,46 @@ import { equip } from '@items/equip';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { applyItemSell, itemSellValue } from '@items/sell';
 import { canBlacksmithUpgrade, nextRarity, upgradeCost, upgradeItem } from '@items/upgrade';
+import { headerStripLayout, panelLayout, splitPaneLayout } from '@render/panel_layout';
 import { createRng } from '@util/rng';
 import { appState } from './app_state';
 
-const PANEL_CX = 480;
-const PANEL_CY = 270;
+const PANEL = panelLayout({
+  canvasW: 960, canvasH: 540,
+  panelW: 920, panelH: 460,
+});
+
+// Asymmetric vertical layout: ~80px header strip above the pane (title/gold/close +
+// mode tabs); ~50px below for panel bottom chrome. marginV is unused — marginVTop/
+// marginVBottom fully override it.
+const SPLIT = splitPaneLayout({
+  panelLeft: PANEL.panelLeft, panelRight: PANEL.panelRight,
+  panelTop: PANEL.panelTop, panelBottom: PANEL.panelBottom,
+  listW: 380, detailW: 440,
+  marginH: 20, marginV: 0,
+  marginVTop: 80, marginVBottom: 50,
+});
+
+const HEADER = headerStripLayout({
+  panelLeft: PANEL.panelLeft, panelRight: PANEL.panelRight, panelTop: PANEL.panelTop,
+  padding: 8, closeBtnSize: 28,
+});
+
+// Existing constant names retained — downstream code references them widely.
+const PANEL_CX = PANEL.panelCx;
+const PANEL_CY = PANEL.panelCy;
 const PANEL_W = 920;
 const PANEL_H = 460;
 
-const LIST_PANE_CX = 230;
-const LIST_PANE_CY = 285;
-const LIST_PANE_W = 380;
-const LIST_PANE_H = 330;
+const LIST_PANE_CX = SPLIT.listCx;
+const LIST_PANE_CY = SPLIT.listCy;
+const LIST_PANE_W = SPLIT.listW;
+const LIST_PANE_H = SPLIT.listH;
 
-const DETAIL_PANE_CX = 700;
-const DETAIL_PANE_CY = 285;
-const DETAIL_PANE_W = 440;
-const DETAIL_PANE_H = 330;
+const DETAIL_PANE_CX = SPLIT.detailCx;
+const DETAIL_PANE_CY = SPLIT.detailCy;
+const DETAIL_PANE_W = SPLIT.detailW;
+const DETAIL_PANE_H = SPLIT.detailH;
 
 const ROW_X = LIST_PANE_CX;
 const ROW_Y_BASE = 145;
@@ -171,7 +194,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x666666);
 
     this.titleText = this.add
-      .text(PANEL_CX, 60, '', {
+      .text(HEADER.titleCx, HEADER.titleY, '', {
         fontFamily: 'monospace',
         fontSize: '18px',
         color: '#ffffff',
@@ -179,7 +202,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.goldText = this.add
-      .text(890, 60, '', {
+      .text(HEADER.goldRightX, HEADER.goldY, '', {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#ffcc66',
@@ -189,10 +212,10 @@ export class BlacksmithPanelScene extends Phaser.Scene {
 
   private buildCloseButton(): void {
     const closeBg = this.add
-      .rectangle(918, 63, 28, 28, 0x553333)
+      .rectangle(HEADER.closeBtnCx, HEADER.closeBtnCy, 28, 28, 0x553333)
       .setStrokeStyle(1, 0x885555);
     this.add
-      .text(918, 63, '×', {
+      .text(HEADER.closeBtnCx, HEADER.closeBtnCy, '×', {
         fontFamily: 'monospace',
         fontSize: '20px',
         color: '#ffffff',

@@ -1,291 +1,169 @@
-import * as Phaser from 'phaser';
+import { ConstraintMode, UiScene } from 'phaser-pixui';
+import type { Frame } from 'phaser-pixui';
 import { hospitalTreatmentCap, nextLevel } from '@camp/building_levels';
 import { applyBuildingUpgrade } from '@camp/building_upgrade';
 import { listHeroes, treatHeroWound, updateHero } from '@camp/roster';
 import { balance, spend } from '@camp/vault';
 import { HOSPITAL_TREATMENT_COST, WOUNDS, describeWoundEffect } from '@data/wounds';
 import type { Hero } from '@heroes/hero';
-import { HeroCard } from '@ui/hero_card';
+import { uiTheme } from '@render/ui_theme';
 import { appState } from './app_state';
 
-const PANEL_CX = 480;
-const PANEL_CY = 270;
-const PANEL_W = 920;
-const PANEL_H = 460;
+// Survives scene.restart() calls so the selected hero persists across rebuild
+let _pendingSelectedHeroId: string | null = null;
 
-const LIST_PANE_CX = 230;
-const LIST_PANE_CY = 270;
-const LIST_PANE_W = 380;
-const LIST_PANE_H = 360;
+const LIST_MAX = 6;
+const ROW_H = 48;
+const ROW_GAP = 8;
+const ROW_STRIDE = ROW_H + ROW_GAP;
 
-const DETAIL_PANE_CX = 700;
-const DETAIL_PANE_CY = 270;
-const DETAIL_PANE_W = 440;
-const DETAIL_PANE_H = 360;
-
-const SLOT_X = 230;
-const SLOT_Y_BASE = 130;
-const SLOT_STRIDE = 60;
-const SLOT_BG_W = 360;
-const SLOT_BG_H = 56;
-
-const WOUND_ROW_X = DETAIL_PANE_CX;
-const WOUND_ROW_Y_BASE = 140;
-const WOUND_ROW_STRIDE = 56;
-const WOUND_ROW_W = 400;
-const WOUND_ROW_H = 48;
-
-interface RosterCard {
-  bg: Phaser.GameObjects.Rectangle;
-  card: HeroCard;
-  countLabel: Phaser.GameObjects.Text;
-  hero: Hero;
-}
-
-export class HospitalPanelScene extends Phaser.Scene {
-  private rosterCards: RosterCard[] = [];
+export class HospitalPanelScene extends UiScene {
   private selectedHeroId: string | null = null;
-  private titleText!: Phaser.GameObjects.Text;
-  private goldText!: Phaser.GameObjects.Text;
-  private listContainer!: Phaser.GameObjects.Container;
-  private detailContainer!: Phaser.GameObjects.Container;
 
   constructor() {
-    super('hospital_panel');
+    super({
+      key: 'hospital_panel',
+      viewportConstraints: { mode: ConstraintMode.Maximum, width: 960, height: 540 },
+      theme: uiTheme,
+    });
   }
 
   create(): void {
-    this.rosterCards = [];
-    this.selectedHeroId = null;
+    // pixui's ResponsiveScene reads window.innerWidth/innerHeight to size its
+    // viewport — wrong for our embedded fixed-resolution game (canvas is always
+    // 960×540; Phaser.Scale.FIT handles browser fitting). Patch the private
+    // canvas-dim methods on this instance to use Phaser's logical canvas size,
+    // then recompute the viewport before super.create() builds the UI tree.
+    // Constructor-time _updateViewport ran with bad numbers but never reached
+    // a render — re-running here corrects it.
+    const self = this as unknown as {
+      _getCanvasWidth: () => number;
+      _getCanvasHeight: () => number;
+      _getDevicePixelRatio: () => number;
+      _updateViewport: () => void;
+    };
+    self._getCanvasWidth = () => this.game.scale.width;
+    self._getCanvasHeight = () => this.game.scale.height;
+    self._getDevicePixelRatio = () => 1;
+    self._updateViewport();
 
-    this.buildOverlayAndPanel();
-    this.buildCloseButton();
-    this.buildUpgradeButton();
-    this.buildListPaneBackground();
-    this.buildDetailPaneBackground();
-    this.listContainer = this.add.container(0, 0);
-    this.detailContainer = this.add.container(0, 0);
-
-    this.rebuild();
-
-    this.input.keyboard?.on('keydown-ESC', () => this.close());
-  }
-
-  private buildUpgradeButton(): void {
-    const level = appState.get().buildingLevels.hospital;
-    const next = nextLevel('hospital', level);
-    if (next === null) return;
-
-    const gold = balance(appState.get().vault);
-    const canAfford = gold >= next.upgradeCost;
-
-    // Mirrors barracks_panel_scene.ts placement.
-    const x = 160;
-    const y = 55;
-    const bgColor = canAfford ? 0x2a4a2a : 0x333333;
-    const strokeColor = canAfford ? 0x44cc44 : 0x555555;
-    const labelColor = canAfford ? '#ffffff' : '#777777';
-
-    const bg = this.add
-      .rectangle(x, y, 160, 24, bgColor)
-      .setStrokeStyle(2, strokeColor);
-    this.add
-      .text(x, y, `Upgrade · ${next.upgradeCost}g`, {
-        fontFamily: 'monospace',
-        fontSize: '13px',
-        color: labelColor,
-      })
-      .setOrigin(0.5);
-    this.add
-      .text(x, y + 20, `→ ${next.unlockDescription}`, {
-        fontFamily: 'monospace',
-        fontSize: '10px',
-        color: '#aaaaaa',
-      })
-      .setOrigin(0.5);
-
-    if (canAfford) {
-      bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerdown', () => {
-        appState.update((s) => applyBuildingUpgrade(s, 'hospital'));
-        this.scene.restart();
-      });
-    }
-  }
-
-  private buildOverlayAndPanel(): void {
-    this.add
-      .rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.6)
-      .setOrigin(0, 0);
-    this.add
-      .rectangle(PANEL_CX, PANEL_CY, PANEL_W, PANEL_H, 0x222222)
-      .setStrokeStyle(2, 0x666666);
-
-    this.titleText = this.add
-      .text(PANEL_CX, 60, '', {
-        fontFamily: 'monospace',
-        fontSize: '18px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-
-    this.goldText = this.add
-      .text(890, 60, '', {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: '#ffcc66',
-      })
-      .setOrigin(1, 0.5);
-  }
-
-  private buildCloseButton(): void {
-    const closeBg = this.add
-      .rectangle(918, 63, 28, 28, 0x553333)
-      .setStrokeStyle(1, 0x885555);
-    this.add
-      .text(918, 63, '×', {
-        fontFamily: 'monospace',
-        fontSize: '20px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-    closeBg.setInteractive({ useHandCursor: true });
-    closeBg.on('pointerdown', () => this.close());
-  }
-
-  private buildListPaneBackground(): void {
-    this.add
-      .rectangle(LIST_PANE_CX, LIST_PANE_CY, LIST_PANE_W, LIST_PANE_H, 0x1a1a1a)
-      .setStrokeStyle(1, 0x444444);
-  }
-
-  private buildDetailPaneBackground(): void {
-    this.add
-      .rectangle(DETAIL_PANE_CX, DETAIL_PANE_CY, DETAIL_PANE_W, DETAIL_PANE_H, 0x1a1a1a)
-      .setStrokeStyle(1, 0x444444);
-  }
-
-  private rebuild(): void {
-    this.listContainer.removeAll(true);
-    this.detailContainer.removeAll(true);
-    this.rosterCards = [];
+    super.create();
 
     const state = appState.get();
     const wounded = listHeroes(state.roster).filter((h) => h.wounds.length > 0);
     const cap = hospitalTreatmentCap(state.buildingLevels.hospital);
     const remaining = state.hospitalTreatmentsRemaining;
+    const vaultGold = balance(state.vault);
 
-    this.titleText.setText(
-      `Hospital · ${wounded.length} wounded · Treatments ${remaining}/${cap}`,
-    );
-    this.goldText.setText(`Gold: ${balance(state.vault)}`);
+    // Restore or default selectedHeroId
+    if (_pendingSelectedHeroId && wounded.some((h) => h.id === _pendingSelectedHeroId)) {
+      this.selectedHeroId = _pendingSelectedHeroId;
+    } else {
+      this.selectedHeroId = wounded.length > 0 ? wounded[0].id : null;
+    }
+    _pendingSelectedHeroId = this.selectedHeroId;
+
+    // Header
+    const headerTitle = `Hospital · ${wounded.length} wounded · ${remaining}/${cap} treatments`;
+    this.insert.top.textArea({ y: 28, text: headerTitle });
+    this.insert.top.textArea({ y: 52, text: `Gold: ${vaultGold}` });
+    this.insert.topRight.button({
+      x: 4,
+      y: 4,
+      width: 48,
+      text: 'X',
+      onClick: () => this.close(),
+    });
+
+    // Upgrade button (top-left area)
+    const level = state.buildingLevels.hospital;
+    const next = nextLevel('hospital', level);
+    if (next !== null) {
+      const canAfford = vaultGold >= next.upgradeCost;
+      this.insert.topLeft.button({
+        x: 4,
+        y: 4,
+        width: 160,
+        enabled: canAfford,
+        text: `Upgrade ${next.upgradeCost}g`,
+        onClick: () => {
+          appState.update((s) => applyBuildingUpgrade(s, 'hospital'));
+          _pendingSelectedHeroId = null;
+          this.scene.restart();
+        },
+      });
+    }
+
+    // Left pane — wounded hero list
+    const listPane = this.insert.left.frame({
+      x: 8,
+      y: 80,
+      width: 380,
+      height: -80,
+    });
 
     if (wounded.length === 0) {
-      this.listContainer.add(
-        this.add
-          .text(LIST_PANE_CX, LIST_PANE_CY, 'All heroes are healthy.', {
-            fontFamily: 'monospace',
-            fontSize: '13px',
-            color: '#888888',
-          })
-          .setOrigin(0.5),
-      );
-      this.selectedHeroId = null;
-      return;
+      listPane.insert.center.textArea({ text: 'All heroes are healthy.' });
+    } else {
+      for (let i = 0; i < wounded.length && i < LIST_MAX; i++) {
+        const hero = wounded[i];
+        const isSelected = hero.id === this.selectedHeroId;
+        const woundText = `${hero.wounds.length} wound${hero.wounds.length === 1 ? '' : 's'}`;
+        const slotY = 40 + i * ROW_STRIDE;
+        listPane.insert.top.button({
+          y: slotY,
+          width: -16,
+          height: 48,
+          // 'selected' style not in theme yet — no highlight renders. Deferred to sub-spec 3.
+          style: isSelected ? 'selected' : undefined,
+          text: `${hero.name}  (${woundText})`,
+          onClick: () => {
+            _pendingSelectedHeroId = hero.id;
+            this.scene.restart();
+          },
+        });
+      }
     }
 
-    if (!this.selectedHeroId || !wounded.some((h) => h.id === this.selectedHeroId)) {
-      this.selectedHeroId = wounded[0].id;
-    }
+    // Right pane — detail for selected hero
+    const detailPane = this.insert.right.frame({
+      x: 8,
+      y: 80,
+      width: 440,
+      height: -80,
+    });
 
-    for (let i = 0; i < wounded.length && i < 6; i++) {
-      this.buildHeroSlot(wounded[i], i);
-    }
-
-    this.refreshSelectionHighlights();
-    this.rebuildDetail();
-  }
-
-  private buildHeroSlot(hero: Hero, index: number): void {
-    const x = SLOT_X;
-    const y = SLOT_Y_BASE + index * SLOT_STRIDE;
-
-    const bg = this.add
-      .rectangle(x, y, SLOT_BG_W, SLOT_BG_H, 0x000000, 0)
-      .setStrokeStyle(2, 0xffcc66, 0);
-    const card = new HeroCard(this, x - 80, y, hero, { size: 'small' });
-    const countLabel = this.add
-      .text(x + 130, y, `${hero.wounds.length} wound${hero.wounds.length === 1 ? '' : 's'}`, {
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: '#cc8866',
-      })
-      .setOrigin(1, 0.5);
-
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerdown', () => this.selectHero(hero.id));
-
-    this.listContainer.add(bg);
-    this.listContainer.add(card);
-    this.listContainer.add(countLabel);
-
-    this.rosterCards.push({ bg, card, countLabel, hero });
-  }
-
-  private selectHero(id: string): void {
-    this.selectedHeroId = id;
-    this.refreshSelectionHighlights();
-    this.rebuildDetail();
-  }
-
-  private refreshSelectionHighlights(): void {
-    for (const rc of this.rosterCards) {
-      const isSelected = rc.hero.id === this.selectedHeroId;
-      rc.bg.setStrokeStyle(2, 0xffcc66, isSelected ? 1 : 0);
-    }
-  }
-
-  private rebuildDetail(): void {
-    this.detailContainer.removeAll(true);
-
-    const hero = this.selectedHeroId
-      ? this.rosterCards.find((rc) => rc.hero.id === this.selectedHeroId)?.hero
+    const selectedHero = this.selectedHeroId
+      ? wounded.find((h) => h.id === this.selectedHeroId)
       : undefined;
 
-    if (!hero) return;
+    if (!selectedHero) {
+      if (wounded.length > 0) {
+        detailPane.insert.center.textArea({ text: 'Select a hero.' });
+      }
+    } else {
+      detailPane.insert.top.textArea({
+        y: 20,
+        text: selectedHero.name,
+      });
 
-    this.detailContainer.add(
-      this.add
-        .text(DETAIL_PANE_CX, 110, hero.name, {
-          fontFamily: 'monospace',
-          fontSize: '16px',
-          color: '#ffffff',
-        })
-        .setOrigin(0.5),
-    );
+      if (remaining === 0) {
+        detailPane.insert.top.textArea({
+          y: 48,
+          text: 'Cap reached — refills after next run.',
+        });
+      }
 
-    const state = appState.get();
-    const vaultGold = balance(state.vault);
-    const treatmentsLeft = state.hospitalTreatmentsRemaining;
-
-    if (treatmentsLeft === 0) {
-      this.detailContainer.add(
-        this.add
-          .text(DETAIL_PANE_CX, 132, 'Cap reached — refills after next run.', {
-            fontFamily: 'monospace',
-            fontSize: '11px',
-            color: '#cc8866',
-          })
-          .setOrigin(0.5),
-      );
+      for (let i = 0; i < selectedHero.wounds.length; i++) {
+        this.buildWoundRow(detailPane, selectedHero, i, vaultGold, remaining > 0);
+      }
     }
 
-    for (let i = 0; i < hero.wounds.length; i++) {
-      this.buildWoundRow(hero, i, vaultGold, treatmentsLeft > 0);
-    }
+    this.input.keyboard?.on('keydown-ESC', () => this.close());
   }
 
   private buildWoundRow(
+    detailPane: Frame,
     hero: Hero,
     woundIndex: number,
     vaultGold: number,
@@ -297,61 +175,23 @@ export class HospitalPanelScene extends Phaser.Scene {
     const cost = HOSPITAL_TREATMENT_COST;
     const canAfford = vaultGold >= cost;
     const canTreat = canAfford && hasTreatments;
-    const y = WOUND_ROW_Y_BASE + woundIndex * WOUND_ROW_STRIDE;
+    const rowY = 72 + woundIndex * ROW_STRIDE;
 
-    const rowBg = this.add
-      .rectangle(WOUND_ROW_X, y, WOUND_ROW_W, WOUND_ROW_H, 0x222222)
-      .setStrokeStyle(1, 0x444444);
-    this.detailContainer.add(rowBg);
+    const row = detailPane.insert.top.frame({
+      y: rowY,
+      width: -16,
+      height: ROW_H,
+    });
 
-    this.detailContainer.add(
-      this.add
-        .text(WOUND_ROW_X - 180, y, def.name, {
-          fontFamily: 'monospace',
-          fontSize: '13px',
-          color: '#ffffff',
-        })
-        .setOrigin(0, 0.5),
-    );
-
-    this.detailContainer.add(
-      this.add
-        .text(WOUND_ROW_X - 180, y + 14, desc, {
-          fontFamily: 'monospace',
-          fontSize: '11px',
-          color: '#aaaaaa',
-        })
-        .setOrigin(0, 0.5),
-    );
-
-    this.detailContainer.add(
-      this.add
-        .text(WOUND_ROW_X + 60, y, `${cost}g`, {
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: canAfford ? '#ffcc66' : '#cc6666',
-        })
-        .setOrigin(1, 0.5),
-    );
-
-    const buttonBg = this.add
-      .rectangle(WOUND_ROW_X + 140, y, 60, 26, canTreat ? 0x335533 : 0x333333)
-      .setStrokeStyle(1, canTreat ? 0x66aa66 : 0x555555);
-    this.detailContainer.add(buttonBg);
-    this.detailContainer.add(
-      this.add
-        .text(WOUND_ROW_X + 140, y, 'Treat', {
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: canTreat ? '#ffffff' : '#777777',
-        })
-        .setOrigin(0.5),
-    );
-
-    if (canTreat) {
-      buttonBg.setInteractive({ useHandCursor: true });
-      buttonBg.on('pointerdown', () => this.treatWound(hero.id, woundIndex));
-    }
+    row.insert.left.textArea({ x: 8, text: `${def.name}\n${desc}` });
+    row.insert.right.textArea({ x: 64, text: `${cost}g` });
+    row.insert.right.button({
+      x: 8,
+      width: 56,
+      enabled: canTreat,
+      text: 'Treat',
+      onClick: () => this.treatWound(hero.id, woundIndex),
+    });
   }
 
   private treatWound(heroId: string, woundIndex: number): void {
@@ -374,10 +214,17 @@ export class HospitalPanelScene extends Phaser.Scene {
       hospitalTreatmentsRemaining: s.hospitalTreatmentsRemaining - 1,
     }));
 
-    this.rebuild();
+    // Stay on this hero if more wounds remain; otherwise clear selection.
+    if (treatedHero.wounds.length > 0) {
+      _pendingSelectedHeroId = heroId;
+    } else {
+      _pendingSelectedHeroId = null;
+    }
+    this.scene.restart();
   }
 
   private close(): void {
+    _pendingSelectedHeroId = null;
     this.scene.stop();
     this.scene.resume('camp');
   }
