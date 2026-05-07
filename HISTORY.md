@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-06 · UI mispositioning fixes across all panels (Cluster B · 44)
+
+- **Why:** User screenshot of Blacksmith panel showed systemic layout issues: panel content shifted right (asymmetric padding 35L/5R), close button (×) clipped 7px past panel boundary, tabs hidden behind item-list top edge, oversized item-icon placeholder boxes overlapping text. Reported as a general issue affecting the whole game, not just blacksmith.
+- **Decisions** (all five symptoms diagnosed via systematic-debugging skill before fixing):
+  - **Asymmetric content padding.** `LIST_PANE_CX 245→230`, `DETAIL_PANE_CX 715→700` across blacksmith/barracks/hospital. PANEL_W=920 with content totaling 880px should distribute the 40px margin as 20/20, not 35/5. Replicated to barracks and hospital (same shared pattern); tab x-positions in blacksmith re-derived as `LIST_PANE_CX ± 70`.
+  - **Close button overflow.** `(933, 63) → (918, 63)` across blacksmith, barracks, hospital, tavern, equip, expeditions. Panel right edge at x=940; old x=933 with 28-wide button overflowed to x=947. New x=918 leaves 8px padding from panel right.
+  - **Tab/list overlap (blacksmith-specific).** Tabs at y=100 (span 87-113) overlapped list pane top at y=90. Fix: lowered both panes' top to y=120 by adjusting `LIST_PANE_CY 270→285`, `LIST_PANE_H 360→330`, `ROW_Y_BASE 130→145`. Detail-pane content y-positions shifted by +30 in lockstep.
+  - **Item icon size + padding (blacksmith).** `setScale(2)` was 32×32 displayed; reduced to `setScale(1.5)` (24×24) and bumped text x-offset from `iconX+22` to `iconX+28` for clear separation.
+- **Surprises:**
+  - The bugs were NOT a recent regression — constants had been the same since the original commit (`cc2bbfb`, 2026-04-30). The user simply hadn't noticed until that screenshot.
+  - The "stray Upgrade button" (top-left of panel) and duplicate "Gold:" display the user noticed turned out to be intentional — the upgrade-building button lives there by design, and the dim 0.6-alpha overlay lets the camp HUD's gold counter bleed through. Documented but not changed.
+  - Equip panel's right pane has its own asymmetry (right edge overflows by 10px) — flagged but deferred since it has a different layout pattern from the other panels.
+- **Source:** TODO Cluster B · 44 (filed 2026-05-06 with user screenshot at `Downloads/Screenshot 2026-05-06 132936.png`). Test count delta: unchanged (visual-only fixes; no scene tests in the codebase).
+
 ### 2026-05-06 · pixui adoption — Hello-World on hospital (Cluster B · 45 sub-spec 2)
 
 - **Why:** Cluster B · 44 (UI mispositioning) revealed that hand-rolled layout drifts; sub-spec 1 attacked layout. Sub-spec 2 attacks the second axis: 60+ hand-rolled button/widget chains across 6 panel scenes. Adopt phaser-pixui (a Phaser 4 UI framework with sprite-art widgets) starting with hospital as the proof of concept. User had the canonical `tinyRPG_manaSoulGUI` + `tinyRPG_fontKit02` assets that match pixui's example, eliminating the art barrier.

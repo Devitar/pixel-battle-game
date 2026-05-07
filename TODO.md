@@ -125,49 +125,23 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 ---
 
-### 45 · Migrate UI to phaser-pixui library
+### 45 · Migrate UI to phaser-pixui library — sub-specs 3a/3b/3c remaining
 
-- **What:** Evaluate and (if a fit) migrate the panel/scene UI from hand-rolled Phaser primitives (Rectangle + Text + Container) to [phaser-pixui](https://github.com/skhoroshavin/phaser-pixui) — a UI component library for Phaser. Currently every panel hand-rolls layout via hardcoded x/y constants (the Cluster B · 44 mispositioning bug surfaced how brittle this is); pixui presumably provides a layout system + reusable widgets.
-- **Why:** The hand-rolled approach has produced systemic layout bugs (asymmetric padding, widget clipping, hidden tabs — all addressed in Cluster B · 44 by manually shifting constants). A proper UI library with layout primitives (containers, anchors, flex/stack layouts, themed widgets) would make these bugs structurally hard to write. Also reduces per-scene boilerplate (every panel currently re-implements close-button / title strip / list-pane / detail-pane patterns from scratch).
+- **What:** Cross-cutting UI refactor adopting [phaser-pixui](https://github.com/skhoroshavin/phaser-pixui). Decomposed into three sub-specs at brainstorm time; first two complete, third decomposed further at the 2026-05-06 sub-spec-3 brainstorm.
+- **Why:** Hand-rolled Phaser primitives produced systemic layout bugs (Cluster B · 44) and 60+ duplicated widget chains across panels. pixui provides a sprite-themed widget framework + asset pipeline. Path D chosen for the final migration: re-implement Paperdoll/HeroCard as pixui Container compositions so all panels can use one uniform pattern.
 - **Tier:** 2 (UX infrastructure)
+- **Status (2026-05-06):**
+  - **Sub-spec 1 — Layout helpers + blacksmith migration: ✓ DONE.** See [HISTORY](HISTORY.md). Built `src/render/panel_layout.ts` (3 pure functions, 14 tests); migrated blacksmith. Helpers will likely retire after sub-spec 3c finishes (or stay as utilities for non-pixui contexts).
+  - **Sub-spec 2 — pixui Hello-World on hospital: ✓ DONE.** See [HISTORY](HISTORY.md). Added `phaser-pixui` + `pixel-tools` deps, asset pipeline (YAML manifests + Vite plugin), Windows shim, theme module, hospital migrated to UiScene. 7 follow-ups filed (Cluster B · 46–52).
+  - **Sub-spec 3a — Foundation + PoC panel: ⏳ NEXT.** Extract `fixPixuiCanvasViewport()` helper from hospital; build `PixuiPaperdoll` + `PixuiHeroCard` (pixui Container compositions of pixui.Image + TextArea + Progress); refactor hospital to use the helper; migrate Tavern as proof of concept (smallest HeroCard-using panel). Estimated ~2-3 days. Brainstorm + spec doc next.
+  - **Sub-spec 3b — Easy panels (no HeroCard): ⏳ pending 3a.** Migrate CampNodeOverlay, TreasureRoomOverlay, Blacksmith (item icons via pixui.Image), ShopOverlay (item icons via pixui.Image). 4 panels, mechanical apply-the-pattern. Estimated ~1-2 days.
+  - **Sub-spec 3c — Remaining HeroCard panels + cleanup: ⏳ pending 3a.** Migrate Barracks (HeroCard + paperdoll detail), Equip (Paperdoll + slot strip), Expeditions (HeroCard formation), EventOverlay (HeroCard), PerkOverlay (Paperdoll). Plus cleanup decision on `panel_layout.ts` and final README polish. Estimated ~3-5 days.
 - **Acceptance:**
-  - **Needs brainstorming first.** This is a cross-cutting refactor touching every panel scene; design decisions need discussion before implementation. Open questions to resolve in brainstorming:
-    - Is phaser-pixui actually a fit? Read the repo, check maintenance status, evaluate API ergonomics, check Phaser-version compatibility (game uses Phaser 3.x — confirm pixui supports it).
-    - Are there better alternatives? (rex-ui plugins, dat.gui, building our own layout helpers, etc.)
-    - Migration scope: all-at-once, or incremental panel-by-panel? Incremental likely safer.
-    - Which scenes migrate first? (Probably blacksmith / barracks / hospital — the ones with the most repeated boilerplate from Cluster B · 44.)
-    - What's the bundle-size impact? Currently the game ships a slim Phaser build; adding a UI library adds weight.
-  - **If pixui is the right fit** (post-brainstorm): incremental migration plan with one panel at a time. Each panel commit should leave the game in a working state.
-  - **If pixui isn't the right fit** but the underlying problem is real (layout brittleness): consider building a small in-repo layout helper instead — `src/render/panel_layout.ts` with primitives like `panelContainer({ width, height })`, `headerStrip({ title, gold, closeButton })`, `splitPane({ left, right })`. Cluster B · 44's manual constant-shifting is evidence this would pay off.
-- **Touches:** every file under `src/scenes/` that builds UI (panel scenes, overlay scenes, the start scene). Likely a new dependency in `package.json` if pixui is chosen. Possibly new shared helpers in `src/render/`.
-- **Source:** `ideas.md` #5 (2026-05-06), promoted in response to the Cluster B · 44 systemic UI mispositioning bug that exposed the cost of hand-rolled layouts.
-
----
-
-### 44 · UI mispositioned across the whole game (panels off-center, widgets clipped)
-
-- **What:** Panels render shifted right, with elements clipped or overlapping. Specifically observed in the Blacksmith panel (screenshot 2026-05-06), but the user reports the issue is general across the whole game.
-- **Why:** Layout is broken/asymmetric. Player-visible: looks unfinished and partially unreadable.
-- **Tier:** 2 (UI bug)
-- **Symptoms** (Blacksmith screenshot, but likely systemic):
-  - Whole layout shifted right — distance from item list to left panel edge (~30 px) is much smaller than the gap between the item-detail box and the right panel edge (~140 px).
-  - Close button (red X) is clipped against the right edge of the panel, half off-bounds.
-  - Tabs ("Upgrade" / "Sell") render *behind* the top of the item list rather than above it — y-position overlap.
-  - A stray "Upgrade · 200g" button renders at top-left INSIDE the dark panel, above the tabs and above the item list — looks like a misplaced widget or leftover from a tooltip/preview.
-  - "Gold: 1111" is rendered TWICE — once outside the panel at the very top-left of the canvas (clipped against the canvas edge), and once inside the panel at the top-right.
-- **Suspected causes** (worth investigating before fixing):
-  - Recent refactor may have changed canvas dimensions, panel base coordinates, or scene-scaling (`Phaser.Scale.FIT, autoCenter: CENTER_BOTH` in `main.ts`) without propagating updates to all consumers.
-  - The duplicate "Gold: 1111" suggests two layers each rendering the gold counter — possibly a top-level HUD (Camp scene? overlay?) and a per-panel header that was supposed to replace it but didn't.
-  - The stray "Upgrade · 200g" button may be a tooltip or hover widget that's positioned to canvas-relative coordinates instead of panel-relative.
-- **Acceptance:**
-  - Blacksmith panel renders centered with consistent left/right margins (visual sweep).
-  - Close button fits inside the panel bounds with at least 8px padding.
-  - Tabs render above the item list, not behind it.
-  - No duplicate gold counters.
-  - No stray "Upgrade · 200g" or other unattached widgets.
-  - Audit other panels (Tavern, Barracks, Hospital, Expeditions, Equip, Shop, Camp Node, Event, Treasure Room, Perk Picker) — apply matching fixes if they share the regression.
-- **Touches:** likely `src/scenes/blacksmith_panel_scene.ts` for the immediate symptom; may extend to other panel scenes in `src/scenes/*_panel_scene.ts` and `src/scenes/*_overlay_scene.ts`. Possibly a shared layout helper.
-- **Source:** user report 2026-05-06 with screenshot (Downloads/Screenshot 2026-05-06 132936.png — Blacksmith panel as the example).
+  - All 11 panel scenes (Hospital ✓, CampNodeOverlay, TreasureRoomOverlay, Blacksmith, ShopOverlay, Tavern, Barracks, Equip, Expeditions, EventOverlay, PerkOverlay) extend `UiScene` and use pixui `insert` DSL + theme.
+  - `PixuiPaperdoll` and `PixuiHeroCard` exist as reusable pixui Container compositions.
+  - Sub-spec 1's layout helpers either retire or are repurposed for non-pixui scenes (decision in 3c cleanup).
+  - The 7 follow-ups in Cluster B · 46–52 are addressed inline during 3b/3c migrations or filed forward.
+- **Source:** `ideas.md` #5 (2026-05-06); brainstorm history captured in specs `2026-05-06-panel-layout-helpers-design.md` (sub-spec 1), `2026-05-06-pixui-adoption-design.md` (sub-spec 2). Sub-spec 3 brainstorm 2026-05-06 produced Path D decomposition (3a/3b/3c). Combat / Dungeon / Corridor scenes are out of scope (not panel-shaped).
 
 ---
 
