@@ -7,3 +7,5 @@ export { createBitmapText, assertWidgetAssetsLoaded, type BitmapTextOpts } from 
 export { createPanel, type PanelOpts, type PanelVariant } from './panel';
 export { Button, type ButtonOpts, type ButtonVariant } from './button';
 export { createDialog, type DialogOpts, type Dialog } from './dialog';
+export { createPaperdoll, type PaperdollOpts } from './paperdoll';
+export { HeroCard, type HeroCardOpts, type HeroCardSize } from './hero_card';

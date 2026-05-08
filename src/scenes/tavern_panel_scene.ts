@@ -1,4 +1,4 @@
-import { ConstraintMode, UiScene } from 'phaser-pixui';
+import * as Phaser from 'phaser';
 import { nextLevel, tavernCandidateCount } from '@camp/building_levels';
 import { applyBuildingUpgrade } from '@camp/building_upgrade';
 import {
@@ -12,38 +12,56 @@ import { addHero, canAdd } from '@camp/roster';
 import { balance, spend } from '@camp/vault';
 import type { Hero } from '@heroes/hero';
 import { isSoftlocked } from '@save/save';
-import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
-import { uiTheme } from '@render/ui_theme';
-import { PixuiHeroCard } from '@ui/pixui_hero_card';
+import {
+  Button,
+  HeroCard,
+  assertWidgetAssetsLoaded,
+  createBitmapText,
+  createPanel,
+} from '@ui/widgets';
 import { createRng } from '@util/rng';
 import { appState } from './app_state';
 
-// Per-candidate-count slot positions. Tavern uses PixuiHeroCard `small` (180px wide).
-// Each row is symmetric around the panel center (x=480) so the layout stays
-// balanced as the tavern upgrades from L1 (3 candidates) to L3 (5 candidates).
+// Per-candidate-count slot positions in canvas coords (centered around
+// x=480). Each card is 'small' (180px wide); the layout stays balanced as
+// the tavern upgrades from L1 (3 candidates) to L3 (5 candidates).
 //
-// L3 (5 candidates) is the tightest: 180px center spacing means cards touch
-// edge-to-edge across the 920px panel (cards span 30-210, 210-390, 390-570,
-// 570-750, 750-930). Future polish: shrink PixuiHeroCard or wrap to two rows for
-// more breathing room — current spec only requires "N candidates show".
+// L3 (5 candidates) is the tightest: 180px center spacing means cards
+// touch edge-to-edge across the 920px panel.
 const SLOT_X_BY_COUNT: Record<3 | 4 | 5, readonly number[]> = {
   3: [170, 480, 790],
   4: [195, 385, 575, 765],
   5: [120, 300, 480, 660, 840],
 };
 
-export class TavernPanelScene extends UiScene {
+const PANEL_X = 20;
+const PANEL_Y = 40;
+const PANEL_W = 920;
+const PANEL_H = 460;
+
+// Card center y (cards are 60 tall in 'small' mode, so card spans y-30..y+30).
+const CARD_Y = PANEL_Y + 180;
+
+// Hire button below the card.
+const HIRE_BUTTON_Y = CARD_Y + 50;
+const HIRE_BUTTON_W = 160;
+const HIRE_BUTTON_H = 32;
+
+// Hire reason text below the disabled hire button.
+const HIRE_REASON_Y = HIRE_BUTTON_Y + 40;
+
+// Reroll button at panel bottom.
+const REROLL_BUTTON_Y = PANEL_Y + PANEL_H - 60;
+const REROLL_BUTTON_W = 200;
+const REROLL_BUTTON_H = 32;
+
+export class TavernPanelScene extends Phaser.Scene {
   constructor() {
-    super({
-      key: 'tavern_panel',
-      viewportConstraints: { mode: ConstraintMode.Maximum, width: 960, height: 540 },
-      theme: uiTheme,
-    });
+    super('tavern_panel');
   }
 
   create(): void {
-    fixPixuiCanvasViewport(this);
-    super.create();
+    assertWidgetAssetsLoaded(this);
 
     const state = appState.get();
     const tavernLevel = state.buildingLevels.tavern;
@@ -52,8 +70,7 @@ export class TavernPanelScene extends UiScene {
     const free = isSoftlocked(state);
     const vaultGold = balance(state.vault);
 
-    // Persisted candidates: ensure the count matches current cap (regenerate on
-    // cap change post-upgrade, otherwise reuse).
+    // Persisted candidates: ensure the count matches current cap.
     const ensured = ensureCandidatesForCap(
       state.tavernCandidates,
       targetCount,
@@ -65,39 +82,70 @@ export class TavernPanelScene extends UiScene {
     }
     const candidates = [...ensured];
 
-    // Header
+    // Outer panel chrome.
+    createPanel({ scene: this, x: PANEL_X, y: PANEL_Y, width: PANEL_W, height: PANEL_H });
+
+    // Title (top strip).
     const headerText = free
-      ? 'Tavern · Hires are free until you recover'
-      : `Tavern · Hire Cost: ${HIRE_COST}g`;
-    this.insert.top.textArea({ y: 28, text: headerText });
-    this.insert.top.textArea({ y: 52, text: `Vault: ${vaultGold}g · Roster: ${state.roster.heroes.length} / ${state.roster.capacity}` });
-    this.insert.topRight.button({
-      x: 4,
+      ? 'Tavern - Hires are free until you recover'
+      : `Tavern - Hire Cost: ${HIRE_COST}g`;
+    createBitmapText({
+      scene: this,
+      x: 480,
+      y: 12,
+      text: headerText,
+      font: 'medium',
+      size: 16,
+      originX: 0.5,
+    });
+
+    // Vault + roster line (top strip, second line).
+    createBitmapText({
+      scene: this,
+      x: 480,
+      y: 36,
+      text: `Vault: ${vaultGold}g · Roster: ${state.roster.heroes.length} / ${state.roster.capacity}`,
+      font: 'small',
+      size: 16,
+      originX: 0.5,
+    });
+
+    // Close button (top strip, far right).
+    new Button({
+      scene: this,
+      x: 908,
       y: 4,
       width: 48,
+      height: 32,
       text: 'X',
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.close(),
     });
 
-    // Upgrade button (top-left)
-    const level = state.buildingLevels.tavern;
-    const next = nextLevel('tavern', level);
+    // Tavern upgrade button (top strip, left).
+    const next = nextLevel('tavern', tavernLevel);
     if (next !== null) {
       const canAfford = vaultGold >= next.upgradeCost;
-      this.insert.topLeft.button({
-        x: 4,
+      new Button({
+        scene: this,
+        x: 88,
         y: 4,
-        width: 160,
+        width: 200,
+        height: 32,
         enabled: canAfford,
         text: `Upgrade · ${next.upgradeCost}g`,
+        font: 'medium',
+        fontSize: 16,
         onClick: () => {
+          if (!canAfford) return;
           appState.update((s) => applyBuildingUpgrade(s, 'tavern'));
           this.scene.restart();
         },
       });
     }
 
-    // Candidate slots
+    // Hire eligibility (shared across all candidate slots).
     const canAddHero = canAdd(state.roster);
     const canAffordHire = free || vaultGold >= HIRE_COST;
     const canHire = canAddHero && canAffordHire;
@@ -106,45 +154,58 @@ export class TavernPanelScene extends UiScene {
     if (!canAffordHire) hireReason = 'Not enough gold';
     else if (!canAddHero) hireReason = 'Roster full';
 
+    // Candidate cards + per-slot Hire buttons.
     const slotXs = SLOT_X_BY_COUNT[candidates.length as 3 | 4 | 5];
     for (let i = 0; i < candidates.length; i++) {
       const candidate = candidates[i];
-      // SLOT_X_BY_COUNT is canvas-absolute (centered at x=480); convert to center-relative
-      const slotXFromCenter = slotXs[i] - 480;
+      const slotX = slotXs[i];
 
-      const slot = this.insert.center.frame({
-        x: slotXFromCenter,
-        y: -20,
-        width: 200,
-        height: 200,
+      new HeroCard({
+        scene: this,
+        x: slotX,
+        y: CARD_Y,
+        hero: candidate,
+        size: 'small',
       });
 
-      const card = new PixuiHeroCard(this, candidate, { size: 'small' });
-      slot.attach(card);
-
-      slot.insert.bottom.button({
-        y: 8,
-        width: -16,
+      new Button({
+        scene: this,
+        x: slotX - HIRE_BUTTON_W / 2,
+        y: HIRE_BUTTON_Y,
+        width: HIRE_BUTTON_W,
+        height: HIRE_BUTTON_H,
         enabled: canHire,
         text: free ? 'Hire (free)' : `Hire (${HIRE_COST}g)`,
+        font: 'medium',
+        fontSize: 16,
         onClick: () => this.hire(i, candidates),
       });
 
       if (!canHire && hireReason) {
-        slot.insert.bottom.textArea({ y: 36, text: hireReason });
+        this.add
+          .text(slotX, HIRE_REASON_Y, hireReason, {
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            color: '#cc6666',
+          })
+          .setOrigin(0.5);
       }
     }
 
-    // Re-roll button at bottom
+    // Reroll button at panel bottom (centered).
     const canAffordReroll = vaultGold >= REROLL_COST;
-    this.insert.bottom.button({
-      y: 16,
-      width: 200,
+    new Button({
+      scene: this,
+      x: 480 - REROLL_BUTTON_W / 2,
+      y: REROLL_BUTTON_Y,
+      width: REROLL_BUTTON_W,
+      height: REROLL_BUTTON_H,
       enabled: canAffordReroll,
       text: `Reroll · ${REROLL_COST}g`,
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.reroll(),
     });
-
     this.input.keyboard?.on('keydown-ESC', () => this.close());
   }
 
