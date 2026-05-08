@@ -1,31 +1,35 @@
 import * as Phaser from 'phaser';
-import { ConstraintMode, UiScene } from 'phaser-pixui';
 import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels';
 import { removeHero, tickRosterWounds, updateHero } from '@camp/roster';
 import { addItems } from '@camp/stash';
 import { credit } from '@camp/vault';
 import { applyPendingMilestones } from '@run/milestones';
 import { cashout, pressOn, type RunState } from '@run/run_state';
-import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
-import { uiTheme } from '@render/ui_theme';
-import { PixuiHeroCard } from '@ui/pixui_hero_card';
+import { Button, HeroCard, assertWidgetAssetsLoaded } from '@ui/widgets';
 import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 
-// Canvas positions for party cards — canvas-absolute, same as the legacy scene.
+// Canvas positions for party cards.
 const PARTY_X = [180, 480, 780] as const;
 const PARTY_Y = 240;
 
-// Full-scene background (not a dim overlay — camp_screen owns the whole canvas).
+// Bottom action buttons (Equip / Leave / Press On).
+const BOTTOM_BUTTON_W = 220;
+const BOTTOM_BUTTON_H = 44;
+const BOTTOM_BUTTON_Y = 540 - 30 - BOTTOM_BUTTON_H; // 30px from canvas bottom
+const BOTTOM_BUTTON_X = [
+  160 - BOTTOM_BUTTON_W / 2, // Equip:    button center at canvas x=160
+  460 - BOTTOM_BUTTON_W / 2, // Leave:    center at 460
+  760 - BOTTOM_BUTTON_W / 2, // Press On: center at 760
+];
+
+// Full-scene background colour (not a dim overlay — camp_screen owns the
+// whole canvas).
 const BG_COLOR = 0x1a1020;
 
-export class CampScreenScene extends UiScene {
+export class CampScreenScene extends Phaser.Scene {
   constructor() {
-    super({
-      key: 'camp_screen',
-      viewportConstraints: { mode: ConstraintMode.Maximum, width: 960, height: 540 },
-      theme: uiTheme,
-    });
+    super('camp_screen');
   }
 
   create(): void {
@@ -36,16 +40,14 @@ export class CampScreenScene extends UiScene {
       return;
     }
 
-    fixPixuiCanvasViewport(this);
-    super.create();
+    assertWidgetAssetsLoaded(this);
 
-    // Full-canvas background — no dim overlay (this is a full scene, not a modal).
+    // Full-canvas background.
     this.add
       .rectangle(0, 0, this.scale.width, this.scale.height, BG_COLOR)
       .setOrigin(0, 0);
 
-    // Header — raw Phaser text: per-instance font size and color that pixui
-    // textArea + bitmap-font theme can't express cleanly.
+    // Header (raw Phaser text — needs per-instance colour and font size).
     this.add
       .text(480, 40, 'Floor Cleared!', {
         fontFamily: 'monospace',
@@ -61,8 +63,7 @@ export class CampScreenScene extends UiScene {
       })
       .setOrigin(0.5, 0.5);
 
-    // Pack pill — raw Phaser rectangle + label (matches existing overlay patterns;
-    // pixui has no bare pill primitive).
+    // Pack pill — raw Phaser rectangle + label.
     const itemCount = run.pack.items.length;
     const packLabel =
       itemCount > 0
@@ -78,18 +79,18 @@ export class CampScreenScene extends UiScene {
       })
       .setOrigin(0.5);
 
-    // Party row — 3 large PixuiHeroCards; wound badges auto-render via 3c-i.
+    // Party row — 3 large hero cards. Wound badges auto-render.
     for (let i = 0; i < run.party.length; i++) {
-      const slot = this.insert.center.frame({
-        x: PARTY_X[i] - 480,
-        y: PARTY_Y - 270,
-        width: 220,
-        height: 260,
+      new HeroCard({
+        scene: this,
+        x: PARTY_X[i],
+        y: PARTY_Y,
+        hero: run.party[i],
+        size: 'large',
       });
-      slot.attach(new PixuiHeroCard(this, run.party[i], { size: 'large' }));
     }
 
-    // Fallen / Lost lines — conditional, raw Phaser text (matches legacy coloring).
+    // Fallen / Lost status lines (conditional, raw Phaser for coloured text).
     let statusY = 360;
     if (run.fallen.length > 0) {
       const names = run.fallen.map((h) => h.name).join(', ');
@@ -113,42 +114,49 @@ export class CampScreenScene extends UiScene {
         .setOrigin(0.5);
     }
 
-    // Three-button row anchored 30px above the canvas bottom.
-    // x offsets: legacy centers 160/460/760 → center-relative -320/-20/280.
+    // Bottom button row.
     const equipEnabled = this.equipButtonEnabled(run);
-    this.insert.bottom.button({
-      x: -320,
-      y: 30,
-      width: 220,
-      height: 44,
+    new Button({
+      scene: this,
+      x: BOTTOM_BUTTON_X[0],
+      y: BOTTOM_BUTTON_Y,
+      width: BOTTOM_BUTTON_W,
+      height: BOTTOM_BUTTON_H,
       enabled: equipEnabled,
       text: 'Equip',
+      font: 'medium',
+      fontSize: 16,
       onClick: () => {
+        if (!equipEnabled) return;
         this.scene.launch('equip', { kind: 'in_run', returnTo: 'camp_screen' });
         this.scene.pause();
       },
     });
-
-    this.insert.bottom.button({
-      x: -20,
-      y: 30,
-      width: 220,
-      height: 44,
+    new Button({
+      scene: this,
+      x: BOTTOM_BUTTON_X[1],
+      y: BOTTOM_BUTTON_Y,
+      width: BOTTOM_BUTTON_W,
+      height: BOTTOM_BUTTON_H,
       text: `Leave (+${run.pack.gold}g to vault)`,
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.onLeave(),
     });
-
-    this.insert.bottom.button({
-      x: 280,
-      y: 30,
-      width: 220,
-      height: 44,
-      text: `Press On → Floor ${run.currentFloorNumber + 1}`,
+    new Button({
+      scene: this,
+      x: BOTTOM_BUTTON_X[2],
+      y: BOTTOM_BUTTON_Y,
+      width: BOTTOM_BUTTON_W,
+      height: BOTTOM_BUTTON_H,
+      text: `Press On > Floor ${run.currentFloorNumber + 1}`,
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.onPressOn(),
     });
 
-    // Resume listener — triggered when equip scene closes and this scene resumes.
-    // Restart refreshes party cards (e.g. newly equipped items) after equip closes.
+    // Resume listener — triggered when equip scene closes and this scene
+    // resumes. Restart refreshes party cards (e.g. newly equipped items).
     this.events.once(Phaser.Scenes.Events.RESUME, () => this.scene.restart());
   }
 
