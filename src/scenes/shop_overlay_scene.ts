@@ -5,6 +5,7 @@ import { BASE_ITEMS } from '@data/items';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { currentNode, leaveShop, purchaseItem } from '@run/run_state';
 import type { ShopItem } from '@dungeon/node';
+import { SHEET } from '@render/frames';
 import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
 import { uiTheme } from '@render/ui_theme';
 import { appState } from './app_state';
@@ -108,7 +109,7 @@ export class ShopOverlayScene extends UiScene {
 
     // Item icon via inline pixui.Image
     const itemSprite = new Image(this, {
-      texture: 'sprites',
+      texture: SHEET.key,
       frame: BASE_ITEMS[slot.item.baseId].spriteId,
     });
     itemSprite.internal.setScale(ICON_SCALE);

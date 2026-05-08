@@ -1,3 +1,4 @@
+import * as Phaser from 'phaser';
 import { ConstraintMode, Dialog, Image, UiScene } from 'phaser-pixui';
 import type { Frame } from 'phaser-pixui';
 import { nextLevel } from '@camp/building_levels';
@@ -11,7 +12,9 @@ import { equip } from '@items/equip';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { applyItemSell, itemSellValue } from '@items/sell';
 import { canBlacksmithUpgrade, nextRarity, upgradeCost, upgradeItem } from '@items/upgrade';
+import { SHEET } from '@render/frames';
 import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
+import { destroyPixuiSubtree, detachPixuiChild } from '@render/pixui_dynamic_rebuild';
 import { uiTheme } from '@render/ui_theme';
 import { createRng } from '@util/rng';
 import { appState } from './app_state';
@@ -66,6 +69,15 @@ interface UpgradeEntry {
 }
 
 export class BlacksmithPanelScene extends UiScene {
+  // Refs used by selection to do partial rebuilds instead of scene.restart().
+  // Selection only changes row highlight colors and the detail pane; a full
+  // restart caused a visible one-frame flicker on every click.
+  // The scene instance is reused across restart()s, so these get reset on
+  // each create().
+  private _panelFrame: Frame | undefined;
+  private _detailFrame: Frame | undefined;
+  private _rowBgs: { bg: Phaser.GameObjects.Rectangle; id: string }[] = [];
+
   constructor() {
     super({
       key: 'blacksmith_panel',
@@ -77,6 +89,10 @@ export class BlacksmithPanelScene extends UiScene {
   create(): void {
     fixPixuiCanvasViewport(this);
     super.create();
+
+    this._panelFrame = undefined;
+    this._detailFrame = undefined;
+    this._rowBgs = [];
 
     // Header
     const isUpgrade = _mode === 'upgrade';
@@ -124,6 +140,7 @@ export class BlacksmithPanelScene extends UiScene {
       width: PANEL_W,
       height: PANEL_H,
     });
+    this._panelFrame = panel;
 
     if (isUpgrade) {
       this.buildUpgradeMode(panel);
@@ -174,6 +191,53 @@ export class BlacksmithPanelScene extends UiScene {
     _selectedItemId = null;
     _listPageStart = 0;
     this.scene.restart();
+  }
+
+  // Partial update on selection click: only the row highlights and the detail
+  // pane change. A full scene.restart() here was visible as a one-frame flicker.
+  private selectItem(id: string): void {
+    if (_selectedItemId === id) return;
+    _selectedItemId = id;
+
+    for (const row of this._rowBgs) {
+      const sel = row.id === id;
+      row.bg.setFillStyle(sel ? 0x2a2418 : 0x1a1a1a);
+      row.bg.setStrokeStyle(2, sel ? 0xffcc66 : 0x222222, 1);
+    }
+
+    this.rebuildDetailPane();
+  }
+
+  // Tear down the current detail Frame and re-run the relevant build method.
+  // Pixui has no public child-removal API, so this reaches into _children /
+  // _initialized — same pattern fixPixuiCanvasViewport uses on _root.
+  private rebuildDetailPane(): void {
+    const panel = this._panelFrame;
+    if (!panel) return;
+
+    if (this._detailFrame) {
+      destroyPixuiSubtree(this._detailFrame);
+      detachPixuiChild(panel, this._detailFrame);
+      this._detailFrame = undefined;
+    }
+
+    if (_mode === 'upgrade') {
+      this.buildUpgradeDetail(panel, this.collectUpgradeable());
+    } else {
+      this.buildSellDetail(panel, this.collectSellable(appState.get().stash.items));
+    }
+
+    // The new detail Frame was attached but not initialized — UiScene's
+    // events.once('create', () => _root.initialize()) hook fires only on
+    // scene boot, not on later inserts. Reposition first so the new frame's
+    // _parent anchor is set, then initialize the sub-tree.
+    if (this._detailFrame) {
+      const inner = (panel as unknown as {
+        _insert: { _container: { updatePosition: () => void } };
+      })._insert._container;
+      inner.updatePosition();
+      (this._detailFrame as unknown as { initialize: () => void }).initialize();
+    }
   }
 
   private buildUpgradeMode(panel: Frame): void {
@@ -292,15 +356,13 @@ export class BlacksmithPanelScene extends UiScene {
       .rectangle(ROW_X, y, ROW_W, ROW_H, isSelected ? 0x2a2418 : 0x1a1a1a)
       .setStrokeStyle(2, isSelected ? 0xffcc66 : 0x222222, 1);
     bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerdown', () => {
-      _selectedItemId = entry.item.id;
-      this.scene.restart();
-    });
+    bg.on('pointerdown', () => this.selectItem(entry.item.id));
+    this._rowBgs.push({ bg, id: entry.item.id });
 
     // Item icon
     const iconX = ROW_X - ROW_W / 2 + 24;
     const itemIcon = new Image(this, {
-      texture: 'sprites',
+      texture: SHEET.key,
       frame: String(BASE_ITEMS[entry.item.baseId].spriteId),
     });
     itemIcon.internal.setScale(1.5);
@@ -366,14 +428,12 @@ export class BlacksmithPanelScene extends UiScene {
       .rectangle(ROW_X, y, ROW_W, ROW_H, isSelected ? 0x2a2418 : 0x1a1a1a)
       .setStrokeStyle(2, isSelected ? 0xffcc66 : 0x222222, 1);
     bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerdown', () => {
-      _selectedItemId = item.id;
-      this.scene.restart();
-    });
+    bg.on('pointerdown', () => this.selectItem(item.id));
+    this._rowBgs.push({ bg, id: item.id });
 
     const iconX = ROW_X - ROW_W / 2 + 24;
     const itemIcon = new Image(this, {
-      texture: 'sprites',
+      texture: SHEET.key,
       frame: String(BASE_ITEMS[item.baseId].spriteId),
     });
     itemIcon.internal.setScale(1.5);
@@ -439,6 +499,7 @@ export class BlacksmithPanelScene extends UiScene {
       width: DETAIL_W,
       height: LIST_H,
     });
+    this._detailFrame = detailPanel;
 
     detailPanel.insert.top.textArea({ y: 20, text: itemDisplayName(item) });
     detailPanel.insert.top.textArea({ y: 50, text: `${item.rarity}  →  ${target}` });
@@ -468,6 +529,7 @@ export class BlacksmithPanelScene extends UiScene {
       width: DETAIL_W,
       height: LIST_H,
     });
+    this._detailFrame = detailPanel;
 
     detailPanel.insert.top.textArea({ y: 20, text: itemDisplayName(item) });
     detailPanel.insert.top.textArea({ y: 50, text: item.rarity });

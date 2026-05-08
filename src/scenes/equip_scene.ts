@@ -1,5 +1,6 @@
-import { ConstraintMode, Clickable, UiScene } from 'phaser-pixui';
+import { ConstraintMode, UiScene } from 'phaser-pixui';
 import type { Frame } from 'phaser-pixui';
+import * as Phaser from 'phaser';
 import { CLASSES } from '@data/classes';
 import type { AbilityId, Item, ItemSlot } from '@data/types';
 import { BASE_ITEMS } from '@data/items';
@@ -12,7 +13,9 @@ import type { Stats } from '@combat/types';
 import { equipFromStash, unequipToStash } from '@items/equip_camp';
 import { equipFromPack, unequipToPack } from '@run/equip_run';
 import { heroToLoadout } from '@render/hero_loadout';
+import { SHEET } from '@render/frames';
 import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
+import { destroyPixuiSubtree, detachPixuiChild } from '@render/pixui_dynamic_rebuild';
 import { PixuiPaperdoll } from '@render/pixui_paperdoll';
 import { uiTheme } from '@render/ui_theme';
 import { appState } from './app_state';
@@ -52,8 +55,6 @@ const HERO_ROW_H = 76;
 const HERO_ROW_PANE_X = 10;          // left margin inside left pane
 const HERO_LIST_PANE_Y_START = 10;   // top margin inside left pane
 const HERO_LIST_VISIBLE_ROWS = 4;
-// Arrow x relative to left pane (right edge - margin)
-const HERO_LIST_ARROW_PANE_X = LEFT_PANE_W - 16;
 
 const SELECTION_GOLD = 0xffcc66;
 
@@ -100,8 +101,6 @@ const PICKER_PANE_Y_START = 185;           // top offset inside right pane (≈3
 const PICKER_W = 540;
 const PICKER_ROW_H = 22;
 const PICKER_VISIBLE_ROWS = 4;
-// Arrow x relative to right pane right edge
-const PICKER_ARROW_PANE_X = RIGHT_PANE_W - 14;
 
 // Absolute coords for raw-Phaser content inside right pane — picker rows need
 // per-instance rarity-color tinting, so they are placed via raw Phaser rather
@@ -129,9 +128,7 @@ const SLOT_ORDER: Record<ItemSlot, number> = {
   hat: 3,
 };
 
-// Commit button — positioned relative to panel bottom-right
-const COMMIT_BUTTON_PANEL_X = 850;
-const COMMIT_BUTTON_PANEL_Y = 440;
+// Commit button — anchored to panel.bottomRight (8px inset on each axis).
 const COMMIT_BUTTON_W = 200;
 const COMMIT_BUTTON_H = 28;
 
@@ -145,6 +142,16 @@ const WEAPON_TYPE_DISPLAY: Record<string, string> = {
 };
 
 export class EquipScene extends UiScene {
+  // Refs and tracking arrays for partial updates on selection / pagination /
+  // commit, instead of scene.restart() (which caused the whole modal to flicker).
+  // Reset on each create() — the scene instance is reused across restarts.
+  private _panelFrame: Frame | undefined;
+  private _leftRawObjects: Phaser.GameObjects.GameObject[] = [];
+  private _leftPixuiTracked: { parent: unknown; component: unknown }[] = [];
+  private _rightRawObjects: Phaser.GameObjects.GameObject[] = [];
+  private _rightPixuiTracked: { parent: unknown; component: unknown }[] = [];
+  private _heroRowStrokes: { rect: Phaser.GameObjects.Rectangle; id: string }[] = [];
+
   constructor() {
     super({
       key: 'equip',
@@ -170,6 +177,13 @@ export class EquipScene extends UiScene {
     fixPixuiCanvasViewport(this);
     super.create();
 
+    this._panelFrame = undefined;
+    this._leftRawObjects = [];
+    this._leftPixuiTracked = [];
+    this._rightRawObjects = [];
+    this._rightPixuiTracked = [];
+    this._heroRowStrokes = [];
+
     const mode = _mode!;
 
     // --- Dim overlay (raw Phaser — full-canvas modal backdrop) ---
@@ -185,6 +199,7 @@ export class EquipScene extends UiScene {
       width: PANEL_W,
       height: PANEL_H,
     });
+    this._panelFrame = panel;
 
     // --- Title ---
     const titleText = mode.kind === 'barracks' ? 'Equip · Barracks' : 'Equip';
@@ -199,29 +214,32 @@ export class EquipScene extends UiScene {
       onClick: () => this.close(),
     });
 
-    // --- Left pane ---
-    const leftPane = panel.insert.topLeft.frame({
-      x: LEFT_PANE_X - PANEL_X,
-      y: LEFT_PANE_Y - PANEL_Y,
-      width: LEFT_PANE_W,
-      height: LEFT_PANE_H,
-    });
-    this.buildLeftPane(leftPane);
+    // --- Left pane (raw Phaser chrome — pixui Frame compounded paddings with
+    //     panel paddingX/Y, shifting the leftPane 12/14px inside the intended
+    //     canvas position, which left every raw-Phaser child positioned by
+    //     LEFT_PANE_X / LEFT_PANE_Y misaligned with the visible frame). ---
+    this.add
+      .rectangle(
+        LEFT_PANE_X + LEFT_PANE_W / 2,
+        LEFT_PANE_Y + LEFT_PANE_H / 2,
+        LEFT_PANE_W,
+        LEFT_PANE_H,
+        0x1a1a1a,
+      )
+      .setStrokeStyle(1, 0x444444);
+    this.buildAndTrackLeftPane();
 
-    // --- Right pane ---
-    const rightPane = panel.insert.topLeft.frame({
-      x: RIGHT_PANE_X - PANEL_X,
-      y: RIGHT_PANE_Y - PANEL_Y,
-      width: RIGHT_PANE_W,
-      height: RIGHT_PANE_H,
-    });
-    this.buildRightPane(rightPane);
-
-    // --- Commit button ---
-    const hero = this.resolveSelectedHero();
-    if (hero) {
-      this.buildCommitButton(panel, hero);
-    }
+    // --- Right pane (raw Phaser chrome, same reason as left pane) ---
+    this.add
+      .rectangle(
+        RIGHT_PANE_X + RIGHT_PANE_W / 2,
+        RIGHT_PANE_Y + RIGHT_PANE_H / 2,
+        RIGHT_PANE_W,
+        RIGHT_PANE_H,
+        0x1a1a1a,
+      )
+      .setStrokeStyle(1, 0x444444);
+    this.buildAndTrackRightPane();
 
     // --- ESC to close ---
     this.input.keyboard?.on('keydown-ESC', () => this.close());
@@ -247,53 +265,144 @@ export class EquipScene extends UiScene {
     return this.getHeroList().find((h) => h.id === _selectedHeroId);
   }
 
+  // -------------------------------------------------------------------------
+  // Partial updates (avoids the full-scene flicker that scene.restart() caused)
+  // -------------------------------------------------------------------------
+
+  // Hero selection click: update left-row strokes in place, rebuild the right
+  // pane (paperdoll, header, slot strip, detail card, picker, commit button).
+  // The left pane's row content doesn't change for selection — only the gold
+  // stroke alpha — so we don't rebuild the left pane.
+  private selectHero(id: string): void {
+    if (_selectedHeroId === id) return;
+    _selectedHeroId = id;
+    _selection = { kind: 'none' };
+    _pickerPageStart = 0;
+
+    for (const row of this._heroRowStrokes) {
+      row.rect.setStrokeStyle(2, row.id === id ? SELECTION_GOLD : 0x444444);
+    }
+
+    this.rebuildRight();
+  }
+
+  // Snapshot-diff tracking: capture every Phaser game object and pixui
+  // component added during the wrapped build call, so a later partial update
+  // can tear them down without scene.restart(). The pixui side has two parents
+  // we care about — scene._root (paperdoll, pagination buttons) and panel
+  // (commit button) — so we snapshot both child arrays.
+  private buildAndTrackLeftPane(): void {
+    const root = (this as unknown as { _root: { _children: { component: unknown }[] } })._root;
+    const dlBefore = this.children.list.length;
+    const rootBefore = root._children.length;
+    this.buildLeftPane();
+    this._leftRawObjects = this.children.list.slice(dlBefore);
+    this._leftPixuiTracked = root._children
+      .slice(rootBefore)
+      .map((c) => ({ parent: root, component: c.component }));
+  }
+
+  private buildAndTrackRightPane(): void {
+    const panel = this._panelFrame;
+    if (!panel) return;
+    const root = (this as unknown as { _root: { _children: { component: unknown }[] } })._root;
+    const panelInner = (panel as unknown as {
+      _insert: { _container: { _children: { component: unknown }[] } };
+    })._insert._container;
+
+    const dlBefore = this.children.list.length;
+    const rootBefore = root._children.length;
+    const panelInnerBefore = panelInner._children.length;
+
+    this.buildRightPane();
+    const hero = this.resolveSelectedHero();
+    if (hero) this.buildCommitButton(panel, hero);
+
+    this._rightRawObjects = this.children.list.slice(dlBefore);
+    this._rightPixuiTracked = [
+      ...root._children.slice(rootBefore).map((c) => ({ parent: root, component: c.component })),
+      ...panelInner._children
+        .slice(panelInnerBefore)
+        .map((c) => ({ parent: panel, component: c.component })),
+    ];
+  }
+
+  private rebuildLeft(): void {
+    for (const obj of this._leftRawObjects) {
+      if (!(obj as { isDestroyed?: boolean }).isDestroyed) obj.destroy();
+    }
+    this._leftRawObjects = [];
+    this._heroRowStrokes = [];
+
+    for (const { parent, component } of this._leftPixuiTracked) {
+      destroyPixuiSubtree(component);
+      detachPixuiChild(parent, component);
+    }
+    this._leftPixuiTracked = [];
+
+    this.buildAndTrackLeftPane();
+    this.repositionAndInit(this._leftPixuiTracked);
+  }
+
+  private rebuildRight(): void {
+    for (const obj of this._rightRawObjects) {
+      if (!(obj as { isDestroyed?: boolean }).isDestroyed) obj.destroy();
+    }
+    this._rightRawObjects = [];
+
+    for (const { parent, component } of this._rightPixuiTracked) {
+      destroyPixuiSubtree(component);
+      detachPixuiChild(parent, component);
+    }
+    this._rightPixuiTracked = [];
+
+    this.buildAndTrackRightPane();
+    this.repositionAndInit(this._rightPixuiTracked);
+  }
+
+  // Newly attached pixui components were never reposition'd or initialized —
+  // UiScene's events.once('create', () => _root.initialize()) only fires at
+  // scene boot. Cascade reposition through _root (sets _parent on the new
+  // children at any depth), then initialize each new top-level component.
+  private repositionAndInit(tracked: { component: unknown }[]): void {
+    if (tracked.length === 0) return;
+    (this as unknown as { _updateRoot: () => void })._updateRoot();
+    for (const { component } of tracked) {
+      (component as { initialize: () => void }).initialize();
+    }
+  }
+
   // Left pane — hero list with mini-equip-strip
 
-  private buildLeftPane(leftPane: Frame): void {
+  private buildLeftPane(): void {
     const list = this.getHeroList();
     const pageEnd = Math.min(list.length, _heroListPageStart + HERO_LIST_VISIBLE_ROWS);
     for (let i = _heroListPageStart; i < pageEnd; i++) {
       const rowPaneY = HERO_LIST_PANE_Y_START + (i - _heroListPageStart) * (HERO_ROW_H + 8);
-      this.buildHeroRow(leftPane, list[i], rowPaneY);
+      this.buildHeroRow(list[i], rowPaneY);
     }
 
     if (list.length > HERO_LIST_VISIBLE_ROWS) {
-      this.buildHeroListArrows(leftPane, list.length);
+      this.buildHeroListArrows(list.length);
     }
   }
 
-  private buildHeroRow(leftPane: Frame, hero: Hero, rowPaneY: number): void {
+  private buildHeroRow(hero: Hero, rowPaneY: number): void {
     const isSelected = _selectedHeroId === hero.id;
-
-    // Row frame — pixui chrome for the background container.
-    const rowFrame = leftPane.insert.topLeft.frame({
-      x: HERO_ROW_PANE_X,
-      y: rowPaneY,
-      width: HERO_ROW_W,
-      height: HERO_ROW_H,
-    });
-
-    // Selection gold border — raw Phaser inline rectangle (dynamic stroke per
-    // selection state; same reason as Barracks gold border on selected rows).
     const absX = LEFT_PANE_X + HERO_ROW_PANE_X + HERO_ROW_W / 2;
     const absY = LEFT_PANE_Y + rowPaneY + HERO_ROW_H / 2;
-    this.add
+
+    // Row background, gold-stroke selection highlight, and click target —
+    // all on a single raw Phaser rectangle. (Replaces the previous pixui
+    // rowFrame + raw rect + pixui Clickable combo: rowFrame's frame_light
+    // NineSlice was rendering decorative artifacts behind the cards because
+    // its inner-padding-shifted position no longer matched the raw rect.)
+    const rowRect = this.add
       .rectangle(absX, absY, HERO_ROW_W, HERO_ROW_H, 0x222222)
       .setStrokeStyle(2, isSelected ? SELECTION_GOLD : 0x444444);
-
-    // Clickable overlay for hero selection.
-    const clickable = new Clickable(this, {
-      width: HERO_ROW_W,
-      height: HERO_ROW_H,
-      onClick: () => {
-        if (_selectedHeroId === hero.id) return;
-        _selectedHeroId = hero.id;
-        _selection = { kind: 'none' };
-        _pickerPageStart = 0;
-        this.scene.restart();
-      },
-    });
-    rowFrame.attach(clickable);
+    rowRect.setInteractive({ useHandCursor: true });
+    rowRect.on('pointerdown', () => this.selectHero(hero.id));
+    this._heroRowStrokes.push({ rect: rowRect, id: hero.id });
 
     // Hero name + class/level/HP text (raw Phaser — multi-color text pattern).
     const classDef = CLASSES[hero.classId];
@@ -310,9 +419,7 @@ export class EquipScene extends UiScene {
       { fontFamily: 'monospace', fontSize: '11px', color: '#aaaaaa' },
     );
 
-    // Mini equip strip — 4 small rarity-bordered squares. Raw Phaser inline
-    // rectangles — rarity color is dynamic per item (same reason as Blacksmith
-    // row tinting workaround, Cluster B · 57).
+    // Mini equip strip — 4 small rarity-bordered squares with item icons.
     const stripY = LEFT_PANE_Y + rowPaneY + HERO_ROW_H - 20;
     const stripStartX = LEFT_PANE_X + HERO_ROW_PANE_X + 16;
     for (let s = 0; s < SLOTS.length; s++) {
@@ -322,48 +429,60 @@ export class EquipScene extends UiScene {
       this.add
         .rectangle(sx, stripY, 22, 22, 0x111111)
         .setStrokeStyle(1, item ? RARITY_COLOR_NUM[item.rarity] : 0x333333);
+      if (item) {
+        this.add
+          .sprite(sx, stripY, SHEET.key, parseInt(BASE_ITEMS[item.baseId].spriteId, 10));
+      }
     }
   }
 
-  private buildHeroListArrows(leftPane: Frame, totalRows: number): void {
+  private buildHeroListArrows(totalRows: number): void {
     const canPageUp = _heroListPageStart > 0;
     const canPageDown = _heroListPageStart + HERO_LIST_VISIBLE_ROWS < totalRows;
+    // Pagination buttons attached to scene root (not pane) since the pane is
+    // raw Phaser. Position is canvas-absolute.
+    const arrowX = LEFT_PANE_X + LEFT_PANE_W - 28;
 
-    // Page-up arrow — Up/Dn text labels (▲/▼ bitmap font support unverified, see plan Task 6 fallback note).
-    leftPane.insert.topLeft.button({
-      x: HERO_LIST_ARROW_PANE_X,
-      y: HERO_LIST_PANE_Y_START,
+    this.insert.topLeft.button({
+      x: arrowX,
+      y: LEFT_PANE_Y + 8,
       width: 24,
       height: 24,
       enabled: canPageUp,
       text: 'Up',
       onClick: () => {
         _heroListPageStart = Math.max(0, _heroListPageStart - HERO_LIST_VISIBLE_ROWS);
-        this.scene.restart();
+        this.rebuildLeft();
       },
     });
 
-    // Page-down arrow — Up/Dn text labels (same fallback as above).
-    leftPane.insert.topLeft.button({
-      x: HERO_LIST_ARROW_PANE_X,
-      y: HERO_LIST_PANE_Y_START + HERO_LIST_VISIBLE_ROWS * (HERO_ROW_H + 8) - 24,
+    this.insert.topLeft.button({
+      x: arrowX,
+      y: LEFT_PANE_Y + LEFT_PANE_H - 32,
       width: 24,
       height: 24,
       enabled: canPageDown,
       text: 'Dn',
       onClick: () => {
         _heroListPageStart += HERO_LIST_VISIBLE_ROWS;
-        this.scene.restart();
+        this.rebuildLeft();
       },
     });
   }
 
   // Right pane — paperdoll + header + slot strip + detail card + picker
 
-  private buildRightPane(rightPane: Frame): void {
+  private buildRightPane(): void {
     const hero = this.resolveSelectedHero();
     if (!hero) {
-      rightPane.insert.center.textArea({ text: 'No hero selected.' });
+      this.add
+        .text(
+          RIGHT_PANE_X + RIGHT_PANE_W / 2,
+          RIGHT_PANE_Y + RIGHT_PANE_H / 2,
+          'No hero selected.',
+          { fontFamily: 'monospace', fontSize: '12px', color: '#888888' },
+        )
+        .setOrigin(0.5);
       return;
     }
 
@@ -371,7 +490,7 @@ export class EquipScene extends UiScene {
     this.buildHeader(hero);
     this.buildSlotStrip(hero);
     this.buildSlotDetailCard(hero);
-    this.buildPicker(rightPane, hero);
+    this.buildPicker(hero);
   }
 
   private buildPaperdoll(hero: Hero): void {
@@ -499,7 +618,7 @@ export class EquipScene extends UiScene {
     if (item) {
       // Item sprite icon — raw Phaser inline add.sprite (matches ShopOverlay pattern).
       this.add
-        .sprite(x, SLOT_STRIP_Y, 'sprites', parseInt(BASE_ITEMS[item.baseId].spriteId, 10))
+        .sprite(x, SLOT_STRIP_Y, SHEET.key, parseInt(BASE_ITEMS[item.baseId].spriteId, 10))
         .setScale(2);
     } else {
       this.add
@@ -533,7 +652,7 @@ export class EquipScene extends UiScene {
       return;
     }
     _selection = { kind: 'equipped-slot', slot };
-    this.scene.restart();
+    this.rebuildRight();
   }
 
   // Slot detail card — before/after preview
@@ -647,7 +766,7 @@ export class EquipScene extends UiScene {
     return this.getSourceItems().find((i) => i.id === itemId);
   }
 
-  private buildPicker(rightPane: Frame, hero: Hero): void {
+  private buildPicker(hero: Hero): void {
     const items = this.sortedSourceItems();
     const sourceLabel = _mode?.kind === 'barracks' ? 'Stash' : 'Pack';
     this.add.text(PICKER_X - PICKER_W / 2, PICKER_Y_START - 16, `${sourceLabel} (${items.length})`, {
@@ -670,42 +789,29 @@ export class EquipScene extends UiScene {
     const pageEnd = Math.min(items.length, _pickerPageStart + PICKER_VISIBLE_ROWS);
     for (let i = _pickerPageStart; i < pageEnd; i++) {
       const rowPaneY = PICKER_PANE_Y_START + (i - _pickerPageStart) * PICKER_ROW_H;
-      this.buildPickerRow(rightPane, items[i], rowPaneY, hero);
+      this.buildPickerRow(items[i], rowPaneY, hero);
     }
 
     if (items.length > PICKER_VISIBLE_ROWS) {
-      this.buildPickerArrows(rightPane, items.length);
+      this.buildPickerArrows(items.length);
     }
   }
 
-  private buildPickerRow(rightPane: Frame, item: Item, rowPaneY: number, hero: Hero): void {
+  private buildPickerRow(item: Item, rowPaneY: number, hero: Hero): void {
     const isSelected =
       _selection.kind === 'pack-item' && _selection.itemId === item.id;
 
-    // Row frame — pixui chrome for the background container.
-    const rowFrame = rightPane.insert.topLeft.frame({
-      x: PICKER_PANE_X,
-      y: rowPaneY,
-      width: PICKER_W,
-      height: PICKER_ROW_H - 2,
-    });
-
-    // Selection highlight background — raw Phaser inline rectangle (dynamic
-    // fill + stroke per selection state; same reason as Barracks gold border).
     const absX = RIGHT_PANE_X + PICKER_PANE_X + PICKER_W / 2;
     const absY = RIGHT_PANE_Y + rowPaneY + (PICKER_ROW_H - 2) / 2;
-    this.add
+    // Selection highlight background + click target — single raw Phaser
+    // rectangle (replaces previous pixui rowFrame + raw rect + Clickable
+    // combo, same reason as buildHeroRow).
+    const rowRect = this.add
       .rectangle(absX, absY, PICKER_W, PICKER_ROW_H - 2,
         isSelected ? 0x2a2418 : 0x111111)
       .setStrokeStyle(1, isSelected ? SELECTION_GOLD : 0x222222);
-
-    // Clickable overlay for item selection.
-    const clickable = new Clickable(this, {
-      width: PICKER_W,
-      height: PICKER_ROW_H - 2,
-      onClick: () => this.onPickerRowClick(item),
-    });
-    rowFrame.attach(clickable);
+    rowRect.setInteractive({ useHandCursor: true });
+    rowRect.on('pointerdown', () => this.onPickerRowClick(item));
 
     // Row text (raw Phaser — rarity-colored per item).
     const isEquipped = hero.equipment[item.slot]?.id === item.id;
@@ -727,35 +833,34 @@ export class EquipScene extends UiScene {
     }
   }
 
-  private buildPickerArrows(rightPane: Frame, totalRows: number): void {
+  private buildPickerArrows(totalRows: number): void {
     const canPageUp = _pickerPageStart > 0;
     const canPageDown = _pickerPageStart + PICKER_VISIBLE_ROWS < totalRows;
+    const arrowX = RIGHT_PANE_X + RIGHT_PANE_W - 30;
 
-    // Page-up arrow — Up/Dn text labels (▲/▼ bitmap font support unverified, see plan Task 6 fallback note).
-    rightPane.insert.topLeft.button({
-      x: PICKER_ARROW_PANE_X,
-      y: PICKER_PANE_Y_START,
+    this.insert.topLeft.button({
+      x: arrowX,
+      y: PICKER_Y_START - 4,
       width: 24,
       height: 20,
       enabled: canPageUp,
       text: 'Up',
       onClick: () => {
         _pickerPageStart = Math.max(0, _pickerPageStart - PICKER_VISIBLE_ROWS);
-        this.scene.restart();
+        this.rebuildRight();
       },
     });
 
-    // Page-down arrow — Up/Dn text labels (same fallback as above).
-    rightPane.insert.topLeft.button({
-      x: PICKER_ARROW_PANE_X,
-      y: PICKER_PANE_Y_START + PICKER_VISIBLE_ROWS * PICKER_ROW_H - 20,
+    this.insert.topLeft.button({
+      x: arrowX,
+      y: PICKER_Y_START + PICKER_VISIBLE_ROWS * PICKER_ROW_H - 20,
       width: 24,
       height: 20,
       enabled: canPageDown,
       text: 'Dn',
       onClick: () => {
         _pickerPageStart += PICKER_VISIBLE_ROWS;
-        this.scene.restart();
+        this.rebuildRight();
       },
     });
   }
@@ -766,7 +871,7 @@ export class EquipScene extends UiScene {
       return;
     }
     _selection = { kind: 'pack-item', itemId: item.id };
-    this.scene.restart();
+    this.rebuildRight();
   }
 
   // Commit button
@@ -790,9 +895,13 @@ export class EquipScene extends UiScene {
       }
     }
 
-    panel.insert.topLeft.button({
-      x: COMMIT_BUTTON_PANEL_X - PANEL_X - COMMIT_BUTTON_W / 2,
-      y: COMMIT_BUTTON_PANEL_Y - PANEL_Y,
+    // Anchor to panel's bottomRight so the button stays inside the inner
+    // padding regardless of the frame's paddingX / paddingY. Previous
+    // topLeft-with-x=730 placed the button's left edge there, ending at
+    // canvas X=962 — past both the panel and the canvas right edge.
+    panel.insert.bottomRight.button({
+      x: 8,
+      y: 8,
       width: COMMIT_BUTTON_W,
       height: COMMIT_BUTTON_H,
       enabled,
@@ -825,7 +934,10 @@ export class EquipScene extends UiScene {
       _pickerPageStart = Math.max(0, newItems.length - PICKER_VISIBLE_ROWS);
     }
 
-    this.scene.restart();
+    // Equipment changed — left mini-strips and the entire right pane need
+    // refreshing.
+    this.rebuildLeft();
+    this.rebuildRight();
   }
 
   private commitEquip(itemId: string, slot: ItemSlot): void {
