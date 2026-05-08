@@ -1,38 +1,59 @@
-import * as Phaser from 'phaser';
+import { ConstraintMode, Clickable, UiScene } from 'phaser-pixui';
+import type { Frame } from 'phaser-pixui';
 import { CLASSES } from '@data/classes';
 import type { AbilityId, Item, ItemSlot } from '@data/types';
 import { BASE_ITEMS } from '@data/items';
 import { ABILITIES } from '@data/abilities';
 import type { Hero } from '@heroes/hero';
-import { Paperdoll } from '@render/paperdoll';
-import { heroToLoadout } from '@render/hero_loadout';
 import { applyEquipmentStats } from '@items/stats';
 import { describeKitStatus, resolveCombatAbilities, resolveAbilityDiff } from '@items/kit';
 import { itemAffixDescription, itemDisplayName, previewStats, type StatPreview } from '@items/selectors';
 import type { Stats } from '@combat/types';
 import { equipFromStash, unequipToStash } from '@items/equip_camp';
 import { equipFromPack, unequipToPack } from '@run/equip_run';
+import { heroToLoadout } from '@render/hero_loadout';
+import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
+import { PixuiPaperdoll } from '@render/pixui_paperdoll';
+import { uiTheme } from '@render/ui_theme';
 import { appState } from './app_state';
 
-const PANEL_CX = 480;
-const PANEL_CY = 270;
+// Module-level state — survives scene.restart() between selection changes
+// and hero switches. Reset on init when the incoming mode changes.
+type Selection =
+  | { kind: 'none' }
+  | { kind: 'pack-item'; itemId: string }
+  | { kind: 'equipped-slot'; slot: ItemSlot };
+
+export type EquipMode =
+  | { kind: 'barracks'; heroId: string }
+  | { kind: 'in_run'; returnTo: string };
+
+let _selection: Selection = { kind: 'none' };
+let _selectedHeroId: string = '';
+let _heroListPageStart = 0;
+let _pickerPageStart = 0;
+let _mode: EquipMode | undefined = undefined;
+
+// Layout constants
+const PANEL_X = 20;
+const PANEL_Y = 40;
 const PANEL_W = 920;
 const PANEL_H = 460;
 
-const TITLE_Y = 60;
-const CLOSE_X = 918;
-const CLOSE_Y = 63;
-
-const LEFT_PANE_CX = 155;
+// Left pane — absolute canvas coords
+const LEFT_PANE_X = PANEL_X + 10;
+const LEFT_PANE_Y = PANEL_Y + 70;
 const LEFT_PANE_W = 260;
 const LEFT_PANE_H = 360;
 
 const HERO_ROW_W = 240;
 const HERO_ROW_H = 76;
-const HERO_ROW_X = 155;
-const HERO_LIST_Y_START = 110;
+// Hero rows are positioned inside leftPane (pane-relative coords)
+const HERO_ROW_PANE_X = 10;          // left margin inside left pane
+const HERO_LIST_PANE_Y_START = 10;   // top margin inside left pane
 const HERO_LIST_VISIBLE_ROWS = 4;
-const HERO_LIST_ARROW_X = 270;
+// Arrow x relative to left pane (right edge - margin)
+const HERO_LIST_ARROW_PANE_X = LEFT_PANE_W - 16;
 
 const SELECTION_GOLD = 0xffcc66;
 
@@ -42,7 +63,15 @@ const RARITY_COLOR_NUM: Record<'common' | 'uncommon' | 'rare', number> = {
   rare: 0xffcc66,
 };
 
-const RIGHT_PANE_CX = 640;
+const RARITY_COLOR_HEX: Record<'common' | 'uncommon' | 'rare', string> = {
+  common: '#cccccc',
+  uncommon: '#4488ff',
+  rare: '#ffcc66',
+};
+
+// Right pane — absolute canvas coords
+const RIGHT_PANE_X = LEFT_PANE_X + LEFT_PANE_W + 10;
+const RIGHT_PANE_Y = PANEL_Y + 70;
 const RIGHT_PANE_W = 620;
 const RIGHT_PANE_H = 360;
 
@@ -60,23 +89,25 @@ const SLOT_SQUARE_SIZE = 56;
 const SLOT_STRIP_Y = 240;
 const SLOT_STRIP_X = [460, 540, 620, 700] as const;
 
-const CARD_CX = 640;  // matches RIGHT_PANE_CX
+const CARD_CX = 640;
 const CARD_Y = 305;
 const CARD_W = 520;
 const CARD_H = 60;
 
-const RARITY_COLOR_HEX: Record<'common' | 'uncommon' | 'rare', string> = {
-  common: '#cccccc',
-  uncommon: '#4488ff',
-  rare: '#ffcc66',
-};
-
-const PICKER_X = 640;  // matches RIGHT_PANE_CX
+// Picker positioned inside rightPane (pane-relative coords)
+const PICKER_PANE_X = 10;                  // left margin inside right pane
+const PICKER_PANE_Y_START = 185;           // top offset inside right pane (≈345-160)
 const PICKER_W = 540;
-const PICKER_Y_START = 345;
 const PICKER_ROW_H = 22;
 const PICKER_VISIBLE_ROWS = 4;
-const PICKER_ARROW_X = 905;
+// Arrow x relative to right pane right edge
+const PICKER_ARROW_PANE_X = RIGHT_PANE_W - 14;
+
+// Absolute coords for raw-Phaser content inside right pane — picker rows need
+// per-instance rarity-color tinting, so they are placed via raw Phaser rather
+// than pixui chrome (which uses pane-relative coords above).
+const PICKER_X = 640;
+const PICKER_Y_START = 345;
 
 const SLOT_TAG: Record<ItemSlot, string> = {
   weapon: '[w]',
@@ -98,8 +129,9 @@ const SLOT_ORDER: Record<ItemSlot, number> = {
   hat: 3,
 };
 
-const COMMIT_BUTTON_X = 850;
-const COMMIT_BUTTON_Y = 440;
+// Commit button — positioned relative to panel bottom-right
+const COMMIT_BUTTON_PANEL_X = 850;
+const COMMIT_BUTTON_PANEL_Y = 440;
 const COMMIT_BUTTON_W = 200;
 const COMMIT_BUTTON_H = 28;
 
@@ -112,222 +144,226 @@ const WEAPON_TYPE_DISPLAY: Record<string, string> = {
   staff: 'staff',
 };
 
-type Selection =
-  | { kind: 'none' }
-  | { kind: 'pack-item'; itemId: string }
-  | { kind: 'equipped-slot'; slot: ItemSlot };
-
-export type EquipMode =
-  | { kind: 'barracks'; heroId: string }
-  | { kind: 'in_run'; returnTo: string };
-
-export class EquipScene extends Phaser.Scene {
-  private mode!: EquipMode;
-  private contentContainer!: Phaser.GameObjects.Container;
-  private selectedHeroId: string = '';
-  private heroListPageStart: number = 0;
-  private pickerPageStart: number = 0;
-  private selection: Selection = { kind: 'none' };
-
+export class EquipScene extends UiScene {
   constructor() {
-    super('equip');
+    super({
+      key: 'equip',
+      viewportConstraints: { mode: ConstraintMode.Maximum, width: 960, height: 540 },
+      theme: uiTheme,
+    });
   }
 
   init(data: EquipMode): void {
-    this.mode = data;
+    // Reset module state when the mode changes (i.e., a new open, not a restart).
+    const modeKey = JSON.stringify(data);
+    const prevKey = _mode ? JSON.stringify(_mode) : '';
+    if (modeKey !== prevKey) {
+      _mode = data;
+      _selection = { kind: 'none' };
+      _heroListPageStart = 0;
+      _pickerPageStart = 0;
+      _selectedHeroId = this.initialHeroIdFor(data);
+    }
   }
 
   create(): void {
-    this.selectedHeroId = this.initialHeroId();
-    this.heroListPageStart = 0;
-    this.buildOverlayAndPanel();
-    this.buildCloseButton();
-    this.contentContainer = this.add.container(0, 0);
-    this.repaint();
+    fixPixuiCanvasViewport(this);
+    super.create();
+
+    const mode = _mode!;
+
+    // --- Dim overlay (raw Phaser — full-canvas modal backdrop) ---
+    this.add
+      .rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.6)
+      .setOrigin(0, 0)
+      .setInteractive();
+
+    // --- Panel frame ---
+    const panel = this.insert.topLeft.frame({
+      x: PANEL_X,
+      y: PANEL_Y,
+      width: PANEL_W,
+      height: PANEL_H,
+    });
+
+    // --- Title ---
+    const titleText = mode.kind === 'barracks' ? 'Equip · Barracks' : 'Equip';
+    panel.insert.top.textArea({ y: 28, text: titleText });
+
+    // --- Close button ---
+    panel.insert.topRight.button({
+      x: 4,
+      y: 4,
+      width: 48,
+      text: 'X',
+      onClick: () => this.close(),
+    });
+
+    // --- Left pane ---
+    const leftPane = panel.insert.topLeft.frame({
+      x: LEFT_PANE_X - PANEL_X,
+      y: LEFT_PANE_Y - PANEL_Y,
+      width: LEFT_PANE_W,
+      height: LEFT_PANE_H,
+    });
+    this.buildLeftPane(leftPane);
+
+    // --- Right pane ---
+    const rightPane = panel.insert.topLeft.frame({
+      x: RIGHT_PANE_X - PANEL_X,
+      y: RIGHT_PANE_Y - PANEL_Y,
+      width: RIGHT_PANE_W,
+      height: RIGHT_PANE_H,
+    });
+    this.buildRightPane(rightPane);
+
+    // --- Commit button ---
+    const hero = this.resolveSelectedHero();
+    if (hero) {
+      this.buildCommitButton(panel, hero);
+    }
+
+    // --- ESC to close ---
     this.input.keyboard?.on('keydown-ESC', () => this.close());
   }
 
-  private initialHeroId(): string {
-    if (this.mode.kind === 'barracks') return this.mode.heroId;
+  // Init helper
+
+  private initialHeroIdFor(mode: EquipMode): string {
+    if (mode.kind === 'barracks') return mode.heroId;
     const run = appState.get().runState;
     return run?.party[0]?.id ?? '';
   }
 
   private getHeroList(): readonly Hero[] {
-    if (this.mode.kind === 'barracks') return appState.get().roster.heroes;
+    if (!_mode) return [];
+    if (_mode.kind === 'barracks') return appState.get().roster.heroes;
     const run = appState.get().runState;
     if (!run) return [];
     return run.party;
   }
 
-  private buildOverlayAndPanel(): void {
-    this.add
-      .rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.6)
-      .setOrigin(0, 0)
-      .setInteractive();
-    this.add
-      .rectangle(PANEL_CX, PANEL_CY, PANEL_W, PANEL_H, 0x222222)
-      .setStrokeStyle(2, 0x666666)
-      .setInteractive();
-    const titleText = this.mode.kind === 'barracks' ? 'Equip · Barracks' : 'Equip';
-    this.add
-      .text(PANEL_CX, TITLE_Y, titleText, {
-        fontFamily: 'monospace',
-        fontSize: '18px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
+  private resolveSelectedHero(): Hero | undefined {
+    return this.getHeroList().find((h) => h.id === _selectedHeroId);
   }
 
-  private buildCloseButton(): void {
-    const closeBg = this.add
-      .rectangle(CLOSE_X, CLOSE_Y, 28, 28, 0x553333)
-      .setStrokeStyle(1, 0x885555);
-    this.add
-      .text(CLOSE_X, CLOSE_Y, '×', {
-        fontFamily: 'monospace',
-        fontSize: '20px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-    closeBg.setInteractive({ useHandCursor: true });
-    closeBg.on('pointerdown', () => this.close());
-  }
+  // Left pane — hero list with mini-equip-strip
 
-  private buildLeftPane(): void {
-    // Background frame.
-    this.contentContainer.add(
-      this.add
-        .rectangle(LEFT_PANE_CX, PANEL_CY, LEFT_PANE_W, LEFT_PANE_H, 0x1a1a1a)
-        .setStrokeStyle(1, 0x444444),
-    );
-
+  private buildLeftPane(leftPane: Frame): void {
     const list = this.getHeroList();
-    const pageEnd = Math.min(list.length, this.heroListPageStart + HERO_LIST_VISIBLE_ROWS);
-    for (let i = this.heroListPageStart; i < pageEnd; i++) {
-      const y = HERO_LIST_Y_START + (i - this.heroListPageStart) * (HERO_ROW_H + 8);
-      this.buildHeroRow(list[i], y);
+    const pageEnd = Math.min(list.length, _heroListPageStart + HERO_LIST_VISIBLE_ROWS);
+    for (let i = _heroListPageStart; i < pageEnd; i++) {
+      const rowPaneY = HERO_LIST_PANE_Y_START + (i - _heroListPageStart) * (HERO_ROW_H + 8);
+      this.buildHeroRow(leftPane, list[i], rowPaneY);
     }
 
     if (list.length > HERO_LIST_VISIBLE_ROWS) {
-      this.buildHeroListArrows(list.length);
+      this.buildHeroListArrows(leftPane, list.length);
     }
   }
 
-  private buildHeroRow(hero: Hero, y: number): void {
-    const isSelected = this.selectedHeroId === hero.id;
-    const bg = this.add
-      .rectangle(HERO_ROW_X, y + HERO_ROW_H / 2, HERO_ROW_W, HERO_ROW_H, 0x222222)
+  private buildHeroRow(leftPane: Frame, hero: Hero, rowPaneY: number): void {
+    const isSelected = _selectedHeroId === hero.id;
+
+    // Row frame — pixui chrome for the background container.
+    const rowFrame = leftPane.insert.topLeft.frame({
+      x: HERO_ROW_PANE_X,
+      y: rowPaneY,
+      width: HERO_ROW_W,
+      height: HERO_ROW_H,
+    });
+
+    // Selection gold border — raw Phaser inline rectangle (dynamic stroke per
+    // selection state; same reason as Barracks gold border on selected rows).
+    const absX = LEFT_PANE_X + HERO_ROW_PANE_X + HERO_ROW_W / 2;
+    const absY = LEFT_PANE_Y + rowPaneY + HERO_ROW_H / 2;
+    this.add
+      .rectangle(absX, absY, HERO_ROW_W, HERO_ROW_H, 0x222222)
       .setStrokeStyle(2, isSelected ? SELECTION_GOLD : 0x444444);
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerdown', () => this.onHeroRowClick(hero.id));
-    this.contentContainer.add(bg);
 
+    // Clickable overlay for hero selection.
+    const clickable = new Clickable(this, {
+      width: HERO_ROW_W,
+      height: HERO_ROW_H,
+      onClick: () => {
+        if (_selectedHeroId === hero.id) return;
+        _selectedHeroId = hero.id;
+        _selection = { kind: 'none' };
+        _pickerPageStart = 0;
+        this.scene.restart();
+      },
+    });
+    rowFrame.attach(clickable);
+
+    // Hero name + class/level/HP text (raw Phaser — multi-color text pattern).
     const classDef = CLASSES[hero.classId];
-    this.contentContainer.add(
-      this.add.text(HERO_ROW_X - HERO_ROW_W / 2 + 12, y + 8, hero.name, {
-        fontFamily: 'monospace',
-        fontSize: '13px',
-        color: '#ffffff',
-      }),
-    );
-    this.contentContainer.add(
-      this.add.text(
-        HERO_ROW_X - HERO_ROW_W / 2 + 12,
-        y + 26,
-        `${classDef.name} · Lv ${hero.level} · HP ${hero.currentHp}/${hero.maxHp}`,
-        { fontFamily: 'monospace', fontSize: '11px', color: '#aaaaaa' },
-      ),
+    const textX = LEFT_PANE_X + HERO_ROW_PANE_X + 12;
+    this.add.text(textX, LEFT_PANE_Y + rowPaneY + 8, hero.name, {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#ffffff',
+    });
+    this.add.text(
+      textX,
+      LEFT_PANE_Y + rowPaneY + 26,
+      `${classDef.name} · Lv ${hero.level} · HP ${hero.currentHp}/${hero.maxHp}`,
+      { fontFamily: 'monospace', fontSize: '11px', color: '#aaaaaa' },
     );
 
-    // Mini equip strip — 4 small squares.
-    const stripY = y + HERO_ROW_H - 20;
-    const stripStartX = HERO_ROW_X - HERO_ROW_W / 2 + 16;
-    const slots: readonly ItemSlot[] = ['weapon', 'shield', 'outfit', 'hat'];
-    for (let s = 0; s < slots.length; s++) {
-      const slot = slots[s];
+    // Mini equip strip — 4 small rarity-bordered squares. Raw Phaser inline
+    // rectangles — rarity color is dynamic per item (same reason as Blacksmith
+    // row tinting workaround, Cluster B · 57).
+    const stripY = LEFT_PANE_Y + rowPaneY + HERO_ROW_H - 20;
+    const stripStartX = LEFT_PANE_X + HERO_ROW_PANE_X + 16;
+    for (let s = 0; s < SLOTS.length; s++) {
+      const slot = SLOTS[s];
       const item = hero.equipment[slot];
       const sx = stripStartX + s * 28;
-      this.contentContainer.add(
-        this.add
-          .rectangle(sx, stripY, 22, 22, 0x111111)
-          .setStrokeStyle(1, item ? RARITY_COLOR_NUM[item.rarity] : 0x333333),
-      );
-    }
-  }
-
-  private buildHeroListArrows(totalRows: number): void {
-    const canPageUp = this.heroListPageStart > 0;
-    const canPageDown = this.heroListPageStart + HERO_LIST_VISIBLE_ROWS < totalRows;
-
-    const upArrow = this.add
-      .text(HERO_LIST_ARROW_X, HERO_LIST_Y_START - 4, '▲', {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: canPageUp ? '#cccccc' : '#444444',
-      })
-      .setOrigin(0.5);
-    if (canPageUp) {
-      upArrow.setInteractive({ useHandCursor: true });
-      upArrow.on('pointerdown', () => {
-        this.heroListPageStart = Math.max(0, this.heroListPageStart - HERO_LIST_VISIBLE_ROWS);
-        this.repaint();
-      });
-    }
-    this.contentContainer.add(upArrow);
-
-    const downArrow = this.add
-      .text(
-        HERO_LIST_ARROW_X,
-        HERO_LIST_Y_START + HERO_LIST_VISIBLE_ROWS * (HERO_ROW_H + 8) - 4,
-        '▼',
-        {
-          fontFamily: 'monospace',
-          fontSize: '14px',
-          color: canPageDown ? '#cccccc' : '#444444',
-        },
-      )
-      .setOrigin(0.5);
-    if (canPageDown) {
-      downArrow.setInteractive({ useHandCursor: true });
-      downArrow.on('pointerdown', () => {
-        this.heroListPageStart += HERO_LIST_VISIBLE_ROWS;
-        this.repaint();
-      });
-    }
-    this.contentContainer.add(downArrow);
-  }
-
-  private onHeroRowClick(heroId: string): void {
-    if (this.selectedHeroId === heroId) return;
-    this.selectedHeroId = heroId;
-    this.selection = { kind: 'none' };
-    this.pickerPageStart = 0;
-    this.repaint();
-  }
-
-  private resolveSelectedHero(): Hero | undefined {
-    return this.getHeroList().find((h) => h.id === this.selectedHeroId);
-  }
-
-  private buildRightPane(): void {
-    this.contentContainer.add(
       this.add
-        .rectangle(RIGHT_PANE_CX, PANEL_CY, RIGHT_PANE_W, RIGHT_PANE_H, 0x1a1a1a)
-        .setStrokeStyle(1, 0x444444),
-    );
+        .rectangle(sx, stripY, 22, 22, 0x111111)
+        .setStrokeStyle(1, item ? RARITY_COLOR_NUM[item.rarity] : 0x333333);
+    }
+  }
 
+  private buildHeroListArrows(leftPane: Frame, totalRows: number): void {
+    const canPageUp = _heroListPageStart > 0;
+    const canPageDown = _heroListPageStart + HERO_LIST_VISIBLE_ROWS < totalRows;
+
+    // Page-up arrow — Up/Dn text labels (▲/▼ bitmap font support unverified, see plan Task 6 fallback note).
+    leftPane.insert.topLeft.button({
+      x: HERO_LIST_ARROW_PANE_X,
+      y: HERO_LIST_PANE_Y_START,
+      width: 24,
+      height: 24,
+      enabled: canPageUp,
+      text: 'Up',
+      onClick: () => {
+        _heroListPageStart = Math.max(0, _heroListPageStart - HERO_LIST_VISIBLE_ROWS);
+        this.scene.restart();
+      },
+    });
+
+    // Page-down arrow — Up/Dn text labels (same fallback as above).
+    leftPane.insert.topLeft.button({
+      x: HERO_LIST_ARROW_PANE_X,
+      y: HERO_LIST_PANE_Y_START + HERO_LIST_VISIBLE_ROWS * (HERO_ROW_H + 8) - 24,
+      width: 24,
+      height: 24,
+      enabled: canPageDown,
+      text: 'Dn',
+      onClick: () => {
+        _heroListPageStart += HERO_LIST_VISIBLE_ROWS;
+        this.scene.restart();
+      },
+    });
+  }
+
+  // Right pane — paperdoll + header + slot strip + detail card + picker
+
+  private buildRightPane(rightPane: Frame): void {
     const hero = this.resolveSelectedHero();
     if (!hero) {
-      this.contentContainer.add(
-        this.add
-          .text(RIGHT_PANE_CX, PANEL_CY, 'No hero selected.', {
-            fontFamily: 'monospace',
-            fontSize: '13px',
-            color: '#888888',
-          })
-          .setOrigin(0.5),
-      );
+      rightPane.insert.center.textArea({ text: 'No hero selected.' });
       return;
     }
 
@@ -335,48 +371,55 @@ export class EquipScene extends Phaser.Scene {
     this.buildHeader(hero);
     this.buildSlotStrip(hero);
     this.buildSlotDetailCard(hero);
-    this.buildPicker(hero);
-    this.buildCommitButton(hero);
+    this.buildPicker(rightPane, hero);
   }
 
   private buildPaperdoll(hero: Hero): void {
-    const doll = new Paperdoll(this, PAPERDOLL_X, PAPERDOLL_Y, heroToLoadout(hero));
-    doll.setScale(PAPERDOLL_SCALE);
-    this.contentContainer.add(doll);
+    // PixuiPaperdoll positioned via a topLeft frame acting as an anchor shim
+    // (pattern from barracks_panel_scene.ts).
+    const paperdollFrame = this.insert.topLeft.frame({
+      x: PAPERDOLL_X - 24,
+      y: PAPERDOLL_Y - 24,
+      width: 48,
+      height: 48,
+    });
+    const paperdoll = new PixuiPaperdoll(this, heroToLoadout(hero), { scale: PAPERDOLL_SCALE });
+    paperdollFrame.attach(paperdoll);
   }
 
   private buildHeader(hero: Hero): void {
     const classDef = CLASSES[hero.classId];
 
-    // Line 1: Name · Class · Lv N
-    this.contentContainer.add(
-      this.add.text(HEADER_X, HEADER_NAME_Y, `${hero.name} · ${classDef.name} · Lv ${hero.level}`, {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: '#ffffff',
-      }),
-    );
+    // Line 1: Name · Class · Lv N (raw Phaser text — color consistency)
+    this.add.text(HEADER_X, HEADER_NAME_Y, `${hero.name} · ${classDef.name} · Lv ${hero.level}`, {
+      fontFamily: 'monospace',
+      fontSize: '14px',
+      color: '#ffffff',
+    });
 
-    // Line 2: Total stats — colored on preview.
+    // Line 2: stat tokens with optional colored preview deltas.
+    // Multi-instance raw Phaser text — one per stat token, each with its own
+    // color based on delta sign. Width cursor advances per token.
     const preview = this.computePreviewStats(hero);
     if (preview) {
       this.buildStatsLineColored(preview);
     } else {
       const stats = applyEquipmentStats(hero.baseStats, hero.equipment);
-      this.contentContainer.add(
-        this.add.text(HEADER_X, HEADER_STATS_Y, this.formatStatsLine(stats), {
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: '#dddddd',
-        }),
-      );
+      this.add.text(HEADER_X, HEADER_STATS_Y, this.formatStatsLine(stats), {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#dddddd',
+      });
     }
 
-    // Line 3: Kit — colored if preview, gray if at-rest.
+    // Line 3: kit line — colored if preview.
     this.buildKitLineColored(hero);
   }
 
   private buildStatsLineColored(preview: StatPreview): void {
+    // Multi-instance raw Phaser text: one text object per stat token, each
+    // colored by delta sign (green = positive, red = negative, gray = neutral).
+    // Width-cursor advancement reads tok.width after add.text.
     const keys: readonly (keyof Stats)[] = ['hp', 'attack', 'defense', 'speed', 'mind', 'crit', 'dodge'];
     const labels: Record<keyof Stats, string> = {
       hp: 'HP', attack: 'ATK', defense: 'DEF', speed: 'SPD', mind: 'MND',
@@ -395,13 +438,12 @@ export class EquipScene extends Phaser.Scene {
         `${labels[k]} ${preview.previewStats[k]}${suffix[k] ?? ''}`,
         { fontFamily: 'monospace', fontSize: '12px', color },
       );
-      this.contentContainer.add(tok);
       xCursor += tok.width + 12;
     }
   }
 
   private computePreviewStats(hero: Hero): StatPreview | null {
-    const sel = this.selection;
+    const sel = _selection;
     if (sel.kind === 'pack-item') {
       const item = this.findSourceItem(sel.itemId);
       if (item) return previewStats(hero, item, item.slot);
@@ -418,7 +460,6 @@ export class EquipScene extends Phaser.Scene {
     if (!item) {
       return { currentStats, previewStats: currentStats, deltas: {} };
     }
-    // Build a hero shape with the slot removed (weapon slot guarded earlier).
     const equipmentWithoutSlot: typeof hero.equipment = { ...hero.equipment };
     if (slot !== 'weapon') {
       delete (equipmentWithoutSlot as unknown as Record<string, unknown>)[slot];
@@ -433,6 +474,8 @@ export class EquipScene extends Phaser.Scene {
     return { currentStats, previewStats: previewed, deltas };
   }
 
+  // Slot strip — 4 large squares (weapon/shield/outfit/hat)
+
   private buildSlotStrip(hero: Hero): void {
     for (let i = 0; i < SLOTS.length; i++) {
       const slot = SLOTS[i];
@@ -441,14 +484,68 @@ export class EquipScene extends Phaser.Scene {
     }
   }
 
-  private buildSlotDetailCard(hero: Hero): void {
-    this.contentContainer.add(
-      this.add
-        .rectangle(CARD_CX, CARD_Y, CARD_W, CARD_H, 0x111111)
-        .setStrokeStyle(1, 0x333333),
-    );
+  private buildSlotSquare(slot: ItemSlot, item: Item | undefined, x: number): void {
+    const isSelected =
+      _selection.kind === 'equipped-slot' && _selection.slot === slot;
+    const isWeapon = slot === 'weapon';
+    const isEmpty = item === undefined;
+    // Rarity-bordered rectangle — raw Phaser; rarity color is dynamic per item
+    // (same reason as Blacksmith's row tinting workaround, Cluster B · 57).
+    const borderColor = item ? RARITY_COLOR_NUM[item.rarity] : 0x444444;
+    const square = this.add
+      .rectangle(x, SLOT_STRIP_Y, SLOT_SQUARE_SIZE, SLOT_SQUARE_SIZE, 0x222222)
+      .setStrokeStyle(isSelected ? 3 : 2, isSelected ? SELECTION_GOLD : borderColor);
 
-    const sel = this.selection;
+    if (item) {
+      // Item sprite icon — raw Phaser inline add.sprite (matches ShopOverlay pattern).
+      this.add
+        .sprite(x, SLOT_STRIP_Y, 'sprites', parseInt(BASE_ITEMS[item.baseId].spriteId, 10))
+        .setScale(2);
+    } else {
+      this.add
+        .text(x, SLOT_STRIP_Y, slot, {
+          fontFamily: 'monospace',
+          fontSize: '10px',
+          color: '#666666',
+        })
+        .setOrigin(0.5);
+    }
+
+    this.add
+      .text(x, SLOT_STRIP_Y + SLOT_SQUARE_SIZE / 2 + 8, slot, {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#888888',
+      })
+      .setOrigin(0.5);
+
+    // Weapon slot is non-clickable (cannot unequip). Empty non-weapon slots are
+    // also non-clickable (nothing to unequip-preview).
+    if (!isWeapon && !isEmpty) {
+      square.setInteractive({ useHandCursor: true });
+      square.on('pointerdown', () => this.onSlotClick(slot));
+    }
+  }
+
+  private onSlotClick(slot: ItemSlot): void {
+    if (_selection.kind === 'equipped-slot' && _selection.slot === slot) {
+      this.commit();
+      return;
+    }
+    _selection = { kind: 'equipped-slot', slot };
+    this.scene.restart();
+  }
+
+  // Slot detail card — before/after preview
+
+  private buildSlotDetailCard(hero: Hero): void {
+    // Detail card background — raw Phaser rectangle (multi-color rarity text
+    // inside; no per-instance tint in pixui TextArea).
+    this.add
+      .rectangle(CARD_CX, CARD_Y, CARD_W, CARD_H, 0x111111)
+      .setStrokeStyle(1, 0x333333);
+
+    const sel = _selection;
 
     if (sel.kind === 'pack-item') {
       const newItem = this.findSourceItem(sel.itemId);
@@ -457,12 +554,10 @@ export class EquipScene extends Phaser.Scene {
         this.renderBeforeAfterInCard(beforeItem, newItem);
         return;
       }
-      // Fallback if item is gone (e.g., already equipped); fall through to at-rest.
     }
 
     if (sel.kind === 'equipped-slot') {
       const beforeItem = hero.equipment[sel.slot];
-      // After = (empty) for unequip preview.
       this.renderBeforeAfterInCard(beforeItem, undefined);
       return;
     }
@@ -471,25 +566,17 @@ export class EquipScene extends Phaser.Scene {
     this.renderItemSummaryInCard(hero.equipment.weapon, CARD_CX, CARD_Y);
   }
 
-  private findSourceItem(itemId: string): Item | undefined {
-    return this.getSourceItems().find((i) => i.id === itemId);
-  }
-
   private renderBeforeAfterInCard(before: Item | undefined, after: Item | undefined): void {
-    // Two halves of the card.
     const leftCx = CARD_CX - CARD_W / 4;
     const rightCx = CARD_CX + CARD_W / 4;
 
-    // Center arrow.
-    this.contentContainer.add(
-      this.add
-        .text(CARD_CX, CARD_Y, '→', {
-          fontFamily: 'monospace',
-          fontSize: '14px',
-          color: '#888888',
-        })
-        .setOrigin(0.5),
-    );
+    this.add
+      .text(CARD_CX, CARD_Y, '→', {
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        color: '#888888',
+      })
+      .setOrigin(0.5);
 
     this.renderItemSummaryInCard(before, leftCx, CARD_Y);
     this.renderItemSummaryInCard(after, rightCx, CARD_Y);
@@ -497,97 +584,48 @@ export class EquipScene extends Phaser.Scene {
 
   private renderItemSummaryInCard(item: Item | undefined, cx: number, cy: number): void {
     if (item === undefined) {
-      this.contentContainer.add(
-        this.add
-          .text(cx, cy, '(empty)', {
-            fontFamily: 'monospace',
-            fontSize: '12px',
-            color: '#888888',
-            fontStyle: 'italic',
-          })
-          .setOrigin(0.5),
-      );
+      this.add
+        .text(cx, cy, '(empty)', {
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          color: '#888888',
+          fontStyle: 'italic',
+        })
+        .setOrigin(0.5);
       return;
     }
 
-    // Title line: "Sword · uncommon · sword" (weapon type appended for weapons).
     let title = `${itemDisplayName(item)} · ${item.rarity}`;
     if (item.slot === 'weapon' && item.weaponType) {
       title = `${title} · ${WEAPON_TYPE_DISPLAY[item.weaponType] ?? item.weaponType}`;
     }
-    this.contentContainer.add(
-      this.add
-        .text(cx, cy - 14, title, {
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: RARITY_COLOR_HEX[item.rarity],
-        })
-        .setOrigin(0.5),
-    );
+    // Rarity-colored title — raw Phaser text; per-instance tint not available
+    // in pixui TextArea (same reason as stat tokens).
+    this.add
+      .text(cx, cy - 14, title, {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: RARITY_COLOR_HEX[item.rarity],
+      })
+      .setOrigin(0.5);
 
-    // Affix line. itemAffixDescription returns "+3 atk · +2 def" or "" if none.
     const affixLine = itemAffixDescription(item);
     if (affixLine.length > 0) {
-      this.contentContainer.add(
-        this.add
-          .text(cx, cy + 4, affixLine, {
-            fontFamily: 'monospace',
-            fontSize: '11px',
-            color: '#aaaaaa',
-          })
-          .setOrigin(0.5),
-      );
-    }
-  }
-
-  private buildSlotSquare(slot: ItemSlot, item: Item | undefined, x: number): void {
-    const isSelected =
-      this.selection.kind === 'equipped-slot' && this.selection.slot === slot;
-    const isWeapon = slot === 'weapon';
-    const isEmpty = item === undefined;
-    const borderColor = item ? RARITY_COLOR_NUM[item.rarity] : 0x444444;
-    const square = this.add
-      .rectangle(x, SLOT_STRIP_Y, SLOT_SQUARE_SIZE, SLOT_SQUARE_SIZE, 0x222222)
-      .setStrokeStyle(isSelected ? 3 : 2, isSelected ? SELECTION_GOLD : borderColor);
-
-    if (item) {
-      const sprite = this.add
-        .sprite(x, SLOT_STRIP_Y, 'sprites', parseInt(BASE_ITEMS[item.baseId].spriteId, 10))
-        .setScale(2);
-      this.contentContainer.add(sprite);
-    } else {
-      this.contentContainer.add(
-        this.add
-          .text(x, SLOT_STRIP_Y, slot, {
-            fontFamily: 'monospace',
-            fontSize: '10px',
-            color: '#666666',
-          })
-          .setOrigin(0.5),
-      );
-    }
-
-    this.contentContainer.add(
       this.add
-        .text(x, SLOT_STRIP_Y + SLOT_SQUARE_SIZE / 2 + 8, slot, {
+        .text(cx, cy + 4, affixLine, {
           fontFamily: 'monospace',
-          fontSize: '10px',
-          color: '#888888',
+          fontSize: '11px',
+          color: '#aaaaaa',
         })
-        .setOrigin(0.5),
-    );
-
-    // Weapon slot is non-clickable (cannot unequip). Empty non-weapon slots are
-    // also non-clickable (nothing to unequip-preview).
-    if (!isWeapon && !isEmpty) {
-      square.setInteractive({ useHandCursor: true });
-      square.on('pointerdown', () => this.onSlotClick(slot));
+        .setOrigin(0.5);
     }
-    this.contentContainer.add(square);
   }
+
+  // Picker — paged list of pack/stash items
 
   private getSourceItems(): readonly Item[] {
-    if (this.mode.kind === 'barracks') return appState.get().stash.items;
+    if (!_mode) return [];
+    if (_mode.kind === 'barracks') return appState.get().stash.items;
     const run = appState.get().runState;
     if (!run) return [];
     return run.pack.items;
@@ -605,138 +643,136 @@ export class EquipScene extends Phaser.Scene {
     });
   }
 
-  private buildPicker(hero: Hero): void {
+  private findSourceItem(itemId: string): Item | undefined {
+    return this.getSourceItems().find((i) => i.id === itemId);
+  }
+
+  private buildPicker(rightPane: Frame, hero: Hero): void {
     const items = this.sortedSourceItems();
-    const sourceLabel = this.mode.kind === 'barracks' ? 'Stash' : 'Pack';
-    this.contentContainer.add(
-      this.add.text(PICKER_X - PICKER_W / 2, PICKER_Y_START - 16, `${sourceLabel} (${items.length})`, {
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: '#cccccc',
-      }),
-    );
+    const sourceLabel = _mode?.kind === 'barracks' ? 'Stash' : 'Pack';
+    this.add.text(PICKER_X - PICKER_W / 2, PICKER_Y_START - 16, `${sourceLabel} (${items.length})`, {
+      fontFamily: 'monospace',
+      fontSize: '12px',
+      color: '#cccccc',
+    });
 
     if (items.length === 0) {
-      this.contentContainer.add(
-        this.add
-          .text(PICKER_X, PICKER_Y_START + 20, `${sourceLabel} is empty.`, {
-            fontFamily: 'monospace',
-            fontSize: '11px',
-            color: '#888888',
-          })
-          .setOrigin(0.5),
-      );
+      this.add
+        .text(PICKER_X, PICKER_Y_START + 20, `${sourceLabel} is empty.`, {
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          color: '#888888',
+        })
+        .setOrigin(0.5);
       return;
     }
 
-    const pageEnd = Math.min(items.length, this.pickerPageStart + PICKER_VISIBLE_ROWS);
-    for (let i = this.pickerPageStart; i < pageEnd; i++) {
-      const y = PICKER_Y_START + (i - this.pickerPageStart) * PICKER_ROW_H;
-      this.buildPickerRow(items[i], y, hero);
+    const pageEnd = Math.min(items.length, _pickerPageStart + PICKER_VISIBLE_ROWS);
+    for (let i = _pickerPageStart; i < pageEnd; i++) {
+      const rowPaneY = PICKER_PANE_Y_START + (i - _pickerPageStart) * PICKER_ROW_H;
+      this.buildPickerRow(rightPane, items[i], rowPaneY, hero);
     }
 
     if (items.length > PICKER_VISIBLE_ROWS) {
-      this.buildPickerArrows(items.length);
+      this.buildPickerArrows(rightPane, items.length);
     }
   }
 
-  private buildPickerRow(item: Item, y: number, hero: Hero): void {
+  private buildPickerRow(rightPane: Frame, item: Item, rowPaneY: number, hero: Hero): void {
     const isSelected =
-      this.selection.kind === 'pack-item' && this.selection.itemId === item.id;
+      _selection.kind === 'pack-item' && _selection.itemId === item.id;
 
-    const bg = this.add
-      .rectangle(PICKER_X, y + PICKER_ROW_H / 2, PICKER_W, PICKER_ROW_H - 2,
+    // Row frame — pixui chrome for the background container.
+    const rowFrame = rightPane.insert.topLeft.frame({
+      x: PICKER_PANE_X,
+      y: rowPaneY,
+      width: PICKER_W,
+      height: PICKER_ROW_H - 2,
+    });
+
+    // Selection highlight background — raw Phaser inline rectangle (dynamic
+    // fill + stroke per selection state; same reason as Barracks gold border).
+    const absX = RIGHT_PANE_X + PICKER_PANE_X + PICKER_W / 2;
+    const absY = RIGHT_PANE_Y + rowPaneY + (PICKER_ROW_H - 2) / 2;
+    this.add
+      .rectangle(absX, absY, PICKER_W, PICKER_ROW_H - 2,
         isSelected ? 0x2a2418 : 0x111111)
       .setStrokeStyle(1, isSelected ? SELECTION_GOLD : 0x222222);
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerdown', () => this.onPickerRowClick(item));
-    this.contentContainer.add(bg);
 
+    // Clickable overlay for item selection.
+    const clickable = new Clickable(this, {
+      width: PICKER_W,
+      height: PICKER_ROW_H - 2,
+      onClick: () => this.onPickerRowClick(item),
+    });
+    rowFrame.attach(clickable);
+
+    // Row text (raw Phaser — rarity-colored per item).
     const isEquipped = hero.equipment[item.slot]?.id === item.id;
     const equippedSuffix = isEquipped ? ' [Equipped]' : '';
     const name = `${SLOT_TAG[item.slot]} ${itemDisplayName(item)} [${item.rarity}]${equippedSuffix}`;
-    this.contentContainer.add(
-      this.add.text(PICKER_X - PICKER_W / 2 + 8, y + 3, name, {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: RARITY_COLOR_HEX[item.rarity],
-      }),
-    );
+    this.add.text(PICKER_X - PICKER_W / 2 + 8, RIGHT_PANE_Y + rowPaneY + 3, name, {
+      fontFamily: 'monospace',
+      fontSize: '11px',
+      color: RARITY_COLOR_HEX[item.rarity],
+    });
 
     const affixLine = itemAffixDescription(item);
     if (affixLine.length > 0) {
-      this.contentContainer.add(
-        this.add.text(PICKER_X + PICKER_W / 2 - 8, y + 3, affixLine, {
-          fontFamily: 'monospace',
-          fontSize: '10px',
-          color: '#999999',
-        }).setOrigin(1, 0),
-      );
+      this.add.text(PICKER_X + PICKER_W / 2 - 8, RIGHT_PANE_Y + rowPaneY + 3, affixLine, {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#999999',
+      }).setOrigin(1, 0);
     }
   }
 
-  private buildPickerArrows(totalRows: number): void {
-    const canPageUp = this.pickerPageStart > 0;
-    const canPageDown = this.pickerPageStart + PICKER_VISIBLE_ROWS < totalRows;
+  private buildPickerArrows(rightPane: Frame, totalRows: number): void {
+    const canPageUp = _pickerPageStart > 0;
+    const canPageDown = _pickerPageStart + PICKER_VISIBLE_ROWS < totalRows;
 
-    const upArrow = this.add
-      .text(PICKER_ARROW_X, PICKER_Y_START + 4, '▲', {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: canPageUp ? '#cccccc' : '#444444',
-      })
-      .setOrigin(0.5);
-    if (canPageUp) {
-      upArrow.setInteractive({ useHandCursor: true });
-      upArrow.on('pointerdown', () => {
-        this.pickerPageStart = Math.max(0, this.pickerPageStart - PICKER_VISIBLE_ROWS);
-        this.repaint();
-      });
-    }
-    this.contentContainer.add(upArrow);
+    // Page-up arrow — Up/Dn text labels (▲/▼ bitmap font support unverified, see plan Task 6 fallback note).
+    rightPane.insert.topLeft.button({
+      x: PICKER_ARROW_PANE_X,
+      y: PICKER_PANE_Y_START,
+      width: 24,
+      height: 20,
+      enabled: canPageUp,
+      text: 'Up',
+      onClick: () => {
+        _pickerPageStart = Math.max(0, _pickerPageStart - PICKER_VISIBLE_ROWS);
+        this.scene.restart();
+      },
+    });
 
-    const downArrow = this.add
-      .text(
-        PICKER_ARROW_X,
-        PICKER_Y_START + PICKER_VISIBLE_ROWS * PICKER_ROW_H - 4,
-        '▼',
-        {
-          fontFamily: 'monospace',
-          fontSize: '14px',
-          color: canPageDown ? '#cccccc' : '#444444',
-        },
-      )
-      .setOrigin(0.5);
-    if (canPageDown) {
-      downArrow.setInteractive({ useHandCursor: true });
-      downArrow.on('pointerdown', () => {
-        this.pickerPageStart += PICKER_VISIBLE_ROWS;
-        this.repaint();
-      });
-    }
-    this.contentContainer.add(downArrow);
+    // Page-down arrow — Up/Dn text labels (same fallback as above).
+    rightPane.insert.topLeft.button({
+      x: PICKER_ARROW_PANE_X,
+      y: PICKER_PANE_Y_START + PICKER_VISIBLE_ROWS * PICKER_ROW_H - 20,
+      width: 24,
+      height: 20,
+      enabled: canPageDown,
+      text: 'Dn',
+      onClick: () => {
+        _pickerPageStart += PICKER_VISIBLE_ROWS;
+        this.scene.restart();
+      },
+    });
   }
 
   private onPickerRowClick(item: Item): void {
-    if (this.selection.kind === 'pack-item' && this.selection.itemId === item.id) {
+    if (_selection.kind === 'pack-item' && _selection.itemId === item.id) {
       this.commit();
       return;
     }
-    this.selection = { kind: 'pack-item', itemId: item.id };
-    this.repaint();
+    _selection = { kind: 'pack-item', itemId: item.id };
+    this.scene.restart();
   }
 
-  private onSlotClick(slot: ItemSlot): void {
-    if (this.selection.kind === 'equipped-slot' && this.selection.slot === slot) {
-      this.commit();
-      return;
-    }
-    this.selection = { kind: 'equipped-slot', slot };
-    this.repaint();
-  }
+  // Commit button
 
-  private buildCommitButton(hero: Hero): void {
-    const sel = this.selection;
+  private buildCommitButton(panel: Frame, hero: Hero): void {
+    const sel = _selection;
     let label = 'Equip';
     let enabled = false;
 
@@ -754,26 +790,21 @@ export class EquipScene extends Phaser.Scene {
       }
     }
 
-    const bg = this.add
-      .rectangle(COMMIT_BUTTON_X, COMMIT_BUTTON_Y, COMMIT_BUTTON_W, COMMIT_BUTTON_H,
-        enabled ? 0x3a2a1a : 0x222222)
-      .setStrokeStyle(2, enabled ? 0xcc8844 : 0x444444);
-    this.contentContainer.add(bg);
-    this.contentContainer.add(
-      this.add.text(COMMIT_BUTTON_X, COMMIT_BUTTON_Y, label, {
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: enabled ? '#ffffff' : '#666666',
-      }).setOrigin(0.5),
-    );
-    if (enabled) {
-      bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerdown', () => this.commit());
-    }
+    panel.insert.topLeft.button({
+      x: COMMIT_BUTTON_PANEL_X - PANEL_X - COMMIT_BUTTON_W / 2,
+      y: COMMIT_BUTTON_PANEL_Y - PANEL_Y,
+      width: COMMIT_BUTTON_W,
+      height: COMMIT_BUTTON_H,
+      enabled,
+      text: label,
+      onClick: () => this.commit(),
+    });
   }
 
+  // Commit action
+
   private commit(): void {
-    const sel = this.selection;
+    const sel = _selection;
     const hero = this.resolveSelectedHero();
     if (!hero) return;
 
@@ -785,19 +816,27 @@ export class EquipScene extends Phaser.Scene {
       this.commitUnequip(sel.slot);
     }
 
-    this.selection = { kind: 'none' };
-    this.repaint();
+    _selection = { kind: 'none' };
+
+    // Clamp picker page cursor: committing may have removed the last item on
+    // the current page, leaving _pickerPageStart past the end of the list.
+    const newItems = this.getSourceItems();
+    if (_pickerPageStart > 0 && _pickerPageStart >= newItems.length) {
+      _pickerPageStart = Math.max(0, newItems.length - PICKER_VISIBLE_ROWS);
+    }
+
+    this.scene.restart();
   }
 
   private commitEquip(itemId: string, slot: ItemSlot): void {
-    if (this.mode.kind === 'barracks') {
+    if (_mode?.kind === 'barracks') {
       const state = appState.get();
-      const result = equipFromStash(state.roster, state.stash, this.selectedHeroId, itemId, slot);
+      const result = equipFromStash(state.roster, state.stash, _selectedHeroId, itemId, slot);
       appState.update((s) => ({ ...s, roster: result.roster, stash: result.stash }));
     } else {
       const run = appState.get().runState;
       if (!run) return;
-      const heroIndex = run.party.findIndex((h) => h.id === this.selectedHeroId);
+      const heroIndex = run.party.findIndex((h) => h.id === _selectedHeroId);
       if (heroIndex < 0) return;
       appState.update((s) => ({
         ...s,
@@ -807,14 +846,14 @@ export class EquipScene extends Phaser.Scene {
   }
 
   private commitUnequip(slot: ItemSlot): void {
-    if (this.mode.kind === 'barracks') {
+    if (_mode?.kind === 'barracks') {
       const state = appState.get();
-      const result = unequipToStash(state.roster, state.stash, this.selectedHeroId, slot);
+      const result = unequipToStash(state.roster, state.stash, _selectedHeroId, slot);
       appState.update((s) => ({ ...s, roster: result.roster, stash: result.stash }));
     } else {
       const run = appState.get().runState;
       if (!run) return;
-      const heroIndex = run.party.findIndex((h) => h.id === this.selectedHeroId);
+      const heroIndex = run.party.findIndex((h) => h.id === _selectedHeroId);
       if (heroIndex < 0) return;
       appState.update((s) => ({
         ...s,
@@ -823,19 +862,14 @@ export class EquipScene extends Phaser.Scene {
     }
   }
 
+  // Kit line with optional colored preview
+
   private formatStatsLine(stats: Stats): string {
     return `HP ${stats.hp}  ATK ${stats.attack}  DEF ${stats.defense}  SPD ${stats.speed}  MND ${stats.mind}  CRT ${stats.crit}%  DDG ${stats.dodge}%`;
   }
 
-  private buildKitLineText(hero: Hero): string {
-    const status = describeKitStatus(hero);
-    const abilityIds: readonly AbilityId[] = resolveCombatAbilities(hero).abilities;
-    const abilityNames = abilityIds.map((id) => ABILITIES[id].name).join(' · ');
-    return `${status} · ${abilityNames}`;
-  }
-
   private buildPreviewedHero(hero: Hero): Hero | null {
-    const sel = this.selection;
+    const sel = _selection;
     if (sel.kind === 'pack-item') {
       const item = this.findSourceItem(sel.itemId);
       if (!item) return null;
@@ -845,7 +879,7 @@ export class EquipScene extends Phaser.Scene {
       };
     }
     if (sel.kind === 'equipped-slot') {
-      if (sel.slot === 'weapon') return null;  // weapon non-unequippable
+      if (sel.slot === 'weapon') return null;
       const equipmentWithoutSlot: Hero['equipment'] = { ...hero.equipment };
       delete (equipmentWithoutSlot as unknown as Record<string, unknown>)[sel.slot];
       return { ...hero, equipment: equipmentWithoutSlot };
@@ -857,14 +891,12 @@ export class EquipScene extends Phaser.Scene {
     const afterHero = this.buildPreviewedHero(beforeHero);
     if (!afterHero) {
       // No preview — render the at-rest kit line.
-      this.contentContainer.add(
-        this.add.text(HEADER_X, HEADER_KIT_Y, this.buildKitLineText(beforeHero), {
-          fontFamily: 'monospace',
-          fontSize: '11px',
-          color: '#aaaaaa',
-          wordWrap: { width: RIGHT_PANE_W - 80 },
-        }),
-      );
+      this.add.text(HEADER_X, HEADER_KIT_Y, this.buildKitLineText(beforeHero), {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#aaaaaa',
+        wordWrap: { width: RIGHT_PANE_W - 80 },
+      });
       return;
     }
 
@@ -873,22 +905,19 @@ export class EquipScene extends Phaser.Scene {
     const afterAbilities = resolveCombatAbilities(afterHero).abilities;
     const removedSet = new Set(diff.removed);
 
-    // Color for the band-label segment.
     let bandColor = '#aaaaaa';
     if (diff.bandChange === 'upgrade') bandColor = '#44cc44';
     else if (diff.bandChange === 'downgrade') bandColor = '#cc4444';
 
-    // Render: status (band-colored), then each ability token (added/same/removed).
+    // Multi-instance raw Phaser text per token — same pattern as buildStatsLineColored.
     let xCursor = HEADER_X;
     const statusText = this.add.text(xCursor, HEADER_KIT_Y, `${afterStatus} · `, {
       fontFamily: 'monospace',
       fontSize: '11px',
       color: bandColor,
     });
-    this.contentContainer.add(statusText);
     xCursor += statusText.width;
 
-    // Tokens: walk afterAbilities for green/gray, then append removed ones in red.
     const beforeAbilitiesSet = new Set(resolveCombatAbilities(beforeHero).abilities);
     for (let i = 0; i < afterAbilities.length; i++) {
       const id = afterAbilities[i];
@@ -900,10 +929,9 @@ export class EquipScene extends Phaser.Scene {
         fontSize: '11px',
         color,
       });
-      this.contentContainer.add(tok);
       xCursor += tok.width;
     }
-    // Removed abilities — appended at the end, red.
+
     let removedIdx = 0;
     for (const id of diff.removed) {
       const isLast = removedIdx === diff.removed.length - 1;
@@ -913,25 +941,27 @@ export class EquipScene extends Phaser.Scene {
         fontSize: '11px',
         color: '#cc4444',
       });
-      this.contentContainer.add(tok);
       xCursor += tok.width;
       removedIdx++;
     }
   }
 
-  private repaint(): void {
-    this.contentContainer.removeAll(true);
-    this.buildLeftPane();
-    this.buildRightPane();
-    // Slot strip / detail card / picker added in subsequent tasks.
+  private buildKitLineText(hero: Hero): string {
+    const status = describeKitStatus(hero);
+    const abilityIds: readonly AbilityId[] = resolveCombatAbilities(hero).abilities;
+    const abilityNames = abilityIds.map((id) => ABILITIES[id].name).join(' · ');
+    return `${status} · ${abilityNames}`;
   }
 
+  // Close
+
   private close(): void {
+    const mode = _mode;
     this.scene.stop();
-    if (this.mode.kind === 'barracks') {
+    if (mode?.kind === 'barracks') {
       this.scene.resume('barracks_panel');
-    } else {
-      this.scene.resume(this.mode.returnTo);
+    } else if (mode?.kind === 'in_run') {
+      this.scene.resume(mode.returnTo);
     }
   }
 }

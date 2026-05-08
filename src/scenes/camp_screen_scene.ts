@@ -1,21 +1,31 @@
 import * as Phaser from 'phaser';
+import { ConstraintMode, UiScene } from 'phaser-pixui';
 import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels';
 import { removeHero, tickRosterWounds, updateHero } from '@camp/roster';
 import { addItems } from '@camp/stash';
 import { credit } from '@camp/vault';
 import { applyPendingMilestones } from '@run/milestones';
 import { cashout, pressOn, type RunState } from '@run/run_state';
-import { HeroCard } from '@ui/hero_card';
+import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
+import { uiTheme } from '@render/ui_theme';
+import { PixuiHeroCard } from '@ui/pixui_hero_card';
 import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 
+// Canvas positions for party cards — canvas-absolute, same as the legacy scene.
 const PARTY_X = [180, 480, 780] as const;
 const PARTY_Y = 240;
+
+// Full-scene background (not a dim overlay — camp_screen owns the whole canvas).
 const BG_COLOR = 0x1a1020;
 
-export class CampScreenScene extends Phaser.Scene {
+export class CampScreenScene extends UiScene {
   constructor() {
-    super('camp_screen');
+    super({
+      key: 'camp_screen',
+      viewportConstraints: { mode: ConstraintMode.Maximum, width: 960, height: 540 },
+      theme: uiTheme,
+    });
   }
 
   create(): void {
@@ -26,136 +36,120 @@ export class CampScreenScene extends Phaser.Scene {
       return;
     }
 
-    this.buildBackground();
-    this.buildHeader(run);
-    this.buildPackPill(run);
-    this.buildPartyRow(run);
-    this.buildFallenLine(run);
-    this.buildButtons(run);
+    fixPixuiCanvasViewport(this);
+    super.create();
 
-    this.events.on(Phaser.Scenes.Events.RESUME, () => this.scene.restart());
-  }
-
-  private buildBackground(): void {
+    // Full-canvas background — no dim overlay (this is a full scene, not a modal).
     this.add
       .rectangle(0, 0, this.scale.width, this.scale.height, BG_COLOR)
       .setOrigin(0, 0);
-  }
 
-  private buildHeader(run: RunState): void {
+    // Header — raw Phaser text: per-instance font size and color that pixui
+    // textArea + bitmap-font theme can't express cleanly.
     this.add
       .text(480, 40, 'Floor Cleared!', {
         fontFamily: 'monospace',
         fontSize: '28px',
         color: '#4caf50',
       })
-      .setOrigin(0.5);
-
+      .setOrigin(0.5, 0.5);
     this.add
       .text(480, 78, `The Crypt · Floor ${run.currentFloorNumber}`, {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#aaaaaa',
       })
-      .setOrigin(0.5);
-  }
+      .setOrigin(0.5, 0.5);
 
-  private buildPackPill(run: RunState): void {
+    // Pack pill — raw Phaser rectangle + label (matches existing overlay patterns;
+    // pixui has no bare pill primitive).
     const itemCount = run.pack.items.length;
-    const label =
+    const packLabel =
       itemCount > 0
         ? `Pack: ${run.pack.gold}g · ${itemCount} item${itemCount === 1 ? '' : 's'}`
         : `Pack: ${run.pack.gold}g`;
-    const width = itemCount > 0 ? 280 : 200;
+    const pillWidth = itemCount > 0 ? 280 : 200;
+    this.add.rectangle(480, 130, pillWidth, 40, 0x2a2418).setStrokeStyle(2, 0xaa8844);
     this.add
-      .rectangle(480, 130, width, 40, 0x2a2418)
-      .setStrokeStyle(2, 0xaa8844);
-    this.add
-      .text(480, 130, label, {
+      .text(480, 130, packLabel, {
         fontFamily: 'monospace',
         fontSize: '16px',
         color: '#ffcc66',
       })
       .setOrigin(0.5);
-  }
 
-  private buildPartyRow(run: RunState): void {
+    // Party row — 3 large PixuiHeroCards; wound badges auto-render via 3c-i.
     for (let i = 0; i < run.party.length; i++) {
-      new HeroCard(this, PARTY_X[i], PARTY_Y, run.party[i], { size: 'large' });
+      const slot = this.insert.center.frame({
+        x: PARTY_X[i] - 480,
+        y: PARTY_Y - 270,
+        width: 220,
+        height: 260,
+      });
+      slot.attach(new PixuiHeroCard(this, run.party[i], { size: 'large' }));
     }
-  }
 
-  private buildFallenLine(run: RunState): void {
-    let y = 360;
+    // Fallen / Lost lines — conditional, raw Phaser text (matches legacy coloring).
+    let statusY = 360;
     if (run.fallen.length > 0) {
       const names = run.fallen.map((h) => h.name).join(', ');
       this.add
-        .text(480, y, `Fallen: ${names}`, {
+        .text(480, statusY, `Fallen: ${names}`, {
           fontFamily: 'monospace',
           fontSize: '11px',
           color: '#cc8888',
         })
         .setOrigin(0.5);
-      y += 14;
+      statusY += 14;
     }
     if (run.lost.length > 0) {
       const names = run.lost.map((h) => h.name).join(', ');
       this.add
-        .text(480, y, `Lost: ${names}`, {
+        .text(480, statusY, `Lost: ${names}`, {
           fontFamily: 'monospace',
           fontSize: '11px',
           color: '#aa66aa',
         })
         .setOrigin(0.5);
     }
-  }
 
-  private buildButtons(run: RunState): void {
-    // Three-button row: Equip · Leave · Press On
+    // Three-button row anchored 30px above the canvas bottom.
+    // x offsets: legacy centers 160/460/760 → center-relative -320/-20/280.
     const equipEnabled = this.equipButtonEnabled(run);
-    const equipBg = this.add
-      .rectangle(160, 470, 220, 44, equipEnabled ? 0x2a2a4a : 0x222222)
-      .setStrokeStyle(2, equipEnabled ? 0x6688cc : 0x444444);
-    this.add
-      .text(160, 470, 'Equip', {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: equipEnabled ? '#ffffff' : '#666666',
-      })
-      .setOrigin(0.5);
-    if (equipEnabled) {
-      equipBg.setInteractive({ useHandCursor: true });
-      equipBg.on('pointerdown', () => {
+    this.insert.bottom.button({
+      x: -320,
+      y: 30,
+      width: 220,
+      height: 44,
+      enabled: equipEnabled,
+      text: 'Equip',
+      onClick: () => {
         this.scene.launch('equip', { kind: 'in_run', returnTo: 'camp_screen' });
         this.scene.pause();
-      });
-    }
+      },
+    });
 
-    const leaveBg = this.add
-      .rectangle(460, 470, 220, 44, 0x2a4a2a)
-      .setStrokeStyle(2, 0x44cc44);
-    this.add
-      .text(460, 470, `Leave (+${run.pack.gold}g to vault)`, {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-    leaveBg.setInteractive({ useHandCursor: true });
-    leaveBg.on('pointerdown', () => this.onLeave());
+    this.insert.bottom.button({
+      x: -20,
+      y: 30,
+      width: 220,
+      height: 44,
+      text: `Leave (+${run.pack.gold}g to vault)`,
+      onClick: () => this.onLeave(),
+    });
 
-    const pressOnBg = this.add
-      .rectangle(760, 470, 220, 44, 0x3a2a1a)
-      .setStrokeStyle(2, 0xcc8844);
-    this.add
-      .text(760, 470, `Press On → Floor ${run.currentFloorNumber + 1}`, {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-    pressOnBg.setInteractive({ useHandCursor: true });
-    pressOnBg.on('pointerdown', () => this.onPressOn());
+    this.insert.bottom.button({
+      x: 280,
+      y: 30,
+      width: 220,
+      height: 44,
+      text: `Press On → Floor ${run.currentFloorNumber + 1}`,
+      onClick: () => this.onPressOn(),
+    });
+
+    // Resume listener — triggered when equip scene closes and this scene resumes.
+    // Restart refreshes party cards (e.g. newly equipped items) after equip closes.
+    this.events.once(Phaser.Scenes.Events.RESUME, () => this.scene.restart());
   }
 
   private equipButtonEnabled(run: RunState): boolean {

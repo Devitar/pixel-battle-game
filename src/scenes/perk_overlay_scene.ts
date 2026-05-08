@@ -1,39 +1,47 @@
-import * as Phaser from 'phaser';
+import { ConstraintMode, Clickable, Frame, UiScene } from 'phaser-pixui';
 import { listHeroes } from '@camp/roster';
 import { CLASSES } from '@data/classes';
 import { CLASS_PERK_PAIRS, PERKS } from '@data/perks';
 import type { PerkId } from '@data/types';
-import { applyPerk, type Hero } from '@heroes/hero';
+import { applyPerk } from '@heroes/hero';
 import { heroToLoadout } from '@render/hero_loadout';
-import { Paperdoll } from '@render/paperdoll';
+import { PixuiPaperdoll } from '@render/pixui_paperdoll';
+import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
+import { uiTheme } from '@render/ui_theme';
 import { appState } from './app_state';
 
-const PANEL_CX = 480;
-const PANEL_CY = 270;
+// Panel dimensions (match original constants for layout parity).
 const PANEL_W = 680;
 const PANEL_H = 360;
 
-const PAPERDOLL_X = 280;
-const PAPERDOLL_Y = 200;
+// Left of panel center, slightly above center.
+const PAPERDOLL_REL_X = -200;
+const PAPERDOLL_REL_Y = -70;
 const PAPERDOLL_SCALE = 4;
 
-const HEADER_X = 380;
-const HEADER_NAME_Y = 130;
-const HEADER_CLASS_Y = 158;
-const HEADER_LEVEL_Y = 184;
-const HEADER_PROMPT_Y = 230;
+// Right of paperdoll, spanning from near top to mid-panel.
+const HEADER_REL_X = -100;
+const HEADER_NAME_REL_Y = -140;
+const HEADER_CLASS_REL_Y = -112;
+const HEADER_LEVEL_REL_Y = -86;
+const HEADER_PROMPT_REL_Y = -40;
 
+// Cards side-by-side below panel center, symmetric around panel midline.
 const CARD_W = 260;
 const CARD_H = 140;
-const CARD_Y = 380;
-const CARD_A_X = 330;
-const CARD_B_X = 630;
+const CARD_Y_REL = 110;
+const CARD_A_X_REL = -150;
+const CARD_B_X_REL = 150;
 
-export class PerkOverlayScene extends Phaser.Scene {
+export class PerkOverlayScene extends UiScene {
   private heroId!: string;
 
   constructor() {
-    super('perk_overlay');
+    super({
+      key: 'perk_overlay',
+      viewportConstraints: { mode: ConstraintMode.Maximum, width: 960, height: 540 },
+      theme: uiTheme,
+    });
   }
 
   init(data: { heroId: string }): void {
@@ -41,6 +49,9 @@ export class PerkOverlayScene extends Phaser.Scene {
   }
 
   create(): void {
+    fixPixuiCanvasViewport(this);
+    super.create();
+
     const hero = listHeroes(appState.get().roster).find((h) => h.id === this.heroId);
     if (!hero || !hero.pendingPerk) {
       // Defensive — shouldn't happen given camp's gate, but guard against
@@ -48,78 +59,102 @@ export class PerkOverlayScene extends Phaser.Scene {
       this.close();
       return;
     }
-    this.buildOverlay(hero);
-  }
 
-  private buildOverlay(hero: Hero): void {
-    // Dim background (full canvas, click-blocking).
+    // Full-canvas dim overlay; raw Phaser rectangle (pixui has no bare-canvas
+    // primitive). setInteractive() blocks clicks from reaching scenes below.
     this.add
       .rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.6)
       .setOrigin(0, 0)
       .setInteractive();
 
     // Panel chrome.
-    this.add
-      .rectangle(PANEL_CX, PANEL_CY, PANEL_W, PANEL_H, 0x222222)
-      .setStrokeStyle(2, 0x666666);
+    const panel = this.insert.center.frame({ width: PANEL_W, height: PANEL_H });
 
-    // Paperdoll.
-    const paperdoll = new Paperdoll(this, PAPERDOLL_X, PAPERDOLL_Y, heroToLoadout(hero));
-    paperdoll.setScale(PAPERDOLL_SCALE);
+    // Paperdoll — centered on a sub-frame at the left of the panel.
+    const dollFrame = panel.insert.center.frame({
+      x: PAPERDOLL_REL_X,
+      y: PAPERDOLL_REL_Y,
+      width: PAPERDOLL_SCALE * 16,
+      height: PAPERDOLL_SCALE * 16,
+    });
+    const paperdoll = new PixuiPaperdoll(this, heroToLoadout(hero), { scale: PAPERDOLL_SCALE });
+    dollFrame.attach(paperdoll);
 
-    // Header text.
+    // Header text block — 4 textArea lines right of paperdoll.
     const classDef = CLASSES[hero.classId];
-    this.add.text(HEADER_X, HEADER_NAME_Y, hero.name, {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#ffffff',
+    panel.insert.center.textArea({
+      x: HEADER_REL_X,
+      y: HEADER_NAME_REL_Y,
+      text: hero.name,
     });
-    this.add.text(HEADER_X, HEADER_CLASS_Y, `${classDef.name} · Level ${hero.level}`, {
-      fontFamily: 'monospace',
-      fontSize: '13px',
-      color: '#aaaaaa',
+    panel.insert.center.textArea({
+      x: HEADER_REL_X,
+      y: HEADER_CLASS_REL_Y,
+      text: `${classDef.name} · Level ${hero.level}`,
     });
-    this.add.text(HEADER_X, HEADER_LEVEL_Y, `Reached Level ${hero.level}!`, {
-      fontFamily: 'monospace',
-      fontSize: '14px',
-      color: '#ffcc66',
+    panel.insert.center.textArea({
+      x: HEADER_REL_X,
+      y: HEADER_LEVEL_REL_Y,
+      text: `Reached Level ${hero.level}!`,
     });
-    this.add.text(HEADER_X, HEADER_PROMPT_Y, 'Choose a perk:', {
-      fontFamily: 'monospace',
-      fontSize: '13px',
-      color: '#aaaaaa',
+    panel.insert.center.textArea({
+      x: HEADER_REL_X,
+      y: HEADER_PROMPT_REL_Y,
+      text: 'Choose a perk:',
     });
 
-    // Perk cards.
+    // Perk cards — Frame + Clickable rather than Button: pixui.Button is
+    // single-string only, but perk cards need title + description visual
+    // hierarchy. Frame + two textAreas + Clickable preserves the two tiers.
     const [perkAId, perkBId] = CLASS_PERK_PAIRS[hero.classId];
-    this.buildPerkCard(CARD_A_X, perkAId);
-    this.buildPerkCard(CARD_B_X, perkBId);
+    this.buildPerkCard(panel, CARD_A_X_REL, perkAId);
+    this.buildPerkCard(panel, CARD_B_X_REL, perkBId);
+
+    this.input.keyboard?.on('keydown-ESC', () => this.close());
   }
 
-  private buildPerkCard(centerX: number, perkId: PerkId): void {
+  private buildPerkCard(panel: Frame, cardXRel: number, perkId: PerkId): void {
     const perk = PERKS[perkId];
-    const bg = this.add
-      .rectangle(centerX, CARD_Y, CARD_W, CARD_H, 0x1a1a1a)
-      .setStrokeStyle(1, 0x444444);
-    this.add
-      .text(centerX, CARD_Y - 30, perk.name, {
-        fontFamily: 'monospace',
-        fontSize: '16px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-    this.add
-      .text(centerX, CARD_Y + 0, perk.description, {
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: '#dddddd',
-      })
-      .setOrigin(0.5);
 
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerover', () => bg.setStrokeStyle(2, 0xffcc66));
-    bg.on('pointerout', () => bg.setStrokeStyle(1, 0x444444));
-    bg.on('pointerdown', () => this.onPick(perkId));
+    // Card frame — visible chrome.
+    const card = panel.insert.center.frame({
+      x: cardXRel,
+      y: CARD_Y_REL,
+      width: CARD_W,
+      height: CARD_H,
+    });
+
+    // Border highlight rectangle — swapped on hover. Factory attaches it for us.
+    const border = card.insert.center.rectangle({
+      width: CARD_W,
+      height: CARD_H,
+      borderColor: 0x444444,
+      borderWidth: 1,
+    });
+
+    // Perk name (title): y=16 from top edge.
+    card.insert.top.textArea({ y: 16, text: perk.name });
+
+    // Perk description (body): y=16 offset from card center.
+    card.insert.center.textArea({ y: 16, text: perk.description });
+
+    // Clickable overlay (covers full card, on top of all children).
+    const clickable = new Clickable(this, {
+      width: CARD_W,
+      height: CARD_H,
+      onClick: () => this.onPick(perkId),
+    });
+    card.attach(clickable);
+
+    // Hover highlight: gold border on pointer-over, reset on pointer-out.
+    clickable.events.on('pointerover', () => {
+      border.borderColor = 0xffcc66;
+      border.borderWidth = 2;
+    });
+    clickable.events.on('pointerout', () => {
+      border.borderColor = 0x444444;
+      border.borderWidth = 1;
+    });
   }
 
   private onPick(perkId: PerkId): void {
