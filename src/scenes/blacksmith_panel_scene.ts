@@ -1,6 +1,4 @@
 import * as Phaser from 'phaser';
-import { ConstraintMode, Dialog, Image, UiScene } from 'phaser-pixui';
-import type { Frame } from 'phaser-pixui';
 import { nextLevel } from '@camp/building_levels';
 import { applyBuildingUpgrade } from '@camp/building_upgrade';
 import { listHeroes, updateHero } from '@camp/roster';
@@ -13,13 +11,18 @@ import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { applyItemSell, itemSellValue } from '@items/sell';
 import { canBlacksmithUpgrade, nextRarity, upgradeCost, upgradeItem } from '@items/upgrade';
 import { SHEET } from '@render/frames';
-import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
-import { destroyPixuiSubtree, detachPixuiChild } from '@render/pixui_dynamic_rebuild';
-import { uiTheme } from '@render/ui_theme';
+import {
+  Button,
+  COLOR,
+  assertWidgetAssetsLoaded,
+  createBitmapText,
+  createDialog,
+  createPanel,
+} from '@ui/widgets';
 import { createRng } from '@util/rng';
 import { appState } from './app_state';
 
-// Module-level state persists across scene.restart().
+// Module-level state — persists across scene.restart().
 type Mode = 'upgrade' | 'sell';
 let _mode: Mode = 'upgrade';
 let _selectedItemId: string | null = null;
@@ -32,17 +35,20 @@ const PANEL_Y = 40;
 const PANEL_W = 920;
 const PANEL_H = 460;
 
-// List pane (left side of split)
+// List pane (canvas coords)
 const LIST_X = PANEL_X + 10;
 const LIST_W = 380;
 const LIST_H = PANEL_H - 90;
 
-// Detail pane (right side of split)
+// Detail pane (canvas coords)
+const DETAIL_X = LIST_X + LIST_W + 20;
+const DETAIL_Y = PANEL_Y + 70;
 const DETAIL_W = 460;
+const DETAIL_H = LIST_H;
 
-// Row constants (absolute coords)
+// Row constants (canvas coords)
 const ROW_X = LIST_X + LIST_W / 2;
-const ROW_Y_BASE = PANEL_Y + 140;
+const ROW_Y_BASE = PANEL_Y + 100;
 const ROW_STRIDE = 56;
 const ROW_W = 360;
 const ROW_H = 50;
@@ -68,87 +74,103 @@ interface UpgradeEntry {
   heroName?: string;
 }
 
-export class BlacksmithPanelScene extends UiScene {
-  // Refs used by selection to do partial rebuilds instead of scene.restart().
-  // Selection only changes row highlight colors and the detail pane; a full
-  // restart caused a visible one-frame flicker on every click.
-  // The scene instance is reused across restart()s, so these get reset on
-  // each create().
-  private _panelFrame: Frame | undefined;
-  private _detailFrame: Frame | undefined;
+export class BlacksmithPanelScene extends Phaser.Scene {
+  // Refs used by selectItem() to do partial rebuilds instead of
+  // scene.restart(). The detail-pane content all lives in a single Phaser
+  // Container so teardown is just `_detailContainer.destroy(true)` — no
+  // pixui dirty tricks needed.
+  private _detailContainer: Phaser.GameObjects.Container | undefined;
   private _rowBgs: { bg: Phaser.GameObjects.Rectangle; id: string }[] = [];
 
   constructor() {
-    super({
-      key: 'blacksmith_panel',
-      viewportConstraints: { mode: ConstraintMode.Maximum, width: 960, height: 540 },
-      theme: uiTheme,
-    });
+    super('blacksmith_panel');
   }
 
   create(): void {
-    fixPixuiCanvasViewport(this);
-    super.create();
-
-    this._panelFrame = undefined;
-    this._detailFrame = undefined;
+    assertWidgetAssetsLoaded(this);
+    this._detailContainer = undefined;
     this._rowBgs = [];
 
-    // Header
+    // Main panel chrome.
+    createPanel({ scene: this, x: PANEL_X, y: PANEL_Y, width: PANEL_W, height: PANEL_H });
+
     const isUpgrade = _mode === 'upgrade';
     const state = appState.get();
     const gold = balance(state.vault);
 
+    // Title (top strip, above the panel — matches the prior layout).
     const titleText = isUpgrade
       ? `Blacksmith · ${this.collectUpgradeable().length} upgradeable`
       : `Blacksmith · Sell (${this.collectSellable(state.stash.items).length} in stash)`;
+    createBitmapText({
+      scene: this,
+      x: 480,
+      y: 12,
+      text: titleText,
+      font: 'medium',
+      size: 16,
+      originX: 0.5,
+    });
 
-    this.insert.top.textArea({ y: 28, text: titleText });
-    this.insert.topRight.textArea({ x: 60, y: 28, text: `Gold: ${gold}` });
-    this.insert.topRight.button({
-      x: 4,
+    // Gold display (top strip, right side).
+    createBitmapText({
+      scene: this,
+      x: 900,
+      y: 12,
+      text: `Gold: ${gold}`,
+      font: 'small',
+      size: 16,
+      tint: COLOR.affordable,
+      originX: 1,
+    });
+
+    // Close button (top strip, far right).
+    new Button({
+      scene: this,
+      x: 908,
       y: 4,
       width: 48,
+      height: 32,
       text: 'X',
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.close(),
     });
 
-    // Building upgrade button (top-left of header)
+    // Building-upgrade button (top strip, left side; conditional).
     this.buildUpgradeButton();
 
-    // Mode toggle buttons
-    this.insert.topLeft.button({
-      x: PANEL_X + LIST_W / 2 - 70,
-      y: PANEL_Y + 60,
+    // Mode toggle buttons (inside the panel header, just below the frame's
+    // top decorative border).
+    new Button({
+      scene: this,
+      x: PANEL_X + LIST_W / 2 - 130,
+      y: PANEL_Y + 24,
       width: 120,
+      height: 32,
       text: 'Upgrade',
-      style: isUpgrade ? undefined : undefined,
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.setMode('upgrade'),
     });
-    this.insert.topLeft.button({
-      x: PANEL_X + LIST_W / 2 + 70,
-      y: PANEL_Y + 60,
+    new Button({
+      scene: this,
+      x: PANEL_X + LIST_W / 2 + 10,
+      y: PANEL_Y + 24,
       width: 120,
+      height: 32,
       text: 'Sell',
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.setMode('sell'),
     });
 
-    // Main panel frame
-    const panel = this.insert.topLeft.frame({
-      x: PANEL_X,
-      y: PANEL_Y,
-      width: PANEL_W,
-      height: PANEL_H,
-    });
-    this._panelFrame = panel;
-
     if (isUpgrade) {
-      this.buildUpgradeMode(panel);
+      this.buildUpgradeMode();
     } else {
-      this.buildSellMode(panel);
+      this.buildSellMode();
     }
 
-    // Sell-confirm dialog (created hidden, shown immediately when _sellConfirmItem is set)
     if (_sellConfirmItem !== null) {
       this.buildSellConfirmDialog(_sellConfirmItem);
     }
@@ -171,12 +193,16 @@ export class BlacksmithPanelScene extends UiScene {
     const gold = balance(appState.get().vault);
     const canAfford = gold >= next.upgradeCost;
 
-    this.insert.topLeft.button({
+    new Button({
+      scene: this,
       x: 88,
-      y: 28,
-      width: 160,
+      y: 4,
+      width: 200,
+      height: 32,
       enabled: canAfford,
       text: `Upgrade · ${next.upgradeCost}g`,
+      font: 'medium',
+      fontSize: 16,
       onClick: () => {
         if (!canAfford) return;
         appState.update((s) => applyBuildingUpgrade(s, 'blacksmith'));
@@ -193,62 +219,50 @@ export class BlacksmithPanelScene extends UiScene {
     this.scene.restart();
   }
 
-  // Partial update on selection click: only the row highlights and the detail
-  // pane change. A full scene.restart() here was visible as a one-frame flicker.
+  // Partial update on selection click: only the row highlights and the
+  // detail pane change — no scene.restart, no flicker.
   private selectItem(id: string): void {
     if (_selectedItemId === id) return;
     _selectedItemId = id;
 
     for (const row of this._rowBgs) {
       const sel = row.id === id;
-      row.bg.setFillStyle(sel ? 0x2a2418 : 0x1a1a1a);
-      row.bg.setStrokeStyle(2, sel ? 0xffcc66 : 0x222222, 1);
+      row.bg.setFillStyle(sel ? COLOR.rowBgSelected : COLOR.paneBg);
+      row.bg.setStrokeStyle(2, sel ? COLOR.selectionGold : COLOR.rowStroke, 1);
     }
 
     this.rebuildDetailPane();
   }
 
-  // Tear down the current detail Frame and re-run the relevant build method.
-  // Pixui has no public child-removal API, so this reaches into _children /
-  // _initialized — same pattern fixPixuiCanvasViewport uses on _root.
+  // Tear down the detail container (Phaser handles cascade-destroy of
+  // children) and rebuild it. Native `Container.destroy(true)` replaces the
+  // pixui sub-tree dirty trick.
   private rebuildDetailPane(): void {
-    const panel = this._panelFrame;
-    if (!panel) return;
-
-    if (this._detailFrame) {
-      destroyPixuiSubtree(this._detailFrame);
-      detachPixuiChild(panel, this._detailFrame);
-      this._detailFrame = undefined;
+    if (this._detailContainer) {
+      this._detailContainer.destroy(true);
+      this._detailContainer = undefined;
     }
-
     if (_mode === 'upgrade') {
-      this.buildUpgradeDetail(panel, this.collectUpgradeable());
+      this.buildUpgradeDetail(this.collectUpgradeable());
     } else {
-      this.buildSellDetail(panel, this.collectSellable(appState.get().stash.items));
-    }
-
-    // The new detail Frame was attached but not initialized — UiScene's
-    // events.once('create', () => _root.initialize()) hook fires only on
-    // scene boot, not on later inserts. Reposition first so the new frame's
-    // _parent anchor is set, then initialize the sub-tree.
-    if (this._detailFrame) {
-      const inner = (panel as unknown as {
-        _insert: { _container: { updatePosition: () => void } };
-      })._insert._container;
-      inner.updatePosition();
-      (this._detailFrame as unknown as { initialize: () => void }).initialize();
+      this.buildSellDetail(this.collectSellable(appState.get().stash.items));
     }
   }
 
-  private buildUpgradeMode(panel: Frame): void {
+  private buildUpgradeMode(): void {
     const entries = this.collectUpgradeable();
 
     if (entries.length === 0) {
-      panel.insert.center.textArea({ text: 'No items can be upgraded.' });
+      this.add
+        .text(ROW_X, ROW_Y_BASE + 60, 'No items can be upgraded.', {
+          fontFamily: 'monospace',
+          fontSize: '13px',
+          color: '#888888',
+        })
+        .setOrigin(0.5);
       return;
     }
 
-    // Clamp page
     const maxStart = Math.max(0, entries.length - VISIBLE_ROWS);
     if (_listPageStart > maxStart) _listPageStart = maxStart;
 
@@ -265,14 +279,20 @@ export class BlacksmithPanelScene extends UiScene {
       this.buildPaginationArrows(entries.length);
     }
 
-    this.buildUpgradeDetail(panel, entries);
+    this.buildUpgradeDetail(entries);
   }
 
-  private buildSellMode(panel: Frame): void {
+  private buildSellMode(): void {
     const items = this.collectSellable(appState.get().stash.items);
 
     if (items.length === 0) {
-      panel.insert.center.textArea({ text: 'Stash is empty.' });
+      this.add
+        .text(ROW_X, ROW_Y_BASE + 60, 'Stash is empty.', {
+          fontFamily: 'monospace',
+          fontSize: '13px',
+          color: '#888888',
+        })
+        .setOrigin(0.5);
       return;
     }
 
@@ -292,7 +312,7 @@ export class BlacksmithPanelScene extends UiScene {
       this.buildPaginationArrows(items.length);
     }
 
-    this.buildSellDetail(panel, items);
+    this.buildSellDetail(items);
   }
 
   private collectSellable(items: readonly Item[]): readonly Item[] {
@@ -351,25 +371,18 @@ export class BlacksmithPanelScene extends UiScene {
     const cost = upgradeCost(entry.item);
     const canAfford = vaultGold >= cost;
 
-    // Row background (raw Phaser for fine-grained selection highlight)
     const bg = this.add
-      .rectangle(ROW_X, y, ROW_W, ROW_H, isSelected ? 0x2a2418 : 0x1a1a1a)
-      .setStrokeStyle(2, isSelected ? 0xffcc66 : 0x222222, 1);
+      .rectangle(ROW_X, y, ROW_W, ROW_H, isSelected ? COLOR.rowBgSelected : COLOR.paneBg)
+      .setStrokeStyle(2, isSelected ? COLOR.selectionGold : COLOR.rowStroke, 1);
     bg.setInteractive({ useHandCursor: true });
     bg.on('pointerdown', () => this.selectItem(entry.item.id));
     this._rowBgs.push({ bg, id: entry.item.id });
 
-    // Item icon
     const iconX = ROW_X - ROW_W / 2 + 24;
-    const itemIcon = new Image(this, {
-      texture: SHEET.key,
-      frame: String(BASE_ITEMS[entry.item.baseId].spriteId),
-    });
-    itemIcon.internal.setScale(1.5);
-    this.add.existing(itemIcon.internal);
-    itemIcon.internal.setPosition(iconX, y);
+    this.add
+      .sprite(iconX, y, SHEET.key, parseInt(BASE_ITEMS[entry.item.baseId].spriteId, 10))
+      .setScale(1.5);
 
-    // Display name + rarity
     const name = itemDisplayName(entry.item);
     this.add
       .text(iconX + 28, y - 10, `${name}  ${RARITY_LABEL[entry.item.rarity]}`, {
@@ -379,7 +392,6 @@ export class BlacksmithPanelScene extends UiScene {
       })
       .setOrigin(0, 0.5);
 
-    // Affix + location
     const affixDesc = itemAffixDescription(entry.item);
     const locLabel = entry.location.kind === 'stash' ? 'Stash' : `on ${entry.heroName ?? '?'}`;
     const subtitle = affixDesc.length > 0 ? `${affixDesc}  ·  ${locLabel}` : locLabel;
@@ -391,7 +403,6 @@ export class BlacksmithPanelScene extends UiScene {
       })
       .setOrigin(0, 0.5);
 
-    // Cost
     this.add
       .text(ROW_X + ROW_W / 2 - 78, y, `${cost}g`, {
         fontFamily: 'monospace',
@@ -400,7 +411,7 @@ export class BlacksmithPanelScene extends UiScene {
       })
       .setOrigin(1, 0.5);
 
-    // Upgrade button
+    // Per-row Upgrade button: raw Phaser custom rect (compact, fits the row).
     const buttonX = ROW_X + ROW_W / 2 - 38;
     const buttonBg = this.add
       .rectangle(buttonX, y, 64, 26, canAfford ? 0x335533 : 0x333333)
@@ -412,7 +423,6 @@ export class BlacksmithPanelScene extends UiScene {
         color: canAfford ? '#ffffff' : '#777777',
       })
       .setOrigin(0.5);
-
     if (canAfford) {
       buttonBg.setInteractive({ useHandCursor: true });
       buttonBg.on('pointerdown', () => this.upgrade(entry));
@@ -425,20 +435,16 @@ export class BlacksmithPanelScene extends UiScene {
     const value = itemSellValue(item);
 
     const bg = this.add
-      .rectangle(ROW_X, y, ROW_W, ROW_H, isSelected ? 0x2a2418 : 0x1a1a1a)
-      .setStrokeStyle(2, isSelected ? 0xffcc66 : 0x222222, 1);
+      .rectangle(ROW_X, y, ROW_W, ROW_H, isSelected ? COLOR.rowBgSelected : COLOR.paneBg)
+      .setStrokeStyle(2, isSelected ? COLOR.selectionGold : COLOR.rowStroke, 1);
     bg.setInteractive({ useHandCursor: true });
     bg.on('pointerdown', () => this.selectItem(item.id));
     this._rowBgs.push({ bg, id: item.id });
 
     const iconX = ROW_X - ROW_W / 2 + 24;
-    const itemIcon = new Image(this, {
-      texture: SHEET.key,
-      frame: String(BASE_ITEMS[item.baseId].spriteId),
-    });
-    itemIcon.internal.setScale(1.5);
-    this.add.existing(itemIcon.internal);
-    itemIcon.internal.setPosition(iconX, y);
+    this.add
+      .sprite(iconX, y, SHEET.key, parseInt(BASE_ITEMS[item.baseId].spriteId, 10))
+      .setScale(1.5);
 
     const name = itemDisplayName(item);
     this.add
@@ -483,7 +489,7 @@ export class BlacksmithPanelScene extends UiScene {
     buttonBg.on('pointerdown', () => this.requestSell(item));
   }
 
-  private buildUpgradeDetail(panel: Frame, entries: UpgradeEntry[]): void {
+  private buildUpgradeDetail(entries: readonly UpgradeEntry[]): void {
     const entry = _selectedItemId
       ? entries.find((e) => e.item.id === _selectedItemId)
       : undefined;
@@ -493,56 +499,152 @@ export class BlacksmithPanelScene extends UiScene {
     const target = nextRarity(item.rarity);
     if (target === null) return;
 
-    const detailPanel = panel.insert.topLeft.frame({
-      x: LIST_W + 20,
-      y: 70,
-      width: DETAIL_W,
-      height: LIST_H,
-    });
-    this._detailFrame = detailPanel;
+    const container = this.add.container(0, 0);
+    this._detailContainer = container;
 
-    detailPanel.insert.top.textArea({ y: 20, text: itemDisplayName(item) });
-    detailPanel.insert.top.textArea({ y: 50, text: `${item.rarity}  →  ${target}` });
-    detailPanel.insert.topLeft.textArea({ x: 12, y: 90, text: 'What this changes:' });
+    // Subtle backdrop for the detail area (pure visual, not pixui).
+    const bg = this.add
+      .rectangle(DETAIL_X + DETAIL_W / 2, DETAIL_Y + DETAIL_H / 2, DETAIL_W, DETAIL_H, 0x1a1a1a)
+      .setStrokeStyle(1, 0x333333);
+    container.add(bg);
 
-    let cursorY = 114;
-    detailPanel.insert.topLeft.textArea({ x: 28, y: cursorY, text: '+1 random affix' });
-    cursorY += 20;
+    const cx = DETAIL_X + DETAIL_W / 2;
+    container.add(
+      createBitmapText({
+        scene: this,
+        x: cx,
+        y: DETAIL_Y + 16,
+        text: itemDisplayName(item),
+        font: 'medium',
+        size: 16,
+        originX: 0.5,
+      }),
+    );
+    container.add(
+      createBitmapText({
+        scene: this,
+        x: cx,
+        y: DETAIL_Y + 44,
+        text: `${item.rarity}  >  ${target}`,
+        font: 'small',
+        size: 16,
+        originX: 0.5,
+      }),
+    );
+    container.add(
+      createBitmapText({
+        scene: this,
+        x: DETAIL_X + 16,
+        y: DETAIL_Y + 80,
+        text: 'What this changes:',
+        font: 'small',
+        size: 16,
+      }),
+    );
+
+    let cursorY = DETAIL_Y + 104;
+    container.add(
+      createBitmapText({
+        scene: this,
+        x: DETAIL_X + 32,
+        y: cursorY,
+        text: '+1 random affix',
+        font: 'small',
+        size: 16,
+      }),
+    );
+    cursorY += 22;
     if (target === 'rare' && item.slot !== 'hat') {
-      detailPanel.insert.topLeft.textArea({ x: 28, y: cursorY, text: '+1 rare property' });
-      cursorY += 20;
+      container.add(
+        createBitmapText({
+          scene: this,
+          x: DETAIL_X + 32,
+          y: cursorY,
+          text: '+1 rare property',
+          font: 'small',
+          size: 16,
+        }),
+      );
+      cursorY += 22;
     }
 
     const cost = upgradeCost(item);
-    detailPanel.insert.topLeft.textArea({ x: 12, y: cursorY + 24, text: `Cost: ${cost}g` });
+    container.add(
+      createBitmapText({
+        scene: this,
+        x: DETAIL_X + 16,
+        y: cursorY + 16,
+        text: `Cost: ${cost}g`,
+        font: 'small',
+        size: 16,
+        tint: COLOR.affordable,
+      }),
+    );
   }
 
-  private buildSellDetail(panel: Frame, items: readonly Item[]): void {
-    const item = _selectedItemId
-      ? items.find((i) => i.id === _selectedItemId)
-      : undefined;
+  private buildSellDetail(items: readonly Item[]): void {
+    const item = _selectedItemId ? items.find((i) => i.id === _selectedItemId) : undefined;
     if (!item) return;
 
-    const detailPanel = panel.insert.topLeft.frame({
-      x: LIST_W + 20,
-      y: 70,
-      width: DETAIL_W,
-      height: LIST_H,
-    });
-    this._detailFrame = detailPanel;
+    const container = this.add.container(0, 0);
+    this._detailContainer = container;
 
-    detailPanel.insert.top.textArea({ y: 20, text: itemDisplayName(item) });
-    detailPanel.insert.top.textArea({ y: 50, text: item.rarity });
+    const bg = this.add
+      .rectangle(DETAIL_X + DETAIL_W / 2, DETAIL_Y + DETAIL_H / 2, DETAIL_W, DETAIL_H, 0x1a1a1a)
+      .setStrokeStyle(1, 0x333333);
+    container.add(bg);
+
+    const cx = DETAIL_X + DETAIL_W / 2;
+    container.add(
+      createBitmapText({
+        scene: this,
+        x: cx,
+        y: DETAIL_Y + 16,
+        text: itemDisplayName(item),
+        font: 'medium',
+        size: 16,
+        originX: 0.5,
+      }),
+    );
+    container.add(
+      createBitmapText({
+        scene: this,
+        x: cx,
+        y: DETAIL_Y + 44,
+        text: item.rarity,
+        font: 'small',
+        size: 16,
+        originX: 0.5,
+      }),
+    );
 
     const affixes = itemAffixDescription(item);
     if (affixes.length > 0) {
-      detailPanel.insert.top.textArea({ y: 90, text: affixes });
+      container.add(
+        createBitmapText({
+          scene: this,
+          x: cx,
+          y: DETAIL_Y + 80,
+          text: affixes,
+          font: 'small',
+          size: 16,
+          originX: 0.5,
+        }),
+      );
     }
 
-    detailPanel.insert.top.textArea({
-      y: affixes.length > 0 ? 120 : 90,
-      text: `Sell value: ${itemSellValue(item)}g`,
-    });
+    container.add(
+      createBitmapText({
+        scene: this,
+        x: cx,
+        y: DETAIL_Y + (affixes.length > 0 ? 110 : 80),
+        text: `Sell value: ${itemSellValue(item)}g`,
+        font: 'small',
+        size: 16,
+        tint: COLOR.affordable,
+        originX: 0.5,
+      }),
+    );
   }
 
   private buildPaginationArrows(totalEntries: number): void {
@@ -591,46 +693,63 @@ export class BlacksmithPanelScene extends UiScene {
   }
 
   private buildSellConfirmDialog(item: Item): void {
-    // pixui.Dialog starts with visible:false; we set it true immediately.
-    // Dismissal is done by setting visible=false, then clearing _sellConfirmItem + restart.
-    // The dialog is placed at center via this.insert.center.dialog(...).
-    const dialog: Dialog = this.insert.center.dialog({
-      width: 420,
-      height: 200,
-    });
+    const dialog = createDialog({ scene: this, width: 420, height: 200 });
+    const cx = dialog.frameX + dialog.width / 2;
 
-    dialog.insert.top.textArea({ y: 20, text: 'Sell rare item?' });
-    dialog.insert.top.textArea({
-      y: 56,
-      text: `${itemDisplayName(item)} for ${itemSellValue(item)}g`,
-    });
+    dialog.container.add(
+      createBitmapText({
+        scene: this,
+        x: cx,
+        y: dialog.frameY + 30,
+        text: 'Sell rare item?',
+        font: 'medium',
+        size: 16,
+        originX: 0.5,
+      }),
+    );
+    dialog.container.add(
+      createBitmapText({
+        scene: this,
+        x: cx,
+        y: dialog.frameY + 70,
+        text: `${itemDisplayName(item)} for ${itemSellValue(item)}g`,
+        font: 'small',
+        size: 16,
+        originX: 0.5,
+      }),
+    );
 
-    dialog.insert.bottom.button({
-      x: -72,
-      y: 12,
+    const cancelBtn = new Button({
+      scene: this,
+      x: dialog.frameX + 60,
+      y: dialog.frameY + dialog.height - 56,
       width: 120,
+      height: 32,
       text: 'Cancel',
+      font: 'medium',
+      fontSize: 16,
       onClick: () => {
-        dialog.visible = false;
         _sellConfirmItem = null;
         this.scene.restart();
       },
     });
+    dialog.container.add(cancelBtn.gameObjects);
 
-    dialog.insert.bottom.button({
-      x: 72,
-      y: 12,
+    const sellBtn = new Button({
+      scene: this,
+      x: dialog.frameX + dialog.width - 180,
+      y: dialog.frameY + dialog.height - 56,
       width: 120,
+      height: 32,
       text: 'Sell',
+      font: 'medium',
+      fontSize: 16,
       onClick: () => {
-        dialog.visible = false;
         _sellConfirmItem = null;
         this.performSell(item);
       },
     });
-
-    // Show immediately.
-    dialog.visible = true;
+    dialog.container.add(sellBtn.gameObjects);
   }
 
   private performSell(item: Item): void {
@@ -676,7 +795,6 @@ export class BlacksmithPanelScene extends UiScene {
   }
 
   private close(): void {
-    // Reset module-level state on close so reopening starts fresh.
     _mode = 'upgrade';
     _selectedItemId = null;
     _listPageStart = 0;
