@@ -3,31 +3,39 @@ import { listHeroes } from '@camp/roster';
 import { CLASSES } from '@data/classes';
 import { CLASS_PERK_PAIRS, PERKS } from '@data/perks';
 import type { PerkId } from '@data/types';
-import { applyPerk, type Hero } from '@heroes/hero';
+import { applyPerk } from '@heroes/hero';
 import { heroToLoadout } from '@render/hero_loadout';
-import { Paperdoll } from '@render/paperdoll';
+import {
+  assertWidgetAssetsLoaded,
+  createBitmapText,
+  createPanel,
+  createPaperdoll,
+} from '@ui/widgets';
 import { appState } from './app_state';
 
-const PANEL_CX = 480;
-const PANEL_CY = 270;
+// Panel dimensions match the original layout for parity.
 const PANEL_W = 680;
 const PANEL_H = 360;
+const PANEL_X = 480 - PANEL_W / 2; // 140 — centered horizontally
+const PANEL_Y = 270 - PANEL_H / 2; // 90  — centered vertically
+const PANEL_CX = 480;
+const PANEL_CY = 270;
 
-const PAPERDOLL_X = 280;
-const PAPERDOLL_Y = 200;
+const PAPERDOLL_X = PANEL_CX - 200; // = 280
+const PAPERDOLL_Y = PANEL_CY - 70;  // = 200
 const PAPERDOLL_SCALE = 4;
 
-const HEADER_X = 380;
-const HEADER_NAME_Y = 130;
-const HEADER_CLASS_Y = 158;
-const HEADER_LEVEL_Y = 184;
-const HEADER_PROMPT_Y = 230;
+const HEADER_X = PANEL_CX - 100;    // = 380
+const HEADER_NAME_Y = PANEL_CY - 140; // = 130
+const HEADER_CLASS_Y = PANEL_CY - 112; // = 158
+const HEADER_LEVEL_Y = PANEL_CY - 86;  // = 184
+const HEADER_PROMPT_Y = PANEL_CY - 40; // = 230
 
 const CARD_W = 260;
 const CARD_H = 140;
-const CARD_Y = 380;
-const CARD_A_X = 330;
-const CARD_B_X = 630;
+const CARD_Y = PANEL_CY + 110 - CARD_H / 2; // top of card
+const CARD_A_X = PANEL_CX - 150 - CARD_W / 2; // top-left of card A
+const CARD_B_X = PANEL_CX + 150 - CARD_W / 2; // top-left of card B
 
 export class PerkOverlayScene extends Phaser.Scene {
   private heroId!: string;
@@ -41,85 +49,110 @@ export class PerkOverlayScene extends Phaser.Scene {
   }
 
   create(): void {
+    assertWidgetAssetsLoaded(this);
+
     const hero = listHeroes(appState.get().roster).find((h) => h.id === this.heroId);
     if (!hero || !hero.pendingPerk) {
-      // Defensive — shouldn't happen given camp's gate, but guard against
-      // scene-restart edge cases.
       this.close();
       return;
     }
-    this.buildOverlay(hero);
-  }
 
-  private buildOverlay(hero: Hero): void {
-    // Dim background (full canvas, click-blocking).
+    // Dim overlay.
     this.add
       .rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.6)
       .setOrigin(0, 0)
       .setInteractive();
 
     // Panel chrome.
-    this.add
-      .rectangle(PANEL_CX, PANEL_CY, PANEL_W, PANEL_H, 0x222222)
-      .setStrokeStyle(2, 0x666666);
+    createPanel({ scene: this, x: PANEL_X, y: PANEL_Y, width: PANEL_W, height: PANEL_H });
 
-    // Paperdoll.
-    const paperdoll = new Paperdoll(this, PAPERDOLL_X, PAPERDOLL_Y, heroToLoadout(hero));
-    paperdoll.setScale(PAPERDOLL_SCALE);
+    // Paperdoll (left side).
+    createPaperdoll({
+      scene: this,
+      x: PAPERDOLL_X,
+      y: PAPERDOLL_Y,
+      loadout: heroToLoadout(hero),
+      scale: PAPERDOLL_SCALE,
+    });
 
-    // Header text.
+    // Header text block.
     const classDef = CLASSES[hero.classId];
-    this.add.text(HEADER_X, HEADER_NAME_Y, hero.name, {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#ffffff',
+    createBitmapText({
+      scene: this,
+      x: HEADER_X,
+      y: HEADER_NAME_Y,
+      text: hero.name,
+      font: 'medium',
+      size: 16,
     });
-    this.add.text(HEADER_X, HEADER_CLASS_Y, `${classDef.name} · Level ${hero.level}`, {
-      fontFamily: 'monospace',
-      fontSize: '13px',
-      color: '#aaaaaa',
+    createBitmapText({
+      scene: this,
+      x: HEADER_X,
+      y: HEADER_CLASS_Y,
+      text: `${classDef.name} · Level ${hero.level}`,
+      font: 'small',
+      size: 16,
     });
-    this.add.text(HEADER_X, HEADER_LEVEL_Y, `Reached Level ${hero.level}!`, {
-      fontFamily: 'monospace',
-      fontSize: '14px',
-      color: '#ffcc66',
+    createBitmapText({
+      scene: this,
+      x: HEADER_X,
+      y: HEADER_LEVEL_Y,
+      text: `Reached Level ${hero.level}!`,
+      font: 'small',
+      size: 16,
     });
-    this.add.text(HEADER_X, HEADER_PROMPT_Y, 'Choose a perk:', {
-      fontFamily: 'monospace',
-      fontSize: '13px',
-      color: '#aaaaaa',
+    createBitmapText({
+      scene: this,
+      x: HEADER_X,
+      y: HEADER_PROMPT_Y,
+      text: 'Choose a perk:',
+      font: 'small',
+      size: 16,
     });
 
-    // Perk cards.
+    // Perk cards — title + description with hover highlight.
     const [perkAId, perkBId] = CLASS_PERK_PAIRS[hero.classId];
     this.buildPerkCard(CARD_A_X, perkAId);
     this.buildPerkCard(CARD_B_X, perkBId);
+
+    this.input.keyboard?.on('keydown-ESC', () => this.close());
   }
 
-  private buildPerkCard(centerX: number, perkId: PerkId): void {
+  private buildPerkCard(cardX: number, perkId: PerkId): void {
     const perk = PERKS[perkId];
-    const bg = this.add
-      .rectangle(centerX, CARD_Y, CARD_W, CARD_H, 0x1a1a1a)
-      .setStrokeStyle(1, 0x444444);
-    this.add
-      .text(centerX, CARD_Y - 30, perk.name, {
-        fontFamily: 'monospace',
-        fontSize: '16px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-    this.add
-      .text(centerX, CARD_Y + 0, perk.description, {
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: '#dddddd',
-      })
-      .setOrigin(0.5);
 
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerover', () => bg.setStrokeStyle(2, 0xffcc66));
-    bg.on('pointerout', () => bg.setStrokeStyle(1, 0x444444));
-    bg.on('pointerdown', () => this.onPick(perkId));
+    // Bordered card background — gold border on hover, gray default. Single
+    // raw Phaser rectangle handles both visual + click target.
+    const card = this.add
+      .rectangle(cardX + CARD_W / 2, CARD_Y + CARD_H / 2, CARD_W, CARD_H, 0x222222)
+      .setStrokeStyle(1, 0x444444);
+    card.setInteractive({ useHandCursor: true });
+    card.on('pointerover', () => card.setStrokeStyle(2, 0xffcc66));
+    card.on('pointerout', () => card.setStrokeStyle(1, 0x444444));
+    card.on('pointerup', () => this.onPick(perkId));
+
+    // Title (top of card).
+    createBitmapText({
+      scene: this,
+      x: cardX + CARD_W / 2,
+      y: CARD_Y + 16,
+      text: perk.name,
+      font: 'medium',
+      size: 16,
+      originX: 0.5,
+    });
+
+    // Description (centered below title). Raw Phaser text wraps cleanly
+    // with wordWrap; bitmap text doesn't have wrap support out of the box.
+    this.add
+      .text(cardX + CARD_W / 2, CARD_Y + CARD_H / 2 + 8, perk.description, {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#cccccc',
+        wordWrap: { width: CARD_W - 24 },
+        align: 'center',
+      })
+      .setOrigin(0.5);
   }
 
   private onPick(perkId: PerkId): void {

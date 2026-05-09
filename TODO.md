@@ -84,40 +84,12 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 ---
 
-### 53 · PixuiHeroCard tooltip parity (wound-badge tap-to-toggle)
-
-- **What:** Existing `HeroCard` (legacy Phaser implementation) has a wound-badge tap-to-toggle tooltip that shows wound details. `PixuiHeroCard` skips this — onPointerOver/onPointerOut are no-ops with a TODO comment. Tavern doesn't need it (fresh-hire candidates have no wounds), but Barracks (sub-spec 3c) does and will block on this work.
-- **Why:** Without this tooltip, players in Barracks can't see wound details on a hero card (only the badge "🩸 N" is visible). Functional parity required before legacy `HeroCard` can be deleted in 3c.
-- **Tier:** 2 (UX parity; required before sub-spec 3c Barracks migration)
-- **Acceptance:**
-  - PixuiHeroCard exposes a wound-badge widget when `hero.wounds.length > 0 && !isDead`.
-  - Tap (or hover, depending on platform — match existing HeroCard's toggle behavior) shows tooltip with `WOUNDS[w.id].name — describeWoundEffect(...)` for each wound.
-  - Tooltip rendering: reuse `createTooltip()` if practical (note: createTooltip requires a `Phaser.GameObjects.Container` parent for lifecycle binding — may need a transient scene-level parent since PixuiHeroCard is a pixui Container, not Phaser). Or build a pixui-native tooltip pattern (Frame + textArea anchored at scene root).
-- **Touches:** `src/ui/pixui_hero_card.ts`, possibly `src/ui/tooltip.ts` (if signature needs adjustment to support non-Phaser-Container callers).
-- **Source:** Cluster B · 45 sub-spec 3a Opus whole-impl review (2026-05-06). Implementer deferred during sub-spec 3a since Tavern doesn't surface the need.
-
----
-
 ### 52 · Cleanup stale boss_sprites_candidate_*.png in public/assets/sprites/temp/
 
 - **What:** Remove the leftover `boss_sprites_candidate_*.png` files in `public/assets/sprites/temp/`. These predate the pixui adoption work but were noticed during the Cluster B · 45 sub-spec 2 whole-implementation review.
 - **Why:** Dead files in a tracked directory cause confusion ("are these used? safe to delete?"). Each new contributor hits the same question.
 - **Tier:** 2 (cleanup)
 - **Acceptance:** Files deleted; verify no source code references them via grep before deletion.
-- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
-
----
-
-### 51 · README + asset-pipeline docs update for pixui
-
-- **What:** Update `README.md` to document the new asset layout (`assets/` root for pixui inputs, `public/packed_assets/` for build outputs), the `pixel-tools` Vite pipeline, and the Windows shim in `vite.config.ts`. Currently the README still describes the pre-pixui asset structure.
-- **Why:** Fresh contributors will be confused by `assets/` (build-time inputs) vs `public/assets/` (existing game assets, served as-is) without an explanation. The Windows shim looks like dark magic without context.
-- **Tier:** 2 (docs polish)
-- **Acceptance:**
-  - README section explains `assets/` (pixel-tools inputs, YAML-described, build-time-packed) vs `public/assets/` (existing game audio + Phaser spritesheets).
-  - README references `vite.config.ts` and explains the Windows shim's purpose in 2-3 lines.
-  - `vite/assets.mjs` gets brief field comments (one line per `source_path` / `destination_path` / `fonts` / `atlases`) for non-pixel-tools-familiar maintainers.
-- **Touches:** `README.md`, `vite/assets.mjs`.
 - **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
 
 ---
@@ -193,26 +165,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
   - Cap-edge state: when exactly `LIST_MAX` heroes are wounded, no overflow indicator should appear.
 - **Touches:** `src/scenes/hospital_panel_scene.ts`.
 - **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
-
----
-
-### 45 · Migrate UI to phaser-pixui library — sub-spec 3c remaining
-
-- **What:** Cross-cutting UI refactor adopting [phaser-pixui](https://github.com/skhoroshavin/phaser-pixui). Decomposed into three sub-specs at brainstorm time; first two complete, third decomposed further at the 2026-05-06 sub-spec-3 brainstorm. After 3b (2026-05-07), 6 of 11 panels run on pixui; only HeroCard-dependent panels remain.
-- **Why:** Hand-rolled Phaser primitives produced systemic layout bugs (Cluster B · 44) and 60+ duplicated widget chains across panels. pixui provides a sprite-themed widget framework + asset pipeline. Path D chosen for the final migration: re-implement Paperdoll/HeroCard as pixui Container compositions so all panels can use one uniform pattern.
-- **Tier:** 2 (UX infrastructure)
-- **Status (2026-05-07):**
-  - **Sub-spec 1 — Layout helpers + blacksmith migration: ✓ DONE.** See [HISTORY](HISTORY.md). Built `src/render/panel_layout.ts`; migrated blacksmith. After 3b, helpers have zero consumers — clean retirement candidate for 3c cleanup.
-  - **Sub-spec 2 — pixui Hello-World on hospital: ✓ DONE.** See [HISTORY](HISTORY.md). Added pixui + pixel-tools, asset pipeline, Windows shim, theme module, hospital migrated. 7 follow-ups filed (Cluster B · 46–52).
-  - **Sub-spec 3a — Foundation + Tavern PoC: ✓ DONE.** See [HISTORY](HISTORY.md). Extracted `fixPixuiCanvasViewport()`; built `PixuiPaperdoll` + `PixuiHeroCard`; migrated Tavern. Discovered + fixed scene.restart() viewport corruption and `insert.left/right` origin gotcha. 4 follow-ups filed (Cluster B · 53–56).
-  - **Sub-spec 3b — Easy panels (no HeroCard): ✓ DONE.** See [HISTORY](HISTORY.md). Migrated TreasureRoomOverlay, ShopOverlay, CampNodeOverlay, Blacksmith. Validated `pixui.Dialog` (sell-confirm) and inline `pixui.Image` for item icons. `panel_layout.ts` orphaned. 1 follow-up filed (Cluster B · 57 — Blacksmith rows kept raw Phaser pending tintable-text support).
-  - **Sub-spec 3c — Remaining HeroCard panels + cleanup: ⏳ NEXT.** Migrate Barracks (HeroCard + paperdoll detail), Equip (Paperdoll + slot strip), Expeditions (HeroCard formation), EventOverlay (HeroCard), PerkOverlay (Paperdoll). Plus retire `panel_layout.ts` and legacy `paperdoll.ts` / `hero_card.ts` once their consumers migrate. Final README polish. Gated on Cluster B · 53 (PixuiHeroCard tooltip parity) before Barracks. Estimated ~3-5 days.
-- **Acceptance:**
-  - All 11 panel scenes (Hospital ✓, TreasureRoomOverlay ✓, ShopOverlay ✓, CampNodeOverlay ✓, Blacksmith ✓, Tavern ✓, Barracks, Equip, Expeditions, EventOverlay, PerkOverlay) extend `UiScene` and use pixui `insert` DSL + theme.
-  - `PixuiPaperdoll` and `PixuiHeroCard` exist as reusable pixui Container compositions.
-  - Sub-spec 1's `panel_layout.ts` retires (zero consumers after 3b); legacy `paperdoll.ts` / `hero_card.ts` retire once 3c finishes.
-  - The follow-ups in Cluster B · 46–57 are addressed inline during 3c or filed forward.
-- **Source:** `ideas.md` #5 (2026-05-06); brainstorm specs in `docs/superpowers/specs/`. Combat / Dungeon / Corridor scenes are out of scope (not panel-shaped).
 
 ---
 

@@ -1,5 +1,4 @@
-import { ConstraintMode, UiScene } from 'phaser-pixui';
-import type { Frame } from 'phaser-pixui';
+import * as Phaser from 'phaser';
 import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels';
 import { removeHero, tickRosterWounds, updateHero } from '@camp/roster';
 import { addItems } from '@camp/stash';
@@ -7,8 +6,12 @@ import { credit } from '@camp/vault';
 import type { WoundId } from '@data/types';
 import { WOUNDS, describeWoundEffect } from '@data/wounds';
 import { chooseCampNodeEffect } from '@run/run_state';
-import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
-import { uiTheme } from '@render/ui_theme';
+import {
+  Button,
+  assertWidgetAssetsLoaded,
+  createBitmapText,
+  createPanel,
+} from '@ui/widgets';
 import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 
@@ -25,114 +28,148 @@ type LastAction =
 let _overlayState: OverlayState = 'main';
 let _lastAction: LastAction | null = null;
 
-export class CampNodeOverlayScene extends UiScene {
+const PANEL_X = 160;
+const PANEL_Y = 80;
+const PANEL_W = 640;
+const PANEL_H = 400;
+
+const ROW_X = PANEL_X + 16;
+const ROW_W = PANEL_W - 32;
+
+export class CampNodeOverlayScene extends Phaser.Scene {
   constructor() {
-    super({
-      key: 'camp_node_overlay',
-      viewportConstraints: { mode: ConstraintMode.Maximum, width: 960, height: 540 },
-      theme: uiTheme,
-    });
+    super('camp_node_overlay');
   }
 
   create(): void {
-    fixPixuiCanvasViewport(this);
-    super.create();
+    assertWidgetAssetsLoaded(this);
 
-    // Header
-    const titleText = _overlayState === 'main'
-      ? 'Camp'
-      : _overlayState === 'treat_picker'
-        ? 'Camp · Treat Wound'
-        : _overlayState === 'leave_confirm'
-          ? 'Camp · Leave Dungeon'
-          : _lastAction?.kind === 'treat'
-            ? 'Camp · Wound Treated'
-            : 'Camp · Party Rested';
+    // Dim overlay.
+    this.add
+      .rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.6)
+      .setOrigin(0, 0)
+      .setInteractive();
 
-    this.insert.top.textArea({ y: 28, text: titleText });
+    const titleText =
+      _overlayState === 'main'
+        ? 'Camp'
+        : _overlayState === 'treat_picker'
+          ? 'Camp - Treat Wound'
+          : _overlayState === 'leave_confirm'
+            ? 'Camp - Leave Dungeon'
+            : _lastAction?.kind === 'treat'
+              ? 'Camp - Wound Treated'
+              : 'Camp - Party Rested';
+
+    createBitmapText({
+      scene: this,
+      x: 480,
+      y: 12,
+      text: titleText,
+      font: 'medium',
+      size: 16,
+      originX: 0.5,
+    });
 
     if (_overlayState !== 'main') {
-      this.insert.topLeft.button({
-        x: 8,
+      new Button({
+        scene: this,
+        x: 16,
         y: 4,
-        width: 72,
+        width: 80,
+        height: 32,
         text: 'Back',
+        font: 'medium',
+        fontSize: 16,
         onClick: () => this.goto('main'),
       });
     }
 
-    this.insert.topRight.button({
-      x: 4,
+    new Button({
+      scene: this,
+      x: 908,
       y: 4,
       width: 48,
+      height: 32,
       text: 'X',
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.closeAndResume(),
     });
 
-    // Main panel
-    const panel = this.insert.topLeft.frame({
-      x: 160,
-      y: 60,
-      width: 640,
-      height: 400,
-    });
+    createPanel({ scene: this, x: PANEL_X, y: PANEL_Y, width: PANEL_W, height: PANEL_H });
 
     if (_overlayState === 'main') {
-      this.buildMain(panel);
+      this.buildMain();
     } else if (_overlayState === 'treat_picker') {
-      this.buildTreatPicker(panel);
+      this.buildTreatPicker();
     } else if (_overlayState === 'leave_confirm') {
-      this.buildLeaveConfirm(panel);
+      this.buildLeaveConfirm();
     } else {
-      this.buildOutcome(panel);
+      this.buildOutcome();
     }
 
     this.input.keyboard?.on('keydown-ESC', () => this.closeAndResume());
   }
 
-  private buildMain(panel: Frame): void {
+  private buildMain(): void {
     const run = appState.get().runState!;
     const hasWounds = run.party.some((h) => h.wounds.length > 0);
 
-    const optionH = 60;
-    const optionStride = 72;
+    const stride = 80;
+    const baseY = PANEL_Y + 30;
 
-    this.buildOptionRow(panel, 0, optionStride, optionH, 'Heal Party', 'Each hero recovers 25% maxHp', true, () => {
-      this.applyHealParty();
-    });
-    this.buildOptionRow(panel, 1, optionStride, optionH, 'Treat Wound', 'Heal one wound on one hero', hasWounds, () => {
-      this.goto('treat_picker');
-    });
-    this.buildOptionRow(panel, 2, optionStride, optionH, 'Leave Dungeon', 'Bank pack and return to camp', true, () => {
-      this.goto('leave_confirm');
-    });
+    this.buildOptionRow(baseY, 'Heal Party', 'Each hero recovers 25% maxHp', true, () =>
+      this.applyHealParty(),
+    );
+    this.buildOptionRow(baseY + stride, 'Treat Wound', 'Heal one wound on one hero', hasWounds, () =>
+      this.goto('treat_picker'),
+    );
+    this.buildOptionRow(baseY + stride * 2, 'Leave Dungeon', 'Bank pack and return to camp', true, () =>
+      this.goto('leave_confirm'),
+    );
   }
 
   private buildOptionRow(
-    panel: Frame,
-    index: number,
-    stride: number,
-    rowH: number,
+    rowTopY: number,
     label: string,
     subtitle: string,
     enabled: boolean,
     onClick: () => void,
   ): void {
-    const rowY = 16 + index * stride;
-    const row = panel.insert.topLeft.frame({ x: 16, y: rowY, width: -32, height: rowH });
-    row.insert.topLeft.textArea({ x: 12, y: 8, text: label });
-    row.insert.topLeft.textArea({ x: 12, y: 32, text: subtitle });
+    const rowH = 60;
+    // Subtle row backdrop.
+    this.add
+      .rectangle(ROW_X + ROW_W / 2, rowTopY + rowH / 2, ROW_W, rowH, 0x111111)
+      .setStrokeStyle(1, 0x333333);
+
+    this.add.text(ROW_X + 12, rowTopY + 8, label, {
+      fontFamily: 'monospace',
+      fontSize: '14px',
+      color: '#ffffff',
+    });
+    this.add.text(ROW_X + 12, rowTopY + 32, subtitle, {
+      fontFamily: 'monospace',
+      fontSize: '11px',
+      color: '#aaaaaa',
+    });
+
     if (enabled) {
-      row.insert.right.button({
-        x: 8,
+      new Button({
+        scene: this,
+        x: ROW_X + ROW_W - 116,
+        y: rowTopY + 14,
         width: 100,
+        height: 32,
         text: 'Select',
+        font: 'medium',
+        fontSize: 16,
         onClick,
       });
     }
   }
 
-  private buildTreatPicker(panel: Frame): void {
+  private buildTreatPicker(): void {
     const run = appState.get().runState!;
     const pairs: { heroIndex: number; woundIndex: number; heroName: string; woundId: WoundId }[] = [];
     for (let hi = 0; hi < run.party.length; hi++) {
@@ -148,32 +185,58 @@ export class CampNodeOverlayScene extends UiScene {
     }
 
     if (pairs.length === 0) {
-      panel.insert.center.textArea({ text: 'No wounds to treat.' });
+      createBitmapText({
+        scene: this,
+        x: PANEL_X + PANEL_W / 2,
+        y: PANEL_Y + PANEL_H / 2 - 8,
+        text: 'No wounds to treat.',
+        font: 'small',
+        size: 16,
+        originX: 0.5,
+      });
       return;
     }
 
     const rowH = 52;
-    const rowStride = 60;
+    const stride = 60;
+    const baseY = PANEL_Y + 30;
 
     for (let i = 0; i < pairs.length; i++) {
       const pair = pairs[i];
       const def = WOUNDS[pair.woundId];
       const desc = describeWoundEffect(def.effect);
-      const rowY = 16 + i * rowStride;
+      const rowTopY = baseY + i * stride;
 
-      const row = panel.insert.topLeft.frame({ x: 16, y: rowY, width: -32, height: rowH });
-      row.insert.topLeft.textArea({ x: 12, y: 8, text: `${pair.heroName} · ${def.name}` });
-      row.insert.topLeft.textArea({ x: 12, y: 30, text: desc });
-      row.insert.right.button({
-        x: 8,
+      this.add
+        .rectangle(ROW_X + ROW_W / 2, rowTopY + rowH / 2, ROW_W, rowH, 0x111111)
+        .setStrokeStyle(1, 0x333333);
+
+      this.add.text(ROW_X + 12, rowTopY + 8, `${pair.heroName} · ${def.name}`, {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: '#ffffff',
+      });
+      this.add.text(ROW_X + 12, rowTopY + 28, desc, {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#cccccc',
+      });
+
+      new Button({
+        scene: this,
+        x: ROW_X + ROW_W - 96,
+        y: rowTopY + 10,
         width: 80,
+        height: 32,
         text: 'Treat',
+        font: 'medium',
+        fontSize: 16,
         onClick: () => this.applyTreatWound(pair.heroIndex, pair.woundIndex),
       });
     }
   }
 
-  private buildLeaveConfirm(panel: Frame): void {
+  private buildLeaveConfirm(): void {
     const run = appState.get().runState!;
     const lines: string[] = [
       `Bank ${run.pack.gold}g and ${run.pack.items.length} item${run.pack.items.length === 1 ? '' : 's'}.`,
@@ -184,37 +247,69 @@ export class CampNodeOverlayScene extends UiScene {
     }
 
     for (let i = 0; i < lines.length; i++) {
-      panel.insert.topLeft.textArea({ x: 16, y: 20 + i * 26, text: lines[i] });
+      createBitmapText({
+        scene: this,
+        x: PANEL_X + 16,
+        y: PANEL_Y + 30 + i * 28,
+        text: lines[i],
+        font: 'small',
+        size: 16,
+      });
     }
 
-    panel.insert.bottom.button({
-      y: 12,
+    new Button({
+      scene: this,
+      x: PANEL_X + PANEL_W / 2 - 100,
+      y: PANEL_Y + PANEL_H - 60,
       width: 200,
+      height: 32,
       text: 'Confirm Leave',
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.applyLeave(),
     });
   }
 
-  private buildOutcome(panel: Frame): void {
+  private buildOutcome(): void {
     const action = _lastAction;
     if (!action) return;
 
     if (action.kind === 'heal') {
       for (let i = 0; i < action.lines.length; i++) {
         const line = action.lines[i];
-        const text = line.delta > 0
-          ? `${line.name}: +${line.delta} HP (${line.currentHp}/${line.maxHp})`
-          : `${line.name}: full HP`;
-        panel.insert.topLeft.textArea({ x: 16, y: 20 + i * 26, text });
+        const text =
+          line.delta > 0
+            ? `${line.name}: +${line.delta} HP (${line.currentHp}/${line.maxHp})`
+            : `${line.name}: full HP`;
+        createBitmapText({
+          scene: this,
+          x: PANEL_X + 16,
+          y: PANEL_Y + 30 + i * 28,
+          text,
+          font: 'small',
+          size: 16,
+        });
       }
     } else {
-      panel.insert.topLeft.textArea({ x: 16, y: 20, text: `${action.heroName}: ${action.woundName} treated` });
+      createBitmapText({
+        scene: this,
+        x: PANEL_X + 16,
+        y: PANEL_Y + 30,
+        text: `${action.heroName}: ${action.woundName} treated`,
+        font: 'small',
+        size: 16,
+      });
     }
 
-    panel.insert.bottom.button({
-      y: 12,
+    new Button({
+      scene: this,
+      x: PANEL_X + PANEL_W / 2 - 80,
+      y: PANEL_Y + PANEL_H - 60,
       width: 160,
+      height: 32,
       text: 'Dismiss',
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.closeAndResume(),
     });
   }
@@ -261,8 +356,8 @@ export class CampNodeOverlayScene extends UiScene {
     const run = appState.get().runState!;
     const rng = this.rng();
 
-    // Capture hero name + wound name BEFORE applying — treat_wound removes the
-    // wound from the hero, so we can't read it afterwards.
+    // Capture hero name + wound name BEFORE applying — treat_wound removes
+    // the wound from the hero, so we can't read it afterwards.
     const heroName = run.party[heroIndex].name;
     const woundName = WOUNDS[run.party[heroIndex].wounds[woundIndex].id].name;
 

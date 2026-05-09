@@ -29,6 +29,48 @@ scripts/          # build-time helpers (sprite name codegen, etc.)
 
 See [`src/README.md`](src/README.md) for the `src/` directory structure and the rules about where new files belong.
 
+## Asset layout
+
+The project has three asset locations, each with a different purpose:
+
+- **`assets/`** — pixui inputs (sprite PNGs + bitmap-font PNGs + YAML manifests).
+  Build-time only. Packed into atlases by [pixel-tools](https://www.npmjs.com/package/pixel-tools)
+  via the Vite plugin defined in `vite/assets.mjs`. Not served at runtime.
+- **`public/assets/`** — runtime-served audio + animated sprites + Phaser spritesheets
+  (legacy game assets predating pixui). Vite copies this directory to `dist/assets/`
+  unchanged during build.
+- **`public/packed_assets/`** — pixel-tools build output (gitignored). Contains
+  `mana_soul.png`/`mana_soul.json` (UI atlas) and `fonts.png`/`fonts.json`
+  (bitmap-font atlas). Regenerated automatically when files in `assets/` change.
+
+YAML manifests:
+- `assets/ui.yaml` — sprite atlas description (frame sizes, slices, output target)
+- `assets/fonts.yaml` — bitmap-font character map and source PNG references
+
+## Pixel-tools pipeline
+
+Asset packing runs as part of the Vite dev server / build. Configuration lives in
+`vite/assets.mjs`:
+
+```javascript
+export const assetsConfig = {
+  source_path: "assets",                          // where YAMLs + PNGs live
+  destination_path: "public/packed_assets",       // build output directory
+  fonts: [{ source: "fonts.yaml" }],              // font manifests
+  atlases: [{ source: "ui.yaml", target: "mana_soul" }],  // atlas manifests
+};
+```
+
+Both YAMLs are watched in dev mode — any change re-packs the affected atlas
+without restarting the server.
+
+## Windows shim
+
+pixel-tools ships its CLI binaries as npm `.cmd` shims. Node's `spawnSync`
+without `shell: true` can't resolve them on Windows. To work around this,
+`vite.config.ts` copies the `.exe` binaries into `node_modules/.cache/pixel-tools-shims/`
+at module-load time and prepends that directory to PATH. Linux/Mac unaffected.
+
 ## Art pipeline
 
 Author sprites in LibreSprite, then **File → Export Sprite Sheet** to generate a PNG + JSON atlas. Drop both into `public/assets/sprites/` (or `public/assets/animated/` for animated sprites) and load them in a scene's `preload()`:
