@@ -50,8 +50,9 @@ const TOOLTIP_X_NUDGE_FROM_BADGE = -30;
  * name/class/HP/trait labels, an optional HP bar, and an optional wound
  * badge that toggles a tooltip on tap.
  *
- * Replaces PixuiHeroCard with the same external shape (small/large size,
- * isDead/onClick/draggable options, `events` event emitter for drag).
+ * Sizes (small=180×60, large=280×120), optional isDead tint, optional
+ * onClick handler, and optional draggable mode that re-emits Phaser drag
+ * events on the public `events` emitter for consumers like Expeditions.
  *
  * Lifecycle: `card.destroy()` tears down the container and every child,
  * including any open tooltip — no leak.
@@ -174,8 +175,7 @@ export class HeroCard {
 
     // Click / drag overlay — only created when the card needs interaction.
     // Skipping it when neither onClick nor draggable is set means clicks
-    // can fall through to whatever is rendered behind the card (unlike
-    // PixuiHeroCard which always installed a hit area, blocking clicks).
+    // can fall through to whatever is rendered behind the card.
     if (opts.onClick || opts.draggable) {
       this.hitArea = this.scene.add
         .rectangle(0, 0, w, h, 0x000000, 0)

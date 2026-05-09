@@ -17,7 +17,7 @@ export interface PaperdollOpts {
  * A layered character sprite stack (body, legs, feet, outfit, hair, hat,
  * shield, weapon) wrapped in a Phaser Container. Children are layered in
  * the order returned by `layerFramesFor`. The container's position is the
- * paperdoll's center (matches how PixuiPaperdoll rendered).
+ * paperdoll's center; child sprites use Phaser's default origin (0.5).
  *
  * Returns the container so the caller can add it to its own parent
  * container, set tints on individual layer sprites, or destroy the whole

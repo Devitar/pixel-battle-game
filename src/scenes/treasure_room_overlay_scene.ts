@@ -1,11 +1,15 @@
-import { ConstraintMode, UiScene } from 'phaser-pixui';
+import * as Phaser from 'phaser';
 import { DUNGEONS } from '@data/dungeons';
 import type { Item } from '@data/types';
 import { rollLoot } from '@dungeon/loot';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { claimTreasure, currentNode } from '@run/run_state';
-import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
-import { uiTheme } from '@render/ui_theme';
+import {
+  Button,
+  assertWidgetAssetsLoaded,
+  createBitmapText,
+  createPanel,
+} from '@ui/widgets';
 import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 
@@ -14,45 +18,74 @@ let _pendingState: 'closed' | 'opened' = 'closed';
 let _pendingItem: Item | undefined;
 let _pendingRngStateAfter: number | undefined;
 
-export class TreasureRoomOverlayScene extends UiScene {
+const PANEL_X = 260;
+const PANEL_Y = 80;
+const PANEL_W = 440;
+const PANEL_H = 360;
+
+export class TreasureRoomOverlayScene extends Phaser.Scene {
   constructor() {
-    super({
-      key: 'treasure_room_overlay',
-      viewportConstraints: { mode: ConstraintMode.Maximum, width: 960, height: 540 },
-      theme: uiTheme,
-    });
+    super('treasure_room_overlay');
   }
 
   create(): void {
-    fixPixuiCanvasViewport(this);
-    super.create();
+    assertWidgetAssetsLoaded(this);
 
     const opened = _pendingState === 'opened';
 
-    // Header
-    this.insert.top.textArea({ y: 28, text: 'Treasure!' });
-    this.insert.topRight.button({
-      x: 4,
+    // Dim overlay.
+    this.add
+      .rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.6)
+      .setOrigin(0, 0)
+      .setInteractive();
+
+    // Header.
+    createBitmapText({
+      scene: this,
+      x: 480,
+      y: 12,
+      text: 'Treasure!',
+      font: 'medium',
+      size: 16,
+      originX: 0.5,
+    });
+    new Button({
+      scene: this,
+      x: 908,
       y: 4,
       width: 48,
+      height: 32,
       text: 'X',
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.close(),
     });
 
-    // Central content frame (top-anchored so y is from canvas top)
-    const panel = this.insert.topLeft.frame({
-      x: 260,
-      y: 60,
-      width: 440,
-      height: 360,
-    });
+    // Central panel.
+    createPanel({ scene: this, x: PANEL_X, y: PANEL_Y, width: PANEL_W, height: PANEL_H });
+
+    const cx = PANEL_X + PANEL_W / 2;
+    const buttonY = PANEL_Y + PANEL_H - 60;
 
     if (!opened) {
-      panel.insert.center.textArea({ text: 'A chest awaits.' });
-      panel.insert.bottom.button({
-        y: 12,
+      createBitmapText({
+        scene: this,
+        x: cx,
+        y: PANEL_Y + PANEL_H / 2 - 20,
+        text: 'A chest awaits.',
+        font: 'medium',
+        size: 16,
+        originX: 0.5,
+      });
+      new Button({
+        scene: this,
+        x: cx - 80,
+        y: buttonY,
         width: 160,
+        height: 32,
         text: 'Open',
+        font: 'medium',
+        fontSize: 16,
         onClick: () => this.openChest(),
       });
     } else {
@@ -61,17 +94,44 @@ export class TreasureRoomOverlayScene extends UiScene {
       const affixes = itemAffixDescription(item);
       const rarityLabel = item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1);
 
-      panel.insert.top.textArea({ y: 20, text: rarityLabel });
-      panel.insert.top.textArea({ y: 60, text: name });
-
+      createBitmapText({
+        scene: this,
+        x: cx,
+        y: PANEL_Y + 40,
+        text: rarityLabel,
+        font: 'small',
+        size: 16,
+        originX: 0.5,
+      });
+      createBitmapText({
+        scene: this,
+        x: cx,
+        y: PANEL_Y + 80,
+        text: name,
+        font: 'medium',
+        size: 16,
+        originX: 0.5,
+      });
       if (affixes.length > 0) {
-        panel.insert.top.textArea({ y: 100, text: affixes });
+        createBitmapText({
+          scene: this,
+          x: cx,
+          y: PANEL_Y + 120,
+          text: affixes,
+          font: 'small',
+          size: 16,
+          originX: 0.5,
+        });
       }
-
-      panel.insert.bottom.button({
-        y: 12,
+      new Button({
+        scene: this,
+        x: cx - 80,
+        y: buttonY,
         width: 160,
+        height: 32,
         text: 'Take',
+        font: 'medium',
+        fontSize: 16,
         onClick: () => this.takeAndAdvance(),
       });
     }

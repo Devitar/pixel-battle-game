@@ -1,57 +1,59 @@
-import { ConstraintMode, Clickable, Frame, UiScene } from 'phaser-pixui';
+import * as Phaser from 'phaser';
 import type { EventOutcome } from '@run/event_resolver';
 import { applyEventChoice } from '@run/event_resolver';
 import { currentNode } from '@run/run_state';
 import { EVENTS, describePayload, type EventCard, type EventChoice } from '@data/events';
 import type { Item } from '@data/types';
 import { heroToLoadout } from '@render/hero_loadout';
-import { PixuiPaperdoll } from '@render/pixui_paperdoll';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
+import {
+  assertWidgetAssetsLoaded,
+  createBitmapText,
+  createPanel,
+  createPaperdoll,
+} from '@ui/widgets';
 import { createRngFromState } from '@util/rng';
-import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
-import { uiTheme } from '@render/ui_theme';
 import { appState } from './app_state';
 
-// Canvas geometry assumed by outcome-line placement (matches viewportConstraints max).
-// Panel is centered at canvas center so panel-relative y = PANEL_CY + offset.
-const PANEL_CX = 480;
-const PANEL_CY = 270;
-
-// Module-level state survives scene.restart() between overlay-state transitions.
-// Reset to defaults on first-open (when scene starts) and on outcome-dismiss.
+// Module-level state survives scene.restart() between overlay-state
+// transitions. Reset on first-open (when scene starts) and on
+// outcome-dismiss.
 let _overlayState: 'card' | 'hero_picker' | 'outcome' = 'card';
 let _pendingChoiceIndex: 0 | 1 = 0;
 let _lastOutcome: EventOutcome | undefined;
 
-// Panel dimensions.
+// Panel — centered on canvas.
 const PANEL_W = 540;
 const PANEL_H = 380;
+const PANEL_X = 480 - PANEL_W / 2; // 210
+const PANEL_Y = 270 - PANEL_H / 2; // 80
+const PANEL_CX = 480;
+const PANEL_CY = 270;
 
-// Card state layout.
-const BODY_Y_REL = -60;
+// Card layout.
+const BODY_Y = PANEL_CY - 60; // 210
 const BODY_WRAP_W = 460;
 const CHOICE_W = 440;
 const CHOICE_H = 64;
-const CHOICE_A_Y_REL = 40;
-const CHOICE_B_Y_REL = 116;
+const CHOICE_A_Y = PANEL_CY + 40;  // 310
+const CHOICE_B_Y = PANEL_CY + 116; // 386
 
-// Hero picker state layout.
+// Hero picker layout.
 const HERO_ROW_W = 460;
 const HERO_ROW_H = 70;
-const HERO_ROW_Y_BASE_REL = -75;
+const HERO_ROW_Y_BASE = PANEL_CY - 75;
 const HERO_ROW_STRIDE = 80;
 const PAPERDOLL_SCALE = 2;
-const PAPERDOLL_ROW_OFFSET_X = -200;
+const PAPERDOLL_OFFSET_X = -200; // from row center
 
-// Outcome state layout.
+// Outcome layout.
 const OUTCOME_LINE_HEIGHT = 22;
-const OUTCOME_START_Y_REL = -90;
-const DISMISS_BUTTON_Y_REL = 110;
+const OUTCOME_START_Y = PANEL_CY - 90;
+const DISMISS_BUTTON_Y = PANEL_CY + 110;
 const DISMISS_BUTTON_W = 200;
 const DISMISS_BUTTON_H = 36;
 
-// String hex for raw Phaser text (outcome lines use this.add.text because pixui
-// TextArea has no per-instance tint support).
+// Per-line outcome colors (raw Phaser text — bitmap text has only uniform tint).
 const RARITY_COLOR: Record<'common' | 'uncommon' | 'rare', string> = {
   common: '#cccccc',
   uncommon: '#4488ff',
@@ -62,109 +64,102 @@ const COLOR_HP_LOSS = '#cc6666';
 const COLOR_GOLD = '#ffcc66';
 const COLOR_LOST = '#aa66aa';
 
-export class EventOverlayScene extends UiScene {
+export class EventOverlayScene extends Phaser.Scene {
   constructor() {
-    super({
-      key: 'event_overlay',
-      viewportConstraints: { mode: ConstraintMode.Maximum, width: 960, height: 540 },
-      theme: uiTheme,
-    });
+    super('event_overlay');
   }
 
   create(): void {
-    fixPixuiCanvasViewport(this);
-    super.create();
+    assertWidgetAssetsLoaded(this);
 
-    // On initial open (card state with no pending outcome), reset module state
-    // so a re-launch doesn't inherit a previous run's outcome or picker state.
     if (_overlayState === 'card' && _lastOutcome === undefined) {
       _pendingChoiceIndex = 0;
     }
 
-    // Full-canvas dim overlay — raw Phaser (pixui has no bare-canvas primitive).
-    // setInteractive() blocks clicks from reaching scenes below.
+    // Dim overlay.
     this.add
       .rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.6)
       .setOrigin(0, 0)
       .setInteractive();
 
-    const panel = this.insert.center.frame({ width: PANEL_W, height: PANEL_H });
+    createPanel({ scene: this, x: PANEL_X, y: PANEL_Y, width: PANEL_W, height: PANEL_H });
 
     if (_overlayState === 'card') {
-      this.buildCardState(panel);
+      this.buildCardState();
     } else if (_overlayState === 'hero_picker') {
-      this.buildHeroPickerState(panel);
+      this.buildHeroPickerState();
     } else {
-      this.buildOutcomeState(panel);
+      this.buildOutcomeState();
     }
 
     this.input.keyboard?.on('keydown-ESC', () => this.handleEsc());
   }
 
-  // ── Card state ──────────────────────────────────────────────────────────────
+  // ── Card state ─────────────────────────────────────────────────────────────
 
-  private buildCardState(panel: Frame): void {
-    // currentCard() reads the current node's cardId; only safe before applyChoice
-    // has advanced currentNodeId. The 'outcome' state runs *after* that advance,
-    // so it must not call currentCard() — it reads from _lastOutcome instead.
+  private buildCardState(): void {
     const card = this.currentCard();
 
-    panel.insert.top.textArea({ y: 20, text: 'Event' });
-
-    panel.insert.center.textArea({
-      y: BODY_Y_REL,
-      // Pass an explicit width so the textArea wraps body text without overflowing the panel.
-      width: BODY_WRAP_W,
-      text: card.body,
+    createBitmapText({
+      scene: this,
+      x: PANEL_CX,
+      y: PANEL_Y + 20,
+      text: 'Event',
+      font: 'medium',
+      size: 16,
+      originX: 0.5,
     });
 
-    this.buildChoiceButton(panel, card.choices[0], 0, CHOICE_A_Y_REL);
-    this.buildChoiceButton(panel, card.choices[1], 1, CHOICE_B_Y_REL);
+    // Body — needs word wrap; raw Phaser text supports wordWrap.
+    this.add
+      .text(PANEL_CX, BODY_Y, card.body, {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: '#dddddd',
+        wordWrap: { width: BODY_WRAP_W },
+        align: 'center',
+      })
+      .setOrigin(0.5);
+
+    this.buildChoiceCard(card.choices[0], 0, CHOICE_A_Y);
+    this.buildChoiceCard(card.choices[1], 1, CHOICE_B_Y);
   }
 
-  private buildChoiceButton(
-    panel: Frame,
-    choice: EventChoice,
-    index: 0 | 1,
-    yRel: number,
-  ): void {
+  // Choice card with title + subtitle + hover highlight. Hand-rolled (not
+  // Button widget) because Button is single-string.
+  private buildChoiceCard(choice: EventChoice, index: 0 | 1, cy: number): void {
     const subtitle =
       choice.payloads.length === 0
         ? 'Walk away'
         : choice.payloads.map(describePayload).join(' · ');
 
-    // Frame + Clickable for title + subtitle visual hierarchy (same fallback-B
-    // pattern as PerkOverlay — pixui.Button is single-string only).
-    const choiceFrame = panel.insert.center.frame({
-      y: yRel,
-      width: CHOICE_W,
-      height: CHOICE_H,
-    });
+    const cardTop = cy - CHOICE_H / 2;
 
-    const border = choiceFrame.insert.center.rectangle({
-      width: CHOICE_W,
-      height: CHOICE_H,
-      borderColor: 0x888888,
-      borderWidth: 1,
-    });
+    const card = this.add
+      .rectangle(PANEL_CX, cy, CHOICE_W, CHOICE_H, 0x222222)
+      .setStrokeStyle(1, 0x888888);
+    card.setInteractive({ useHandCursor: true });
+    card.on('pointerover', () => card.setStrokeStyle(2, 0xffcc66));
+    card.on('pointerout', () => card.setStrokeStyle(1, 0x888888));
+    card.on('pointerup', () => this.onChoiceClicked(index));
 
-    choiceFrame.insert.top.textArea({ y: 10, text: choice.label });
-    choiceFrame.insert.bottom.textArea({ y: 10, text: subtitle });
-
-    const clickable = new Clickable(this, {
-      width: CHOICE_W,
-      height: CHOICE_H,
-      onClick: () => this.onChoiceClicked(index),
+    createBitmapText({
+      scene: this,
+      x: PANEL_CX,
+      y: cardTop + 10,
+      text: choice.label,
+      font: 'medium',
+      size: 16,
+      originX: 0.5,
     });
-    choiceFrame.attach(clickable);
-
-    clickable.events.on('pointerover', () => {
-      border.borderColor = 0xffcc66;
-      border.borderWidth = 2;
-    });
-    clickable.events.on('pointerout', () => {
-      border.borderColor = 0x888888;
-      border.borderWidth = 1;
+    createBitmapText({
+      scene: this,
+      x: PANEL_CX,
+      y: cardTop + CHOICE_H - 26,
+      text: subtitle,
+      font: 'small',
+      size: 16,
+      originX: 0.5,
     });
   }
 
@@ -181,117 +176,100 @@ export class EventOverlayScene extends UiScene {
     }
   }
 
-  // ── Hero picker state ────────────────────────────────────────────────────────
+  // ── Hero picker state ──────────────────────────────────────────────────────
 
-  private buildHeroPickerState(panel: Frame): void {
-    panel.insert.top.textArea({ y: 20, text: 'Pick a hero to be Lost.' });
+  private buildHeroPickerState(): void {
+    createBitmapText({
+      scene: this,
+      x: PANEL_CX,
+      y: PANEL_Y + 20,
+      text: 'Pick a hero to be Lost.',
+      font: 'medium',
+      size: 16,
+      originX: 0.5,
+    });
 
-    // Back button — returns to card state.
-    const backFrame = panel.insert.topRight.frame({
-      x: 8,
-      y: 8,
-      width: 60,
-      height: 26,
-    });
-    const backBorder = backFrame.insert.center.rectangle({
-      width: 60,
-      height: 26,
-      borderColor: 0x888888,
-      borderWidth: 1,
-    });
-    backFrame.insert.center.textArea({ text: 'Back' });
-    const backClickable = new Clickable(this, {
-      width: 60,
-      height: 26,
-      onClick: () => {
+    // Back button (small, top-right of panel inner).
+    this.buildSmallBorderedButton(
+      PANEL_X + PANEL_W - 8 - 60,
+      PANEL_Y + 8,
+      60,
+      26,
+      'Back',
+      0x888888,
+      () => {
         _overlayState = 'card';
         this.scene.restart();
       },
-    });
-    backFrame.attach(backClickable);
-    backClickable.events.on('pointerover', () => {
-      backBorder.borderColor = 0xffcc66;
-    });
-    backClickable.events.on('pointerout', () => {
-      backBorder.borderColor = 0x888888;
-    });
+    );
 
     const run = appState.get().runState!;
     for (let i = 0; i < run.party.length; i++) {
-      this.buildHeroRow(panel, i);
+      this.buildHeroRow(i);
     }
   }
 
-  private buildHeroRow(panel: Frame, heroIndex: number): void {
+  private buildHeroRow(heroIndex: number): void {
     const run = appState.get().runState!;
     const hero = run.party[heroIndex];
-    const yRel = HERO_ROW_Y_BASE_REL + heroIndex * HERO_ROW_STRIDE;
+    const cy = HERO_ROW_Y_BASE + heroIndex * HERO_ROW_STRIDE;
 
-    const rowFrame = panel.insert.center.frame({
-      y: yRel,
-      width: HERO_ROW_W,
-      height: HERO_ROW_H,
-    });
+    // Row chrome.
+    this.add
+      .rectangle(PANEL_CX, cy, HERO_ROW_W, HERO_ROW_H, 0x111111)
+      .setStrokeStyle(1, 0x444444);
 
-    rowFrame.insert.center.rectangle({
-      width: HERO_ROW_W,
-      height: HERO_ROW_H,
-      borderColor: 0x444444,
-      borderWidth: 1,
-    });
-
-    // Paperdoll — sub-frame left of row center.
-    const dollFrame = rowFrame.insert.center.frame({
-      x: PAPERDOLL_ROW_OFFSET_X,
-      y: 0,
-      width: PAPERDOLL_SCALE * 16,
-      height: PAPERDOLL_SCALE * 16,
-    });
-    const paperdoll = new PixuiPaperdoll(this, heroToLoadout(hero), {
+    // Paperdoll (left of row center).
+    createPaperdoll({
+      scene: this,
+      x: PANEL_CX + PAPERDOLL_OFFSET_X,
+      y: cy,
+      loadout: heroToLoadout(hero),
       scale: PAPERDOLL_SCALE,
     });
-    dollFrame.attach(paperdoll);
 
-    // Name + HP to the right of the paperdoll.
-    rowFrame.insert.center.textArea({ x: -100, y: -10, text: hero.name });
-    rowFrame.insert.center.textArea({
-      x: -100,
-      y: 10,
+    // Name + HP (right of paperdoll).
+    createBitmapText({
+      scene: this,
+      x: PANEL_CX - 100,
+      y: cy - 18,
+      text: hero.name,
+      font: 'medium',
+      size: 16,
+    });
+    createBitmapText({
+      scene: this,
+      x: PANEL_CX - 100,
+      y: cy + 2,
       text: `${hero.currentHp}/${hero.maxHp} HP`,
+      font: 'small',
+      size: 16,
     });
 
-    // Pick button — right side of row.
-    const pickFrame = rowFrame.insert.right.frame({
-      x: 8,
-      y: 0,
-      width: 60,
-      height: 30,
-    });
-    const pickBorder = pickFrame.insert.center.rectangle({
-      width: 60,
-      height: 30,
-      borderColor: 0x66aa66,
-      borderWidth: 1,
-    });
-    pickFrame.insert.center.textArea({ text: 'Pick' });
-    const pickClickable = new Clickable(this, {
-      width: 60,
-      height: 30,
-      onClick: () => this.applyChoice(_pendingChoiceIndex, heroIndex),
-    });
-    pickFrame.attach(pickClickable);
-    pickClickable.events.on('pointerover', () => {
-      pickBorder.borderColor = 0xffcc66;
-    });
-    pickClickable.events.on('pointerout', () => {
-      pickBorder.borderColor = 0x66aa66;
-    });
+    // Pick button (right side of row).
+    this.buildSmallBorderedButton(
+      PANEL_CX + HERO_ROW_W / 2 - 8 - 60,
+      cy - 15,
+      60,
+      30,
+      'Pick',
+      0x66aa66,
+      () => this.applyChoice(_pendingChoiceIndex, heroIndex),
+    );
   }
 
-  // ── Outcome state ────────────────────────────────────────────────────────────
+  // ── Outcome state ──────────────────────────────────────────────────────────
 
-  private buildOutcomeState(panel: Frame): void {
-    panel.insert.top.textArea({ y: 20, text: 'Event · Outcome' });
+  private buildOutcomeState(): void {
+    createBitmapText({
+      scene: this,
+      x: PANEL_CX,
+      y: PANEL_Y + 20,
+      text: 'Event - Outcome',
+      font: 'medium',
+      size: 16,
+      originX: 0.5,
+    });
 
     if (_lastOutcome === undefined) {
       throw new Error('event_overlay: outcome state entered without _lastOutcome set');
@@ -314,10 +292,7 @@ export class EventOverlayScene extends UiScene {
 
     if (outcome.goldDelta !== undefined && outcome.goldDelta !== 0) {
       const sign = outcome.goldDelta >= 0 ? '+' : '';
-      lines.push({
-        text: `${sign}${outcome.goldDelta}g`,
-        color: COLOR_GOLD,
-      });
+      lines.push({ text: `${sign}${outcome.goldDelta}g`, color: COLOR_GOLD });
     }
 
     if (outcome.itemAdded) {
@@ -331,20 +306,21 @@ export class EventOverlayScene extends UiScene {
     }
 
     if (outcome.heroLost) {
-      lines.push({
-        text: `${outcome.heroLost.heroName} is Lost.`,
-        color: COLOR_LOST,
-      });
+      lines.push({ text: `${outcome.heroLost.heroName} is Lost.`, color: COLOR_LOST });
     }
 
     if (lines.length === 0) {
-      panel.insert.center.textArea({ text: 'Nothing happened.' });
+      createBitmapText({
+        scene: this,
+        x: PANEL_CX,
+        y: PANEL_CY - 8,
+        text: 'Nothing happened.',
+        font: 'small',
+        size: 16,
+        originX: 0.5,
+      });
     } else {
-      // Outcome lines need per-line color; pixui TextArea has no tint property
-      // (confirmed in shop_overlay_scene.ts comment). Use raw Phaser text at
-      // absolute canvas coords — same approach as the original scene.
-      const startY = PANEL_CY + OUTCOME_START_Y_REL;
-      let cursorY = startY;
+      let cursorY = OUTCOME_START_Y;
       for (const line of lines) {
         this.add
           .text(PANEL_CX, cursorY, line.text, {
@@ -367,37 +343,51 @@ export class EventOverlayScene extends UiScene {
       }
     }
 
-    // Dismiss button.
-    const dismissFrame = panel.insert.center.frame({
-      y: DISMISS_BUTTON_Y_REL,
-      width: DISMISS_BUTTON_W,
-      height: DISMISS_BUTTON_H,
-    });
+    // Dismiss button — same hover-highlight pattern as the choice cards.
+    this.buildSmallBorderedButton(
+      PANEL_CX - DISMISS_BUTTON_W / 2,
+      DISMISS_BUTTON_Y - DISMISS_BUTTON_H / 2,
+      DISMISS_BUTTON_W,
+      DISMISS_BUTTON_H,
+      'Dismiss',
+      0xaa66aa,
+      () => this.dismiss(),
+    );
+  }
 
-    const dismissBorder = dismissFrame.insert.center.rectangle({
-      width: DISMISS_BUTTON_W,
-      height: DISMISS_BUTTON_H,
-      borderColor: 0xaa66aa,
-      borderWidth: 2,
-    });
+  // Hover-highlighted bordered button. Single rectangle handles visual +
+  // click target; matches the perk-card and choice-card pattern. Default
+  // border color, gold-on-hover.
+  private buildSmallBorderedButton(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    label: string,
+    borderColor: number,
+    onClick: () => void,
+  ): void {
+    const rect = this.add
+      .rectangle(x + w / 2, y + h / 2, w, h, 0x222222)
+      .setStrokeStyle(2, borderColor);
+    rect.setInteractive({ useHandCursor: true });
+    rect.on('pointerover', () => rect.setStrokeStyle(2, 0xffcc66));
+    rect.on('pointerout', () => rect.setStrokeStyle(2, borderColor));
+    rect.on('pointerup', onClick);
 
-    dismissFrame.insert.center.textArea({ text: 'Dismiss' });
-
-    const dismissClickable = new Clickable(this, {
-      width: DISMISS_BUTTON_W,
-      height: DISMISS_BUTTON_H,
-      onClick: () => this.dismiss(),
-    });
-    dismissFrame.attach(dismissClickable);
-    dismissClickable.events.on('pointerover', () => {
-      dismissBorder.borderColor = 0xffcc66;
-    });
-    dismissClickable.events.on('pointerout', () => {
-      dismissBorder.borderColor = 0xaa66aa;
+    createBitmapText({
+      scene: this,
+      x: x + w / 2,
+      y: y + h / 2,
+      text: label,
+      font: 'medium',
+      size: 16,
+      originX: 0.5,
+      originY: 0.42,
     });
   }
 
-  // ── Shared helpers ───────────────────────────────────────────────────────────
+  // ── Shared helpers ─────────────────────────────────────────────────────────
 
   private currentCard(): EventCard {
     const run = appState.get().runState!;
@@ -418,9 +408,6 @@ export class EventOverlayScene extends UiScene {
     const args = selectedHeroIndex !== undefined ? { selectedHeroIndex } : {};
     const rng = this.rng();
     const result = applyEventChoice(initialRs, card, choiceIndex, args, rng);
-    // Click-to-advance: stay at the event node and flag awaitingFork. When the
-    // player dismisses the outcome panel and the dungeon scene resumes, it'll
-    // light up the next-row choice as a click target rather than auto-walking.
     const awaitingClick = { ...result.runState, awaitingFork: true };
 
     appState.update((s) => ({
@@ -449,12 +436,10 @@ export class EventOverlayScene extends UiScene {
       this.scene.restart();
       return;
     }
-    // outcome state
     this.dismiss();
   }
 
   private dismiss(): void {
-    // Reset module state so next open starts fresh.
     _overlayState = 'card';
     _lastOutcome = undefined;
     _pendingChoiceIndex = 0;

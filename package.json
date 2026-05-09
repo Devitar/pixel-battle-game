@@ -23,7 +23,6 @@
     "vitest": "^4.1.5"
   },
   "dependencies": {
-    "phaser": "^4.0.0",
-    "phaser-pixui": "^0.2.1"
+    "phaser": "^4.0.0"
   }
 }

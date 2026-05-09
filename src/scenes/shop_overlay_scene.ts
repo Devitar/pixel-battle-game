@@ -1,13 +1,15 @@
-import { ConstraintMode, Image, OriginX, OriginY, UiScene } from 'phaser-pixui';
-import type { Frame } from 'phaser-pixui';
 import * as Phaser from 'phaser';
 import { BASE_ITEMS } from '@data/items';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { currentNode, leaveShop, purchaseItem } from '@run/run_state';
 import type { ShopItem } from '@dungeon/node';
 import { SHEET } from '@render/frames';
-import { fixPixuiCanvasViewport } from '@render/pixui_canvas_fix';
-import { uiTheme } from '@render/ui_theme';
+import {
+  Button,
+  assertWidgetAssetsLoaded,
+  createBitmapText,
+  createPanel,
+} from '@ui/widgets';
 import { appState } from './app_state';
 
 const PANEL_X = 140;
@@ -17,70 +19,91 @@ const PANEL_H = 400;
 
 const ROW_H = 52;
 const ROW_STRIDE = 56;
-const ROW_Y_FIRST = 20;
+const ROW_Y_FIRST = PANEL_Y + 20;
 const ICON_SCALE = 2;
 
-export class ShopOverlayScene extends UiScene {
+export class ShopOverlayScene extends Phaser.Scene {
   constructor() {
-    super({
-      key: 'shop_overlay',
-      viewportConstraints: { mode: ConstraintMode.Maximum, width: 960, height: 540 },
-      theme: uiTheme,
-    });
+    super('shop_overlay');
   }
 
   create(): void {
-    fixPixuiCanvasViewport(this);
-    super.create();
+    assertWidgetAssetsLoaded(this);
 
     const run = appState.get().runState!;
     const node = currentNode(run);
     if (node.type !== 'shop') return;
 
-    // Header
-    this.insert.top.textArea({ y: 28, text: 'Shop' });
-    this.insert.topRight.button({
-      x: 4,
+    // Dim overlay (full-canvas modal backdrop). Interactive blocks clicks
+    // from reaching scenes below.
+    this.add
+      .rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.6)
+      .setOrigin(0, 0)
+      .setInteractive();
+
+    // Header (top strip, above panel).
+    createBitmapText({
+      scene: this,
+      x: 480,
+      y: 12,
+      text: 'Shop',
+      font: 'medium',
+      size: 16,
+      originX: 0.5,
+    });
+    createBitmapText({
+      scene: this,
+      x: 900,
+      y: 12,
+      text: `Pack: ${run.pack.gold}g`,
+      font: 'small',
+      size: 16,
+      originX: 1,
+    });
+    new Button({
+      scene: this,
+      x: 908,
       y: 4,
       width: 48,
+      height: 32,
       text: 'X',
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.onLeave(),
     });
-    this.insert.topRight.textArea({
-      x: 60,
-      y: 28,
-      text: `Pack: ${run.pack.gold}g`,
-    });
 
-    // Main panel
-    const panel = this.insert.topLeft.frame({
-      x: PANEL_X,
-      y: PANEL_Y,
-      width: PANEL_W,
-      height: PANEL_H,
-    });
+    // Main panel.
+    createPanel({ scene: this, x: PANEL_X, y: PANEL_Y, width: PANEL_W, height: PANEL_H });
 
-    // Item rows
+    // Item rows.
     for (let i = 0; i < node.inventory.length; i++) {
       const slot = node.inventory[i];
       const rowY = ROW_Y_FIRST + i * ROW_STRIDE;
-      this.buildRow(panel, slot, rowY, run.pack.gold);
+      this.buildRow(slot, rowY, run.pack.gold);
     }
 
-    // Footer buttons
+    // Footer buttons (below panel).
     const footerY = PANEL_Y + PANEL_H + 12;
-    this.insert.topLeft.button({
+    new Button({
+      scene: this,
       x: PANEL_X + 60,
       y: footerY,
       width: 160,
+      height: 32,
       text: 'Manage Gear',
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.onManageGear(),
     });
-    this.insert.topLeft.button({
+    new Button({
+      scene: this,
       x: PANEL_X + 280,
       y: footerY,
       width: 120,
+      height: 32,
       text: 'Leave',
+      font: 'medium',
+      fontSize: 16,
       onClick: () => this.onLeave(),
     });
 
@@ -90,44 +113,45 @@ export class ShopOverlayScene extends UiScene {
     this.events.once(Phaser.Scenes.Events.RESUME, () => this.scene.restart());
   }
 
-  private buildRow(
-    panel: Frame,
-    slot: ShopItem,
-    rowY: number,
-    packGold: number,
-  ): void {
+  private buildRow(slot: ShopItem, rowY: number, packGold: number): void {
     const sold = slot.sold;
     const canAfford = packGold >= slot.price;
+    const rowX = PANEL_X + 16;
+    const rowW = PANEL_W - 32;
 
-    // Row frame
-    const row = panel.insert.topLeft.frame({
-      x: 8,
-      y: rowY,
-      width: -16,
-      height: ROW_H,
-    });
+    // Subtle row background.
+    this.add
+      .rectangle(rowX + rowW / 2, rowY + ROW_H / 2, rowW, ROW_H, 0x111111)
+      .setStrokeStyle(1, 0x333333);
 
-    // Item icon via inline pixui.Image
-    const itemSprite = new Image(this, {
-      texture: SHEET.key,
-      frame: BASE_ITEMS[slot.item.baseId].spriteId,
-    });
-    itemSprite.internal.setScale(ICON_SCALE);
-    if (sold) itemSprite.internal.setAlpha(0.4);
-    row.attach(itemSprite, OriginX.Left, OriginY.Center);
+    // Item icon (raw Phaser sprite — same pattern as the blacksmith rows).
+    const iconX = rowX + 16;
+    const iconY = rowY + ROW_H / 2;
+    const sprite = this.add
+      .sprite(iconX, iconY, SHEET.key, parseInt(BASE_ITEMS[slot.item.baseId].spriteId, 10))
+      .setScale(ICON_SCALE);
+    if (sold) sprite.setAlpha(0.4);
 
-    // Item name (rarity indicated by text suffix since TextArea has no tint)
+    // Item name (raw Phaser — multi-color name with rarity tag).
     const rarityTag = sold ? '' : ` [${slot.item.rarity}]`;
     const nameText = itemDisplayName(slot.item) + rarityTag;
-    row.insert.topLeft.textArea({ x: 48, y: 4, text: nameText });
+    this.add.text(rowX + 40, rowY + 4, nameText, {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: sold ? '#666666' : '#ffffff',
+    });
 
-    // Affix line
+    // Affix line.
     const affixLine = itemAffixDescription(slot.item);
     if (affixLine.length > 0) {
-      row.insert.topLeft.textArea({ x: 48, y: 26, text: affixLine });
+      this.add.text(rowX + 40, rowY + 26, affixLine, {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#999999',
+      });
     }
 
-    // Price / state (right-aligned)
+    // Price / state (right-aligned).
     let priceText: string;
     if (sold) {
       priceText = 'SOLD';
@@ -136,16 +160,30 @@ export class ShopOverlayScene extends UiScene {
     } else {
       priceText = `${slot.price}g`;
     }
-    row.insert.topRight.textArea({ x: 8, y: 16, text: priceText });
+    this.add
+      .text(rowX + rowW - 100, rowY + ROW_H / 2, priceText, {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: sold ? '#666666' : canAfford ? '#ffcc66' : '#cc6666',
+      })
+      .setOrigin(1, 0.5);
 
-    // Buy button (only when purchasable)
+    // Buy button (only when purchasable). Compact raw-Phaser rect button
+    // matches the blacksmith per-row pattern.
     if (!sold && canAfford) {
-      row.insert.right.button({
-        x: 8,
-        width: 80,
-        text: 'Buy',
-        onClick: () => this.onBuy(slot.item.id),
-      });
+      const buttonCx = rowX + rowW - 40;
+      const buttonBg = this.add
+        .rectangle(buttonCx, rowY + ROW_H / 2, 64, 26, 0x335533)
+        .setStrokeStyle(1, 0x66aa66);
+      this.add
+        .text(buttonCx, rowY + ROW_H / 2, 'Buy', {
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          color: '#ffffff',
+        })
+        .setOrigin(0.5);
+      buttonBg.setInteractive({ useHandCursor: true });
+      buttonBg.on('pointerdown', () => this.onBuy(slot.item.id));
     }
   }
 
