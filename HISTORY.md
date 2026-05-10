@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-10 · UI widgets audit — Button cleanup + 3 TODOs filed
+
+- **Why:** Audit pass over `src/ui/widgets/` after the 2026-05-09 pixui removal to find post-migration debt. Findings either fixed inline (small/clear) or filed as TODO entries (larger/decision-required). One latent constructor bug surfaced and fixed because it materially affected the YAGNI cleanup.
+- **Decisions:**
+  - **YAGNI-deleted `Button.setEnabled()` and `Button.setText()`.** Both had zero callers in production code (12 `enabled: ...` callsites all set state at construction; the 14 `.setText(` hits in scenes target Phaser `Text`/`BitmapText` HUD labels, not `Button`). `setEnabled` carried a latent listener-leak bug (`disableInteractive()` doesn't remove handlers, but `attachInput()` re-attached on enable → 4 stale listeners per toggle). `setText` had a never-recenter bug. Both API removed; the field `_enabled` is now `readonly`.
+  - **Fixed real bug in Button constructor `enabled: false` path.** Before: `_state` was hardcoded to `'default'` regardless of `_enabled`, and `attachInput()` ran unconditionally. Net effect: a button constructed with `enabled: false` rendered the **enabled** frame + tint, the cursor changed to a hand on hover, but click was silently swallowed by the `handle()` `!_enabled` guard. Visible across 12 callsites (Tavern Upgrade button when broke, Equip page arrows at boundaries, Hospital treat button when no treatments left, etc.). Fix: in constructor, set `_state = enabled ? 'default' : 'disabled'` and skip `attachInput()` when disabled, so `applyState()` paints the disabled frame and tint correctly.
+  - **3 TODOs filed instead of fixed inline:** #59 (HeroCard's 4 labels still use raw HTML/canvas text — visually inconsistent with the bitmap-font everywhere else), #60 (`assertWidgetAssetsLoaded` called in 3 scenes, skipped in 10 — pick a policy), #61 (drop dead `COLOR.textDark` and `COLOR.textDim`). User chose file-as-TODO to keep the audit turn lightweight.
+- **Surprises:**
+  - The Button `enabled: false` constructor bug had been present since the in-house widget was authored on 2026-05-08, yet the user had been actively playtesting through 2 days without filing it. Likely explanations: many disabled-states are gated upstream (the button doesn't render at all when its action is unavailable), and where it does render, the cursor-hand affordance is subtle enough to escape notice. Worth noting that visible-bug-doesn't-equal-noticed-bug.
+  - `assertWidgetAssetsLoaded` lives in `widgets/text.ts` (alongside `createBitmapText`) — slightly awkward placement; if #60 lands as "every panel calls it" the helper might earn its own file.
+- **Source:** UI widgets audit (this turn). Latent issues that didn't pass the YAGNI bar to fix inline are documented in TODOs #59-61.
+
+---
+
 ### 2026-05-10 · Tavern RNG seeding audit + blacksmith normalization (closes Cluster B · 56)
 
 - **Why:** #56 flagged `tavern_panel_scene.ts` `createRng(Date.now())` (3 sites) as potentially determinism-hostile and possibly diverging from a project-canonical pattern. Audit goal: find the canonical pattern and either align Tavern or confirm it's already consistent.
