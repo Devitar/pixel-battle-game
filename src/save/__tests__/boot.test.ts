@@ -34,6 +34,7 @@ describe('resolveSaveState', () => {
       buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
       hospitalTreatmentsRemaining: 1,
       tavernCandidates: [],
+      campRngState: 0,
     };
     save(original, storage);
 

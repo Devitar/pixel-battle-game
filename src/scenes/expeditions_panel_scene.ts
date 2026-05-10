@@ -6,7 +6,7 @@ import type { Hero } from '@heroes/hero';
 import { EnemySprite } from '@render/enemy_sprite';
 import { Button, HeroCard } from '@ui/widgets';
 import { startRun } from '@run/run_state';
-import { createRng } from '@util/rng';
+import { createRng, createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 import { computeCardPositions } from './expeditions_layout';
 
@@ -439,14 +439,20 @@ export class ExpeditionsPanelScene extends Phaser.Scene {
     if (!_formation.every((h): h is Hero => h !== null)) return;
     const party = _formation as readonly Hero[];
 
-    const seed = Date.now();
-    const rng = createRng(seed);
-    const runState = startRun(_selectedDungeonId, party, seed, rng);
+    // Fork the run's seed off the persistent camp RNG. Camp advances by one
+    // step (the fork) and the new run-rng starts from that forked seed —
+    // threads determinism across the camp→run boundary instead of seeding
+    // both streams from Date.now() independently.
+    const campRng = createRngFromState(appState.get().campRngState);
+    const runSeed = campRng.int(0, 0xffffffff);
+    const runRng = createRng(runSeed);
+    const runState = startRun(_selectedDungeonId, party, runSeed, runRng);
 
     appState.update((s) => ({
       ...s,
       runState,
-      runRngState: rng.getState(),
+      runRngState: runRng.getState(),
+      campRngState: campRng.getState(),
     }));
 
     _stage = 'dungeon_list';

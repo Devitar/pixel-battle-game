@@ -27,22 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 58 · Deterministic camp RNG via `SaveFile.campRngState`
-
-- **What:** Add a persisted `campRngState: number` field to `SaveFile` and migrate the 5 camp-side `createRng(Date.now())` sites (`boot_scene.ts:45`, `tavern_panel_scene.ts:69, 219, 239`, `blacksmith_panel_scene.ts:767`) to read/write through it — mirroring the run-time `runRngState` pattern (`createRngFromState(state.campRngState)` → roll → write `campRngState: rng.getState()`). Replaces the current ad-hoc seeding which can't be replayed or seeded for testing.
-- **Why:** Today's camp RNG is non-deterministic — Tavern hire rolls, reroll candidate generation, and blacksmith upgrade rolls all seed from `Date.now()`, so they can't be reproduced for save-load consistency tests, replay debugging, or balance audits. The architecturally correct fix mirrors the run-time pattern (`runRngState` field + `createRngFromState`/`getState` flow) already deeply consistent across 8 in-run scenes. Originally scoped out of #56 because it required a schema bump; the 2026-05-10 lift of the pre-launch schema-pin policy unblocks it.
-- **Tier:** 2 (architecture quality / correctness; non-blocking)
-- **Acceptance:**
-  - Bump `CURRENT_SCHEMA_VERSION` from 1 to 2 in `src/save/migration.ts`; register `MIGRATIONS[1]` to add `campRngState: Date.now()` to existing v1 saves.
-  - Add `campRngState: number` to `SaveFile` (required, not optional — `createFreshSave` seeds it with `Date.now()` once at save creation).
-  - Migrate the 5 camp-side seeding sites listed above: each reads `appState.get().campRngState`, calls `createRngFromState`, then writes `campRngState: rng.getState()` after rolling.
-  - `expeditions_panel_scene.ts:444` (run-start seeding) should consume from `campRngState` to seed the new run's `runRngState` — threads determinism across the camp→run boundary instead of double-`Date.now()`.
-  - All 1716 tests still green; add test coverage for the migration + the seed/state flow at one camp site (Tavern is the easiest fixture).
-- **Touches:** `src/save/save.ts` (SaveFile field), `src/save/migration.ts` (bump + migration), `src/save/boot.ts` (createFreshSave), `src/scenes/{boot,tavern_panel,blacksmith_panel,expeditions_panel}_scene.ts`. New tests in `src/save/__tests__/`.
-- **Source:** Cluster B · 56 audit (2026-05-10); unblocked same-day by lifted pre-launch schema-pin policy.
-
----
-
 ### 42 · Tavern: pre-leveled hero candidates at higher cost (deferred)
 
 - **What:** Tavern hires are always level-1 fresh recruits regardless of when in the run progression you visit. User suggested higher-level pre-leveled candidates appearing at proportionally higher cost.

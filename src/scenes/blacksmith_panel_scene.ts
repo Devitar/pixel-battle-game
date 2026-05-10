@@ -18,7 +18,7 @@ import {
   createDialog,
   createPanel,
 } from '@ui/widgets';
-import { createRng } from '@util/rng';
+import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 
 // Module-level state — persists across scene.restart().
@@ -761,7 +761,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
     const cost = upgradeCost(entry.item);
     if (balance(state.vault) < cost) return;
 
-    const rng = createRng(Date.now());
+    const rng = createRngFromState(state.campRngState);
     const upgraded = upgradeItem(entry.item, rng);
     const newVault = spend(state.vault, cost);
 
@@ -786,6 +786,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
       vault: newVault,
       stash: nextStash,
       roster: nextRoster,
+      campRngState: rng.getState(),
     }));
 
     this.scene.restart();

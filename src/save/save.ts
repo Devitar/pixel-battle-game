@@ -24,6 +24,11 @@ export interface SaveFile {
   buildingLevels: BuildingLevels;
   hospitalTreatmentsRemaining: number;
   tavernCandidates: readonly Hero[];
+  /** Persisted RNG state for camp-side actions (Tavern hire/reroll, Blacksmith
+   *  upgrade rolls, expedition-start seeding). Read via createRngFromState,
+   *  advanced by the action, written back via rng.getState(). Mirrors the
+   *  in-run runRngState pattern; threads determinism across camp→run boundary. */
+  campRngState: number;
   runState?: RunState;
   runRngState?: number;
   preferences?: Preferences;

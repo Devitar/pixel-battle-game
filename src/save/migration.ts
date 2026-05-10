@@ -4,11 +4,16 @@ import type { SaveFile } from './save';
 // like Hero, Roster, RunState, Vault, Unlocks, Preferences) and register a
 // migration in MIGRATIONS[previousVersion] that maps old raw shape to new.
 // Loaders newer than CURRENT_SCHEMA_VERSION are rejected at save.ts:load.
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 type MigrationFn = (raw: Record<string, unknown>) => Record<string, unknown>;
 
-const MIGRATIONS: Record<number, MigrationFn> = {};
+const MIGRATIONS: Record<number, MigrationFn> = {
+  // v1 → v2: introduce SaveFile.campRngState (Cluster B · 58, 2026-05-10).
+  // Old saves seed it from load-time Date.now() — the same bootstrap used
+  // for fresh saves' campRngState. Subsequent camp actions advance it.
+  1: (raw) => ({ ...raw, campRngState: Date.now(), version: 2 }),
+};
 
 export function migrate(raw: unknown): SaveFile | null {
   if (typeof raw !== 'object' || raw === null) return null;
