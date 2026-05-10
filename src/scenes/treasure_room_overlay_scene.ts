@@ -6,7 +6,6 @@ import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { claimTreasure, currentNode } from '@run/run_state';
 import {
   Button,
-  assertWidgetAssetsLoaded,
   createBitmapText,
   createPanel,
 } from '@ui/widgets';
@@ -29,8 +28,6 @@ export class TreasureRoomOverlayScene extends Phaser.Scene {
   }
 
   create(): void {
-    assertWidgetAssetsLoaded(this);
-
     const opened = _pendingState === 'opened';
 
     // Dim overlay.

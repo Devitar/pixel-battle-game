@@ -27,20 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 60 · `assertWidgetAssetsLoaded` policy: every panel or none
-
-- **What:** `assertWidgetAssetsLoaded(scene)` is called in 3 scenes (`tavern_panel_scene.ts`, `camp_screen_scene.ts`, `expeditions_panel_scene.ts`) and skipped in 10 others (blacksmith, barracks, hospital, equip, event_overlay, perk_overlay, shop_overlay, treasure_room_overlay, camp_node_overlay, plus dev scenes). Same goal — guard against BootScene preload regressions — but inconsistent application.
-- **Why:** The current half-and-half state is the worst of both. Either the assert pays for itself (panels show a clear "atlas missing" error beating the cryptic Phaser failure) and every panel calls it, OR BootScene's promise of "loaded once globally for all scenes" (`boot_scene.ts:34-41`) is enough and the 3 callsites are over-defensive.
-- **Tier:** 2 (consistency / DX)
-- **Acceptance:**
-  - Decision in implementation: every-panel adoption OR fully-remove from the 3 current sites.
-  - If every-panel: add the assert call to the 10 panels missing it.
-  - If remove-all: drop the call from the 3 current sites; remove the export from `widgets/index.ts` and the helper from `widgets/text.ts`.
-- **Touches:** Either 10 scene files (add) or 5 (3 scenes + `text.ts` + `index.ts`).
-- **Source:** UI widgets audit (2026-05-10).
-
----
-
 ### 58 · Deterministic camp RNG via `SaveFile.campRngState`
 
 - **What:** Add a persisted `campRngState: number` field to `SaveFile` and migrate the 5 camp-side `createRng(Date.now())` sites (`boot_scene.ts:45`, `tavern_panel_scene.ts:69, 219, 239`, `blacksmith_panel_scene.ts:767`) to read/write through it — mirroring the run-time `runRngState` pattern (`createRngFromState(state.campRngState)` → roll → write `campRngState: rng.getState()`). Replaces the current ad-hoc seeding which can't be replayed or seeded for testing.

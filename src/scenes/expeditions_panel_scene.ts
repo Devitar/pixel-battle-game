@@ -4,7 +4,7 @@ import { DUNGEONS } from '@data/dungeons';
 import type { DungeonDef, DungeonId, EnemyId } from '@data/types';
 import type { Hero } from '@heroes/hero';
 import { EnemySprite } from '@render/enemy_sprite';
-import { Button, HeroCard, assertWidgetAssetsLoaded } from '@ui/widgets';
+import { Button, HeroCard } from '@ui/widgets';
 import { startRun } from '@run/run_state';
 import { createRng } from '@util/rng';
 import { appState } from './app_state';
@@ -48,8 +48,6 @@ export class ExpeditionsPanelScene extends Phaser.Scene {
   }
 
   create(): void {
-    assertWidgetAssetsLoaded(this);
-
     // Dim overlay.
     this.add
       .rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.6)

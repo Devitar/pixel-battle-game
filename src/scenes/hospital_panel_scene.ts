@@ -8,7 +8,6 @@ import type { Hero } from '@heroes/hero';
 import {
   Button,
   COLOR,
-  assertWidgetAssetsLoaded,
   createBitmapText,
   createPanel,
 } from '@ui/widgets';
@@ -66,9 +65,7 @@ export class HospitalPanelScene extends Phaser.Scene {
     super('hospital_panel');
   }
 
-  create(): void {
-    assertWidgetAssetsLoaded(this);
-    this._detailContainer = undefined;
+  create(): void {    this._detailContainer = undefined;
     this._rowBgs = [];
 
     const state = appState.get();

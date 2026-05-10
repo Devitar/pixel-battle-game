@@ -7,7 +7,6 @@ import type { Item } from '@data/types';
 import { heroToLoadout } from '@render/hero_loadout';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import {
-  assertWidgetAssetsLoaded,
   createBitmapText,
   createPanel,
   createPaperdoll,
@@ -70,8 +69,6 @@ export class EventOverlayScene extends Phaser.Scene {
   }
 
   create(): void {
-    assertWidgetAssetsLoaded(this);
-
     if (_overlayState === 'card' && _lastOutcome === undefined) {
       _pendingChoiceIndex = 0;
     }

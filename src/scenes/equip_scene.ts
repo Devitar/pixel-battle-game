@@ -14,7 +14,6 @@ import { heroToLoadout } from '@render/hero_loadout';
 import { SHEET } from '@render/frames';
 import {
   Button,
-  assertWidgetAssetsLoaded,
   createBitmapText,
   createPanel,
   createPaperdoll,
@@ -154,9 +153,7 @@ export class EquipScene extends Phaser.Scene {
     }
   }
 
-  create(): void {
-    assertWidgetAssetsLoaded(this);
-    this._leftContainer = undefined;
+  create(): void {    this._leftContainer = undefined;
     this._rightContainer = undefined;
     this._heroRowStrokes = [];
 

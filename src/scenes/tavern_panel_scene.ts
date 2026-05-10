@@ -15,7 +15,6 @@ import { isSoftlocked } from '@save/save';
 import {
   Button,
   HeroCard,
-  assertWidgetAssetsLoaded,
   createBitmapText,
   createPanel,
 } from '@ui/widgets';
@@ -61,8 +60,6 @@ export class TavernPanelScene extends Phaser.Scene {
   }
 
   create(): void {
-    assertWidgetAssetsLoaded(this);
-
     const state = appState.get();
     const tavernLevel = state.buildingLevels.tavern;
     const targetCount = tavernCandidateCount(tavernLevel);

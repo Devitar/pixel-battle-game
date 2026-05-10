@@ -5,7 +5,7 @@ import { addItems } from '@camp/stash';
 import { credit } from '@camp/vault';
 import { applyPendingMilestones } from '@run/milestones';
 import { cashout, pressOn, type RunState } from '@run/run_state';
-import { Button, HeroCard, assertWidgetAssetsLoaded } from '@ui/widgets';
+import { Button, HeroCard } from '@ui/widgets';
 import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 
@@ -39,8 +39,6 @@ export class CampScreenScene extends Phaser.Scene {
       this.scene.start('camp');
       return;
     }
-
-    assertWidgetAssetsLoaded(this);
 
     // Full-canvas background.
     this.add

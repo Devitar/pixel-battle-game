@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-10 · `assertWidgetAssetsLoaded` removed (closes Cluster B · 60)
+
+- **Why:** The widget audit on 2026-05-10 flagged the assert helper as inconsistently applied — original audit said 3-of-13 scenes call it. Re-grep at implementation time corrected that: actually 12 scenes called it, leaving the helper near-universal but still defensive against a class of bug that BootScene's design already prevents. Picked remove-all (see decisions) for the cleaner outcome.
+- **Decisions:**
+  - **Remove-all over every-panel.** BootScene's `preload()` (`boot_scene.ts:34-41`) loads the `mana_soul` atlas + bitmap fonts globally before any other scene starts; Phaser's scene system guarantees BootScene completes before the next scene's `create()` runs. If preload fails, EVERY scene fails — there's no "this panel works but that one doesn't" failure mode the assert could catch. The helper added a slightly nicer error message at one specific point in time but did not catch a real bug class.
+  - **Net delta:** 12 scenes lose 1 import line + 1 call site each (24 LOC); `widgets/text.ts` loses the 14-line helper definition + the now-unused `ATLAS` import; `widgets/index.ts` loses the export from its barrel. Total ~40 LOC removed across 14 files.
+  - **Did NOT add an alternative defensive check elsewhere.** The trust boundary is now BootScene; nothing else needs to verify what BootScene already promises.
+- **Surprises:**
+  - **Audit error caught at implementation time.** The 2026-05-10 widget-audit HISTORY entry said 3 scenes called the assert and 10 didn't — that was wrong. Fresh grep showed 12 of 13 scenes called it (only the dev scenes and BootScene itself didn't). The original audit must have grepped for a stale pattern or sampled a small subset. Lesson: re-grep at implementation time, not just at audit time.
+  - **The `import ATLAS from theme` cleanup in `widgets/text.ts` was an automatic side-effect.** ATLAS was only referenced by the deleted helper; once it was gone, ATLAS became an unused import. Catching unused imports is the kind of thing typecheck flags — handy as a post-hoc safety net.
+- **Source:** UI widgets audit (2026-05-10).
+
+---
+
 ### 2026-05-10 · HeroCard labels migrate to bitmap fonts (closes Cluster B · 59)
 
 - **Why:** HeroCard's three text labels (name, class-line-with-inline-HP, trait) used raw `scene.add.text({ fontFamily: 'monospace', ... })` — every other widget renders via mana_soul bitmap fonts. HeroCards placed next to bitmap-font headers in any panel showed visibly inconsistent typography. The 2026-05-10 widget audit flagged this as the highest-leverage user-visible polish in the cluster.
