@@ -764,7 +764,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
     const cost = upgradeCost(entry.item);
     if (balance(state.vault) < cost) return;
 
-    const rng = createRng(Math.floor(Math.random() * 0xffffffff));
+    const rng = createRng(Date.now());
     const upgraded = upgradeItem(entry.item, rng);
     const newVault = spend(state.vault, cost);
 

@@ -27,20 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 56 · Tavern RNG seeding audit — replace `createRng(Date.now())`
-
-- **What:** `tavern_panel_scene.ts:51, 158, 178` use `createRng(Date.now())` for hire-replacement and reroll candidate generation. This is determinism-hostile (rerolling the same frame twice can give identical candidates if `Date.now()` resolution permits) and may diverge from how the rest of the codebase seeds RNG.
-- **Why:** Determinism matters for save-load consistency (in-progress runs that depend on RNG outputs) and for testing. The original Phaser-based Tavern may have used a different seeding approach; the pixui rewrite carried `Date.now()` forward without auditing.
-- **Tier:** 2 (correctness)
-- **Acceptance:**
-  - Audit how the rest of the codebase seeds RNG for camp-side actions (`@util/rng.ts`, save state, etc.). Look for a project-canonical pattern.
-  - If the project uses `state.rngSeed` or similar persisted seed, Tavern should too — replace `Date.now()` with the canonical source.
-  - If the project uses ad-hoc seeding everywhere (the existing pattern), confirm Tavern is consistent and document the rationale.
-- **Touches:** `src/scenes/tavern_panel_scene.ts` (3 call sites). Possibly `@util/rng.ts` if a new `createCampRng()` helper is justified.
-- **Source:** Cluster B · 45 sub-spec 3a Opus whole-impl review (2026-05-06).
-
----
-
 ### 52 · Cleanup stale boss_sprites_candidate_*.png in public/assets/sprites/temp/
 
 - **What:** Remove the leftover `boss_sprites_candidate_*.png` files in `public/assets/sprites/temp/`. These predate the pixui adoption work but were noticed during the Cluster B · 45 sub-spec 2 whole-implementation review.

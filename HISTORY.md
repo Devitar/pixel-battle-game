@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-10 · Tavern RNG seeding audit + blacksmith normalization (closes Cluster B · 56)
+
+- **Why:** #56 flagged `tavern_panel_scene.ts` `createRng(Date.now())` (3 sites) as potentially determinism-hostile and possibly diverging from a project-canonical pattern. Audit goal: find the canonical pattern and either align Tavern or confirm it's already consistent.
+- **Decisions:**
+  - **Two RNG patterns coexist deliberately by context.** Run-time RNG persists via `SaveFile.runRngState: number` (`save.ts:28`) — every in-run scene reads `createRngFromState(state.runRngState)`, rolls, writes `runRngState: rng.getState()`. Rigorously consistent across 8 files, with a load-time invariant pairing `runState`/`runRngState`. Camp-time RNG has no persisted seed; each action seeds ad-hoc.
+  - **Tavern is already consistent with the camp-side pattern.** 4 of 5 camp-time `createRng()` sites use `Date.now()` (boot, tavern×3, expeditions-at-run-start). The "same-frame double-fire" theoretical concern from #56 doesn't reach reality — Tavern actions go through `scene.restart()` which costs ≥1 animation frame (~16ms), well above `Date.now()`'s 1ms resolution. **No Tavern change made.**
+  - **Normalized blacksmith outlier.** `blacksmith_panel_scene.ts:767` was the lone camp-side site using `createRng(Math.floor(Math.random() * 0xffffffff))`. Changed to `createRng(Date.now())` to bring camp-side seeding to 5/5 consistency. Both forms are functionally equivalent (ms-or-better resolution, both non-deterministic for testing); the change is purely about the codebase reading uniformly.
+  - **Did NOT add `SaveFile.campRngState`** for fully deterministic camp RNG. That's the architecturally correct path but blocked by the pre-launch policy of pinning schema at v1 with no migrations. Revisit post-launch if camp RNG determinism becomes a real testing/replay need.
+- **Surprises:**
+  - The codebase's run-time RNG persistence is much more disciplined than the camp-side. The `runRngState`/`runState` pairing invariant in `save.ts:38` is a level of rigor that doesn't exist on the camp side at all — and that's fine because camp RNG outputs are committed to state immediately (e.g., `tavernCandidates`), so there's no equivalent "in-flight roll" to persist.
+- **Source:** Cluster B · 45 sub-spec 3a Opus whole-impl review (2026-05-06). 1716/1716 tests still pass.
+
+---
+
 ### 2026-05-09 · Migrated off pixui to in-house UI widgets (closes Cluster B · 48, 54, 55, 57)
 
 - **Why:** Cluster B · 45 shipped a working camp UI on pixui but accumulated friction worth retiring the dep over: bitmap-font-only `TextArea` blocked tintable text (#57), private-field reach via `pixui_canvas_fix.ts` was load-bearing fragility (#55), `insert.left/right` origin gotchas (#54), no `'selected'` style for the button theme (#48), per-scene atlas+font preloads. The 5-commit arc `e109046..199abb1` replaces pixui's Frame/insert system with a flat helper module wrapping raw Phaser primitives.
