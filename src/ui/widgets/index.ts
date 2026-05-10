@@ -3,7 +3,7 @@
 // must be loaded by BootScene before any of these are used.
 
 export { ATLAS, FONT, FRAME, COLOR, type FontKey } from './theme';
-export { createBitmapText, assertWidgetAssetsLoaded, type BitmapTextOpts } from './text';
+export { createBitmapText, type BitmapTextOpts } from './text';
 export { createPanel, type PanelOpts, type PanelVariant } from './panel';
 export { Button, type ButtonOpts, type ButtonVariant } from './button';
 export { createDialog, type DialogOpts, type Dialog } from './dialog';

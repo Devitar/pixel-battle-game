@@ -17,6 +17,20 @@ describe('migrate', () => {
     expect(migrate(raw)).toBeNull();
   });
 
+  it('v1 → v2: adds campRngState (a number) and bumps version', () => {
+    const v1 = {
+      version: 1,
+      roster: { heroes: [], capacity: 12 },
+      vault: { gold: 0 },
+      unlocks: { classes: ['knight'], dungeons: ['crypt'] },
+    };
+    const result = migrate(v1) as unknown as { version: number; campRngState: unknown };
+    expect(result).not.toBeNull();
+    expect(result.version).toBe(2);
+    expect(typeof result.campRngState).toBe('number');
+    expect(Number.isFinite(result.campRngState)).toBe(true);
+  });
+
   it('returns null on null input', () => {
     expect(migrate(null)).toBeNull();
   });

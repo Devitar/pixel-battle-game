@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { ATLAS, COLOR, FONT, type FontKey } from './theme';
+import { COLOR, FONT, type FontKey } from './theme';
 
 export interface BitmapTextOpts {
   scene: Phaser.Scene;
@@ -41,18 +41,3 @@ export function createBitmapText(opts: BitmapTextOpts): Phaser.GameObjects.Bitma
   return t;
 }
 
-/** Verifies that the loaded mana_soul atlas / bitmap fonts are available. */
-export function assertWidgetAssetsLoaded(scene: Phaser.Scene): void {
-  if (!scene.textures.exists(ATLAS)) {
-    throw new Error(
-      `Widget atlas '${ATLAS}' not loaded — load it in BootScene.preload before using ui/widgets.`,
-    );
-  }
-  for (const fontName of Object.values(FONT)) {
-    if (!scene.cache.bitmapFont.exists(fontName)) {
-      throw new Error(
-        `Widget bitmap font '${fontName}' not loaded — load it in BootScene.preload before using ui/widgets.`,
-      );
-    }
-  }
-}

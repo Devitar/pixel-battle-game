@@ -15,11 +15,10 @@ import { isSoftlocked } from '@save/save';
 import {
   Button,
   HeroCard,
-  assertWidgetAssetsLoaded,
   createBitmapText,
   createPanel,
 } from '@ui/widgets';
-import { createRng } from '@util/rng';
+import { createRngFromState } from '@util/rng';
 import { appState } from './app_state';
 
 // Per-candidate-count slot positions in canvas coords (centered around
@@ -61,12 +60,10 @@ export class TavernPanelScene extends Phaser.Scene {
   }
 
   create(): void {
-    assertWidgetAssetsLoaded(this);
-
     const state = appState.get();
     const tavernLevel = state.buildingLevels.tavern;
     const targetCount = tavernCandidateCount(tavernLevel);
-    const rng = createRng(Date.now());
+    const rng = createRngFromState(state.campRngState);
     const free = isSoftlocked(state);
     const vaultGold = balance(state.vault);
 
@@ -77,8 +74,14 @@ export class TavernPanelScene extends Phaser.Scene {
       rng,
       state.unlocks.classes,
     );
+    // ensureCandidatesForCap only advances rng when it generates new
+    // candidates — so a list-unchanged result implies an rng-unchanged result.
     if (ensured !== state.tavernCandidates) {
-      appState.update((s) => ({ ...s, tavernCandidates: ensured }));
+      appState.update((s) => ({
+        ...s,
+        tavernCandidates: ensured,
+        campRngState: rng.getState(),
+      }));
     }
     const candidates = [...ensured];
 
@@ -216,7 +219,7 @@ export class TavernPanelScene extends Phaser.Scene {
     if (!free && balance(state.vault) < HIRE_COST) return;
 
     const hired = candidates[slotIndex];
-    const rng = createRng(Date.now());
+    const rng = createRngFromState(state.campRngState);
     const replacement = generateCandidate(rng, state.unlocks.classes);
     const newCandidates = [...candidates];
     newCandidates[slotIndex] = replacement;
@@ -226,6 +229,7 @@ export class TavernPanelScene extends Phaser.Scene {
       vault: free ? s.vault : spend(s.vault, HIRE_COST),
       roster: addHero(s.roster, hired),
       tavernCandidates: newCandidates,
+      campRngState: rng.getState(),
     }));
 
     this.scene.restart();
@@ -236,7 +240,7 @@ export class TavernPanelScene extends Phaser.Scene {
     if (balance(state.vault) < REROLL_COST) return;
 
     const tavernLevel = state.buildingLevels.tavern;
-    const rng = createRng(Date.now());
+    const rng = createRngFromState(state.campRngState);
     const fresh = generateCandidates(
       rng,
       state.unlocks.classes,
@@ -247,6 +251,7 @@ export class TavernPanelScene extends Phaser.Scene {
       ...s,
       vault: spend(s.vault, REROLL_COST),
       tavernCandidates: fresh,
+      campRngState: rng.getState(),
     }));
 
     this.scene.restart();

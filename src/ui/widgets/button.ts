@@ -32,18 +32,16 @@ type ButtonState = 'default' | 'hover' | 'pressed' | 'disabled';
 
 /**
  * A NineSlice + label button with up/hover/pressed/disabled states.
- *
- * Lifecycle:
- *   const btn = new Button({ scene, x, y, width, height, text, onClick });
- *   btn.setText('New label');     // update label
- *   btn.setEnabled(false);        // disabled state
- *   btn.destroy();                // tears down NineSlice + label
+ * Visual state is fixed at construction time: pass `enabled: false` to
+ * render the disabled frame and ignore clicks. To change a button's
+ * enabled state at runtime, destroy and recreate it (every panel scene
+ * already rebuilds via `scene.restart()` on state change).
  *
  * The internal NineSlice is the Phaser game object that handles input;
- * `frame` is swapped per state. The label is a separate BitmapText
- * positioned over the NineSlice center. Both live in the public
- * `gameObjects` array for callers that want to add them to their own
- * Phaser Container.
+ * `frame` is swapped per hover/pressed state. The label is a separate
+ * BitmapText positioned over the NineSlice center. Both live in the
+ * public `gameObjects` array for callers that want to add them to their
+ * own Phaser Container.
  */
 export class Button {
   readonly nineSlice: Phaser.GameObjects.NineSlice;
@@ -53,8 +51,8 @@ export class Button {
   private readonly frames: { up: string; hover: string; down: string; disabled: string };
   private readonly tintEnabled: number;
   private readonly tintDisabled: number;
-  private _enabled: boolean;
-  private _state: ButtonState = 'default';
+  private readonly _enabled: boolean;
+  private _state: ButtonState;
   private _onClick?: () => void;
   private _destroyed = false;
 
@@ -64,6 +62,7 @@ export class Button {
     this.tintEnabled = opts.tint ?? COLOR.textDefault;
     this.tintDisabled = opts.tintDisabled ?? COLOR.textDisabled;
     this._enabled = opts.enabled ?? true;
+    this._state = this._enabled ? 'default' : 'disabled';
     this._onClick = opts.onClick;
 
     this.nineSlice = opts.scene.add
@@ -106,29 +105,7 @@ export class Button {
 
     this.gameObjects = [this.nineSlice, this.label];
 
-    this.attachInput();
-    this.applyState();
-  }
-
-  get enabled(): boolean {
-    return this._enabled;
-  }
-
-  setText(text: string): void {
-    if (this._destroyed) return;
-    this.label.setText(text);
-  }
-
-  setEnabled(enabled: boolean): void {
-    if (this._destroyed || this._enabled === enabled) return;
-    this._enabled = enabled;
-    if (enabled) {
-      this.attachInput();
-      this._state = 'default';
-    } else {
-      this.nineSlice.disableInteractive();
-      this._state = 'disabled';
-    }
+    if (this._enabled) this.attachInput();
     this.applyState();
   }
 

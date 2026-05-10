@@ -11,7 +11,9 @@ export interface PanelOpts {
   y: number;
   width: number;
   height: number;
-  /** Frame style. Defaults to 'light'. */
+  /** Frame style. Defaults to 'dark' (purple chrome) — harmonizes with the
+   *  dark inner-content backdrops most camp panels use. Pass 'light' for the
+   *  warm gray-cream chrome, or 'bright' for the cream variant. */
   variant?: PanelVariant;
 }
 
@@ -27,7 +29,7 @@ export interface PanelOpts {
  * contents to share lifetime.
  */
 export function createPanel(opts: PanelOpts): Phaser.GameObjects.NineSlice {
-  const frameName = panelFrame(opts.variant ?? 'light');
+  const frameName = panelFrame(opts.variant ?? 'dark');
   const ns = opts.scene.add.nineslice(
     opts.x,
     opts.y,

@@ -36,6 +36,7 @@ function makeBaseSave(): SaveFile {
     buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
     hospitalTreatmentsRemaining: 1,
     tavernCandidates: [],
+    campRngState: 0,
   };
 }
 
@@ -103,6 +104,34 @@ describe('save / load roundtrip', () => {
     const storage = new MemoryStorage();
     const data: SaveFile = { ...makeBaseSave(), runRngState: 42 };
     expect(() => save(data, storage)).toThrow();
+  });
+
+  it('round-trips campRngState through save/load', () => {
+    const storage = new MemoryStorage();
+    const original: SaveFile = { ...makeBaseSave(), campRngState: 0xdeadbeef };
+    save(original, storage);
+    const loaded = load(storage);
+    expect(loaded?.campRngState).toBe(0xdeadbeef);
+  });
+
+  it('loads a v1 save from storage by migrating to v2 with campRngState added', () => {
+    const storage = new MemoryStorage();
+    const v1 = {
+      version: 1,
+      roster: createRoster(),
+      vault: createVault(),
+      stash: createStash(),
+      unlocks: createDefaultUnlocks(),
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
+      hospitalTreatmentsRemaining: 1,
+      tavernCandidates: [],
+      // intentionally missing campRngState — it's a v2-introduced field
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(v1));
+    const loaded = load(storage);
+    expect(loaded).not.toBeNull();
+    expect(loaded?.version).toBe(CURRENT_SCHEMA_VERSION);
+    expect(typeof loaded?.campRngState).toBe('number');
   });
 
   it('round-trips preferences.combatSpeed', () => {
@@ -581,6 +610,7 @@ describe('isSoftlocked', () => {
       buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
       hospitalTreatmentsRemaining: 1,
       tavernCandidates: [],
+      campRngState: 0,
     };
   }
 

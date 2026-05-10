@@ -6,6 +6,7 @@ import type { Hero } from '@heroes/hero';
 import { heroToLoadout } from '@render/hero_loadout';
 import { createTooltip } from '@ui/tooltip';
 import { createPaperdoll } from './paperdoll';
+import { createBitmapText } from './text';
 
 export type HeroCardSize = 'small' | 'large';
 
@@ -120,23 +121,29 @@ export class HeroCard {
     const traitDef = TRAITS[this.hero.traitId];
 
     const nameLabel = isDead ? `${this.hero.name} (Fallen)` : this.hero.name;
-    const nameLine = this.scene.add
-      .text(textX, textOffsetFromTop, nameLabel, {
-        fontFamily: 'monospace',
-        fontSize: isLarge ? '14px' : '12px',
-        color: '#ffffff',
-      });
+    const nameLine = createBitmapText({
+      scene: this.scene,
+      x: textX,
+      y: textOffsetFromTop,
+      text: nameLabel,
+      font: 'medium',
+      size: 16,
+      tint: 0xffffff,
+    });
     this.container.add(nameLine);
 
     const classLine = isLarge
       ? `${classDef.name} · Lv ${this.hero.level}`
       : `${classDef.name} · Lv ${this.hero.level} · ${this.hero.currentHp}/${this.hero.maxHp}`;
-    const classText = this.scene.add
-      .text(textX, textOffsetFromTop + (isLarge ? 24 : 16), classLine, {
-        fontFamily: 'monospace',
-        fontSize: isLarge ? '12px' : '10px',
-        color: '#aaaaaa',
-      });
+    const classText = createBitmapText({
+      scene: this.scene,
+      x: textX,
+      y: textOffsetFromTop + (isLarge ? 24 : 16),
+      text: classLine,
+      font: 'small',
+      size: 16,
+      tint: 0xaaaaaa,
+    });
     this.container.add(classText);
 
     if (!isDead) {
@@ -164,12 +171,15 @@ export class HeroCard {
       const traitLabel = isLarge
         ? `${traitDef.name} - ${traitDef.description}`
         : `${traitDef.name} · ${traitDef.shortDescription}`;
-      const traitText = this.scene.add
-        .text(textX, traitY, traitLabel, {
-          fontFamily: 'monospace',
-          fontSize: isLarge ? '11px' : '10px',
-          color: '#ccbbaa',
-        });
+      const traitText = createBitmapText({
+        scene: this.scene,
+        x: textX,
+        y: traitY,
+        text: traitLabel,
+        font: 'small',
+        size: 16,
+        tint: 0xccbbaa,
+      });
       this.container.add(traitText);
     }
 

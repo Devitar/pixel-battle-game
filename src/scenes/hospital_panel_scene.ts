@@ -8,7 +8,6 @@ import type { Hero } from '@heroes/hero';
 import {
   Button,
   COLOR,
-  assertWidgetAssetsLoaded,
   createBitmapText,
   createPanel,
 } from '@ui/widgets';
@@ -16,6 +15,9 @@ import { appState } from './app_state';
 
 // Survives scene.restart() so the selected hero persists across rebuilds.
 let _pendingSelectedHeroId: string | null = null;
+// Survives scene.restart() so paging across treatments doesn't snap back to
+// page 1. Reset to 0 when the panel closes (next visit starts at the top).
+let _listPageStart = 0;
 
 const PANEL_X = 20;
 const PANEL_Y = 40;
@@ -40,6 +42,12 @@ const ROW_W = 360;
 const ROW_H = 50;
 const VISIBLE_ROWS = 6;
 
+// Pagination arrows sit in the gap between list and detail pane, aligned
+// with the first/last list rows. Mirrors blacksmith's pattern for parity.
+const PAGE_ARROW_X = LIST_X + LIST_W + 8;
+const PAGE_UP_Y = ROW_Y_BASE - 6;
+const PAGE_DOWN_Y = ROW_Y_BASE + (VISIBLE_ROWS - 1) * ROW_STRIDE + 6;
+
 // Wound rows inside the detail pane
 const WOUND_ROW_H = 50;
 const WOUND_ROW_STRIDE = 58;
@@ -57,9 +65,7 @@ export class HospitalPanelScene extends Phaser.Scene {
     super('hospital_panel');
   }
 
-  create(): void {
-    assertWidgetAssetsLoaded(this);
-    this._detailContainer = undefined;
+  create(): void {    this._detailContainer = undefined;
     this._rowBgs = [];
 
     const state = appState.get();
@@ -149,9 +155,18 @@ export class HospitalPanelScene extends Phaser.Scene {
         })
         .setOrigin(0.5);
     } else {
-      const visible = wounded.slice(0, VISIBLE_ROWS);
+      // Clamp page start in case the list shrank since last render (e.g.,
+      // user treated the last hero on the current page).
+      const maxStart = Math.max(0, wounded.length - VISIBLE_ROWS);
+      if (_listPageStart > maxStart) _listPageStart = maxStart;
+
+      const visible = wounded.slice(_listPageStart, _listPageStart + VISIBLE_ROWS);
       for (let i = 0; i < visible.length; i++) {
         this.buildHeroRow(visible[i], i);
+      }
+
+      if (wounded.length > VISIBLE_ROWS) {
+        this.buildPaginationArrows(wounded.length);
       }
     }
 
@@ -362,6 +377,41 @@ export class HospitalPanelScene extends Phaser.Scene {
     }
   }
 
+  private buildPaginationArrows(totalEntries: number): void {
+    const canPageUp = _listPageStart > 0;
+    const canPageDown = _listPageStart + VISIBLE_ROWS < totalEntries;
+
+    const upArrow = this.add
+      .text(PAGE_ARROW_X, PAGE_UP_Y, '▲', {
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        color: canPageUp ? '#cccccc' : '#444444',
+      })
+      .setOrigin(0, 0.5);
+    if (canPageUp) {
+      upArrow.setInteractive({ useHandCursor: true });
+      upArrow.on('pointerdown', () => {
+        _listPageStart = Math.max(0, _listPageStart - VISIBLE_ROWS);
+        this.scene.restart();
+      });
+    }
+
+    const downArrow = this.add
+      .text(PAGE_ARROW_X, PAGE_DOWN_Y, '▼', {
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        color: canPageDown ? '#cccccc' : '#444444',
+      })
+      .setOrigin(0, 0.5);
+    if (canPageDown) {
+      downArrow.setInteractive({ useHandCursor: true });
+      downArrow.on('pointerdown', () => {
+        _listPageStart += VISIBLE_ROWS;
+        this.scene.restart();
+      });
+    }
+  }
+
   private treatWound(heroId: string, woundIndex: number): void {
     const state = appState.get();
     const hero = listHeroes(state.roster).find((h) => h.id === heroId);
@@ -389,6 +439,7 @@ export class HospitalPanelScene extends Phaser.Scene {
 
   private close(): void {
     _pendingSelectedHeroId = null;
+    _listPageStart = 0;
     this.scene.stop();
     this.scene.resume('camp');
   }

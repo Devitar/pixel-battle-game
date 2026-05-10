@@ -36,14 +36,13 @@ export const FRAME = {
   headerScroll: 'header_scroll',
 } as const;
 
-// Common colors. Numeric form (0xRRGGBB) for tint / fill / stroke calls;
-// HEX form for Phaser Text styling where pixui's bitmap-font-only API can't
-// reach (multi-color text uses raw Phaser text).
+// Common colors. Numeric form (0xRRGGBB) for tint / fill / stroke calls.
+// Use raw `scene.add.text({ color: '#xxxxxx' })` when multi-color or
+// per-character tint is needed — bitmap-font labels only support a uniform
+// numeric tint.
 export const COLOR = {
   textDefault: 0xfbe4af,
-  textDim: 0x7bb6bc,
   textDisabled: 0x7bb6bc,
-  textDark: 0x111343,
 
   selectionGold: 0xffcc66,
   affordable: 0xffcc66,

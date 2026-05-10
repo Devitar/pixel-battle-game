@@ -6,7 +6,6 @@ import type { PerkId } from '@data/types';
 import { applyPerk } from '@heroes/hero';
 import { heroToLoadout } from '@render/hero_loadout';
 import {
-  assertWidgetAssetsLoaded,
   createBitmapText,
   createPanel,
   createPaperdoll,
@@ -49,8 +48,6 @@ export class PerkOverlayScene extends Phaser.Scene {
   }
 
   create(): void {
-    assertWidgetAssetsLoaded(this);
-
     const hero = listHeroes(appState.get().roster).find((h) => h.id === this.heroId);
     if (!hero || !hero.pendingPerk) {
       this.close();

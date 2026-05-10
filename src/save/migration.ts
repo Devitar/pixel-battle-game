@@ -1,14 +1,19 @@
 import type { SaveFile } from './save';
 
-// Pre-launch: stays at 1. Schema changes discard old saves via the loader's
-// "newer-than-supported" rejection (which catches saves persisted at any prior
-// transient bump value). Migrations get registered post-launch when real
-// player saves exist.
-export const CURRENT_SCHEMA_VERSION = 1;
+// Bump on any change to the persisted SaveFile shape (or nested types
+// like Hero, Roster, RunState, Vault, Unlocks, Preferences) and register a
+// migration in MIGRATIONS[previousVersion] that maps old raw shape to new.
+// Loaders newer than CURRENT_SCHEMA_VERSION are rejected at save.ts:load.
+export const CURRENT_SCHEMA_VERSION = 2;
 
 type MigrationFn = (raw: Record<string, unknown>) => Record<string, unknown>;
 
-const MIGRATIONS: Record<number, MigrationFn> = {};
+const MIGRATIONS: Record<number, MigrationFn> = {
+  // v1 → v2: introduce SaveFile.campRngState (Cluster B · 58, 2026-05-10).
+  // Old saves seed it from load-time Date.now() — the same bootstrap used
+  // for fresh saves' campRngState. Subsequent camp actions advance it.
+  1: (raw) => ({ ...raw, campRngState: Date.now(), version: 2 }),
+};
 
 export function migrate(raw: unknown): SaveFile | null {
   if (typeof raw !== 'object' || raw === null) return null;

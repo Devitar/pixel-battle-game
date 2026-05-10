@@ -15,7 +15,6 @@ import { heroToLoadout } from '@render/hero_loadout';
 import {
   Button,
   HeroCard,
-  assertWidgetAssetsLoaded,
   createBitmapText,
   createDialog,
   createPanel,
@@ -73,9 +72,7 @@ export class BarracksPanelScene extends Phaser.Scene {
     super('barracks_panel');
   }
 
-  create(): void {
-    assertWidgetAssetsLoaded(this);
-    this._detailContainer = undefined;
+  create(): void {    this._detailContainer = undefined;
     this._slotBgs = [];
 
     const state = appState.get();

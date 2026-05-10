@@ -29,6 +29,175 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-10 · Canvas horizontal-centering fix (drop Phaser autoCenter)
+
+- **Why:** User reported the game canvas was not horizontally centered. Diagnosis: `style.css:14-16` set `#game` to `display: flex; justify-content: center; align-items: center` AND `main.ts:33` set `autoCenter: Phaser.Scale.CENTER_BOTH`. Phaser's CENTER_BOTH writes explicit `marginLeft`/`marginTop` pixel values onto the canvas to center it relative to its parent — those margins stack on top of the flex algorithm's positioning, double-offsetting the canvas toward an edge. Worse on widescreens where horizontal letterboxing is larger.
+- **Decisions:**
+  - **Dropped Phaser autoCenter; kept CSS flex.** One-line removal in `main.ts`. CSS layout is more predictable than Phaser mutating canvas margins on resize, and the flex centering was already in place. Vertical centering still works because the viewport's aspect ratio is close enough to 16:9 that vertical letterboxing was small (the double-offset existed there too but was less visible).
+- **Source:** ad-hoc bug report (user-driven, this session).
+
+---
+
+### 2026-05-10 · Deterministic camp RNG via `SaveFile.campRngState` (closes Cluster B · 58 — first migration)
+
+- **Why:** Camp-side RNG had been ad-hoc per-action seeding (`createRng(Date.now())` at 5 sites: tavern×3, blacksmith×1, expeditions-start×1) — non-deterministic, untestable, divergent from the codebase's rigorously-consistent run-time RNG persistence (`runRngState` field, 8 sites). Originally scoped out of #56 under the pre-launch schema-pin policy; same-day lift of that policy on 2026-05-10 unblocked it. This is also the **first registered save migration** in the codebase — exercises the migration infrastructure that was always present (`migration.ts`, `MIGRATIONS = {}`, the `migrate()` while loop) but never used.
+- **Decisions:**
+  - **`campRngState: number` is REQUIRED on `SaveFile`, not optional.** Acceptance criteria called for required; `createFreshSave` seeds it from the bootstrap rng's post-starter-generation state, so every fresh save has it from creation. Existing v1 saves get it via the new migration.
+  - **`MIGRATIONS[1]` adds `campRngState: Date.now()` and bumps version to 2.** Same `Date.now()` bootstrap as fresh saves use — consistent treatment of "no prior camp seed exists." Future schema bumps follow the same pattern: register `MIGRATIONS[N]` mapping vN→v(N+1) raw shape.
+  - **Boot scene needs no syntactic change.** `boot_scene.ts:45` still creates `rng = createRng(Date.now())` as the bootstrap; the rng is passed to `resolveSaveState` → `createFreshSave`, which now also captures `rng.getState()` post-roster-generation into `campRngState`. The "5 sites" framing in the TODO entry counted boot as a migration site; it turned out boot's role is bootstrap (source) not consumer.
+  - **Expeditions descend forks the run seed off the camp rng.** Pattern: `campRng = createRngFromState(state.campRngState)` → `runSeed = campRng.int(0, 0xffffffff)` → `runRng = createRng(runSeed)` → write back BOTH `campRngState: campRng.getState()` AND `runRngState: runRng.getState()`. Camp advances by one rng step (the fork); the new run starts deterministically from the forked seed. Replaces the previous double-`Date.now()` seeding for camp and run independently.
+  - **Tavern's `ensureCandidatesForCap` write-back is conditional.** The function only advances rng when it generates new candidates. Wrote the campRngState update only inside the `if (ensured !== state.tavernCandidates)` branch — same condition that already gates the candidates write — so panel-open with a full candidate list doesn't trigger a useless localStorage write.
+  - **Two new tests, not three.** Migration unit test (v1→v2 adds campRngState as a finite number) + integration test (write a v1 raw to storage, load() returns v2 with campRngState). Skipped the suggested "Tavern seed/state flow" test — the rng's determinism is already covered in `rng.test.ts`, and the actual integration sits in scene code that the codebase doesn't unit-test. Test count: 1716 → 1719.
+- **Surprises:**
+  - **Test fixtures with `version: CURRENT_SCHEMA_VERSION` shims wrote raw JSON bypassing `save()`'s type checks.** Many storage-shim tests in `save.test.ts` set `version: CURRENT_SCHEMA_VERSION` and intentionally omit fields to test the normalizer. After the bump, those shims claim to be v2 saves but lack `campRngState`. Decided not to update them — they bypass the migration path (version matches CURRENT_SCHEMA_VERSION → returned as-is) and the tests don't check campRngState on the loaded SaveFile. The loaded objects technically have `campRngState: undefined` despite the type saying it's a number; harmless because nothing reads it in those tests. Worth flagging if a future change tries to assert SaveFile completeness.
+  - **`CURRENT_SCHEMA_VERSION` was used as a *literal* in test shims that should arguably have been `1`.** Shims like the `runState.lost` normalizer test predate the bump and were testing "v1 with old field shape." After bumping to v2, those shims are technically lying about what version they are. Left as-is for minimum churn; if those tests start exercising migration behavior (e.g., need to verify campRngState gets defaulted), flip them to `version: 1` and let the migration path run.
+  - **The empty `MIGRATIONS = {}` infrastructure paid off.** Registering `MIGRATIONS[1]` was a single-line addition; no scaffolding required. The `migrate()` while loop and the load-time `version > CURRENT_SCHEMA_VERSION` rejection were both already wired, just unused. Validates the choice (made under the prior policy) to keep the infrastructure even when no migrations existed.
+- **Source:** TODO #58 (Cluster B), promoted same-day from the 2026-05-10 schema-pin policy lift.
+
+---
+
+### 2026-05-10 · `assertWidgetAssetsLoaded` removed (closes Cluster B · 60)
+
+- **Why:** The widget audit on 2026-05-10 flagged the assert helper as inconsistently applied — original audit said 3-of-13 scenes call it. Re-grep at implementation time corrected that: actually 12 scenes called it, leaving the helper near-universal but still defensive against a class of bug that BootScene's design already prevents. Picked remove-all (see decisions) for the cleaner outcome.
+- **Decisions:**
+  - **Remove-all over every-panel.** BootScene's `preload()` (`boot_scene.ts:34-41`) loads the `mana_soul` atlas + bitmap fonts globally before any other scene starts; Phaser's scene system guarantees BootScene completes before the next scene's `create()` runs. If preload fails, EVERY scene fails — there's no "this panel works but that one doesn't" failure mode the assert could catch. The helper added a slightly nicer error message at one specific point in time but did not catch a real bug class.
+  - **Net delta:** 12 scenes lose 1 import line + 1 call site each (24 LOC); `widgets/text.ts` loses the 14-line helper definition + the now-unused `ATLAS` import; `widgets/index.ts` loses the export from its barrel. Total ~40 LOC removed across 14 files.
+  - **Did NOT add an alternative defensive check elsewhere.** The trust boundary is now BootScene; nothing else needs to verify what BootScene already promises.
+- **Surprises:**
+  - **Audit error caught at implementation time.** The 2026-05-10 widget-audit HISTORY entry said 3 scenes called the assert and 10 didn't — that was wrong. Fresh grep showed 12 of 13 scenes called it (only the dev scenes and BootScene itself didn't). The original audit must have grepped for a stale pattern or sampled a small subset. Lesson: re-grep at implementation time, not just at audit time.
+  - **The `import ATLAS from theme` cleanup in `widgets/text.ts` was an automatic side-effect.** ATLAS was only referenced by the deleted helper; once it was gone, ATLAS became an unused import. Catching unused imports is the kind of thing typecheck flags — handy as a post-hoc safety net.
+- **Source:** UI widgets audit (2026-05-10).
+
+---
+
+### 2026-05-10 · HeroCard labels migrate to bitmap fonts (closes Cluster B · 59)
+
+- **Why:** HeroCard's three text labels (name, class-line-with-inline-HP, trait) used raw `scene.add.text({ fontFamily: 'monospace', ... })` — every other widget renders via mana_soul bitmap fonts. HeroCards placed next to bitmap-font headers in any panel showed visibly inconsistent typography. The 2026-05-10 widget audit flagged this as the highest-leverage user-visible polish in the cluster.
+- **Decisions:**
+  - **Three labels migrated, not four.** The TODO entry phrased it as "four labels" but the inline HP fragment is part of `classLine` for small cards (e.g., `Knight · Lv 3 · 24/32`), not a separate game object. Net: name, class, trait. All now use `createBitmapText`.
+  - **Wound badge stays on `scene.add.text`.** `🩸 ${count}` requires emoji rendering which bitmap fonts can't do (constant upstream limitation, also confirmed in the pixui-era HISTORY).
+  - **Size hierarchy via font choice, not size param.** All call sites pass `size: 16` (codebase convention; `mana_soul` bitmap fonts render naturally at 16). The visual size hierarchy comes from picking different fonts: `medium` (mana_trunk, button-label scale) for the name, `small` (mana_roots, body scale) for class and trait. This matches every other panel — headers use `medium`/`large`, body uses `small`.
+  - **Tints kept identical to the prior canvas-text colors.** Name `0xffffff`, class `0xaaaaaa`, trait `0xccbbaa`. Did NOT switch to theme-defined `COLOR.textDefault` etc. — visual continuity matters more than theme-discipline for this migration; users shouldn't see a color shift, only a typography unification.
+  - **Y-coordinates unchanged.** Bitmap-font glyphs may seat 1-2px lower than canvas-text glyphs at the same y-origin (Button widget hit this in 2026-05-08 with the `0.56` not `0.5` vertical-bias factor). Decision: ship with same coords and let the smoke check reveal whether any nudge is needed; bitmap-font-rendering is the win even if vertical drift requires a follow-up.
+- **Surprises:**
+  - **Bitmap-font sizes are determined by the font, not the `size` param.** Reading the `theme.ts` comment ("roots = small body, trunk = medium / button labels, branches = large / headers") plus the codebase convention of always passing `size: 16` made it clear the intended pattern is "pick the right font, don't try to scale." If smoke shows the small card layout is too cramped at this rendering, the next move is layout adjustment (taller card or tighter line-spacing) rather than scaling the bitmap font down.
+- **Source:** UI widgets audit (2026-05-10).
+
+---
+
+### 2026-05-10 · Theme palette — switch panel default to 'dark' (closes Cluster B · 47)
+
+- **Why:** All 10 camp panels rendered as `frame_light` (warm gray-cream chrome) wrapping `0x1a1a1a` near-black inner content — a light-warm frame around dark-cool data. The earlier HISTORY note describing mana_soul as "cream-on-blue" was wrong; reading the actual atlas (`mana_soul.png`) shows the variants are `dark` (purple), `bright` (warm cream), and `light` (gray-cream), with gold curly accents shared across all three. The unifying accent across the chrome and the game-native overlay is gold (`0xffcc66`); the visible mismatch was in the body fills.
+- **Decisions:**
+  - **Switched `createPanel`'s default variant from `'light'` to `'dark'`.** Single-line change in `src/ui/widgets/panel.ts:30`. All 10 `createPanel(...)` call sites pass no explicit variant, so they all flip to `frame_dark` (dark purple chrome) atomically. Result: dark-purple frame wrapping dark-gray content, gold accents shared across both layers.
+  - **Did NOT change inner-content colors (`paneBg`, `rowBg`, etc.).** Keeping `0x1a1a1a` preserves the conventional "dark = data area" affordance while the frame change does the cohesion work. If the dark-purple-on-dark-gray transition is too soft or too stark in practice, the next move is to warm the inner content (`paneBg → 0x2a1f2e` to echo mana_soul's interior shadow) — left as a follow-up only if the smoke check flags it.
+  - **Did NOT pursue full retheme to game-native art.** That's a sprite-art job (new atlas under `assets/ui.yaml`); not justified when a 1-line variant default change unifies the look.
+  - **Updated jsdoc on `PanelOpts.variant`** to reflect the new default and document why (harmonizes with dark inner-content backdrops).
+- **Surprises:**
+  - **The earlier HISTORY description of mana_soul was wrong** — "cream-on-blue palette" appears in the 2026-05-09 widget-migration entry and the original #47 TODO. Reading the actual atlas PNG showed the panels are purple/gray-cream/cream, not blue. One blue button accent in the atlas may have seeded the misnomer. Lesson: when working with bitmap art, read the actual PNG before describing it from memory.
+  - **`Dialog`'s default variant is `'bright'` and was left unchanged** — confirmation modals intentionally pop with the warm cream chrome vs the underlying scene; that's a different visual design role from panel chrome.
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); promoted to TODO #47.
+
+---
+
+### 2026-05-10 · Hospital scene.restart() perf check — premise was wrong (closes Cluster B · 49)
+
+- **Why:** TODO #49 asked for a manual FPS measurement on hospital under "rapid clicking between heroes" with the assumption that hero selection triggered full `scene.restart()`. Audit before measurement: the premise is false — the rapid-click hot path is already partial-update.
+- **Decisions:**
+  - **No measurement run.** No FPS counter, no browser smoke test. The audit alone resolves the concern.
+  - **Three panels share the same partial-update architecture.** Hospital `selectHero()` (`hospital_panel_scene.ts:165`), blacksmith `selectItem()` (`blacksmith_panel_scene.ts:224`), and barracks `selectHero()` (`barracks_panel_scene.ts:241`) all swap row/slot strokes in place and call `_detailContainer.destroy(true)` + rebuild — no `scene.restart()` on the click path. Inline comments at each site explicitly call this out as the no-flicker pattern.
+  - **`scene.restart()` only fires on human-pace events.** Hospital's 4 restart sites: upgrade (line 146), treat (line 440), page-up (line 398), page-down (line 413). All bound to user decisions, none to a 60-Hz hot path. Same pattern in blacksmith (mode-switch, sell-confirm, upgrade, page-flip) and barracks (retire, equip-resume).
+- **Surprises:**
+  - **The TODO entry was filed in 2026-05-06 against a pre-pixui hospital that may have been more restart-heavy** — by the time it surfaced as #49, the codebase had already been refactored toward partial-update, and the 2026-05-09 pixui removal preserved that. Worth knowing for future "is the perf concern still real?" audits: re-check the code before booking a measurement slot.
+  - The corollary perf-check question — "what about pages where rapid clicking *does* trigger restart, like the equip slot strip?" — wasn't asked here. If that ever bites, file a separate TODO with a real reproducer rather than carrying a stale generic concern.
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); promoted to TODO #49.
+
+---
+
+### 2026-05-10 · Windows shim robustness in vite.config.ts (closes Cluster B · 50)
+
+- **Why:** The pixel-tools Windows shim block at the top of `vite.config.ts` had two latent issues that would surface as cryptic errors on environments slightly different from the current author's win32-x64 box: the binary suffix was hardcoded to `win32-x64`, and `mkdirSync`/`copyFileSync` would emit raw EACCES errors on read-only `node_modules/.cache/` (Bazel / Nix hermetic CI scenarios).
+- **Decisions:**
+  - **Arch detection via `process.arch`.** The binary suffix is now `win32-${arch}` so a future arm64 Windows laptop will at least try the right filename. The pre-existing `existsSync(src)` guard now produces a more specific error: it names the missing file (with arch), explains pixel-tools may not ship that arch, and offers two paths (file an issue with pixel-tools or run on x64). The x64 case (existsSync false despite arch=x64 → broken install) gets `npm install` as the suggestion.
+  - **Two separate try/catches for `mkdirSync` and `copyFileSync`.** Both fail independently on a read-only filesystem with the same root cause, so the error message is ~the same — but split keeps each error message naming the actual operation that failed (cache-dir creation vs binary copy), so debugging is clearer than a single wrapper would give.
+  - **No helper extraction for the duplicated "needs writable cache" message.** Per CLAUDE.md "three similar lines is better than a premature abstraction"; two near-identical strings is fine.
+- **Surprises:**
+  - **Vitest loads `vite.config.ts` at startup,** so `npm test` exercises the shim block and validates that no regression made the config un-loadable on this win32-x64 box. That's the acceptance-criteria "manual dev-server test" baked into the test runner.
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); promoted to TODO #50.
+
+---
+
+### 2026-05-10 · Trivial cleanups: stale boss-sprite candidates + dead theme colors (closes Cluster B · 52, 61)
+
+- **Why:** Two minor cleanups batched in one pass to keep cluster-B noise down.
+  - **#52** — `public/assets/sprites/temp/boss_sprites_candidate_{a,c}.png` predated the pixui adoption work and were leftovers from the bone-lich bespoke-sprite design exploration. Each new contributor hit the same "are these live?" question.
+  - **#61** — `COLOR.textDark` and `COLOR.textDim` in `src/ui/widgets/theme.ts` had zero consumers across `src/`. `textDim` also duplicated `textDisabled`'s `0x7bb6bc`. Surfaced by the 2026-05-10 widget audit.
+- **Decisions:**
+  - **Left dangling reference in `docs/superpowers/specs/2026-04-26-bone-lich-bespoke-sprite-design.md`.** Spec docs record-of-evaluation, not source code; deleting candidates that the spec referred to doesn't invalidate the historical document. Acceptance criteria for #52 only required source-code grep cleanliness.
+  - **Left `public/assets/sprites/temp/` directory in place** even though it's now empty. The directory's purpose (sprite-candidate staging) is real; CLAUDE.md's "don't materialize empty directories" rule is about creation, not post-deletion state.
+  - **Updated `theme.ts` header comment** to reflect post-pixui reality — the old comment mentioned "pixui's bitmap-font-only API" as the reason multi-color text uses raw Phaser. Pixui is gone; the underlying bitmap-font limitation is the same. Reworded.
+- **Source:** TODO #52 (from Cluster B · 45 sub-spec 2 whole-impl review, 2026-05-06) and #61 (UI widgets audit, 2026-05-10). Test count unchanged: 1716/1716.
+
+---
+
+### 2026-05-10 · Hospital wounded-list pagination (closes Cluster B · 46)
+
+- **Why:** `hospital_panel_scene.ts` capped the wounded list at `VISIBLE_ROWS = 6` via `wounded.slice(0, VISIBLE_ROWS)` with no overflow affordance. Heroes 7+ in the list were silently inaccessible — a real UX bug at the late-game edge case where many heroes accumulate wounds across runs.
+- **Decisions:**
+  - **Pagination over "+N more" indicator.** Spec accepted either; pagination chosen for parity with blacksmith's existing pattern (sub-spec 1 era). Mirrors `_listPageStart` module-level state, `▲`/`▼` arrow widgets, and the `maxStart = Math.max(0, total - VISIBLE_ROWS)` clamp verbatim from `blacksmith_panel_scene.ts:266-280, 650-683`.
+  - **Page state persists across `scene.restart()` but resets on `close()`.** Treatments rebuild the scene; if the page reset to 0 on every treat, paging through page-2 wounds would feel broken. Closing the panel resets — next visit starts at the top, matching the user's mental model of "fresh look at the hospital."
+  - **Arrow placement matches blacksmith's exactly.** `PAGE_ARROW_X = LIST_X + LIST_W + 8` (hospital and blacksmith share the same `LIST_X` and `LIST_W`), `PAGE_UP_Y = ROW_Y_BASE - 6`, `PAGE_DOWN_Y = ROW_Y_BASE + (VISIBLE_ROWS - 1) * ROW_STRIDE + 6`. Result: the two panels are visually parallel — same arrow positions, same disabled-state coloring (`#cccccc` enabled vs `#444444` disabled).
+- **Surprises:**
+  - **Selection-vs-page edge case carried over from blacksmith.** When a user on page 2 treats the last wound of the hero in their selected slot, the wounded list shrinks; the page-clamp brings `_listPageStart` back into range, but `_selectedHeroId` rebinds to `wounded[0]` (per the existing line 75 fallback) which may be off the new visible page. The detail pane shows wounded[0]'s wounds while the page shows wounded[N..N+5]. Not new to this change — blacksmith has the same edge — but worth knowing. Acceptable for now; would be fixed by a future "scroll-to-selection" pass across both panels if it bites.
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); promoted to TODO #46. Test count unchanged (1716/1716 — scenes aren't unit-tested in this codebase).
+
+---
+
+### 2026-05-10 · UI widgets audit — Button cleanup + 3 TODOs filed
+
+- **Why:** Audit pass over `src/ui/widgets/` after the 2026-05-09 pixui removal to find post-migration debt. Findings either fixed inline (small/clear) or filed as TODO entries (larger/decision-required). One latent constructor bug surfaced and fixed because it materially affected the YAGNI cleanup.
+- **Decisions:**
+  - **YAGNI-deleted `Button.setEnabled()` and `Button.setText()`.** Both had zero callers in production code (12 `enabled: ...` callsites all set state at construction; the 14 `.setText(` hits in scenes target Phaser `Text`/`BitmapText` HUD labels, not `Button`). `setEnabled` carried a latent listener-leak bug (`disableInteractive()` doesn't remove handlers, but `attachInput()` re-attached on enable → 4 stale listeners per toggle). `setText` had a never-recenter bug. Both API removed; the field `_enabled` is now `readonly`.
+  - **Fixed real bug in Button constructor `enabled: false` path.** Before: `_state` was hardcoded to `'default'` regardless of `_enabled`, and `attachInput()` ran unconditionally. Net effect: a button constructed with `enabled: false` rendered the **enabled** frame + tint, the cursor changed to a hand on hover, but click was silently swallowed by the `handle()` `!_enabled` guard. Visible across 12 callsites (Tavern Upgrade button when broke, Equip page arrows at boundaries, Hospital treat button when no treatments left, etc.). Fix: in constructor, set `_state = enabled ? 'default' : 'disabled'` and skip `attachInput()` when disabled, so `applyState()` paints the disabled frame and tint correctly.
+  - **3 TODOs filed instead of fixed inline:** #59 (HeroCard's 4 labels still use raw HTML/canvas text — visually inconsistent with the bitmap-font everywhere else), #60 (`assertWidgetAssetsLoaded` called in 3 scenes, skipped in 10 — pick a policy), #61 (drop dead `COLOR.textDark` and `COLOR.textDim`). User chose file-as-TODO to keep the audit turn lightweight.
+- **Surprises:**
+  - The Button `enabled: false` constructor bug had been present since the in-house widget was authored on 2026-05-08, yet the user had been actively playtesting through 2 days without filing it. Likely explanations: many disabled-states are gated upstream (the button doesn't render at all when its action is unavailable), and where it does render, the cursor-hand affordance is subtle enough to escape notice. Worth noting that visible-bug-doesn't-equal-noticed-bug.
+  - `assertWidgetAssetsLoaded` lives in `widgets/text.ts` (alongside `createBitmapText`) — slightly awkward placement; if #60 lands as "every panel calls it" the helper might earn its own file.
+- **Source:** UI widgets audit (this turn). Latent issues that didn't pass the YAGNI bar to fix inline are documented in TODOs #59-61.
+
+---
+
+### 2026-05-10 · Tavern RNG seeding audit + blacksmith normalization (closes Cluster B · 56)
+
+- **Why:** #56 flagged `tavern_panel_scene.ts` `createRng(Date.now())` (3 sites) as potentially determinism-hostile and possibly diverging from a project-canonical pattern. Audit goal: find the canonical pattern and either align Tavern or confirm it's already consistent.
+- **Decisions:**
+  - **Two RNG patterns coexist deliberately by context.** Run-time RNG persists via `SaveFile.runRngState: number` (`save.ts:28`) — every in-run scene reads `createRngFromState(state.runRngState)`, rolls, writes `runRngState: rng.getState()`. Rigorously consistent across 8 files, with a load-time invariant pairing `runState`/`runRngState`. Camp-time RNG has no persisted seed; each action seeds ad-hoc.
+  - **Tavern is already consistent with the camp-side pattern.** 4 of 5 camp-time `createRng()` sites use `Date.now()` (boot, tavern×3, expeditions-at-run-start). The "same-frame double-fire" theoretical concern from #56 doesn't reach reality — Tavern actions go through `scene.restart()` which costs ≥1 animation frame (~16ms), well above `Date.now()`'s 1ms resolution. **No Tavern change made.**
+  - **Normalized blacksmith outlier.** `blacksmith_panel_scene.ts:767` was the lone camp-side site using `createRng(Math.floor(Math.random() * 0xffffffff))`. Changed to `createRng(Date.now())` to bring camp-side seeding to 5/5 consistency. Both forms are functionally equivalent (ms-or-better resolution, both non-deterministic for testing); the change is purely about the codebase reading uniformly.
+  - **Did NOT add `SaveFile.campRngState`** for fully deterministic camp RNG. That's the architecturally correct path but blocked by the pre-launch policy of pinning schema at v1 with no migrations. Revisit post-launch if camp RNG determinism becomes a real testing/replay need.
+- **Surprises:**
+  - The codebase's run-time RNG persistence is much more disciplined than the camp-side. The `runRngState`/`runState` pairing invariant in `save.ts:38` is a level of rigor that doesn't exist on the camp side at all — and that's fine because camp RNG outputs are committed to state immediately (e.g., `tavernCandidates`), so there's no equivalent "in-flight roll" to persist.
+- **Source:** Cluster B · 45 sub-spec 3a Opus whole-impl review (2026-05-06). 1716/1716 tests still pass.
+
+---
+
+### 2026-05-09 · Migrated off pixui to in-house UI widgets (closes Cluster B · 48, 54, 55, 57)
+
+- **Why:** Cluster B · 45 shipped a working camp UI on pixui but accumulated friction worth retiring the dep over: bitmap-font-only `TextArea` blocked tintable text (#57), private-field reach via `pixui_canvas_fix.ts` was load-bearing fragility (#55), `insert.left/right` origin gotchas (#54), no `'selected'` style for the button theme (#48), per-scene atlas+font preloads. The 5-commit arc `e109046..199abb1` replaces pixui's Frame/insert system with a flat helper module wrapping raw Phaser primitives.
+- **Decisions:**
+  - **Flat helpers over a component tree.** `src/ui/widgets/{button,dialog,panel,text,paperdoll,hero_card}.ts` expose `createPanel()`, `Button`, `createDialog()`, `createBitmapText()`, `createPaperdoll()`, `HeroCard` — each returns a plain Phaser GameObject (NineSlice for panels, atlas-frame buttons, BitmapText labels). Scenes parent into `Container`s when they want shared lifetime; no insert DSL, no Frame anchor math.
+  - **Reuse pixui's atlas + bitmap fonts as raw assets.** `mana_soul.atlas` and `mana_{roots,trunk,branches}.bmfont` stay — they're the visual identity. `BootScene.preload()` (lines 34-41) loads them once globally instead of pixui's per-scene preload.
+  - **Hybrid theme palette.** `widgets/theme.ts` keeps mana_soul's cream-on-blue panel chrome (`0xfbe4af` text) but adopts the game's gold (`0xffcc66`) / dark-gray (`0x1a1a1a`) palette for selection states and row backgrounds — addresses #47's consistency concern via blend rather than full retheme.
+  - **Hospital selection highlight rendered directly.** `rectangle().setStrokeStyle()` swap on `isSelected` (`hospital_panel_scene.ts:198-199`) closes #48 — no theme entry needed when the call is just two color swaps.
+- **Surprises:**
+  - Net delta: +1377 / −1851 = **−474 LOC** with no test churn (1716 → 1716). Removing pixui's abstraction was lighter than the equivalent in-house code, not heavier.
+  - 7 modules retired: `pixui_canvas_fix.ts`, `pixui_dynamic_rebuild.ts`, `pixui_paperdoll.ts`, `pixui_hero_card.ts`, `render/ui_theme.ts`, plus the `phaser-pixui` npm dep.
+  - `scene.restart()` is still the rebuild strategy in Hospital (4 sites) — the architectural concern from #49 carries straight to the new code unchanged.
+  - `src/README.md:32` had a stale "pixui_hero_card.ts / pixui_paperdoll.ts" reference; fixed inline.
+- **Source:** ad-hoc; 5-commit arc `e109046..199abb1` (begin migration → hospital → tavern/herocard/paperdoll → camp_screen → final). Closes #48, #54, #55, #57. #46, #47, #49 carry over.
+
+---
+
 ### 2026-05-08 · pixui hero-card panels migration + cleanup (Cluster B · 45 sub-spec 3c-ii; closes Cluster B · 45 + Cluster B · 51)
 
 - **Why:** The mechanical apply-the-pattern phase for the 6 remaining HeroCard/Paperdoll-using scenes after 3c-i validated the foundation. Migrate Perk → Event → camp_screen → Barracks → Expeditions → Equip; retire `panel_layout.ts` (orphan since 3b) and `hero_card.ts`; rewrite README to document the post-pixui asset structure (closes Cluster B · 51 alongside). After 3c-ii ships, the entire pixui adoption initiative closes — every panel scene + `camp_screen_scene` runs on pixui.

@@ -8,7 +8,6 @@ import { WOUNDS, describeWoundEffect } from '@data/wounds';
 import { chooseCampNodeEffect } from '@run/run_state';
 import {
   Button,
-  assertWidgetAssetsLoaded,
   createBitmapText,
   createPanel,
 } from '@ui/widgets';
@@ -42,8 +41,6 @@ export class CampNodeOverlayScene extends Phaser.Scene {
   }
 
   create(): void {
-    assertWidgetAssetsLoaded(this);
-
     // Dim overlay.
     this.add
       .rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 0.6)

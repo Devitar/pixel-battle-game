@@ -6,7 +6,6 @@ import type { ShopItem } from '@dungeon/node';
 import { SHEET } from '@render/frames';
 import {
   Button,
-  assertWidgetAssetsLoaded,
   createBitmapText,
   createPanel,
 } from '@ui/widgets';
@@ -28,8 +27,6 @@ export class ShopOverlayScene extends Phaser.Scene {
   }
 
   create(): void {
-    assertWidgetAssetsLoaded(this);
-
     const run = appState.get().runState!;
     const node = currentNode(run);
     if (node.type !== 'shop') return;

@@ -24,6 +24,11 @@ export interface SaveFile {
   buildingLevels: BuildingLevels;
   hospitalTreatmentsRemaining: number;
   tavernCandidates: readonly Hero[];
+  /** Persisted RNG state for camp-side actions (Tavern hire/reroll, Blacksmith
+   *  upgrade rolls, expedition-start seeding). Read via createRngFromState,
+   *  advanced by the action, written back via rng.getState(). Mirrors the
+   *  in-run runRngState pattern; threads determinism across camp→run boundary. */
+  campRngState: number;
   runState?: RunState;
   runRngState?: number;
   preferences?: Preferences;
@@ -112,9 +117,11 @@ function isPlausibleRawSave(parsed: unknown): parsed is { version: number } {
   return typeof v === 'number' && Number.isFinite(v) && v >= 1;
 }
 
-// Pre-launch policy: schema stays at 1 and we add new fields without bumps.
-// Old v1 saves predating a field need defaults to be loadable. This is the
-// single point of defaulting; do not scatter `?? createStash()` reads elsewhere.
+// Default-pads fields that were added to the v1 schema without a version
+// bump (under the now-lifted pre-launch policy). New fields added going
+// forward should ship as migrations in `migration.ts` instead, but existing
+// defaults here stay until each is folded into an explicit migration.
+// Single point of defaulting — do not scatter `?? createStash()` reads.
 function normalizeSaveFile(file: SaveFile): SaveFile {
   return {
     ...file,
