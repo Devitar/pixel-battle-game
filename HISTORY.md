@@ -29,6 +29,15 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-10 · Canvas horizontal-centering fix (drop Phaser autoCenter)
+
+- **Why:** User reported the game canvas was not horizontally centered. Diagnosis: `style.css:14-16` set `#game` to `display: flex; justify-content: center; align-items: center` AND `main.ts:33` set `autoCenter: Phaser.Scale.CENTER_BOTH`. Phaser's CENTER_BOTH writes explicit `marginLeft`/`marginTop` pixel values onto the canvas to center it relative to its parent — those margins stack on top of the flex algorithm's positioning, double-offsetting the canvas toward an edge. Worse on widescreens where horizontal letterboxing is larger.
+- **Decisions:**
+  - **Dropped Phaser autoCenter; kept CSS flex.** One-line removal in `main.ts`. CSS layout is more predictable than Phaser mutating canvas margins on resize, and the flex centering was already in place. Vertical centering still works because the viewport's aspect ratio is close enough to 16:9 that vertical letterboxing was small (the double-offset existed there too but was less visible).
+- **Source:** ad-hoc bug report (user-driven, this session).
+
+---
+
 ### 2026-05-10 · Deterministic camp RNG via `SaveFile.campRngState` (closes Cluster B · 58 — first migration)
 
 - **Why:** Camp-side RNG had been ad-hoc per-action seeding (`createRng(Date.now())` at 5 sites: tavern×3, blacksmith×1, expeditions-start×1) — non-deterministic, untestable, divergent from the codebase's rigorously-consistent run-time RNG persistence (`runRngState` field, 8 sites). Originally scoped out of #56 under the pre-launch schema-pin policy; same-day lift of that policy on 2026-05-10 unblocked it. This is also the **first registered save migration** in the codebase — exercises the migration infrastructure that was always present (`migration.ts`, `MIGRATIONS = {}`, the `migrate()` while loop) but never used.
