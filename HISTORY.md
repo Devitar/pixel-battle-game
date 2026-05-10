@@ -29,6 +29,23 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-09 · Migrated off pixui to in-house UI widgets (closes Cluster B · 48, 54, 55, 57)
+
+- **Why:** Cluster B · 45 shipped a working camp UI on pixui but accumulated friction worth retiring the dep over: bitmap-font-only `TextArea` blocked tintable text (#57), private-field reach via `pixui_canvas_fix.ts` was load-bearing fragility (#55), `insert.left/right` origin gotchas (#54), no `'selected'` style for the button theme (#48), per-scene atlas+font preloads. The 5-commit arc `e109046..199abb1` replaces pixui's Frame/insert system with a flat helper module wrapping raw Phaser primitives.
+- **Decisions:**
+  - **Flat helpers over a component tree.** `src/ui/widgets/{button,dialog,panel,text,paperdoll,hero_card}.ts` expose `createPanel()`, `Button`, `createDialog()`, `createBitmapText()`, `createPaperdoll()`, `HeroCard` — each returns a plain Phaser GameObject (NineSlice for panels, atlas-frame buttons, BitmapText labels). Scenes parent into `Container`s when they want shared lifetime; no insert DSL, no Frame anchor math.
+  - **Reuse pixui's atlas + bitmap fonts as raw assets.** `mana_soul.atlas` and `mana_{roots,trunk,branches}.bmfont` stay — they're the visual identity. `BootScene.preload()` (lines 34-41) loads them once globally instead of pixui's per-scene preload.
+  - **Hybrid theme palette.** `widgets/theme.ts` keeps mana_soul's cream-on-blue panel chrome (`0xfbe4af` text) but adopts the game's gold (`0xffcc66`) / dark-gray (`0x1a1a1a`) palette for selection states and row backgrounds — addresses #47's consistency concern via blend rather than full retheme.
+  - **Hospital selection highlight rendered directly.** `rectangle().setStrokeStyle()` swap on `isSelected` (`hospital_panel_scene.ts:198-199`) closes #48 — no theme entry needed when the call is just two color swaps.
+- **Surprises:**
+  - Net delta: +1377 / −1851 = **−474 LOC** with no test churn (1716 → 1716). Removing pixui's abstraction was lighter than the equivalent in-house code, not heavier.
+  - 7 modules retired: `pixui_canvas_fix.ts`, `pixui_dynamic_rebuild.ts`, `pixui_paperdoll.ts`, `pixui_hero_card.ts`, `render/ui_theme.ts`, plus the `phaser-pixui` npm dep.
+  - `scene.restart()` is still the rebuild strategy in Hospital (4 sites) — the architectural concern from #49 carries straight to the new code unchanged.
+  - `src/README.md:32` had a stale "pixui_hero_card.ts / pixui_paperdoll.ts" reference; fixed inline.
+- **Source:** ad-hoc; 5-commit arc `e109046..199abb1` (begin migration → hospital → tavern/herocard/paperdoll → camp_screen → final). Closes #48, #54, #55, #57. #46, #47, #49 carry over.
+
+---
+
 ### 2026-05-08 · pixui hero-card panels migration + cleanup (Cluster B · 45 sub-spec 3c-ii; closes Cluster B · 45 + Cluster B · 51)
 
 - **Why:** The mechanical apply-the-pattern phase for the 6 remaining HeroCard/Paperdoll-using scenes after 3c-i validated the foundation. Migrate Perk → Event → camp_screen → Barracks → Expeditions → Equip; retire `panel_layout.ts` (orphan since 3b) and `hero_card.ts`; rewrite README to document the post-pixui asset structure (closes Cluster B · 51 alongside). After 3c-ii ships, the entire pixui adoption initiative closes — every panel scene + `camp_screen_scene` runs on pixui.

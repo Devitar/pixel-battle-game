@@ -27,20 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 57 · Blacksmith rows pixui-ification (gated on tintable text or theme `selected` style)
-
-- **What:** `blacksmith_panel_scene.ts` `buildUpgradeRow()` (lines ~283-358) and `buildSellRow()` (lines ~360-424) construct row chrome — background rectangle, name/affix/cost text, Upgrade/Sell button — entirely with raw Phaser `this.add.rectangle/.text/.existing` at absolute canvas coordinates rather than the pixui insert DSL. The item icon already uses `pixui.Image` correctly. The rest is intentional workaround.
-- **Why:** Selection highlight requires per-row tinting of background fill (`0x2a2418` selected vs `0x1a1a1a`) and stroke (`0xffcc66` vs `0x222222`); cost-text colors flip on affordability (`#ffcc66` vs `#cc6666`); button bg/border/text all flip on canAfford. pixui's `TextArea` is `StyledComponent` (no `.internal`, no color tint), and pixui's theme has no `'selected'` button style yet (Cluster B · 48). Doing this in pixui today means dropping all three visual cues — meaningful UX regression for a sub-spec whose explicit goal was "no behavior changes." ShopOverlay's row pattern is achievable in pixui because it has none of these per-row tint needs.
-- **Tier:** 2 (consistency cleanup; not blocking)
-- **Acceptance:**
-  - Triggered when ANY of: (a) Cluster B · 48 lands a `'selected'` button theme style usable for row backgrounds, (b) pixui exposes tintable text via a future `Renderable`-based label primitive, or (c) we extract a project-side `pixuiTintableText()` / `pixuiTintableRow()` helper.
-  - Once a trigger fires: rewrite both row methods using `panel.insert.topLeft.frame(...)` row containers + pixui labels, matching ShopOverlay's row pattern.
-  - Functional parity required — selection highlight, cost-affordability text color, and button-disabled visual must all remain visible after migration.
-- **Touches:** `src/scenes/blacksmith_panel_scene.ts` (~140 LOC across two methods).
-- **Source:** Cluster B · 45 sub-spec 3b spec compliance review (2026-05-07). Implementer chose raw Phaser as articulated workaround; reviewer flagged as partial migration; user accepted with this follow-up filed.
-
----
-
 ### 56 · Tavern RNG seeding audit — replace `createRng(Date.now())`
 
 - **What:** `tavern_panel_scene.ts:51, 158, 178` use `createRng(Date.now())` for hire-replacement and reroll candidate generation. This is determinism-hostile (rerolling the same frame twice can give identical candidates if `Date.now()` resolution permits) and may diverge from how the rest of the codebase seeds RNG.
@@ -52,35 +38,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
   - If the project uses ad-hoc seeding everywhere (the existing pattern), confirm Tavern is consistent and document the rationale.
 - **Touches:** `src/scenes/tavern_panel_scene.ts` (3 call sites). Possibly `@util/rng.ts` if a new `createCampRng()` helper is justified.
 - **Source:** Cluster B · 45 sub-spec 3a Opus whole-impl review (2026-05-06).
-
----
-
-### 55 · `fixPixuiCanvasViewport` runtime sanity check + pixui version pin
-
-- **What:** Two robustness improvements for `src/render/pixui_canvas_fix.ts`:
-  - **(a) Runtime sanity check.** The fix monkey-patches pixui's private `_root._initialized` and `_root._children`. If pixui v0.3+ renames these fields or restructures the initialize state machine, the cast goes silent (`as unknown as` → `any` for missing fields) and the symptom is render-blank with no compile-time warning. Add a load-time check that `typeof internal._root._initialized === 'boolean'`; throw with a clear "pixui internals changed; pixui_canvas_fix.ts needs review" error if the assertion fails.
-  - **(b) Version pin.** Verify `package.json` constrains `phaser-pixui` to `^0.2.x` (caret on a 0.x version pins to bug fixes only — minor bumps don't auto-apply). If currently `*` or unbounded, tighten.
-- **Why:** Convert a latent fragility into an obvious load-time failure. pixui is a 0.x dep with a thin API surface; a minor bump that breaks our private-field reach would be very expensive to debug from a render-blank symptom alone.
-- **Tier:** 2 (robustness; non-blocking until a real pixui upgrade scenario)
-- **Acceptance:**
-  - `pixui_canvas_fix.ts` throws a descriptive error if `_root._initialized` isn't a boolean (or other private-field assumptions don't hold).
-  - `package.json` `phaser-pixui` constraint is `^0.2.1` (or whatever current; caret-on-0.x prevents minor bumps).
-- **Touches:** `src/render/pixui_canvas_fix.ts`, `package.json`.
-- **Source:** Cluster B · 45 sub-spec 3a Opus whole-impl review (2026-05-06).
-
----
-
-### 54 · pixui `insert.left/right` origin gotcha — wrapper or doc
-
-- **What:** pixui's `insert.left` returns origin `(Left, Center)` and `insert.right` returns `(Right, Center)`. The Center y-anchor means a y-offset like `y: 80` is from CANVAS CENTER (y=270 for our 540-tall canvas), not from canvas top. Hospital's `insert.left.frame({ y: 80, height: -80 })` rendered with bottom at y=580 — 40px past canvas bottom. Fixed by switching to `insert.topLeft` / `insert.topRight` (origin `(Left|Right, Top)`).
-- **Why:** A real pixui API design pitfall. Sub-spec 3b (Blacksmith, ShopOverlay, CampNodeOverlay, TreasureRoomOverlay) and sub-spec 3c (Barracks, Equip, Expeditions, EventOverlay, PerkOverlay) will reach for `insert.left`/`right` naturally and re-discover the bug. Document or wrap before the next round of debugging.
-- **Tier:** 2 (DX; prevents repeated re-discovery)
-- **Acceptance:**
-  - **Option A — Project-side wrapper.** Add `insertTopLeft` / `insertTopRight` helpers (or similar shape) in `src/render/pixui_canvas_fix.ts` (or new sibling file) that scenes call instead of pixui's `insert.left/right` for top-anchored layouts.
-  - **Option B — Documentation.** Add a prominent comment block in `src/render/pixui_canvas_fix.ts` (or a notes file at `src/render/pixui_notes.md`) listing the API gotchas: `insert.left/right` origin, `insert.center.frame` y-offset semantics, `Container.attach` is append-only, `.internal` access pattern.
-  - Decision in implementation: A or B based on whether wrapping pays off (probably B — cheaper, doesn't add an abstraction layer).
-- **Touches:** `src/render/pixui_canvas_fix.ts`, possibly new `src/render/pixui_notes.md`.
-- **Source:** Cluster B · 45 sub-spec 3a (hospital regression debug, 2026-05-06).
 
 ---
 
@@ -112,59 +69,43 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 ### 49 · scene.restart() performance check on hospital under rapid clicking
 
-- **What:** pixui Frames are immutable, so hospital uses `scene.restart()` for every state change (hero selection, treat, upgrade). Each restart triggers full UI teardown + rebuild. Verify there's no perceptible lag, dropped frames, or memory growth under rapid clicking — particularly when the wounded list is at `LIST_MAX` and the player rapidly clicks through heroes + treats.
-- **Why:** The architecture is "correct but expensive." Per-interaction full rebuilds may bite at scale or on lower-end devices. Worth quantifying before sub-spec 3 commits more panels to the same pattern.
-- **Tier:** 2 (perf check; informs sub-spec 3 strategy)
+- **What:** Hospital uses `scene.restart()` for every state change (hero selection, treat, upgrade) — 4 sites in `hospital_panel_scene.ts`. Each restart triggers full UI teardown + rebuild. Verify there's no perceptible lag, dropped frames, or memory growth under rapid clicking — particularly when the wounded list is full and the player rapidly clicks through heroes + treats.
+- **Why:** The pattern carried over from the pixui era and was preserved by the 2026-05-09 in-house widget migration unchanged. Per-interaction full rebuilds may bite at scale or on lower-end devices. Worth quantifying — other panels (barracks, equip, blacksmith) follow the same pattern, so a measured answer informs whether a future in-place update strategy is worth the complexity.
+- **Tier:** 2 (perf check)
 - **Acceptance:**
   - Manual test: Open hospital with 6 wounded heroes. Rapidly click between heroes for 30s. Observe FPS counter (Phaser dev tools or browser perf panel). Verify no drops below 30fps, no growing memory.
   - If perf is fine: file a HISTORY-style note confirming.
-  - If perf is bad: brainstorm in-place update strategy or cap restart frequency. May influence sub-spec 3's "should we keep using pixui everywhere?" decision.
+  - If perf is bad: brainstorm in-place update strategy or cap restart frequency.
 - **Touches:** none (measurement task; results may trigger follow-up code change).
-- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); pattern survived 2026-05-09 pixui removal.
 
 ---
 
-### 48 · pixui `selected` button style + remove dead branch
+### 47 · Theme palette: revisit mana_soul vs game's gold/dark-gray identity
 
-- **What:** Hospital's wounded-hero list passes `style: isSelected ? 'selected' : undefined` on each row button (`hospital_panel_scene.ts:118`-ish). The pixui theme has no `'selected'` style entry, so pixui silently falls back to the default — no visual selection indicator renders. Either:
-  - **(A)** Add a `selected` style to `ui_theme.ts` (e.g., gold-outlined variant of the default button frame) so selection actually renders.
-  - **(B)** Remove the `style: isSelected ? ...` branch entirely and rely on the inline comment to explain why selection isn't visualized.
-- **Why:** Currently this is dead code that LOOKS like a working selection highlight. A maintainer reading the file will assume selection is visualized; debugging "why doesn't selected hero glow?" wastes time.
-- **Tier:** 2 (UX polish + code clarity)
+- **What:** `src/ui/widgets/theme.ts` currently runs a hybrid: mana_soul atlas frames (cream `0xfbe4af` text, blue panel chrome) for panels and buttons, but game-native gold (`0xffcc66`) and dark-gray (`0x1a1a1a`) for selection states + row backgrounds. The 2026-05-09 widget migration adopted this blend without a deliberate visual-design pass. Open question: does the blend read as cohesive, or does it look like two themes welded together?
+- **Why:** Visual consistency across camp panels. The hybrid is functional but the assets/colors weren't co-designed. May warrant a side-by-side review (open Tavern + Hospital + Blacksmith back-to-back) and either (a) commit to the hybrid as the final identity and tune any remaining clashes, or (b) replace mana_soul atlas frames with game-themed art (gold/dark-gray panels) for a unified gold-on-dark look.
+- **Tier:** 2 (visual polish; non-blocking)
 - **Acceptance:**
-  - Decision in implementation: A (add style + theme entry) or B (remove branch).
-  - If A: themed selected style renders distinctly from default; visible across all pixui list-button consumers (sub-spec 3 panels too).
-  - If B: branch removed, inline comment explains intentional gap.
-- **Touches:** `src/scenes/hospital_panel_scene.ts`, `src/render/ui_theme.ts` (if A).
-- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
-
----
-
-### 47 · pixui theme palette to match game's gold/dark-gray identity
-
-- **What:** Current `ui_theme.ts` adopts pixui example's `mana_soul` palette as-is: cream (`0xfbe4af`) / dark blue (`0x111343`) / cyan (`0x7bb6bc`). Our game's existing palette is gold (`#ffcc66`) accent on dark gray (`#222222`) panel. Hospital now looks visually distinct from Tavern/Barracks/Blacksmith/etc. — jarring for a player opening multiple panels in one camp session.
-- **Why:** Visual consistency. Pixui's palette is used as tints over the sprite art; the underlying mana_soul art is themed (blue gradient frames, gold curly accents) so the color shift is more nuanced than just "switch hex codes." May require either custom theme tints or a visual-design judgment call about which palette to standardize on.
-- **Tier:** 2 (visual polish)
-- **Acceptance:**
-  - Decision in implementation: retheme pixui to match existing game (gold/dark-gray) OR commit to mana_soul palette across the whole game (means migrating Tavern/Barracks/etc. visuals too).
-  - If rethemed: hospital looks visually consistent with Tavern when opened back-to-back.
-  - May reveal sprite-art constraints (mana_soul art is hardcoded blue frames; tinting can recolor but shape stays).
-- **Touches:** `src/render/ui_theme.ts`. Possibly `assets/ui.yaml` if sprite swaps are needed.
-- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
+  - Side-by-side smoke check across all camp panels.
+  - Decision: keep hybrid (and tune `theme.ts` tints if anything reads off) OR retheme to fully game-native (means new atlas art under `assets/ui.yaml` and a new packed atlas).
+  - May reveal that the hybrid is fine and this entry retires without code changes.
+- **Touches:** `src/ui/widgets/theme.ts` (tint tuning); potentially `assets/ui.yaml` + new sprite art (full retheme path).
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); rescoped 2026-05-09 after widget migration.
 
 ---
 
 ### 46 · Hospital wounded list pagination / overflow indicator
 
-- **What:** `hospital_panel_scene.ts` caps the wounded list at `LIST_MAX = 6`. With 7+ wounded heroes, the rest are silently dropped — no scrollbar, no "+N more" indicator. Combined with the pixui no-selection-highlight regression (Cluster B · 48), a player can't tell if/which heroes are missing.
+- **What:** `hospital_panel_scene.ts:152` caps the wounded list at `VISIBLE_ROWS` via `wounded.slice(0, VISIBLE_ROWS)`. With more wounded heroes than fit, the rest are silently dropped — no scrollbar, no "+N more" indicator. A player can't tell if/which heroes are missing.
 - **Why:** Real UX bug at the edge case. Late-game with many heroes wounded across runs, the player may be unable to access some of them via the hospital UI.
 - **Tier:** 2 (UX bug)
 - **Acceptance:**
-  - Either pagination (matching blacksmith's pattern from sub-spec 1 era) OR a visible "+N more" text row when `wounded.length > LIST_MAX`.
-  - Pagination preferred for parity with other panels; but pixui's `insert` DSL may not have a clean pagination primitive — implementer evaluates.
-  - Cap-edge state: when exactly `LIST_MAX` heroes are wounded, no overflow indicator should appear.
+  - Either pagination (matching blacksmith's pattern) OR a visible "+N more" text row when `wounded.length > VISIBLE_ROWS`.
+  - Pagination preferred for parity with other panels.
+  - Cap-edge state: when exactly `VISIBLE_ROWS` heroes are wounded, no overflow indicator should appear.
 - **Touches:** `src/scenes/hospital_panel_scene.ts`.
-- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); concern carries over post-pixui.
 
 ---
 

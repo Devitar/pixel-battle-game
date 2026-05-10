@@ -29,7 +29,7 @@ Why: keeps the game logic unit-testable without a browser, keeps Vitest fast, an
 | `data/` | Content as TS modules. **No logic, just data.** | `classes.ts`, `abilities.ts`, `enemies.ts`, `items.ts`, `dungeons.ts`, `events.ts`, `traits.ts`, `perks.ts`, `names.ts` |
 | `scenes/` | Phaser scenes — the bridge between core and rendering. One scene per major game screen. | `boot_scene.ts`, `camp_scene.ts`, `dungeon_scene.ts`, `corridor_scene.ts`, `camp_screen_scene.ts`, `expeditions_panel_scene.ts` |
 | `scenes/dev/` | Dev-only scenes (sprite explorer, paperdoll demos). Not part of the shipping flow. | `main_scene.ts`, `explorer_scene.ts` |
-| `ui/` | Reusable Phaser UI widgets. | `pixui_hero_card.ts`, `pixui_paperdoll.ts`, `ability_icon.ts`, `formation_editor.ts`, `pack_panel.ts`, `inventory_panel.ts`, `shop_panel.ts`, `event_card_panel.ts` |
+| `ui/` | Reusable Phaser UI widgets. `widgets/` is the in-house theme layer (panel, button, dialog, paperdoll, hero_card) over the `mana_soul` atlas + bitmap fonts. | `widgets/{panel,button,dialog,text,paperdoll,hero_card}.ts`, `ability_icon.ts`, `formation_editor.ts`, `pack_panel.ts`, `inventory_panel.ts`, `shop_panel.ts`, `event_card_panel.ts` |
 | `render/` | Rendering and sprite-atlas helpers. | `paperdoll.ts`, `paperdoll_layers.ts`, `frames.ts`, `parse_sprite_names.ts`, `sprite_names.generated.ts` |
 | `util/` | RNG, math, formatting helpers. | `rng.ts`, `math.ts`, `format.ts` |
 
