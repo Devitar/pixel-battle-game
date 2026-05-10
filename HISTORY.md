@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-10 · HeroCard labels migrate to bitmap fonts (closes Cluster B · 59)
+
+- **Why:** HeroCard's three text labels (name, class-line-with-inline-HP, trait) used raw `scene.add.text({ fontFamily: 'monospace', ... })` — every other widget renders via mana_soul bitmap fonts. HeroCards placed next to bitmap-font headers in any panel showed visibly inconsistent typography. The 2026-05-10 widget audit flagged this as the highest-leverage user-visible polish in the cluster.
+- **Decisions:**
+  - **Three labels migrated, not four.** The TODO entry phrased it as "four labels" but the inline HP fragment is part of `classLine` for small cards (e.g., `Knight · Lv 3 · 24/32`), not a separate game object. Net: name, class, trait. All now use `createBitmapText`.
+  - **Wound badge stays on `scene.add.text`.** `🩸 ${count}` requires emoji rendering which bitmap fonts can't do (constant upstream limitation, also confirmed in the pixui-era HISTORY).
+  - **Size hierarchy via font choice, not size param.** All call sites pass `size: 16` (codebase convention; `mana_soul` bitmap fonts render naturally at 16). The visual size hierarchy comes from picking different fonts: `medium` (mana_trunk, button-label scale) for the name, `small` (mana_roots, body scale) for class and trait. This matches every other panel — headers use `medium`/`large`, body uses `small`.
+  - **Tints kept identical to the prior canvas-text colors.** Name `0xffffff`, class `0xaaaaaa`, trait `0xccbbaa`. Did NOT switch to theme-defined `COLOR.textDefault` etc. — visual continuity matters more than theme-discipline for this migration; users shouldn't see a color shift, only a typography unification.
+  - **Y-coordinates unchanged.** Bitmap-font glyphs may seat 1-2px lower than canvas-text glyphs at the same y-origin (Button widget hit this in 2026-05-08 with the `0.56` not `0.5` vertical-bias factor). Decision: ship with same coords and let the smoke check reveal whether any nudge is needed; bitmap-font-rendering is the win even if vertical drift requires a follow-up.
+- **Surprises:**
+  - **Bitmap-font sizes are determined by the font, not the `size` param.** Reading the `theme.ts` comment ("roots = small body, trunk = medium / button labels, branches = large / headers") plus the codebase convention of always passing `size: 16` made it clear the intended pattern is "pick the right font, don't try to scale." If smoke shows the small card layout is too cramped at this rendering, the next move is layout adjustment (taller card or tighter line-spacing) rather than scaling the bitmap font down.
+- **Source:** UI widgets audit (2026-05-10).
+
+---
+
 ### 2026-05-10 · Theme palette — switch panel default to 'dark' (closes Cluster B · 47)
 
 - **Why:** All 10 camp panels rendered as `frame_light` (warm gray-cream chrome) wrapping `0x1a1a1a` near-black inner content — a light-warm frame around dark-cool data. The earlier HISTORY note describing mana_soul as "cream-on-blue" was wrong; reading the actual atlas (`mana_soul.png`) shows the variants are `dark` (purple), `bright` (warm cream), and `light` (gray-cream), with gold curly accents shared across all three. The unifying accent across the chrome and the game-native overlay is gold (`0xffcc66`); the visible mismatch was in the body fills.

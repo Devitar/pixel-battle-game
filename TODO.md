@@ -27,21 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 59 · HeroCard labels migrate to bitmap fonts
-
-- **What:** `src/ui/widgets/hero_card.ts:121-173` renders the four card labels (name, class+level, inline HP, trait) via raw `scene.add.text({ fontFamily: 'monospace', ... })`. Every other widget — Button labels, panel headers via `createBitmapText`, in-scene captions — uses the `mana_soul` bitmap fonts. HeroCards next to bitmap-font headers in any panel render visibly different typography.
-- **Why:** Visual consistency across all camp panels. Each consumer of HeroCard (Tavern, Barracks, Hospital, Equip, Expeditions, Perk, Event, camp_screen) would benefit. Migration replaces inline `color: '#xxxxxx'` with numeric tints and `fontSize: '12px'` with bitmap-font sizes.
-- **Tier:** 2 (visual polish)
-- **Acceptance:**
-  - Four labels migrated to `createBitmapText`: name, class line, HP text (inline with class line on small cards), trait line.
-  - Wound-badge emoji at `hero_card.ts:213` stays on raw `scene.add.text` — bitmap fonts can't render emoji (constant upstream limitation, confirmed in pixui-era HISTORY).
-  - Visual smoke check: Tavern + Barracks + Hospital all show consistent typography between HeroCards and surrounding panel text.
-  - Pick bitmap-font sizes that approximate the current pixel sizes without requiring new font assets.
-- **Touches:** `src/ui/widgets/hero_card.ts` (~30 LOC).
-- **Source:** UI widgets audit (2026-05-10).
-
----
-
 ### 60 · `assertWidgetAssetsLoaded` policy: every panel or none
 
 - **What:** `assertWidgetAssetsLoaded(scene)` is called in 3 scenes (`tavern_panel_scene.ts`, `camp_screen_scene.ts`, `expeditions_panel_scene.ts`) and skipped in 10 others (blacksmith, barracks, hospital, equip, event_overlay, perk_overlay, shop_overlay, treasure_room_overlay, camp_node_overlay, plus dev scenes). Same goal — guard against BootScene preload regressions — but inconsistent application.
