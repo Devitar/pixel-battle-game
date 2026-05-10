@@ -27,20 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 49 · scene.restart() performance check on hospital under rapid clicking
-
-- **What:** Hospital uses `scene.restart()` for every state change (hero selection, treat, upgrade) — 4 sites in `hospital_panel_scene.ts`. Each restart triggers full UI teardown + rebuild. Verify there's no perceptible lag, dropped frames, or memory growth under rapid clicking — particularly when the wounded list is full and the player rapidly clicks through heroes + treats.
-- **Why:** The pattern carried over from the pixui era and was preserved by the 2026-05-09 in-house widget migration unchanged. Per-interaction full rebuilds may bite at scale or on lower-end devices. Worth quantifying — other panels (barracks, equip, blacksmith) follow the same pattern, so a measured answer informs whether a future in-place update strategy is worth the complexity.
-- **Tier:** 2 (perf check)
-- **Acceptance:**
-  - Manual test: Open hospital with 6 wounded heroes. Rapidly click between heroes for 30s. Observe FPS counter (Phaser dev tools or browser perf panel). Verify no drops below 30fps, no growing memory.
-  - If perf is fine: file a HISTORY-style note confirming.
-  - If perf is bad: brainstorm in-place update strategy or cap restart frequency.
-- **Touches:** none (measurement task; results may trigger follow-up code change).
-- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); pattern survived 2026-05-09 pixui removal.
-
----
-
 ### 47 · Theme palette: revisit mana_soul vs game's gold/dark-gray identity
 
 - **What:** `src/ui/widgets/theme.ts` currently runs a hybrid: mana_soul atlas frames (cream `0xfbe4af` text, blue panel chrome) for panels and buttons, but game-native gold (`0xffcc66`) and dark-gray (`0x1a1a1a`) for selection states + row backgrounds. The 2026-05-09 widget migration adopted this blend without a deliberate visual-design pass. Open question: does the blend read as cohesive, or does it look like two themes welded together?

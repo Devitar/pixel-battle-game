@@ -29,6 +29,20 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-10 · Hospital scene.restart() perf check — premise was wrong (closes Cluster B · 49)
+
+- **Why:** TODO #49 asked for a manual FPS measurement on hospital under "rapid clicking between heroes" with the assumption that hero selection triggered full `scene.restart()`. Audit before measurement: the premise is false — the rapid-click hot path is already partial-update.
+- **Decisions:**
+  - **No measurement run.** No FPS counter, no browser smoke test. The audit alone resolves the concern.
+  - **Three panels share the same partial-update architecture.** Hospital `selectHero()` (`hospital_panel_scene.ts:165`), blacksmith `selectItem()` (`blacksmith_panel_scene.ts:224`), and barracks `selectHero()` (`barracks_panel_scene.ts:241`) all swap row/slot strokes in place and call `_detailContainer.destroy(true)` + rebuild — no `scene.restart()` on the click path. Inline comments at each site explicitly call this out as the no-flicker pattern.
+  - **`scene.restart()` only fires on human-pace events.** Hospital's 4 restart sites: upgrade (line 146), treat (line 440), page-up (line 398), page-down (line 413). All bound to user decisions, none to a 60-Hz hot path. Same pattern in blacksmith (mode-switch, sell-confirm, upgrade, page-flip) and barracks (retire, equip-resume).
+- **Surprises:**
+  - **The TODO entry was filed in 2026-05-06 against a pre-pixui hospital that may have been more restart-heavy** — by the time it surfaced as #49, the codebase had already been refactored toward partial-update, and the 2026-05-09 pixui removal preserved that. Worth knowing for future "is the perf concern still real?" audits: re-check the code before booking a measurement slot.
+  - The corollary perf-check question — "what about pages where rapid clicking *does* trigger restart, like the equip slot strip?" — wasn't asked here. If that ever bites, file a separate TODO with a real reproducer rather than carrying a stale generic concern.
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); promoted to TODO #49.
+
+---
+
 ### 2026-05-10 · Windows shim robustness in vite.config.ts (closes Cluster B · 50)
 
 - **Why:** The pixel-tools Windows shim block at the top of `vite.config.ts` had two latent issues that would surface as cryptic errors on environments slightly different from the current author's win32-x64 box: the binary suffix was hardcoded to `win32-x64`, and `mkdirSync`/`copyFileSync` would emit raw EACCES errors on read-only `node_modules/.cache/` (Bazel / Nix hermetic CI scenarios).
