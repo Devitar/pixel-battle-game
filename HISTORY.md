@@ -29,6 +29,19 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-10 · Trivial cleanups: stale boss-sprite candidates + dead theme colors (closes Cluster B · 52, 61)
+
+- **Why:** Two minor cleanups batched in one pass to keep cluster-B noise down.
+  - **#52** — `public/assets/sprites/temp/boss_sprites_candidate_{a,c}.png` predated the pixui adoption work and were leftovers from the bone-lich bespoke-sprite design exploration. Each new contributor hit the same "are these live?" question.
+  - **#61** — `COLOR.textDark` and `COLOR.textDim` in `src/ui/widgets/theme.ts` had zero consumers across `src/`. `textDim` also duplicated `textDisabled`'s `0x7bb6bc`. Surfaced by the 2026-05-10 widget audit.
+- **Decisions:**
+  - **Left dangling reference in `docs/superpowers/specs/2026-04-26-bone-lich-bespoke-sprite-design.md`.** Spec docs record-of-evaluation, not source code; deleting candidates that the spec referred to doesn't invalidate the historical document. Acceptance criteria for #52 only required source-code grep cleanliness.
+  - **Left `public/assets/sprites/temp/` directory in place** even though it's now empty. The directory's purpose (sprite-candidate staging) is real; CLAUDE.md's "don't materialize empty directories" rule is about creation, not post-deletion state.
+  - **Updated `theme.ts` header comment** to reflect post-pixui reality — the old comment mentioned "pixui's bitmap-font-only API" as the reason multi-color text uses raw Phaser. Pixui is gone; the underlying bitmap-font limitation is the same. Reworded.
+- **Source:** TODO #52 (from Cluster B · 45 sub-spec 2 whole-impl review, 2026-05-06) and #61 (UI widgets audit, 2026-05-10). Test count unchanged: 1716/1716.
+
+---
+
 ### 2026-05-10 · Hospital wounded-list pagination (closes Cluster B · 46)
 
 - **Why:** `hospital_panel_scene.ts` capped the wounded list at `VISIBLE_ROWS = 6` via `wounded.slice(0, VISIBLE_ROWS)` with no overflow affordance. Heroes 7+ in the list were silently inaccessible — a real UX bug at the late-game edge case where many heroes accumulate wounds across runs.

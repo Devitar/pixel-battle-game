@@ -27,16 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 52 · Cleanup stale boss_sprites_candidate_*.png in public/assets/sprites/temp/
-
-- **What:** Remove the leftover `boss_sprites_candidate_*.png` files in `public/assets/sprites/temp/`. These predate the pixui adoption work but were noticed during the Cluster B · 45 sub-spec 2 whole-implementation review.
-- **Why:** Dead files in a tracked directory cause confusion ("are these used? safe to delete?"). Each new contributor hits the same question.
-- **Tier:** 2 (cleanup)
-- **Acceptance:** Files deleted; verify no source code references them via grep before deletion.
-- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
-
----
-
 ### 50 · Windows shim robustness in vite.config.ts
 
 - **What:** Two robustness improvements for the pixel-tools Windows shim block in `vite.config.ts`:
@@ -106,19 +96,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
   - If every-panel: add the assert call to the 10 panels missing it.
   - If remove-all: drop the call from the 3 current sites; remove the export from `widgets/index.ts` and the helper from `widgets/text.ts`.
 - **Touches:** Either 10 scene files (add) or 5 (3 scenes + `text.ts` + `index.ts`).
-- **Source:** UI widgets audit (2026-05-10).
-
----
-
-### 61 · Drop dead theme colors `textDark`, `textDim`
-
-- **What:** `src/ui/widgets/theme.ts:42-63` declares `textDark: 0x111343` and `textDim: 0x7bb6bc` in the `COLOR` map. Cross-codebase grep returns zero consumers for either. `textDim` also duplicates `textDisabled`'s value (both `0x7bb6bc`).
-- **Why:** Theme cleanup. Dead entries blur the line between "intentional palette" and "abandoned experiment"; removing them makes the remaining colors a tighter signal of what the widget system actually expresses.
-- **Tier:** 2 (cleanup)
-- **Acceptance:**
-  - Remove `textDark` and `textDim` from `COLOR` in `theme.ts`.
-  - Re-verify no consumers via `Grep "COLOR\.(textDark|textDim)"` before deletion.
-- **Touches:** `src/ui/widgets/theme.ts` (~2 lines).
 - **Source:** UI widgets audit (2026-05-10).
 
 ---
