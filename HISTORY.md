@@ -29,6 +29,19 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-10 · Windows shim robustness in vite.config.ts (closes Cluster B · 50)
+
+- **Why:** The pixel-tools Windows shim block at the top of `vite.config.ts` had two latent issues that would surface as cryptic errors on environments slightly different from the current author's win32-x64 box: the binary suffix was hardcoded to `win32-x64`, and `mkdirSync`/`copyFileSync` would emit raw EACCES errors on read-only `node_modules/.cache/` (Bazel / Nix hermetic CI scenarios).
+- **Decisions:**
+  - **Arch detection via `process.arch`.** The binary suffix is now `win32-${arch}` so a future arm64 Windows laptop will at least try the right filename. The pre-existing `existsSync(src)` guard now produces a more specific error: it names the missing file (with arch), explains pixel-tools may not ship that arch, and offers two paths (file an issue with pixel-tools or run on x64). The x64 case (existsSync false despite arch=x64 → broken install) gets `npm install` as the suggestion.
+  - **Two separate try/catches for `mkdirSync` and `copyFileSync`.** Both fail independently on a read-only filesystem with the same root cause, so the error message is ~the same — but split keeps each error message naming the actual operation that failed (cache-dir creation vs binary copy), so debugging is clearer than a single wrapper would give.
+  - **No helper extraction for the duplicated "needs writable cache" message.** Per CLAUDE.md "three similar lines is better than a premature abstraction"; two near-identical strings is fine.
+- **Surprises:**
+  - **Vitest loads `vite.config.ts` at startup,** so `npm test` exercises the shim block and validates that no regression made the config un-loadable on this win32-x64 box. That's the acceptance-criteria "manual dev-server test" baked into the test runner.
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); promoted to TODO #50.
+
+---
+
 ### 2026-05-10 · Trivial cleanups: stale boss-sprite candidates + dead theme colors (closes Cluster B · 52, 61)
 
 - **Why:** Two minor cleanups batched in one pass to keep cluster-B noise down.

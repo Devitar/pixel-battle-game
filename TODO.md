@@ -27,22 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 50 · Windows shim robustness in vite.config.ts
-
-- **What:** Two robustness improvements for the pixel-tools Windows shim block in `vite.config.ts`:
-  - **Arch detection.** Currently hardcodes `win32-x64` binary name. Will throw with a descriptive message on win32-arm64 (per the existsSync guard added during Cluster B · 45 sub-spec 2 review), but the message points at "the shim strategy" without explaining how to fix it. Detect `process.arch` and select the right binary suffix; fall back to a clearer error if pixel-tools doesn't ship that arch.
-  - **Read-only `node_modules/.cache/` fallback.** Some CI runners (Bazel, Nix hermetic builds) have read-only node_modules. The current `mkdirSync` + `copyFileSync` will throw raw EACCES errors. Wrap in try/catch with a contextual error: "pixel-tools Windows shim needs writable `node_modules/.cache/`; configure your CI to allow this OR run on a non-Windows runner."
-- **Why:** Both are latent issues. Today's setup works on x64 Windows + writable cache. Future ARM Windows laptops or hermetic CI will hit cryptic errors with no clear path forward.
-- **Tier:** 2 (robustness; non-blocking until a real ARM/CI scenario hits)
-- **Acceptance:**
-  - Use `process.arch` to compute binary suffix (`win32-${arch}`).
-  - Wrap `mkdirSync`/`copyFileSync` in try/catch; throw with actionable message on failure.
-  - Manual test: confirm dev server still starts cleanly on win32-x64 (no regression).
-- **Touches:** `vite.config.ts`.
-- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06).
-
----
-
 ### 49 · scene.restart() performance check on hospital under rapid clicking
 
 - **What:** Hospital uses `scene.restart()` for every state change (hero selection, treat, upgrade) — 4 sites in `hospital_panel_scene.ts`. Each restart triggers full UI teardown + rebuild. Verify there's no perceptible lag, dropped frames, or memory growth under rapid clicking — particularly when the wounded list is full and the player rapidly clicks through heroes + treats.
