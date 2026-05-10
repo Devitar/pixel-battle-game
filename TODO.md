@@ -27,20 +27,6 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 47 · Theme palette: revisit mana_soul vs game's gold/dark-gray identity
-
-- **What:** `src/ui/widgets/theme.ts` currently runs a hybrid: mana_soul atlas frames (cream `0xfbe4af` text, blue panel chrome) for panels and buttons, but game-native gold (`0xffcc66`) and dark-gray (`0x1a1a1a`) for selection states + row backgrounds. The 2026-05-09 widget migration adopted this blend without a deliberate visual-design pass. Open question: does the blend read as cohesive, or does it look like two themes welded together?
-- **Why:** Visual consistency across camp panels. The hybrid is functional but the assets/colors weren't co-designed. May warrant a side-by-side review (open Tavern + Hospital + Blacksmith back-to-back) and either (a) commit to the hybrid as the final identity and tune any remaining clashes, or (b) replace mana_soul atlas frames with game-themed art (gold/dark-gray panels) for a unified gold-on-dark look.
-- **Tier:** 2 (visual polish; non-blocking)
-- **Acceptance:**
-  - Side-by-side smoke check across all camp panels.
-  - Decision: keep hybrid (and tune `theme.ts` tints if anything reads off) OR retheme to fully game-native (means new atlas art under `assets/ui.yaml` and a new packed atlas).
-  - May reveal that the hybrid is fine and this entry retires without code changes.
-- **Touches:** `src/ui/widgets/theme.ts` (tint tuning); potentially `assets/ui.yaml` + new sprite art (full retheme path).
-- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); rescoped 2026-05-09 after widget migration.
-
----
-
 ### 59 · HeroCard labels migrate to bitmap fonts
 
 - **What:** `src/ui/widgets/hero_card.ts:121-173` renders the four card labels (name, class+level, inline HP, trait) via raw `scene.add.text({ fontFamily: 'monospace', ... })`. Every other widget — Button labels, panel headers via `createBitmapText`, in-scene captions — uses the `mana_soul` bitmap fonts. HeroCards next to bitmap-font headers in any panel render visibly different typography.

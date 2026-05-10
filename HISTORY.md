@@ -29,6 +29,21 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-10 · Theme palette — switch panel default to 'dark' (closes Cluster B · 47)
+
+- **Why:** All 10 camp panels rendered as `frame_light` (warm gray-cream chrome) wrapping `0x1a1a1a` near-black inner content — a light-warm frame around dark-cool data. The earlier HISTORY note describing mana_soul as "cream-on-blue" was wrong; reading the actual atlas (`mana_soul.png`) shows the variants are `dark` (purple), `bright` (warm cream), and `light` (gray-cream), with gold curly accents shared across all three. The unifying accent across the chrome and the game-native overlay is gold (`0xffcc66`); the visible mismatch was in the body fills.
+- **Decisions:**
+  - **Switched `createPanel`'s default variant from `'light'` to `'dark'`.** Single-line change in `src/ui/widgets/panel.ts:30`. All 10 `createPanel(...)` call sites pass no explicit variant, so they all flip to `frame_dark` (dark purple chrome) atomically. Result: dark-purple frame wrapping dark-gray content, gold accents shared across both layers.
+  - **Did NOT change inner-content colors (`paneBg`, `rowBg`, etc.).** Keeping `0x1a1a1a` preserves the conventional "dark = data area" affordance while the frame change does the cohesion work. If the dark-purple-on-dark-gray transition is too soft or too stark in practice, the next move is to warm the inner content (`paneBg → 0x2a1f2e` to echo mana_soul's interior shadow) — left as a follow-up only if the smoke check flags it.
+  - **Did NOT pursue full retheme to game-native art.** That's a sprite-art job (new atlas under `assets/ui.yaml`); not justified when a 1-line variant default change unifies the look.
+  - **Updated jsdoc on `PanelOpts.variant`** to reflect the new default and document why (harmonizes with dark inner-content backdrops).
+- **Surprises:**
+  - **The earlier HISTORY description of mana_soul was wrong** — "cream-on-blue palette" appears in the 2026-05-09 widget-migration entry and the original #47 TODO. Reading the actual atlas PNG showed the panels are purple/gray-cream/cream, not blue. One blue button accent in the atlas may have seeded the misnomer. Lesson: when working with bitmap art, read the actual PNG before describing it from memory.
+  - **`Dialog`'s default variant is `'bright'` and was left unchanged** — confirmation modals intentionally pop with the warm cream chrome vs the underlying scene; that's a different visual design role from panel chrome.
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); promoted to TODO #47.
+
+---
+
 ### 2026-05-10 · Hospital scene.restart() perf check — premise was wrong (closes Cluster B · 49)
 
 - **Why:** TODO #49 asked for a manual FPS measurement on hospital under "rapid clicking between heroes" with the assumption that hero selection triggered full `scene.restart()`. Audit before measurement: the premise is false — the rapid-click hot path is already partial-update.
