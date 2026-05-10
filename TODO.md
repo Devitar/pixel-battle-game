@@ -81,20 +81,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 ---
 
-### 46 · Hospital wounded list pagination / overflow indicator
-
-- **What:** `hospital_panel_scene.ts:152` caps the wounded list at `VISIBLE_ROWS` via `wounded.slice(0, VISIBLE_ROWS)`. With more wounded heroes than fit, the rest are silently dropped — no scrollbar, no "+N more" indicator. A player can't tell if/which heroes are missing.
-- **Why:** Real UX bug at the edge case. Late-game with many heroes wounded across runs, the player may be unable to access some of them via the hospital UI.
-- **Tier:** 2 (UX bug)
-- **Acceptance:**
-  - Either pagination (matching blacksmith's pattern) OR a visible "+N more" text row when `wounded.length > VISIBLE_ROWS`.
-  - Pagination preferred for parity with other panels.
-  - Cap-edge state: when exactly `VISIBLE_ROWS` heroes are wounded, no overflow indicator should appear.
-- **Touches:** `src/scenes/hospital_panel_scene.ts`.
-- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); concern carries over post-pixui.
-
----
-
 ### 59 · HeroCard labels migrate to bitmap fonts
 
 - **What:** `src/ui/widgets/hero_card.ts:121-173` renders the four card labels (name, class+level, inline HP, trait) via raw `scene.add.text({ fontFamily: 'monospace', ... })`. Every other widget — Button labels, panel headers via `createBitmapText`, in-scene captions — uses the `mana_soul` bitmap fonts. HeroCards next to bitmap-font headers in any panel render visibly different typography.

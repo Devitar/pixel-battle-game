@@ -29,6 +29,19 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-10 · Hospital wounded-list pagination (closes Cluster B · 46)
+
+- **Why:** `hospital_panel_scene.ts` capped the wounded list at `VISIBLE_ROWS = 6` via `wounded.slice(0, VISIBLE_ROWS)` with no overflow affordance. Heroes 7+ in the list were silently inaccessible — a real UX bug at the late-game edge case where many heroes accumulate wounds across runs.
+- **Decisions:**
+  - **Pagination over "+N more" indicator.** Spec accepted either; pagination chosen for parity with blacksmith's existing pattern (sub-spec 1 era). Mirrors `_listPageStart` module-level state, `▲`/`▼` arrow widgets, and the `maxStart = Math.max(0, total - VISIBLE_ROWS)` clamp verbatim from `blacksmith_panel_scene.ts:266-280, 650-683`.
+  - **Page state persists across `scene.restart()` but resets on `close()`.** Treatments rebuild the scene; if the page reset to 0 on every treat, paging through page-2 wounds would feel broken. Closing the panel resets — next visit starts at the top, matching the user's mental model of "fresh look at the hospital."
+  - **Arrow placement matches blacksmith's exactly.** `PAGE_ARROW_X = LIST_X + LIST_W + 8` (hospital and blacksmith share the same `LIST_X` and `LIST_W`), `PAGE_UP_Y = ROW_Y_BASE - 6`, `PAGE_DOWN_Y = ROW_Y_BASE + (VISIBLE_ROWS - 1) * ROW_STRIDE + 6`. Result: the two panels are visually parallel — same arrow positions, same disabled-state coloring (`#cccccc` enabled vs `#444444` disabled).
+- **Surprises:**
+  - **Selection-vs-page edge case carried over from blacksmith.** When a user on page 2 treats the last wound of the hero in their selected slot, the wounded list shrinks; the page-clamp brings `_listPageStart` back into range, but `_selectedHeroId` rebinds to `wounded[0]` (per the existing line 75 fallback) which may be off the new visible page. The detail pane shows wounded[0]'s wounds while the page shows wounded[N..N+5]. Not new to this change — blacksmith has the same edge — but worth knowing. Acceptable for now; would be fixed by a future "scroll-to-selection" pass across both panels if it bites.
+- **Source:** Cluster B · 45 sub-spec 2 whole-impl review (2026-05-06); promoted to TODO #46. Test count unchanged (1716/1716 — scenes aren't unit-tested in this codebase).
+
+---
+
 ### 2026-05-10 · UI widgets audit — Button cleanup + 3 TODOs filed
 
 - **Why:** Audit pass over `src/ui/widgets/` after the 2026-05-09 pixui removal to find post-migration debt. Findings either fixed inline (small/clear) or filed as TODO entries (larger/decision-required). One latent constructor bug surfaced and fixed because it materially affected the YAGNI cleanup.
