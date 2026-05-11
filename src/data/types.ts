@@ -349,7 +349,10 @@ export interface PerkDef {
   petAttackBonus?: number;
 }
 
+export type BuildingId = 'tavern' | 'barracks' | 'blacksmith' | 'hospital' | 'chapel';
+
 export interface Unlocks {
   classes: readonly ClassId[];
   dungeons: readonly DungeonId[];
+  buildings: readonly BuildingId[];
 }

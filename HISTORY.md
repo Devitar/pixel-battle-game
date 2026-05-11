@@ -29,6 +29,26 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-11 · Chapel building — Add or Replace traits (closes Cluster D · 5)
+
+- **Why:** Second of three Sunken-Keep-gated unlocks (Hunter shipped 2026-05-10; Training Grounds follows as Cluster D · 6). Original gdd framed Chapel as "remove a negative Trait, expensive" — brainstorming pivoted the feature toward a *growth* model: heroes can accumulate up to 3 traits across their lifetime via two distinct actions (Replace / Add). gdd §6 row 6 patched in same change.
+- **Decisions:**
+  - **Two operations, not one.** Replace (swap an existing trait, flat 50g × hero.level) and Add (grow the trait set, 50g × level × current trait count). Cap at 3 traits/hero. User explicitly rejected the original "Remove a Trait" framing during brainstorming — Add+Replace gives more depth and turns Chapel from a fix-tool into a growth-tool. Negative-trait escape now happens via Replace (overwrite) rather than Remove.
+  - **`Hero.traitId: TraitId` → `traitIds: readonly TraitId[]`** (singular → plural). Load-bearing shape change cascaded across ~10 files: Hero, Combatant, `computeMaxHp` / `recomputeMaxHp` (now take `readonly TraitDef[]`), `getEffectiveStat` (iterates + sums), combat_setup pass-through, HeroCard with 2-trait + ellipsis truncation, Barracks panel join. `createHero` keeps its singular `traitId` parameter signature and internally wraps to `[traitId]` — kept all 4 call sites unchanged.
+  - **Commit-then-reveal** for both actions. Gold deducts on click → roll new trait → scene re-renders with the change visible. No preview-then-confirm; the gambling tension *is* the chapel mechanic.
+  - **Re-roll pool excludes current traits.** Player never wastes gold on a "pay 250g, get same trait back" outcome; new trait is guaranteed different from the existing set. With 3-trait cap and 12-trait pool, exhaustion is never a runtime concern.
+  - **New `Unlocks.buildings: readonly BuildingId[]` field** parallels classes/dungeons. Camp scene gates the Chapel tile on `unlocks.buildings.includes('chapel')`. `BuildingId` moved from `save.ts` to `data/types.ts` (re-exported from save.ts for back-compat) to avoid a `data` → `save` layering inversion when Unlocks references it.
+  - **Building data registry shape unchanged.** `BUILDING_LEVELS.chapel = [{ level: 1, upgradeCost: 0, ... }]` (single-element array). The existing `nextLevel` function returns null when current+1 has no entry — L1-only is handled without a special case.
+  - **Save schema bump v3 → v4 + migration.** Per `feedback_save_migrations`, migrations are in-scope as of 2026-05-10. Migration converts `traitId` → `traitIds: [traitId]` across all 5 Hero record locations (roster, tavernCandidates, runState.party/fallen/lost), defaults `buildingLevels.chapel = 1`, defaults `unlocks.buildings = []`. Pre-existing v1→v2 and v2→v3 chain through cleanly.
+- **Surprises:**
+  - **Task 4 implementer (Hunter spec) pulled Task 5's perk content forward** to satisfy `Record<ClassId, ...>` exhaustiveness. Reading back: the same pattern likely landed during the Chapel cascade — Task 2's implementer caught an unanticipated 7th fixture file (`milestones.test.ts`) that needed `unlocks: { buildings: [] }` widening when `Unlocks` widened. Type system did the work; implementer self-resolved.
+  - **Task 5 ChapelPanelScene resolved all four widget-signature ambiguities** the plan flagged: `Button` actually uses `text`/`enabled`/`gameObjects` (not `label`/`disabled`/`container`); `appState.update` takes a producer function `(s) => s'` (not a plain object). The implementer correctly read Hospital + the existing `Button` widget as templates rather than guessing — saved a debug round.
+  - **Defensive `normalizeHero` legacy `traitId → traitIds` fallback** landed in `save.ts` during Task 3 (Hero shape cascade), in addition to the canonical Task 8 migration. Belt-and-suspenders — harmless but technically redundant. Worth removing in a future cleanup if save shape ever needs another normalization pass.
+  - **Percent-mode HP effects compose multiplicatively when stacked** (e.g., Stout +10% twice = 1.21× base, not 1.20×). In practice the duplicate-exclusion rule prevents this, but the test for compose order documents the semantic in case future feature work loosens that constraint.
+- **Source:** TODO Cluster D · 5. Spec: `docs/superpowers/specs/2026-05-11-chapel-building-design.md`. Plan: `docs/superpowers/plans/2026-05-11-chapel-building.md`. gdd §6 row 6 patched in the same change (Remove → Add or Replace, up to 3 per hero).
+
+---
+
 ### 2026-05-10 · Hunter class — second unlockable (closes Cluster D · 4)
 
 - **Why:** First class unlock gated on a tier-2 dungeon clear. Completes the "every dungeon clear unlocks a class" pattern through tier 2 (Crypt → Paladin shipped; Sunken Keep → Hunter). Also scaffolds the `first_sunken_keep_clear` milestone for the sibling Cluster D · 5 (Chapel) and · 6 (Training Grounds) to extend.

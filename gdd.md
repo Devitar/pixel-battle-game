@@ -195,7 +195,7 @@ Camp is presented as a side-scrolling village at the same pixel scale as combat.
 | **Blacksmith** | Upgrade gear tiers (common → uncommon → rare). Costs gold + materials (drop from elites / bosses). | L1: common→uncommon / L2: +uncommon→rare / L3: +rare→epic |
 | **Hospital** | Heal Wounds. Gold per wound, or time-based (wounds clear after N runs for free). | L1: 1 wound/run cheap / L2: 2 / L3: 3 + faster time-heal |
 | **Expeditions** | Pick the next dungeon. Not upgraded directly — unlocks appear here as bosses are beaten. | n/a |
-| **Chapel** *(unlock)* | Remove a Trait from a hero. Expensive. Unlocks after first Sunken Keep clear. | L1 only |
+| **Chapel** *(unlock)* | Add or replace traits on a hero — up to 3 per hero. Expensive. Unlocks after first Sunken Keep clear. | L1 only |
 | **Training Grounds** *(unlock)* | Benched heroes passively gain XP from every completed run (active or not). XP gain is pro-rated against what an active hero of the same level would have earned on that run, so deep runs train better. Gained on both cashout and wipe; wipes pay less. | L1: 2 trainee slots, 25% pro-rated XP / L2: 3 slots, 40% / L3: 4 slots, 55%. Unlocks: first Sunken Keep clear. |
 
 ### Typical camp visit

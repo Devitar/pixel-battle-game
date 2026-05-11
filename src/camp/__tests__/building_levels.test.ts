@@ -99,3 +99,15 @@ describe('BARRACKS_CAPACITY', () => {
     expect(BARRACKS_CAPACITY[3]).toBe(20);
   });
 });
+
+describe('chapel building levels (L1-only)', () => {
+  it('registers chapel with exactly one tier at level 1', () => {
+    expect(BUILDING_LEVELS.chapel).toHaveLength(1);
+    expect(BUILDING_LEVELS.chapel[0]?.level).toBe(1);
+    expect(BUILDING_LEVELS.chapel[0]?.upgradeCost).toBe(0);
+  });
+
+  it('chapel has no L2 upgrade path', () => {
+    expect(nextLevel('chapel', 1)).toBeNull();
+  });
+});

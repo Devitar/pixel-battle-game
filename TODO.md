@@ -45,23 +45,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 Tier 3 scope from gdd §10. Sunken Keep (Cluster D · 1, 2026-05-06) and Paladin (Cluster D · 3, 2026-05-06) shipped; the Crypt-clear → Paladin/Sunken-Keep cascade is wired. Entries below are the **first-Sunken-Keep-clear cascade** (Hunter + Chapel + Training Grounds, gdd §9), plus future Tier 3 surface (dungeons 3-4, legendary gear, level-10 perks, NG+) that hasn't been broken down yet.
 
-### 5 · Chapel building — trait removal
-
-- **What:** Add the Chapel camp building (gdd §6 row 6): L1-only (no tier progression), single function — remove a Trait from a hero for an expensive gold cost. Unlocks via the same `first_sunken_keep_clear` handler as Hunter and Training Grounds.
-- **Why:** Trait removal is the player-facing utility for first Sunken Keep clear, alongside Hunter and Training Grounds. Lets the player escape negative traits on otherwise-promising heroes — a meaningful tool in the Tier 3 economy. Mechanically the simplest of the three Sunken Keep-gated unlocks (no candidate generation, no roll mechanics, no progression tiers).
-- **Tier:** 3
-- **Acceptance:**
-  - **Needs brainstorming first** to define the gold cost (gdd says "expensive"; should balance against re-rolling via retire-and-rehire path) and the UI (hero picker → trait list → confirm dialog).
-  - New camp scene: `chapel_panel_scene.ts`. Pattern can mirror Hospital's structure (list of heroes with traits + detail pane + confirm action) but simpler since there's no per-hero state to manage.
-  - New `removeTrait(hero, ...)` data-layer function in `src/camp/roster.ts` or `src/heroes/hero.ts`.
-  - Camp scene gets a new chapel tile that's hidden until the milestone fires (extend the milestone handler to also reveal the Chapel building entry alongside `unlocks.buildings`).
-  - `BuildingId` widens to include `'chapel'`; `BuildingLevels` shape changes (Chapel is L1-only, may not need a level entry — design decision).
-  - Save schema bump if `BuildingLevels` shape changes; mirror `MIGRATIONS[1]` pattern from Cluster B · 58.
-- **Touches:** `src/scenes/chapel_panel_scene.ts` (new), `src/scenes/camp_scene.ts` (new tile), `src/camp/buildings/chapel.ts` (new), `src/camp/roster.ts` or `src/heroes/hero.ts` (removeTrait function), `src/run/milestones.ts` (extend handler), `src/save/save.ts` + `src/save/migration.ts` (if schema bumps), `src/data/types.ts` (BuildingId widening, possibly Unlocks shape).
-- **Source:** gdd §6 (buildings table) + §9 (meta-progression). Cluster D blurb placeholder.
-
----
-
 ### 6 · Training Grounds building — passive XP for benched heroes
 
 - **What:** Add the Training Grounds camp building (gdd §6 row 7): benched heroes assigned to trainee slots gain pro-rated XP from every completed run. L1-3 progression: L1=2 slots / 25% / L2=3 / 40% / L3=4 / 55%. XP awarded on both cashout AND wipe (wipe pays less per gdd). Unlocks via the `first_sunken_keep_clear` handler.

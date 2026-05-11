@@ -4,7 +4,7 @@ import type { SaveFile } from './save';
 // like Hero, Roster, RunState, Vault, Unlocks, Preferences) and register a
 // migration in MIGRATIONS[previousVersion] that maps old raw shape to new.
 // Loaders newer than CURRENT_SCHEMA_VERSION are rejected at save.ts:load.
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 type MigrationFn = (raw: Record<string, unknown>) => Record<string, unknown>;
 
@@ -45,6 +45,43 @@ const MIGRATIONS: Record<number, MigrationFn> = {
         );
       }
     }
+    return out;
+  },
+
+  // v3 → v4: Hero.traitId → traitIds (single → array); buildingLevels.chapel = 1;
+  // unlocks.buildings = []. Chapel spec, 2026-05-11.
+  3: (raw) => {
+    const out: Record<string, unknown> = { ...raw, version: 4 };
+
+    const migrateHero = (h: Record<string, unknown>): Record<string, unknown> => {
+      if (Array.isArray(h.traitIds)) return h;
+      if (typeof h.traitId !== 'string') return h;
+      const { traitId, ...rest } = h;
+      return { ...rest, traitIds: [traitId] };
+    };
+
+    const roster = out.roster as { heroes?: Array<Record<string, unknown>> } | undefined;
+    if (roster?.heroes) roster.heroes = roster.heroes.map(migrateHero);
+
+    const candidates = out.tavernCandidates as Array<Record<string, unknown>> | undefined;
+    if (candidates) out.tavernCandidates = candidates.map(migrateHero);
+
+    const runState = out.runState as Record<string, unknown> | undefined;
+    if (runState) {
+      const party = runState.party as Array<Record<string, unknown>> | undefined;
+      if (party) runState.party = party.map(migrateHero);
+      const fallen = runState.fallen as Array<Record<string, unknown>> | undefined;
+      if (fallen) runState.fallen = fallen.map(migrateHero);
+      const lost = runState.lost as Array<Record<string, unknown>> | undefined;
+      if (lost) runState.lost = lost.map(migrateHero);
+    }
+
+    const bl = out.buildingLevels as Record<string, unknown> | undefined;
+    if (bl && bl.chapel === undefined) bl.chapel = 1;
+
+    const unlocks = out.unlocks as Record<string, unknown> | undefined;
+    if (unlocks && unlocks.buildings === undefined) unlocks.buildings = [];
+
     return out;
   },
 };
