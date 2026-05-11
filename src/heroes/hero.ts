@@ -16,7 +16,7 @@ export interface Hero {
   baseStats: Stats;
   currentHp: number;
   maxHp: number;
-  traitId: TraitId;
+  traitIds: readonly TraitId[];
   bodySpriteId: string;
   legsSpriteId: string;
   feetSpriteId: string;
@@ -41,7 +41,7 @@ export function createHero(
 ): Hero {
   const def = CLASSES[classId];
   const equipment = buildStarterEquipment(id, def.starterLoadout);
-  const maxHp = computeMaxHp(def.baseStats.hp, TRAITS[traitId], equipment);
+  const maxHp = computeMaxHp(def.baseStats.hp, [TRAITS[traitId]], equipment);
   return {
     id,
     classId,
@@ -49,7 +49,7 @@ export function createHero(
     baseStats: { ...def.baseStats },
     currentHp: maxHp,
     maxHp,
-    traitId,
+    traitIds: [traitId],
     bodySpriteId,
     legsSpriteId,
     feetSpriteId,
@@ -64,21 +64,23 @@ export function createHero(
 
 export function computeMaxHp(
   classBaseHp: number,
-  trait: TraitDef,
+  traits: readonly TraitDef[],
   equipment: HeroEquipment,
   perk?: PerkDef,
 ): number {
   let base = classBaseHp;
-  if (trait.hpEffect) base = applyHpEffect(base, trait.hpEffect);
+  for (const trait of traits) {
+    if (trait.hpEffect) base = applyHpEffect(base, trait.hpEffect);
+  }
   if (perk?.hpEffect) base = applyHpEffect(base, perk.hpEffect);
   return base + gearTotal(equipment);
 }
 
 export function recomputeMaxHp(hero: Hero): Hero {
   const classDef = CLASSES[hero.classId];
-  const trait = TRAITS[hero.traitId];
+  const traits = hero.traitIds.map((id) => TRAITS[id]);
   const perk = hero.perkId ? PERKS[hero.perkId] : undefined;
-  const newMaxHp = computeMaxHp(classDef.baseStats.hp, trait, hero.equipment, perk);
+  const newMaxHp = computeMaxHp(classDef.baseStats.hp, traits, hero.equipment, perk);
   return {
     ...hero,
     maxHp: newMaxHp,

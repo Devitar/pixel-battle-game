@@ -19,11 +19,13 @@ function evaluateTraitCondition(
 export function getEffectiveStat(combatant: Combatant, stat: BuffableStat): number {
   let total = combatant.baseStats[stat === 'hp' ? 'hp' : stat];
 
-  if (stat !== 'hp' && combatant.traitId) {
-    const trait = TRAITS[combatant.traitId];
-    for (const effect of trait.statEffects ?? []) {
-      if (effect.stat === stat && evaluateTraitCondition(effect.condition, combatant)) {
-        total += effect.delta;
+  if (stat !== 'hp' && combatant.traitIds) {
+    for (const id of combatant.traitIds) {
+      const trait = TRAITS[id];
+      for (const effect of trait.statEffects ?? []) {
+        if (effect.stat === stat && evaluateTraitCondition(effect.condition, combatant)) {
+          total += effect.delta;
+        }
       }
     }
   }

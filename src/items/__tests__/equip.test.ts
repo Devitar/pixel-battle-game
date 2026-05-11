@@ -20,7 +20,7 @@ const fakeHero = (overrides: Partial<Hero> = {}): Hero => ({
   baseStats: { hp: 20, attack: 4, defense: 4, speed: 3, mind: 0, crit: 5, dodge: 5 },
   currentHp: 20,
   maxHp: 20,
-  traitId: 'stout',
+  traitIds: ['stout'],
   bodySpriteId: '0',
   legsSpriteId: '0',
   feetSpriteId: '0',

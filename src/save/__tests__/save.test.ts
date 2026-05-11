@@ -33,7 +33,7 @@ function makeBaseSave(): SaveFile {
     vault: credit(createVault(), 100),
     stash: createStash(),
     unlocks: createDefaultUnlocks(),
-    buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
+    buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
     hospitalTreatmentsRemaining: 1,
     tavernCandidates: [],
     campRngState: 0,
@@ -124,7 +124,7 @@ describe('save / load roundtrip', () => {
       vault: createVault(),
       stash: createStash(),
       unlocks: createDefaultUnlocks(),
-      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
       hospitalTreatmentsRemaining: 1,
       tavernCandidates: [],
       // intentionally missing campRngState — it's a v2-introduced field
@@ -239,10 +239,11 @@ describe('clearSave', () => {
 });
 
 describe('createDefaultUnlocks', () => {
-  it('includes the six launch classes and Crypt', () => {
+  it('returns the six Tier-1+ classes, the Crypt dungeon, and an empty buildings list', () => {
     const u = createDefaultUnlocks();
     expect([...u.classes].sort()).toEqual(['archer', 'barbarian', 'knight', 'mage', 'priest', 'rogue']);
     expect(u.dungeons).toEqual(['crypt']);
+    expect(u.buildings).toEqual([]);
   });
 });
 
@@ -284,7 +285,7 @@ describe('load — buildingLevels normalizer', () => {
     storage.setItem(STORAGE_KEY, JSON.stringify(oldShape));
     const loaded = load(storage);
     expect(loaded?.buildingLevels).toEqual({
-      tavern: 1, barracks: 1, blacksmith: 1, hospital: 1,
+      tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1,
     });
   });
 });
@@ -345,7 +346,7 @@ describe('save normalizer — runState.lost default', () => {
       roster: { heroes: [], slots: 12 },
       vault: { gold: 0 },
       stash: createStash(),
-      unlocks: { classes: [], dungeons: [] },
+      unlocks: { classes: [], dungeons: [], buildings: [] },
       runState: {
         dungeonId: 'crypt',
         seed: 1,
@@ -382,7 +383,7 @@ describe('save normalizer — runState.lost default', () => {
       roster: { heroes: [], slots: 12 },
       vault: { gold: 0 },
       stash: createStash(),
-      unlocks: { classes: [], dungeons: [] },
+      unlocks: { classes: [], dungeons: [], buildings: [] },
       runState: {
         dungeonId: 'crypt',
         seed: 1,
@@ -412,7 +413,7 @@ describe('save normalizer — runState.traversedNodeIds default', () => {
       roster: { heroes: [], slots: 12 },
       vault: { gold: 0 },
       stash: createStash(),
-      unlocks: { classes: [], dungeons: [] },
+      unlocks: { classes: [], dungeons: [], buildings: [] },
       runState: {
         dungeonId: 'crypt',
         seed: 1,
@@ -442,7 +443,7 @@ describe('save normalizer — runState.traversedNodeIds default', () => {
       roster: { heroes: [], slots: 12 },
       vault: { gold: 0 },
       stash: createStash(),
-      unlocks: { classes: [], dungeons: [] },
+      unlocks: { classes: [], dungeons: [], buildings: [] },
       runState: {
         dungeonId: 'crypt',
         seed: 1,
@@ -474,7 +475,7 @@ describe('save normalizer — runState.surprisesThisFloor default', () => {
       roster: { heroes: [], slots: 12 },
       vault: { gold: 0 },
       stash: createStash(),
-      unlocks: { classes: [], dungeons: [] },
+      unlocks: { classes: [], dungeons: [], buildings: [] },
       runState: {
         dungeonId: 'crypt',
         seed: 1,
@@ -505,7 +506,7 @@ describe('save normalizer — runState.surprisesThisFloor default', () => {
       roster: { heroes: [], slots: 12 },
       vault: { gold: 0 },
       stash: createStash(),
-      unlocks: { classes: [], dungeons: [] },
+      unlocks: { classes: [], dungeons: [], buildings: [] },
       runState: {
         dungeonId: 'crypt',
         seed: 1,
@@ -536,7 +537,7 @@ describe('save normalizer — runState.pendingMilestones default', () => {
       roster: { heroes: [], slots: 12 },
       vault: { gold: 0 },
       stash: createStash(),
-      unlocks: { classes: [], dungeons: [] },
+      unlocks: { classes: [], dungeons: [], buildings: [] },
       runState: {
         dungeonId: 'crypt',
         seed: 1,
@@ -572,7 +573,7 @@ describe('save normalizer — runState.pendingMilestones default', () => {
       roster: { heroes: [], slots: 12 },
       vault: { gold: 0 },
       stash: createStash(),
-      unlocks: { classes: [], dungeons: [] },
+      unlocks: { classes: [], dungeons: [], buildings: [] },
       runState: {
         dungeonId: 'crypt',
         seed: 1,
@@ -609,7 +610,7 @@ describe('isSoftlocked', () => {
       vault: credit(createVault(), gold),
       stash: createStash(),
       unlocks: createDefaultUnlocks(),
-      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
       hospitalTreatmentsRemaining: 1,
       tavernCandidates: [],
       campRngState: 0,

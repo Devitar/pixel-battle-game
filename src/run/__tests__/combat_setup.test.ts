@@ -88,7 +88,7 @@ describe('buildCombatState', () => {
 });
 
 describe('buildCombatState — trait propagation', () => {
-  it('copies each Hero traitId into the resulting Combatant', () => {
+  it('copies each Hero traitIds into the resulting Combatant', () => {
     const party = [
       createHero('knight', 'K', 'h0', 'stout', 'body1'),
       createHero('archer', 'A', 'h1', 'cowardly', 'body1'),
@@ -96,9 +96,9 @@ describe('buildCombatState — trait propagation', () => {
     ];
     const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
     const state = buildCombatState(party, encounter);
-    expect(state.combatants[0].traitId).toBe('stout');
-    expect(state.combatants[1].traitId).toBe('cowardly');
-    expect(state.combatants[2].traitId).toBe('sharp_eyed');
+    expect(state.combatants[0].traitIds).toEqual(['stout']);
+    expect(state.combatants[1].traitIds).toEqual(['cowardly']);
+    expect(state.combatants[2].traitIds).toEqual(['sharp_eyed']);
   });
 
   it('applies a statDelta wound (winded) to baseStats.attack', () => {

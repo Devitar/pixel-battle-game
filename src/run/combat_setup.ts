@@ -77,7 +77,7 @@ export function buildCombatState(
         baseStats: fullStats,
         currentHp: Math.min(hero.currentHp, woundedMaxHp),
         maxHp: woundedMaxHp,
-        traitId: hero.traitId,
+        traitIds: hero.traitIds,
         abilities,
         aiPriority,
         ...(hero.perkId !== undefined ? { perkId: hero.perkId } : {}),

@@ -118,7 +118,9 @@ export class HeroCard {
     const textOffsetFromTop = (isLarge ? 12 : 6) - h / 2;
 
     const classDef = CLASSES[this.hero.classId];
-    const traitDef = TRAITS[this.hero.traitId];
+    const traitNames = this.hero.traitIds.length > 2
+      ? this.hero.traitIds.slice(0, 2).map((id) => TRAITS[id].name).join(' · ') + ' …'
+      : this.hero.traitIds.map((id) => TRAITS[id].name).join(' · ');
 
     const nameLabel = isDead ? `${this.hero.name} (Fallen)` : this.hero.name;
     const nameLine = createBitmapText({
@@ -168,9 +170,7 @@ export class HeroCard {
 
       // Trait line
       const traitY = barY + barH + (isLarge ? 6 : 3);
-      const traitLabel = isLarge
-        ? `${traitDef.name} - ${traitDef.description}`
-        : `${traitDef.name} · ${traitDef.shortDescription}`;
+      const traitLabel = traitNames;
       const traitText = createBitmapText({
         scene: this.scene,
         x: textX,

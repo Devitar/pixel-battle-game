@@ -51,7 +51,7 @@ export interface Combatant {
   aiPriority: readonly AbilityId[];
   preferredSlots?: readonly SlotIndex[];
   tags?: readonly CombatantTag[];
-  traitId?: TraitId;
+  traitIds?: readonly TraitId[];
   perkId?: PerkId;
   damageTakenMultiplier?: number;
   // Candidates for consolidation into a `passives` bag once 3+ more land.
