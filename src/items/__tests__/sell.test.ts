@@ -25,9 +25,10 @@ function makeState(items: readonly Item[], gold = 0): SaveFile {
     vault: credit(createVault(), gold),
     stash: addItems(createStash(), items),
     unlocks: createDefaultUnlocks(),
-    buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
+    buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 1 },
     hospitalTreatmentsRemaining: 1,
     tavernCandidates: [],
+    traineeHeroIds: [null, null],
     campRngState: 0,
   };
 }

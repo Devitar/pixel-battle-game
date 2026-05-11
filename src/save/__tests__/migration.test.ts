@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CURRENT_SCHEMA_VERSION, migrate } from '../migration';
+import type { SaveFile } from '../save';
 
 describe('migrate', () => {
   it('returns the input as-is when version matches CURRENT_SCHEMA_VERSION', () => {
@@ -147,7 +148,8 @@ describe('migrate', () => {
       unlocks: { buildings?: string[] };
     };
     expect(result).not.toBeNull();
-    expect(result.version).toBe(4);
+    // v3 chains through v4 → v5; final version is CURRENT_SCHEMA_VERSION
+    expect(result.version).toBe(CURRENT_SCHEMA_VERSION);
     expect(result.roster.heroes[0].traitIds).toEqual(['stout']);
     expect(result.roster.heroes[0].traitId).toBeUndefined();
     expect(result.tavernCandidates[0].traitIds).toEqual(['quick']);
@@ -195,9 +197,94 @@ describe('migrate', () => {
       buildingLevels: { chapel?: number };
       unlocks: { buildings?: string[] };
     };
-    expect(result.version).toBe(4);
+    expect(result.version).toBe(CURRENT_SCHEMA_VERSION);
     expect(result.runState).toBeUndefined();
     expect(result.buildingLevels.chapel).toBe(1);
     expect(result.unlocks.buildings).toEqual([]);
+  });
+});
+
+describe('v4 → v5 migration (Training Grounds)', () => {
+  it('adds buildingLevels.training_grounds = 1', () => {
+    const raw = {
+      version: 4,
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
+      roster: { heroes: [], capacity: 12 },
+      vault: { gold: 0 },
+      stash: { items: [] },
+      unlocks: { classes: ['knight'], dungeons: ['crypt'], buildings: [] },
+      hospitalTreatmentsRemaining: 1,
+      tavernCandidates: [],
+      campRngState: 0,
+    };
+    const migrated = migrate(raw) as SaveFile;
+    expect(migrated.buildingLevels.training_grounds).toBe(1);
+  });
+
+  it('adds traineeHeroIds = [null, null] (L1 default)', () => {
+    const raw = {
+      version: 4,
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
+      roster: { heroes: [], capacity: 12 },
+      vault: { gold: 0 },
+      stash: { items: [] },
+      unlocks: { classes: ['knight'], dungeons: ['crypt'], buildings: [] },
+      hospitalTreatmentsRemaining: 1,
+      tavernCandidates: [],
+      campRngState: 0,
+    };
+    const migrated = migrate(raw) as SaveFile;
+    expect(migrated.traineeHeroIds).toEqual([null, null]);
+  });
+
+  it('adds runState.traineeXpBase = 0 when a run is in progress', () => {
+    const raw = {
+      version: 4,
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
+      roster: { heroes: [], capacity: 12 },
+      vault: { gold: 0 },
+      stash: { items: [] },
+      unlocks: { classes: ['knight'], dungeons: ['crypt'], buildings: [] },
+      hospitalTreatmentsRemaining: 1,
+      tavernCandidates: [],
+      campRngState: 0,
+      runState: {
+        dungeonId: 'crypt',
+        seed: 0,
+        party: [],
+        pack: { gold: 0, items: [] },
+        currentFloorNumber: 1,
+        currentFloorNodes: [],
+        currentNodeId: 'start',
+        awaitingFork: false,
+        status: 'in_dungeon',
+        fallen: [],
+        lost: [],
+        traversedNodeIds: ['start'],
+        surprisesThisFloor: 0,
+        pendingMilestones: [],
+        petsDownByHeroId: [],
+      },
+      runRngState: 0,
+    };
+    const migrated = migrate(raw) as SaveFile;
+    expect(migrated.runState?.traineeXpBase).toBe(0);
+  });
+
+  it('full chain v1 → v5 produces a valid v5 save', () => {
+    const v1raw = {
+      version: 1,
+      roster: { heroes: [], capacity: 12 },
+      vault: { gold: 0 },
+      stash: { items: [] },
+      unlocks: { classes: ['knight'], dungeons: ['crypt'] },
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
+      hospitalTreatmentsRemaining: 1,
+      tavernCandidates: [],
+    };
+    const migrated = migrate(v1raw) as SaveFile;
+    expect(migrated.version).toBe(5);
+    expect(migrated.buildingLevels.training_grounds).toBe(1);
+    expect(migrated.traineeHeroIds).toEqual([null, null]);
   });
 });

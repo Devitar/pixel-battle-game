@@ -10,11 +10,13 @@ import {
   createDefaultUnlocks,
   isSoftlocked,
   load,
+  normalizeSaveFile,
   save,
   type SaveFile,
 } from '../save';
 import { createHero } from '@heroes/hero';
 import { addHero } from '@camp/roster';
+import type { Hero } from '@heroes/hero';
 
 class MemoryStorage implements Storage {
   private store = new Map<string, string>();
@@ -33,9 +35,10 @@ function makeBaseSave(): SaveFile {
     vault: credit(createVault(), 100),
     stash: createStash(),
     unlocks: createDefaultUnlocks(),
-    buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
+    buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 1 },
     hospitalTreatmentsRemaining: 1,
     tavernCandidates: [],
+    traineeHeroIds: [null, null],
     campRngState: 0,
   };
 }
@@ -67,6 +70,7 @@ describe('save / load roundtrip', () => {
       surprisesThisFloor: 0,
       pendingMilestones: [],
       petsDownByHeroId: [],
+      traineeXpBase: 0,
     };
     const original: SaveFile = {
       ...makeBaseSave(),
@@ -97,6 +101,7 @@ describe('save / load roundtrip', () => {
       surprisesThisFloor: 0,
       pendingMilestones: [],
       petsDownByHeroId: [],
+      traineeXpBase: 0,
     };
     const data: SaveFile = { ...makeBaseSave(), runState: fakeRunState };
     expect(() => save(data, storage)).toThrow();
@@ -285,7 +290,7 @@ describe('load — buildingLevels normalizer', () => {
     storage.setItem(STORAGE_KEY, JSON.stringify(oldShape));
     const loaded = load(storage);
     expect(loaded?.buildingLevels).toEqual({
-      tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1,
+      tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 1,
     });
   });
 });
@@ -610,9 +615,10 @@ describe('isSoftlocked', () => {
       vault: credit(createVault(), gold),
       stash: createStash(),
       unlocks: createDefaultUnlocks(),
-      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 1 },
       hospitalTreatmentsRemaining: 1,
       tavernCandidates: [],
+      traineeHeroIds: [null, null],
       campRngState: 0,
     };
   }
@@ -645,5 +651,73 @@ describe('isSoftlocked', () => {
   it('threshold is exclusive on roster (2 heroes + 0g is softlocked, 3 is not)', () => {
     expect(isSoftlocked(makeState(0, 2))).toBe(true);
     expect(isSoftlocked(makeState(0, 3))).toBe(false);
+  });
+});
+
+describe('normalizeSaveFile — traineeHeroIds scrubbing and length-matching', () => {
+  function buildSaveFileFixture(opts: {
+    buildingLevels: SaveFile['buildingLevels'];
+    traineeHeroIds: readonly (string | null)[] | undefined;
+    rosterHeroIds: readonly string[];
+  }): SaveFile {
+    let roster = createRoster();
+    for (const id of opts.rosterHeroIds) {
+      const hero: Hero = { ...createHero('knight', id, id, 'stout', '0'), id };
+      roster = addHero(roster, hero);
+    }
+    return {
+      version: CURRENT_SCHEMA_VERSION,
+      roster,
+      vault: credit(createVault(), 100),
+      stash: createStash(),
+      unlocks: createDefaultUnlocks(),
+      buildingLevels: opts.buildingLevels,
+      hospitalTreatmentsRemaining: 1,
+      tavernCandidates: [],
+      campRngState: 0,
+      // Use `as` cast so the builder can accept `undefined` and pass through
+      // to normalizeSaveFile, which must defend against that legacy shape.
+      traineeHeroIds: opts.traineeHeroIds as SaveFile['traineeHeroIds'],
+    };
+  }
+
+  it('scrubs orphan trainee ids (heroId not in roster) to null', () => {
+    const raw = buildSaveFileFixture({
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 1 },
+      traineeHeroIds: ['ghost-id', 'h1'],
+      rosterHeroIds: ['h1'],
+    });
+    const file = normalizeSaveFile(raw);
+    expect(file.traineeHeroIds).toEqual([null, 'h1']);
+  });
+
+  it('pads traineeHeroIds with null when shorter than capacity', () => {
+    const raw = buildSaveFileFixture({
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 2 },
+      traineeHeroIds: ['h1'],
+      rosterHeroIds: ['h1'],
+    });
+    const file = normalizeSaveFile(raw);
+    expect(file.traineeHeroIds).toEqual(['h1', null, null]);
+  });
+
+  it('truncates traineeHeroIds when longer than capacity', () => {
+    const raw = buildSaveFileFixture({
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 1 },
+      traineeHeroIds: ['h1', 'h2', 'h3'],
+      rosterHeroIds: ['h1', 'h2', 'h3'],
+    });
+    const file = normalizeSaveFile(raw);
+    expect(file.traineeHeroIds).toEqual(['h1', 'h2']);
+  });
+
+  it('defaults missing traineeHeroIds to all-null at current capacity', () => {
+    const raw = buildSaveFileFixture({
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 3 },
+      traineeHeroIds: undefined,
+      rosterHeroIds: ['h1'],
+    });
+    const file = normalizeSaveFile(raw);
+    expect(file.traineeHeroIds).toEqual([null, null, null, null]);
   });
 });

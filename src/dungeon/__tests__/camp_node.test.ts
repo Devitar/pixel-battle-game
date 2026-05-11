@@ -31,6 +31,7 @@ function makeRunState(partyOverrides: Partial<Hero>[] = []): RunState {
     surprisesThisFloor: 0,
     pendingMilestones: [],
     petsDownByHeroId: [],
+    traineeXpBase: 0,
   };
 }
 

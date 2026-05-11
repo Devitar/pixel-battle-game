@@ -4,7 +4,7 @@ import type { SaveFile } from './save';
 // like Hero, Roster, RunState, Vault, Unlocks, Preferences) and register a
 // migration in MIGRATIONS[previousVersion] that maps old raw shape to new.
 // Loaders newer than CURRENT_SCHEMA_VERSION are rejected at save.ts:load.
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 type MigrationFn = (raw: Record<string, unknown>) => Record<string, unknown>;
 
@@ -81,6 +81,27 @@ const MIGRATIONS: Record<number, MigrationFn> = {
 
     const unlocks = out.unlocks as Record<string, unknown> | undefined;
     if (unlocks && unlocks.buildings === undefined) unlocks.buildings = [];
+
+    return out;
+  },
+
+  // v4 → v5: introduce Training Grounds. Add buildingLevels.training_grounds = 1;
+  // traineeHeroIds = [null, null]; (mid-run) runState.traineeXpBase = 0.
+  // Training Grounds spec, 2026-05-11.
+  4: (raw) => {
+    const out: Record<string, unknown> = { ...raw, version: 5 };
+
+    const bl = out.buildingLevels as Record<string, unknown> | undefined;
+    if (bl && bl.training_grounds === undefined) bl.training_grounds = 1;
+
+    if (out.traineeHeroIds === undefined) {
+      out.traineeHeroIds = [null, null];
+    }
+
+    const runState = out.runState as Record<string, unknown> | undefined;
+    if (runState && runState.traineeXpBase === undefined) {
+      runState.traineeXpBase = 0;
+    }
 
     return out;
   },

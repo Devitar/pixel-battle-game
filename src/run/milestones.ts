@@ -41,7 +41,13 @@ export const MILESTONES: Record<MilestoneId, MilestoneHandler> = {
         unlocks: { ...next.unlocks, buildings: [...next.unlocks.buildings, 'chapel'] },
       };
     }
-    return next;  // identity preserved when both branches no-op
+    if (!next.unlocks.buildings.includes('training_grounds')) {
+      next = {
+        ...next,
+        unlocks: { ...next.unlocks, buildings: [...next.unlocks.buildings, 'training_grounds'] },
+      };
+    }
+    return next;  // identity preserved when all branches no-op
   },
 };
 

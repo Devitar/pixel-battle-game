@@ -30,6 +30,11 @@ export const BUILDING_LEVELS: Record<BuildingId, readonly BuildingLevelDef[]> = 
   chapel: [
     { level: 1, upgradeCost: 0, unlockDescription: 'Add or replace traits on heroes' },
   ],
+  training_grounds: [
+    { level: 1, upgradeCost: 0,   unlockDescription: '2 trainee slots · 25% XP' },
+    { level: 2, upgradeCost: 200, unlockDescription: '3 trainee slots · 40% XP' },
+    { level: 3, upgradeCost: 500, unlockDescription: '4 trainee slots · 55% XP' },
+  ],
 };
 
 // Aligned with createRoster's DEFAULT_ROSTER_CAPACITY = 12 (BARRACKS_CAPACITY[1]).
@@ -56,3 +61,6 @@ export function hospitalTreatmentCap(level: BuildingLevel): number {
 export function hospitalTickAmount(level: BuildingLevel): number {
   return level === 3 ? 2 : 1;
 }
+
+export const TRAINEE_SLOT_CAPACITY: Record<BuildingLevel, number> = { 1: 2, 2: 3, 3: 4 };
+export const TRAINEE_PRO_RATE: Record<BuildingLevel, number>     = { 1: 0.25, 2: 0.40, 3: 0.55 };

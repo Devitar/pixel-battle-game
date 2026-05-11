@@ -18,6 +18,7 @@ import { PerkOverlayScene } from './scenes/perk_overlay_scene';
 import { ShopOverlayScene } from './scenes/shop_overlay_scene';
 import { StartScene } from './scenes/start_scene';
 import { TavernPanelScene } from './scenes/tavern_panel_scene';
+import { TrainingGroundsPanelScene } from './scenes/training_grounds_panel_scene';
 import { CorridorScene } from './scenes/corridor_scene';
 import { TreasureRoomOverlayScene } from './scenes/treasure_room_overlay_scene';
 import { installPwaPrompt } from './util/pwa_install_prompt';
@@ -41,6 +42,7 @@ new Phaser.Game({
     BlacksmithPanelScene,
     ChapelPanelScene,
     HospitalPanelScene,
+    TrainingGroundsPanelScene,
     ExpeditionsPanelScene,
     DungeonScene,
     CorridorScene,

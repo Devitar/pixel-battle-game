@@ -4,6 +4,7 @@ import type { CombatantId, CombatResult, CombatState } from '@combat/types';
 import type { Item, Rarity } from '@data/types';
 import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels';
 import { removeHero, tickRosterWounds } from '@camp/roster';
+import { grantTraineeXp } from '@camp/trainee_xp';
 import { CHATTER, computeChatterCondition } from '@data/chatter';
 import { DUNGEONS } from '@data/dungeons';
 import { ENEMIES } from '@data/enemies';
@@ -1208,8 +1209,18 @@ export class CorridorScene extends Phaser.Scene {
       (fallenCount > 0 ? 1 : 0) +
       (lostCount > 0 ? 1 : 0);
 
+    // Preview trainee-xp grant for the toast (pure preview; actual grant runs
+    // in onWipeReturn). If eligibleCount > 0 we add one extra line to the panel.
+    const previewState = appState.get();
+    const previewActiveIds = [
+      ...wipe.heroesFallen.map((h) => h.id),
+      ...wipe.heroesLost.map((h) => h.id),
+    ];
+    const traineePreview = grantTraineeXp(previewState, wipe.traineeXpBase, previewActiveIds);
+    const showTraineeToast = traineePreview.eligibleCount > 0;
+
     const baseHeight = 220;
-    const extraLines = Math.max(0, totalLines - 4);
+    const extraLines = Math.max(0, totalLines - 4) + (showTraineeToast ? 1 : 0);
     const panelHeight = baseHeight + extraLines * 14;
 
     const bg = this.add
@@ -1276,6 +1287,23 @@ export class CorridorScene extends Phaser.Scene {
       }
     }
 
+    if (showTraineeToast) {
+      const trainees = traineePreview.eligibleCount;
+      const xp = traineePreview.xpPerTrainee;
+      y += 4;
+      lines.push(
+        this.add
+          .text(
+            0,
+            y,
+            `Training Grounds: ${trainees} trainee${trainees === 1 ? '' : 's'} will gain ${xp} XP.`,
+            { fontFamily: 'monospace', fontSize: '11px', color: '#aaddaa' },
+          )
+          .setOrigin(0.5),
+      );
+      y += 14;
+    }
+
     const btnY = panelHeight / 2 - 30;
     const btnBg = this.add
       .rectangle(0, btnY, 180, 34, 0x2a4a2a)
@@ -1298,6 +1326,11 @@ export class CorridorScene extends Phaser.Scene {
     const fallenIds = new Set(wipe.heroesFallen.map((h) => h.id));
     const lostIds = new Set(wipe.heroesLost.map((h) => h.id));
 
+    const activeIds = [
+      ...wipe.heroesFallen.map((h) => h.id),
+      ...wipe.heroesLost.map((h) => h.id),
+    ];
+
     appState.update((s) => {
       let roster = s.roster;
       for (const id of fallenIds) {
@@ -1318,7 +1351,8 @@ export class CorridorScene extends Phaser.Scene {
         runState: undefined,
         runRngState: undefined,
       };
-      return applyPendingMilestones(next, wipe.milestonesTriggered);
+      const grant = grantTraineeXp(next, wipe.traineeXpBase, activeIds);
+      return applyPendingMilestones(grant.state, wipe.milestonesTriggered);
     });
 
     this.scene.start('camp');

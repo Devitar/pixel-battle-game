@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createHeroCombatant } from '@combat/combatant';
 import type { CombatResult, CombatState } from '@combat/types';
-import { xpForEliteNode } from '@data/leveling';
+import { xpForBossNode, xpForCombatNode, xpForEliteNode } from '@data/leveling';
 import type { Item, SlotIndex } from '@data/types';
 import { DUNGEONS } from '@data/dungeons';
 import type { Encounter, Node } from '@dungeon/node';
@@ -1551,5 +1551,117 @@ describe('petsDownByHeroId — initialization', () => {
     const seed = 1;
     const rs = startRun('crypt', party, seed, createRng(seed));
     expect(rs.petsDownByHeroId).toEqual([]);
+  });
+});
+
+describe('traineeXpBase accumulator', () => {
+  // Run parked at a non-combat destination so completeSurpriseCombat is valid.
+  // Mirrors the helper in the completeSurpriseCombat describe block.
+  function runAtNonCombatNode(): ReturnType<typeof startRun> {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    while (true) {
+      const node = currentNode(rs);
+      if (
+        node.type === 'shop' ||
+        node.type === 'camp' ||
+        node.type === 'event' ||
+        node.type === 'treasure'
+      ) {
+        return rs;
+      }
+      if (rs.awaitingFork) {
+        const choices = nextNodeChoices(rs);
+        const nonCombat = choices.find(
+          (n) => n.type === 'shop' || n.type === 'camp' || n.type === 'event' || n.type === 'treasure',
+        );
+        rs = chooseNextNode(rs, (nonCombat ?? choices[0]).id);
+        continue;
+      }
+      if (node.type === 'combat' || node.type === 'elite') {
+        rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+        continue;
+      }
+      throw new Error('no non-combat node reached before boss in test setup');
+    }
+  }
+
+  it('startRun initializes traineeXpBase to 0', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(rs.traineeXpBase).toBe(0);
+  });
+
+  it('completeCombat victory at a combat node increments by xpForCombatNode(floor)', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    // Start node is row-0 combat. xpForCombatNode(1) = 5.
+    expect(currentNode(rs).type).toBe('combat');
+    const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const before = rs.traineeXpBase;
+    const { runState: next } = completeCombat(rs, result, createRng(99));
+    expect(next.traineeXpBase).toBe(before + xpForCombatNode(rs.currentFloorNumber));
+  });
+
+  it('completeCombat victory at an elite node increments by xpForEliteNode(floor)', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    // Find an elite node on floor 1.
+    const eliteNode = rs.currentFloorNodes.find((n): n is Extract<Node, { type: 'elite' }> => n.type === 'elite');
+    if (!eliteNode) {
+      // Skip if seed didn't place an elite on floor 1.
+      return;
+    }
+    // Mirror the same pattern used in the elite-gold test above: jump straight
+    // to the elite by overwriting currentNodeId; we're testing accumulator math,
+    // not traversal.
+    rs = { ...rs, currentNodeId: eliteNode.id };
+    const before = rs.traineeXpBase;
+    const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const { runState: next } = completeCombat(rs, result, createRng(99));
+    expect(next.traineeXpBase).toBe(before + xpForEliteNode(rs.currentFloorNumber));
+  });
+
+  it('completeCombat victory at a boss node increments by xpForBossNode(floor)', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = advanceToBossNode(rs);
+    expect(currentNode(rs).type).toBe('boss');
+    const before = rs.traineeXpBase;
+    const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const { runState: next } = completeCombat(rs, result, createRng(99));
+    expect(next.traineeXpBase).toBe(before + xpForBossNode(rs.currentFloorNumber));
+  });
+
+  it('completeSurpriseCombat victory increments by xpForCombatNode(floor)', () => {
+    const rs = runAtNonCombatNode();
+    const before = rs.traineeXpBase;
+    const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const { runState: next } = completeSurpriseCombat(rs, result, createRng(99));
+    expect(next.traineeXpBase).toBe(before + xpForCombatNode(rs.currentFloorNumber));
+  });
+
+  it('player_defeat at completeCombat carries traineeXpBase into the WipeOutcome (no increment)', () => {
+    const rs0 = startRun('crypt', makeParty(), 1, createRng(1));
+    const rs = { ...rs0, traineeXpBase: 50 };
+    const result = mockCombatResult(rs.party, [0, 0, 0], 'player_defeat');
+    const { wipe } = completeCombat(rs, result, createRng(99));
+    expect(wipe).toBeDefined();
+    expect(wipe!.traineeXpBase).toBe(50);
+  });
+
+  it('player_defeat at completeSurpriseCombat carries traineeXpBase into the WipeOutcome (no increment)', () => {
+    const rs0 = runAtNonCombatNode();
+    const rs = { ...rs0, traineeXpBase: 75 };
+    const result = mockCombatResult(rs.party, [0, 0, 0], 'player_defeat');
+    const { wipe } = completeSurpriseCombat(rs, result, createRng(99));
+    expect(wipe).toBeDefined();
+    expect(wipe!.traineeXpBase).toBe(75);
+  });
+
+  it('pressOn preserves traineeXpBase across floor advancement', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = advanceToBossNode(rs);
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    // Inject a known value before pressOn so the assertion isn't sensitive to
+    // the boss-XP accumulation that just happened.
+    const tagged = { ...rs, traineeXpBase: 120 };
+    const next = pressOn(tagged, createRng(99));
+    expect(next.traineeXpBase).toBe(120);
   });
 });

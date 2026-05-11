@@ -121,7 +121,7 @@ describe('first_sunken_keep_clear handler', () => {
     const before = makeFakeSave({
       classes: ['knight', 'hunter'],
       dungeons: ['crypt', 'sunken_keep'],
-      buildings: ['chapel'],
+      buildings: ['chapel', 'training_grounds'],
     });
     const after = MILESTONES.first_sunken_keep_clear(before);
     expect(after).toBe(before);
@@ -148,15 +148,48 @@ describe('first_sunken_keep_clear handler', () => {
     expect(after.unlocks.classes).toEqual(['knight', 'hunter']);
   });
 
-  it('appends only hunter when chapel already unlocked', () => {
+  it('appends only hunter when chapel and training_grounds already unlocked', () => {
     const before = makeFakeSave({
       classes: ['knight'],
+      dungeons: ['crypt', 'sunken_keep'],
+      buildings: ['chapel', 'training_grounds'],
+    });
+    const after = MILESTONES.first_sunken_keep_clear(before);
+    expect(after.unlocks.classes).toContain('hunter');
+    expect(after.unlocks.buildings).toEqual(['chapel', 'training_grounds']);
+  });
+});
+
+describe('first_sunken_keep_clear — training_grounds branch', () => {
+  it('appends training_grounds to unlocks.buildings on a fresh state', () => {
+    const before = makeFakeSave({
+      classes: ['knight'],
+      dungeons: ['crypt', 'sunken_keep'],
+      buildings: [],
+    });
+    const after = MILESTONES.first_sunken_keep_clear(before);
+    expect(after.unlocks.buildings).toContain('training_grounds');
+  });
+
+  it('appends only training_grounds when hunter and chapel already unlocked', () => {
+    const before = makeFakeSave({
+      classes: ['knight', 'hunter'],
       dungeons: ['crypt', 'sunken_keep'],
       buildings: ['chapel'],
     });
     const after = MILESTONES.first_sunken_keep_clear(before);
-    expect(after.unlocks.classes).toContain('hunter');
-    expect(after.unlocks.buildings).toEqual(['chapel']);
+    expect(after.unlocks.buildings).toEqual(['chapel', 'training_grounds']);
+    expect(after.unlocks.classes).toEqual(['knight', 'hunter']);
+  });
+
+  it('is idempotent when all three branches already applied', () => {
+    const before = makeFakeSave({
+      classes: ['knight', 'hunter'],
+      dungeons: ['crypt', 'sunken_keep'],
+      buildings: ['chapel', 'training_grounds'],
+    });
+    const after = MILESTONES.first_sunken_keep_clear(before);
+    expect(after.unlocks.buildings).toEqual(['chapel', 'training_grounds']);
   });
 });
 

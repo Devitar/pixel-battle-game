@@ -1,3 +1,4 @@
+import { TRAINEE_SLOT_CAPACITY } from '@camp/building_levels';
 import { HIRE_COST } from '@camp/buildings/tavern';
 import type { Roster } from '@camp/roster';
 import { createStash, type Stash } from '@camp/stash';
@@ -24,6 +25,12 @@ export interface SaveFile {
   buildingLevels: BuildingLevels;
   hospitalTreatmentsRemaining: number;
   tavernCandidates: readonly Hero[];
+  /** Training Grounds trainee slots. Length matches
+   *  `TRAINEE_SLOT_CAPACITY[buildingLevels.training_grounds]`. Each entry is
+   *  either a roster hero's id (currently a trainee) or null (empty slot).
+   *  Normalized on load: orphan ids (not in roster) are scrubbed to null,
+   *  the array is padded/truncated to current capacity. */
+  traineeHeroIds: readonly (string | null)[];
   /** Persisted RNG state for camp-side actions (Tavern hire/reroll, Blacksmith
    *  upgrade rolls, expedition-start seeding). Read via createRngFromState,
    *  advanced by the action, written back via rng.getState(). Mirrors the
@@ -123,11 +130,13 @@ function isPlausibleRawSave(parsed: unknown): parsed is { version: number } {
 // forward should ship as migrations in `migration.ts` instead, but existing
 // defaults here stay until each is folded into an explicit migration.
 // Single point of defaulting — do not scatter `?? createStash()` reads.
-function normalizeSaveFile(file: SaveFile): SaveFile {
-  return {
+export function normalizeSaveFile(file: SaveFile): SaveFile {
+  const withDefaults: SaveFile = {
     ...file,
     stash: file.stash ?? createStash(),
-    buildingLevels: file.buildingLevels ?? { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
+    buildingLevels: file.buildingLevels ?? {
+      tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 1,
+    },
     hospitalTreatmentsRemaining: file.hospitalTreatmentsRemaining ?? 1,
     tavernCandidates: file.tavernCandidates ?? [],
     roster: {
@@ -142,7 +151,12 @@ function normalizeSaveFile(file: SaveFile): SaveFile {
           traversedNodeIds: file.runState.traversedNodeIds ?? [file.runState.currentNodeId],
           surprisesThisFloor: file.runState.surprisesThisFloor ?? 0,
           pendingMilestones: file.runState.pendingMilestones ?? [],
+          traineeXpBase: file.runState.traineeXpBase ?? 0,
         },
+  };
+  return {
+    ...withDefaults,
+    traineeHeroIds: normalizeTraineeSlots(withDefaults),
   };
 }
 
@@ -161,4 +175,21 @@ function normalizeHero(hero: Hero): Hero {
     legsSpriteId: hero.legsSpriteId ?? DEFAULT_LEGS_SPRITE,
     feetSpriteId: hero.feetSpriteId ?? DEFAULT_FEET_SPRITE,
   };
+}
+
+// Length-matches traineeHeroIds to TRAINEE_SLOT_CAPACITY[training_grounds level]
+// and scrubs any id that no longer corresponds to a roster hero (e.g., hero
+// died and was removed from roster). Pads with null when shorter than capacity,
+// truncates when longer.
+function normalizeTraineeSlots(file: SaveFile): readonly (string | null)[] {
+  const level = file.buildingLevels?.training_grounds ?? 1;
+  const capacity = TRAINEE_SLOT_CAPACITY[level];
+  const rosterIds = new Set(file.roster.heroes.map((h) => h.id));
+  const current = file.traineeHeroIds ?? [];
+  const scrubbed = current.map((id) => (id !== null && rosterIds.has(id) ? id : null));
+  if (scrubbed.length === capacity) return scrubbed;
+  if (scrubbed.length < capacity) {
+    return [...scrubbed, ...new Array(capacity - scrubbed.length).fill(null)];
+  }
+  return scrubbed.slice(0, capacity);
 }

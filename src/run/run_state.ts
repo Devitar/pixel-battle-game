@@ -31,6 +31,12 @@ export interface RunState {
   readonly surprisesThisFloor: number;
   readonly pendingMilestones: readonly MilestoneId[];
   readonly petsDownByHeroId: readonly string[];
+  /** Cumulative per-node XP yield this run — sums the xpReward awarded at
+   *  combat/elite/boss completions (completeCombat) and surprise victories
+   *  (completeSurpriseCombat). Read at run-end (cashout / wipe) by the
+   *  Training Grounds payout: each eligible trainee gains
+   *  round(traineeXpBase × proRate). Survives floor advancement. */
+  readonly traineeXpBase: number;
 }
 
 export interface CashoutOutcome {
@@ -47,6 +53,9 @@ export interface WipeOutcome {
   heroesFallen: readonly Hero[];   // died in combat (including the wiping fight)
   heroesLost: readonly Hero[];     // narratively Lost prior to the wipe
   milestonesTriggered: readonly MilestoneId[];
+  /** Cumulative per-node XP yield carried through from RunState. Read by the
+   *  Training Grounds payout at wipe time. No increment on the failing node. */
+  readonly traineeXpBase: number;
 }
 
 export const PARTY_SIZE = 3;
@@ -99,6 +108,7 @@ export function startRun(
     surprisesThisFloor: 0,
     pendingMilestones: [],
     petsDownByHeroId: [],
+    traineeXpBase: 0,
   };
 }
 
@@ -237,6 +247,7 @@ export function completeCombat(
       heroesFallen: allLost,
       heroesLost: runState.lost,
       milestonesTriggered: runState.pendingMilestones,
+      traineeXpBase: runState.traineeXpBase,
     };
     return {
       runState: {
@@ -307,6 +318,7 @@ export function completeCombat(
         status: 'camp_screen',
         pendingMilestones: [...runState.pendingMilestones, ...triggered],
         petsDownByHeroId: newPetsDown,
+        traineeXpBase: runState.traineeXpBase + xpReward,
       },
     };
   }
@@ -326,6 +338,7 @@ export function completeCombat(
       status: 'in_dungeon',
       awaitingFork: true,
       petsDownByHeroId: newPetsDown,
+      traineeXpBase: runState.traineeXpBase + xpReward,
     },
   };
 }
@@ -381,6 +394,7 @@ export function completeSurpriseCombat(
       heroesFallen: allLost,
       heroesLost: runState.lost,
       milestonesTriggered: runState.pendingMilestones,
+      traineeXpBase: runState.traineeXpBase,
     };
     return {
       runState: {
@@ -433,6 +447,7 @@ export function completeSurpriseCombat(
       fallen: [...runState.fallen, ...newFallen],
       pack: newPack,
       petsDownByHeroId: newPetsDown,
+      traineeXpBase: runState.traineeXpBase + xpReward,
     },
   };
 }

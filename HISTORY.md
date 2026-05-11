@@ -29,6 +29,25 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-11 · Training Grounds building — passive XP for benched heroes (closes Cluster D · 6)
+
+- **Why:** Third and final Sunken-Keep-gated unlock (Hunter shipped 2026-05-10; Chapel shipped earlier 2026-05-11). Solves the "benched heroes lag behind" problem and gives an extended roster a reason to exist. Closes the first-Sunken-Keep-clear cascade.
+- **Decisions:**
+  - **XP base = sum of cleared-node XP yields** (not per-trainee-level scaled). Simplest reading of "deep runs train better" — depth already lives in the per-node yield. `RunState.traineeXpBase` accumulates in-engine at the two existing XP grant sites (`completeCombat`, `completeSurpriseCombat`); cashout reads it from `runState`, wipe carries it through `WipeOutcome`.
+  - **Wipes pay full, not less.** User pivoted from gdd's "wipes pay less" framing to "time spent training" — what matters is run depth, not outcome. gdd §6 row 7 patched in the same change.
+  - **`SaveFile.traineeHeroIds: readonly (string | null)[]`** — nullable-fixed-length, not variable-length. Slot positions stay stable across drag-out/drag-in interactions. `normalizeSaveFile` scrubs orphan ids and pads/truncates to `TRAINEE_SLOT_CAPACITY[level]` on every load.
+  - **Drag UX modeled on Expeditions party_picker.** Eligible-grid → slot, slot → slot swap, slot → outside unassigns. State writes are live (no Confirm button), mirroring Equip/Stash.
+  - **Lookup-driven camp tile loop** replaces the 4-way Chapel-on/off conditional. Adaptive `STEP_X` (125 when ≥7 tiles, 130 otherwise) fits Chapel + Training Grounds + Expeditions within 960px.
+  - **Same `grantTraineeXp` helper used for both preview and actual grant.** Pure function called twice (`create()` for the toast, `onLeave`/`onWipeReturn` for the side effect) — determinism falls out of `cashout()` literally assigning `outcome.heroesReturned/Fallen/Lost = runState.party/fallen/lost`, so the two activeId sets are bit-equal.
+- **Surprises:**
+  - **`HeroCard` is a container-based widget** — drag handlers must mutate `card.container.x/y`, not `card.x/y`. The plan's direct-assignment code would compile but not visually move the card; Task 8's implementer caught this by reading the Expeditions reference before writing.
+  - **Plan's `Stats` fixture had wrong field names** (`accuracy: 95` doesn't exist; real shape has `mind`). Task 2's implementer worked around by using `createHero(...)` instead of inline literals. Lesson: when writing test fixtures in plans, grep the actual interface rather than hand-rolling shapes.
+  - **`normalizeSaveFile` widened from private to exported** so the new orphan-scrub tests can exercise it directly. Single intentional API surface widening; `normalizeTraineeSlots` stays private (only used internally).
+  - **Task 7's uniform x-spacing introduced minor visual drift** vs. the original hand-tuned tile positions (Blacksmith +10px, Hospital −10px, Expeditions −20px in the 5-tile case). Trade-off accepted as part of the lookup-driven refactor; trivially revertable to per-tile X coords if the layout reads worse in practice.
+- **Source:** TODO Cluster D · 6. Spec: `docs/superpowers/specs/2026-05-11-training-grounds-design.md`. Plan: `docs/superpowers/plans/2026-05-11-training-grounds.md`. gdd §6 row 7 patched in the same change.
+
+---
+
 ### 2026-05-11 · Chapel building — Add or Replace traits (closes Cluster D · 5)
 
 - **Why:** Second of three Sunken-Keep-gated unlocks (Hunter shipped 2026-05-10; Training Grounds follows as Cluster D · 6). Original gdd framed Chapel as "remove a negative Trait, expensive" — brainstorming pivoted the feature toward a *growth* model: heroes can accumulate up to 3 traits across their lifetime via two distinct actions (Replace / Add). gdd §6 row 6 patched in same change.
