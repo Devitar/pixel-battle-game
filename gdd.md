@@ -84,7 +84,7 @@ A hand-crafted roster, each with a clear role, position preference, and signatur
 | 5 | **Archer** | Ranged DPS | 3 | Bow | Attack / Speed | Piercing Shot (enemy 3–4), Volley (all enemies, low dmg), Flare Arrow (marks a target for bonus damage) |
 | 6 | **Mage** | Caster | 3 | Staff / Wand | Mind | Firebolt (single target, enemy 3–4), Frost Nova (AoE + slow), Arc Shock (chance-stun) |
 | 7 | **Paladin** *(unlock)* | Hybrid frontline | 1–2 | Sword + Holy symbol | Attack / Mind | Smite, Lay on Hands (heal), Consecrate (party HoT). Unlocks: first Crypt clear. |
-| 8 | **Hunter** *(unlock)* | Ranged + beast | 3 | Bow / Spear | Attack | Bonds with a pet that occupies slot 4 and acts on its own priority. Unlocks: first Warren clear. |
+| 8 | **Hunter** *(unlock)* | Ranged + beast | 3 | Bow / Spear | Attack | Bonds with a pet that occupies slot 4 and acts on its own priority. Unlocks: first Sunken Keep clear. |
 
 Each class has 3–4 abilities total plus a universal basic Attack that works with any weapon.
 
@@ -195,7 +195,7 @@ Camp is presented as a side-scrolling village at the same pixel scale as combat.
 | **Blacksmith** | Upgrade gear tiers (common → uncommon → rare). Costs gold + materials (drop from elites / bosses). | L1: common→uncommon / L2: +uncommon→rare / L3: +rare→epic |
 | **Hospital** | Heal Wounds. Gold per wound, or time-based (wounds clear after N runs for free). | L1: 1 wound/run cheap / L2: 2 / L3: 3 + faster time-heal |
 | **Expeditions** | Pick the next dungeon. Not upgraded directly — unlocks appear here as bosses are beaten. | n/a |
-| **Chapel** *(unlock)* | Remove a Trait from a hero. Expensive. Unlocks after first Sunken Keep clear. | L1 only |
+| **Chapel** *(unlock)* | Add or replace traits on a hero — up to 3 per hero. Expensive. Unlocks after first Sunken Keep clear. | L1 only |
 | **Training Grounds** *(unlock)* | Benched heroes passively gain XP from every completed run (active or not). XP gain is pro-rated against what an active hero of the same level would have earned on that run, so deep runs train better. Gained on both cashout and wipe; wipes pay less. | L1: 2 trainee slots, 25% pro-rated XP / L2: 3 slots, 40% / L3: 4 slots, 55%. Unlocks: first Sunken Keep clear. |
 
 ### Typical camp visit

@@ -5,7 +5,7 @@ import {
 } from '@data/body_sprites';
 import { NAMES } from '@data/names';
 import { TRAITS } from '@data/traits';
-import type { ClassId, TraitId } from '@data/types';
+import type { ClassId, PetSpeciesId, TraitId } from '@data/types';
 import { createHero, type Hero } from '@heroes/hero';
 import type { Rng } from '@util/rng';
 
@@ -13,6 +13,7 @@ export const HIRE_COST = 50;
 export const REROLL_COST = 25;
 
 const ALL_TRAIT_IDS = Object.keys(TRAITS) as TraitId[];
+const PET_SPECIES_IDS: readonly PetSpeciesId[] = ['wolf', 'hawk', 'bear'];
 
 export function generateCandidate(
   rng: Rng,
@@ -25,7 +26,10 @@ export function generateCandidate(
   const feetSpriteId = rng.pick(PLAYER_FEET_SPRITES);
   const name = rng.pick(NAMES);
   const id = `hero_${rng.int(100000, 999999)}`;
-  return createHero(classId, name, id, traitId, bodySpriteId, legsSpriteId, feetSpriteId);
+  const petSpeciesId = classId === 'hunter' ? rng.pick(PET_SPECIES_IDS) : undefined;
+  return createHero(
+    classId, name, id, traitId, bodySpriteId, legsSpriteId, feetSpriteId, petSpeciesId,
+  );
 }
 
 export function generateCandidates(

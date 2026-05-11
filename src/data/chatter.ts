@@ -58,4 +58,9 @@ export const CHATTER: Record<ClassId, Record<ChatterCondition, readonly string[]
     wounded:  ['I am tested, not broken.', 'The light sustains me.', 'Pain tempers the soul.'],
     critical: ['Light... do not forsake me...', 'I cannot... protect them...', 'Forgive my failure.'],
   },
+  hunter: {
+    healthy:  ['Steady now.', 'I know these woods.', 'Let them come to us.'],
+    wounded:  ['Still standing.', 'Hurts less than a bad hunt.', 'My aim holds.'],
+    critical: ['Can\'t draw a breath...', 'Not like this...', 'Get back...'],
+  },
 };

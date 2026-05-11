@@ -30,6 +30,7 @@ function makeRunState(partyOverrides: Partial<Hero>[] = []): RunState {
     traversedNodeIds: [],
     surprisesThisFloor: 0,
     pendingMilestones: [],
+    petsDownByHeroId: [],
   };
 }
 
@@ -146,6 +147,30 @@ describe('applyCampNodeEffect — treat_wound', () => {
     expect(() =>
       applyCampNodeEffect(rs, { kind: 'treat_wound', heroIndex: 0, woundIndex: 0 }, createRng(1)),
     ).toThrow();
+  });
+});
+
+describe('applyCampNodeEffect — pet respawn', () => {
+  it('clears petsDownByHeroId on heal_party', () => {
+    const baseRunState = makeRunState();
+    const runState = { ...baseRunState, petsDownByHeroId: ['hunter_id_1', 'hunter_id_2'] };
+    const after = applyCampNodeEffect(runState, { kind: 'heal_party' }, createRng(0));
+    expect(after.petsDownByHeroId).toEqual([]);
+  });
+
+  it('clears petsDownByHeroId on treat_wound', () => {
+    const baseRunState = makeRunState();
+    const wounded: Hero = { ...baseRunState.party[0], wounds: [{ id: 'bruised', runsRemaining: 2 }] };
+    const runState = {
+      ...baseRunState,
+      party: [wounded, ...baseRunState.party.slice(1)],
+      petsDownByHeroId: ['hunter_id_1'],
+    };
+    const after = applyCampNodeEffect(
+      runState, { kind: 'treat_wound', heroIndex: 0, woundIndex: 0 }, createRng(0),
+    );
+    expect(after.petsDownByHeroId).toEqual([]);
+    expect(after.party[0].wounds).toHaveLength(0);
   });
 });
 

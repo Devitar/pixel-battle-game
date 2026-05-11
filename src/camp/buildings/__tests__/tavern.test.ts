@@ -33,7 +33,7 @@ describe('generateCandidate', () => {
 
   it('returns a Hero with a registered trait', () => {
     const c = generateCandidate(createRng(1), TIER1_CLASSES);
-    expect(TRAITS[c.traitId]).toBeDefined();
+    expect(TRAITS[c.traitIds[0]]).toBeDefined();
   });
 
   it('returns a Hero with a body sprite from PLAYER_BODY_SPRITES', () => {
@@ -76,9 +76,9 @@ describe('generateCandidates', () => {
       const list = generateCandidates(createRng(seed), TIER1_CLASSES, 3);
       for (const h of list) {
         const classBase = CLASSES[h.classId].baseStats.hp;
-        if (h.traitId === 'stout') {
+        if (h.traitIds[0] === 'stout') {
           expect(h.maxHp, `seed ${seed} hero ${h.id}`).toBeGreaterThan(classBase);
-        } else if (h.traitId === 'frail') {
+        } else if (h.traitIds[0] === 'frail') {
           expect(h.maxHp, `seed ${seed} hero ${h.id}`).toBeLessThan(classBase);
         } else {
           expect(h.maxHp, `seed ${seed} hero ${h.id}`).toBe(classBase);
@@ -144,5 +144,22 @@ describe('generateCandidate — paladin in unlocked pool', () => {
     const unlocked: ClassId[] = ['paladin'];  // single-class pool guarantees the roll
     const hero = generateCandidate(rng, unlocked);
     expect(hero.classId).toBe('paladin');
+  });
+});
+
+describe('generateCandidate — Hunter petSpeciesId', () => {
+  it('rolls a petSpeciesId when classId is hunter', () => {
+    const rng = createRng(42);
+    const hero = generateCandidate(rng, ['hunter']);
+    expect(hero.classId).toBe('hunter');
+    expect(hero.petSpeciesId).toBeDefined();
+    expect(['wolf', 'hawk', 'bear']).toContain(hero.petSpeciesId);
+  });
+
+  it('does not roll petSpeciesId for non-Hunter classes', () => {
+    const rng = createRng(42);
+    const hero = generateCandidate(rng, ['knight']);
+    expect(hero.classId).toBe('knight');
+    expect(hero.petSpeciesId).toBeUndefined();
   });
 });

@@ -43,7 +43,24 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 ## Cluster D — Tier 3 content
 
-Tier 3 scope from gdd §10. The Crypt is the only dungeon today; Tier 3 adds dungeons 2–4, unlock classes (Paladin, Hunter), unlock buildings (Chapel, Training Grounds), legendary tier, milestone achievements, level-10 perks, NG+. Most Tier 3 unlocks gate on first Sunken Keep clear, so Sunken Keep is the natural first task.
+Tier 3 scope from gdd §10. Sunken Keep (Cluster D · 1, 2026-05-06) and Paladin (Cluster D · 3, 2026-05-06) shipped; the Crypt-clear → Paladin/Sunken-Keep cascade is wired. Entries below are the **first-Sunken-Keep-clear cascade** (Hunter + Chapel + Training Grounds, gdd §9), plus future Tier 3 surface (dungeons 3-4, legendary gear, level-10 perks, NG+) that hasn't been broken down yet.
+
+### 6 · Training Grounds building — passive XP for benched heroes
+
+- **What:** Add the Training Grounds camp building (gdd §6 row 7): benched heroes assigned to trainee slots gain pro-rated XP from every completed run. L1-3 progression: L1=2 slots / 25% / L2=3 / 40% / L3=4 / 55%. XP awarded on both cashout AND wipe (wipe pays less per gdd). Unlocks via the `first_sunken_keep_clear` handler.
+- **Why:** Solves the "benched heroes lag behind" problem — players keep an extended roster only if there's a reason to invest in non-active heroes. Makes the Tavern → Barracks → expedition path more meaningful for backups. Most mechanically novel of the three Sunken Keep-gated unlocks (introduces a new XP-economy channel).
+- **Tier:** 3
+- **Acceptance:**
+  - **Needs brainstorming first** to nail down the XP math: "pro-rated against what an active hero of the same level would have earned on that run, so deep runs train better" (gdd §6) — spec must define the calculation (sum of XP earned by an active hero of matched level across all completed nodes? Just the boss node? Per-floor?), the wipe-pays-less rate, and the trainee slot management UI.
+  - New camp scene: `training_grounds_panel_scene.ts` for trainee-slot assignment (pick hero → assign to slot, similar to Expeditions's party-slot picker).
+  - Run-completion hook: `cashout` and `wipe` paths in `run/run_state.ts` need to compute trainee XP gain alongside their existing logic.
+  - Trainee-slot state lives in `SaveFile` (new field, e.g., `traineeHeroIds: readonly string[]` capped at building level). Schema bump required.
+  - `BuildingId` widens to include `'training_grounds'`; `BuildingLevels` already supports tiers via existing pattern (Tavern/Barracks/Blacksmith/Hospital all 1-3).
+  - Camp scene gets a new training-grounds tile, hidden until the milestone fires.
+- **Touches:** `src/scenes/training_grounds_panel_scene.ts` (new), `src/scenes/camp_scene.ts` (new tile), `src/camp/buildings/training_grounds.ts` (new), `src/camp/building_levels.ts` (training_grounds tier costs), `src/run/run_state.ts` (XP gain hook in cashout/wipe), `src/save/save.ts` + migration (schema bump for traineeHeroIds), `src/data/types.ts` (BuildingId), `src/run/milestones.ts` (extend handler).
+- **Source:** gdd §6 (buildings table) + §9 (meta-progression). Cluster D blurb placeholder.
+
+---
 
 ## Cluster C — Art polish (non-blocking)
 

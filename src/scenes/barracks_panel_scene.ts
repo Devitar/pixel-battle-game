@@ -275,7 +275,7 @@ export class BarracksPanelScene extends Phaser.Scene {
     }
 
     const classDef = CLASSES[hero.classId];
-    const traitDef = TRAITS[hero.traitId];
+    const traitNames = hero.traitIds.map((id) => TRAITS[id].name).join(' · ');
 
     // Paperdoll (scale 4) — at canvas-absolute coords.
     container.add(
@@ -325,7 +325,7 @@ export class BarracksPanelScene extends Phaser.Scene {
     const traitText = this.add.text(
       DETAIL_TEXT_X,
       188,
-      `trait: ${traitDef.name} - ${traitDef.description}`,
+      `trait: ${traitNames}`,
       { fontFamily: 'monospace', fontSize: '11px', color: '#ccbbaa', wordWrap: { width: 340 } },
     );
     container.add(traitText);

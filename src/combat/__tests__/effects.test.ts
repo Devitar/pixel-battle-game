@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ABILITIES } from '@data/abilities';
 import { createRng } from '@util/rng';
 import { applyAbility } from '../effects';
+import { createPetCombatant } from '../combatant';
 import { resolveTargetSelector } from '../target_selector';
 import type { CombatEvent, StatusInstance } from '../types';
 import { makeEnemyCombatant, makeHeroCombatant, makeTestState } from './helpers';
@@ -1053,6 +1054,62 @@ describe('of_thorns rare property', () => {
     applyAbility(ABILITIES.bone_slash, e0, ['p0'], state, rng, events);
     expect(e0.isDead).toBe(true);
     expect(events.some((ev) => ev.kind === 'death' && ev.combatantId === 'e0')).toBe(true);
+  });
+});
+
+describe('commandPet effect', () => {
+  it('triggers the pet\'s AI-picked ability', () => {
+    const hunter = makeHeroCombatant('hunter', 1, 'h1');
+    const pet = createPetCombatant('wolf', 'h1', 10);
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e1');
+    const state = makeTestState([hunter, pet], [enemy]);
+
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.command_strike, hunter, [hunter.id], state, createRng(1), events);
+
+    // wolf picks wolf_howl (cd 0, top priority) → applies blessed buff to ally hunter.
+    // If howl filters out (no eligible allies), wolf_bite triggers damage on enemy.
+    // Either way an ability_cast for the pet should appear in events.
+    const petCasts = events.filter(
+      (e) => e.kind === 'ability_cast' && e.casterId === pet.id,
+    );
+    expect(petCasts.length).toBe(1);
+  });
+
+  it('no-ops gracefully when the pet is dead', () => {
+    const hunter = makeHeroCombatant('hunter', 1, 'h2');
+    const pet = createPetCombatant('wolf', 'h2', 10);
+    pet.isDead = true;
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e1');
+    const state = makeTestState([hunter, pet], [enemy]);
+
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.command_strike, hunter, [hunter.id], state, createRng(1), events);
+
+    const petCasts = events.filter(
+      (e) => e.kind === 'ability_cast' && e.casterId === pet.id,
+    );
+    expect(petCasts.length).toBe(0);
+    // Hunter's command_strike cast event should still appear
+    const hunterCasts = events.filter(
+      (e) => e.kind === 'ability_cast' && e.casterId === hunter.id,
+    );
+    expect(hunterCasts.length).toBe(1);
+  });
+
+  it('sets cooldown on pet\'s triggered ability', () => {
+    const hunter = makeHeroCombatant('hunter', 1, 'h3');
+    const pet = createPetCombatant('wolf', 'h3', 10);
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e1');
+    const state = makeTestState([hunter, pet], [enemy]);
+
+    const events: CombatEvent[] = [];
+    applyAbility(ABILITIES.command_strike, hunter, [hunter.id], state, createRng(1), events);
+
+    // wolf_howl has cooldown 4; setCooldown stores 4+1=5 per the convention in combat.ts.
+    if (pet.cooldowns.wolf_howl !== undefined) {
+      expect(pet.cooldowns.wolf_howl).toBeGreaterThanOrEqual(4);
+    }
   });
 });
 

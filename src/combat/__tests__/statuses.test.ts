@@ -148,27 +148,27 @@ describe('tickStatuses', () => {
 
 describe('getEffectiveStat — trait evaluation', () => {
   it('Quick combatant adds +1 to speed', () => {
-    const c = makeHeroCombatant('knight', 1, 'p0', { traitId: 'quick' });
+    const c = makeHeroCombatant('knight', 1, 'p0', { traitIds: ['quick'] });
     expect(getEffectiveStat(c, 'speed')).toBe(c.baseStats.speed + 1);
   });
 
   it('Stout combatant does not change HP via getEffectiveStat (HP is baked at Hero creation)', () => {
-    const c = makeHeroCombatant('knight', 1, 'p0', { traitId: 'stout' });
+    const c = makeHeroCombatant('knight', 1, 'p0', { traitIds: ['stout'] });
     expect(getEffectiveStat(c, 'hp')).toBe(c.baseStats.hp);
   });
 
   it('Cowardly in slot 1 reduces speed by 1', () => {
-    const c = makeHeroCombatant('knight', 1, 'p0', { traitId: 'cowardly' });
+    const c = makeHeroCombatant('knight', 1, 'p0', { traitIds: ['cowardly'] });
     expect(getEffectiveStat(c, 'speed')).toBe(c.baseStats.speed - 1);
   });
 
   it('Cowardly in slot 2 does not change speed (condition not satisfied)', () => {
-    const c = makeHeroCombatant('knight', 2, 'p0', { traitId: 'cowardly' });
+    const c = makeHeroCombatant('knight', 2, 'p0', { traitIds: ['cowardly'] });
     expect(getEffectiveStat(c, 'speed')).toBe(c.baseStats.speed);
   });
 
   it('Sturdy trait and Bulwark status stack on defense', () => {
-    const c = makeHeroCombatant('knight', 1, 'p0', { traitId: 'sturdy' });
+    const c = makeHeroCombatant('knight', 1, 'p0', { traitIds: ['sturdy'] });
     c.statuses['bulwark'] = status(
       { kind: 'buff', stat: 'defense', delta: 3, duration: 2, statusId: 'bulwark' },
       2,
@@ -177,13 +177,13 @@ describe('getEffectiveStat — trait evaluation', () => {
   });
 
   it('Lucky combatant adds +5 to crit', () => {
-    const c = makeHeroCombatant('knight', 1, 'p0', { traitId: 'lucky' });
+    const c = makeHeroCombatant('knight', 1, 'p0', { traitIds: ['lucky'] });
     expect(getEffectiveStat(c, 'crit')).toBe(c.baseStats.crit + 5);
   });
 
   it('Bloodthirsty active: +2 attack when below 50% HP', () => {
     const c = makeHeroCombatant('knight', 1, 'p0', {
-      traitId: 'bloodthirsty',
+      traitIds: ['bloodthirsty'],
       maxHp: 20,
       currentHp: 9,
     });
@@ -192,7 +192,7 @@ describe('getEffectiveStat — trait evaluation', () => {
 
   it('Bloodthirsty inactive: no bonus at full HP', () => {
     const c = makeHeroCombatant('knight', 1, 'p0', {
-      traitId: 'bloodthirsty',
+      traitIds: ['bloodthirsty'],
       maxHp: 20,
       currentHp: 20,
     });
@@ -201,16 +201,16 @@ describe('getEffectiveStat — trait evaluation', () => {
 
   it('Bloodthirsty boundary: no bonus at exactly 50% HP', () => {
     const c = makeHeroCombatant('knight', 1, 'p0', {
-      traitId: 'bloodthirsty',
+      traitIds: ['bloodthirsty'],
       maxHp: 20,
       currentHp: 10,
     });
     expect(getEffectiveStat(c, 'attack')).toBe(c.baseStats.attack);
   });
 
-  it('Combatant with no traitId reads base + statuses only', () => {
+  it('Combatant with no traitIds reads base + statuses only', () => {
     const c = makeEnemyCombatant('skeleton_warrior', 1, 'e0');
-    expect(c.traitId).toBeUndefined();
+    expect(c.traitIds).toBeUndefined();
     expect(getEffectiveStat(c, 'attack')).toBe(c.baseStats.attack);
   });
 });
@@ -229,7 +229,7 @@ describe('getEffectiveStat — perk evaluation', () => {
 
   it('Trait Sturdy + perk Iron Will stack additively on defense', () => {
     const c = makeHeroCombatant('knight', 1, 'p0', {
-      traitId: 'sturdy',
+      traitIds: ['sturdy'],
       perkId: 'iron_will',
     });
     expect(getEffectiveStat(c, 'defense')).toBe(c.baseStats.defense + 1 + 1);
@@ -303,6 +303,23 @@ describe('tickStatuses — poison', () => {
     expect(death).toMatchObject({ combatantId: 'p0' });
     const dmg = events.find((e) => e.kind === 'damage_applied');
     expect(dmg).toMatchObject({ lethal: true });
+  });
+});
+
+describe('getEffectiveStat with multiple traitIds', () => {
+  it('sums stat effects across all traits', () => {
+    const combatant = makeHeroCombatant('knight', 1, 'p0', {
+      traitIds: ['quick', 'sharp_eyed'],
+    });
+    // Quick = +1 Speed; sharp_eyed = +1 Attack. Knight base speed = 3; with quick = 4.
+    // sharp_eyed has no speed effect, so speed should equal baseStats.speed + 1.
+    const speed = getEffectiveStat(combatant, 'speed');
+    expect(speed).toBeGreaterThan(combatant.baseStats.speed);
+  });
+
+  it('returns base stat when traitIds is empty', () => {
+    const combatant = makeHeroCombatant('knight', 1, 'p0', { traitIds: [] });
+    expect(getEffectiveStat(combatant, 'speed')).toBe(combatant.baseStats.speed);
   });
 });
 

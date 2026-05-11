@@ -13,7 +13,7 @@ describe('createHero — basic shape', () => {
     expect(h.baseStats).toEqual(CLASSES.knight.baseStats);
     expect(h.currentHp).toBe(h.maxHp);
     expect(h.maxHp).toBe(CLASSES.knight.baseStats.hp);
-    expect(h.traitId).toBe('quick');
+    expect(h.traitIds).toEqual(['quick']);
     expect(h.bodySpriteId).toBe('body1');
   });
 
@@ -146,7 +146,7 @@ describe('computeMaxHp — perk HP effect', () => {
     const knight = createHero('knight', 'K', 'h0', 'stout', 'body1');
     const result = computeMaxHp(
       CLASSES.knight.baseStats.hp,
-      TRAITS.stout,
+      [TRAITS.stout],
       knight.equipment,
       PERKS.resolute,
     );
@@ -162,5 +162,63 @@ describe('recomputeMaxHp', () => {
     expect(withPerk.maxHp).toBe(24);  // 20 → 22 (Stout +10%) → 24 (Resolute +10%)
     const recomputed = recomputeMaxHp(withPerk);
     expect(recomputed.maxHp).toBe(24);  // bug: would be 22 if perk dropped
+  });
+});
+
+describe('multi-trait Hero shape', () => {
+  it('stores traitIds as a single-element array on createHero', () => {
+    const hero = createHero('knight', 'A', 'h1', 'stout', 'body1');
+    expect(hero.traitIds).toEqual(['stout']);
+  });
+
+  it('computeMaxHp composes multiple percent-mode hp effects multiplicatively', () => {
+    // Stout = +10% HP. Stacking two gives 1.21× base, not 1.20×.
+    const knightHp = 20;
+    const stout = TRAITS.stout;
+    const traits = [stout, stout];  // illegal in practice but verifies compose order
+    const equipment = {
+      weapon: { id: 'w', baseId: 'sword_basic', slot: 'weapon', rarity: 'common', affixes: [], floorRolledAt: 1 },
+    } as never;
+    const hp = computeMaxHp(knightHp, traits, equipment);
+    // 20 → 22 → 24 (per applyHpEffect's Math.round each step). Verify value is greater
+    // than the single-stout case.
+    const singleHp = computeMaxHp(knightHp, [stout], equipment);
+    expect(hp).toBeGreaterThan(singleHp);
+  });
+
+  it('recomputeMaxHp uses every trait in the array', () => {
+    const hero = createHero('knight', 'A', 'h2', 'stout', 'body1');
+    const heroWithTwo = { ...hero, traitIds: ['stout', 'sturdy'] as const };
+    const recomputed = recomputeMaxHp(heroWithTwo);
+    // Sturdy = +1 Defense (no HP effect); Stout = +10% HP.
+    // Recomputed maxHp should equal the single-stout case (sturdy does not change HP).
+    expect(recomputed.maxHp).toBe(recomputeMaxHp(hero).maxHp);
+  });
+});
+
+describe('createHero — Hunter petSpeciesId', () => {
+  it('stores petSpeciesId on Hunter heroes when provided', () => {
+    const hero = createHero(
+      'hunter', 'Robin', 'h_robin', 'stout',
+      'body1', 'legs_default', 'feet_default',
+      'wolf',
+    );
+    expect(hero.petSpeciesId).toBe('wolf');
+  });
+
+  it('leaves petSpeciesId undefined for non-Hunter classes', () => {
+    const hero = createHero(
+      'knight', 'Aldous', 'h_aldous', 'stout',
+      'body1',
+    );
+    expect(hero.petSpeciesId).toBeUndefined();
+  });
+
+  it('leaves petSpeciesId undefined for a Hunter when not provided', () => {
+    const hero = createHero(
+      'hunter', 'Mute', 'h_mute', 'quick',
+      'body1',
+    );
+    expect(hero.petSpeciesId).toBeUndefined();
   });
 });

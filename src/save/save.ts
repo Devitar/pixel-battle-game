@@ -3,7 +3,7 @@ import type { Roster } from '@camp/roster';
 import { createStash, type Stash } from '@camp/stash';
 import type { Vault } from '@camp/vault';
 import { DEFAULT_FEET_SPRITE, DEFAULT_LEGS_SPRITE } from '@data/body_sprites';
-import type { Unlocks } from '@data/types';
+import type { BuildingId, Unlocks } from '@data/types';
 import type { Hero } from '@heroes/hero';
 import { PARTY_SIZE, type RunState } from '@run/run_state';
 import { CURRENT_SCHEMA_VERSION, migrate } from './migration';
@@ -11,7 +11,7 @@ import { CURRENT_SCHEMA_VERSION, migrate } from './migration';
 export { CURRENT_SCHEMA_VERSION } from './migration';
 export const STORAGE_KEY = 'pixel-battle-game/save';
 
-export type BuildingId = 'tavern' | 'barracks' | 'blacksmith' | 'hospital';
+export type { BuildingId } from '@data/types';
 export type BuildingLevel = 1 | 2 | 3;
 export type BuildingLevels = Record<BuildingId, BuildingLevel>;
 
@@ -108,6 +108,7 @@ export function createDefaultUnlocks(): Unlocks {
   return {
     classes: ['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage'],
     dungeons: ['crypt'],
+    buildings: [],
   };
 }
 
@@ -126,7 +127,7 @@ function normalizeSaveFile(file: SaveFile): SaveFile {
   return {
     ...file,
     stash: file.stash ?? createStash(),
-    buildingLevels: file.buildingLevels ?? { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
+    buildingLevels: file.buildingLevels ?? { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
     hospitalTreatmentsRemaining: file.hospitalTreatmentsRemaining ?? 1,
     tavernCandidates: file.tavernCandidates ?? [],
     roster: {
@@ -146,8 +147,14 @@ function normalizeSaveFile(file: SaveFile): SaveFile {
 }
 
 function normalizeHero(hero: Hero): Hero {
+  // Legacy saves (pre-traitIds) stored a single `traitId: TraitId` field.
+  // Wrap it in an array when upgrading from that shape.
+  const raw = hero as Hero & { traitId?: string };
+  const traitIds: readonly string[] = hero.traitIds
+    ?? (raw.traitId !== undefined ? [raw.traitId] : []);
   return {
     ...hero,
+    traitIds: traitIds as Hero['traitIds'],
     xp: hero.xp ?? 0,
     level: hero.level ?? 1,
     pendingPerk: hero.pendingPerk ?? false,

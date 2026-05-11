@@ -4,7 +4,8 @@ import { resolveCombatAbilities } from '@items/kit';
 import { applyEquipmentStats, rarePropertyFields } from '@items/stats';
 import type { EnemyId, SlotIndex, Wound } from '@data/types';
 import { WOUNDS } from '@data/wounds';
-import { createEnemyCombatant, createHeroCombatant } from '@combat/combatant';
+import { createEnemyCombatant, createHeroCombatant, createPetCombatant } from '@combat/combatant';
+import { PERKS } from '@data/perks';
 import type { CombatState, Combatant, Stats } from '@combat/types';
 import type { Encounter, ScaleFactors } from '@dungeon/node';
 import type { Hero } from '@heroes/hero';
@@ -59,6 +60,7 @@ function scaleEnemyStats(enemyId: EnemyId, scale: ScaleFactors): Stats {
 export function buildCombatState(
   party: readonly Hero[],
   encounter: Encounter,
+  petsDownByHeroId: readonly string[] = [],
 ): CombatState {
   const combatants: Combatant[] = [];
 
@@ -75,13 +77,32 @@ export function buildCombatState(
         baseStats: fullStats,
         currentHp: Math.min(hero.currentHp, woundedMaxHp),
         maxHp: woundedMaxHp,
-        traitId: hero.traitId,
+        traitIds: hero.traitIds,
         abilities,
         aiPriority,
         ...(hero.perkId !== undefined ? { perkId: hero.perkId } : {}),
         ...(damageTakenMultiplier !== 1 ? { damageTakenMultiplier } : {}),
         ...rareFields,
       }),
+    );
+  }
+
+  // Pet build pass — for each Hunter party member with a petSpeciesId whose pet
+  // isn't currently down for the run, add a pet combatant at slot 4.
+  for (let i = 0; i < party.length; i++) {
+    const hero = party[i];
+    if (hero.classId !== 'hunter' || !hero.petSpeciesId) continue;
+    if (petsDownByHeroId.includes(hero.id)) continue;
+    const heroCombatant = combatants[i];
+    const perk = hero.perkId ? PERKS[hero.perkId] : undefined;
+    const petAttackBonus = perk?.petAttackBonus ?? 0;
+    combatants.push(
+      createPetCombatant(
+        hero.petSpeciesId,
+        hero.id,
+        heroCombatant.baseStats.attack,
+        petAttackBonus,
+      ),
     );
   }
 

@@ -38,7 +38,7 @@ function createFreshSave(rng: Rng): SaveFile {
     vault: credit(createVault(), STARTER_GOLD),
     stash: createStash(),
     unlocks: createDefaultUnlocks(),
-    buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1 },
+    buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
     hospitalTreatmentsRemaining: 1,
     tavernCandidates: [],
     // Camp RNG seed = the bootstrap rng's state after starter-roster

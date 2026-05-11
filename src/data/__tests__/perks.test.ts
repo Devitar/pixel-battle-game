@@ -12,6 +12,8 @@ const EXPECTED_IDS: readonly PerkId[] = [
   'arcane_power', 'quick_cast',
   // Paladin
   'righteous', 'vindicator',
+  // Hunter
+  'beastmaster', 'sharpshooter',
 ];
 
 describe('PERKS map', () => {
@@ -36,23 +38,24 @@ describe('PERKS map', () => {
     it('classId is a valid ClassId', () => {
       expect(Object.keys(CLASSES)).toContain(PERKS[id].classId);
     });
-    it('has at least one effect (statEffects or hpEffect)', () => {
+    it('has at least one effect (statEffects, hpEffect, or petAttackBonus)', () => {
       const p = PERKS[id];
       const hasStat = p.statEffects !== undefined && p.statEffects.length > 0;
       const hasHp = p.hpEffect !== undefined;
-      expect(hasStat || hasHp).toBe(true);
+      const hasPetAttack = p.petAttackBonus !== undefined;
+      expect(hasStat || hasHp || hasPetAttack).toBe(true);
     });
   });
 });
 
 describe('CLASS_PERK_PAIRS', () => {
-  it('has exactly 7 entries (one per ClassId)', () => {
+  it('has exactly 8 entries (one per ClassId)', () => {
     const expectedClasses: ClassId[] =
-      ['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage', 'paladin'];
+      ['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage', 'paladin', 'hunter'];
     expect(Object.keys(CLASS_PERK_PAIRS).sort()).toEqual([...expectedClasses].sort());
   });
 
-  describe.each(['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage', 'paladin'] as ClassId[])(
+  describe.each(['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage', 'paladin', 'hunter'] as ClassId[])(
     'class %s pair',
     (classId) => {
       it('has exactly 2 distinct perks', () => {
@@ -68,4 +71,20 @@ describe('CLASS_PERK_PAIRS', () => {
       });
     },
   );
+});
+
+describe('hunter perks', () => {
+  it('beastmaster: pet-only +2 attack via petAttackBonus field', () => {
+    const p = PERKS.beastmaster;
+    expect(p.classId).toBe('hunter');
+    expect(p.petAttackBonus).toBe(2);
+    expect(p.statEffects ?? []).toEqual([]);
+  });
+
+  it('sharpshooter: hero +2 attack via statEffects', () => {
+    const p = PERKS.sharpshooter;
+    expect(p.classId).toBe('hunter');
+    expect(p.petAttackBonus).toBeUndefined();
+    expect(p.statEffects).toEqual([{ stat: 'attack', delta: 2 }]);
+  });
 });

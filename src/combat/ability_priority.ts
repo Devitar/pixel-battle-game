@@ -18,7 +18,7 @@ export function pickAbility(caster: Combatant, state: CombatState, rng: Rng): Pi
     if (!ability.canCastFrom.includes(caster.slot)) continue;
     const targetIds = resolveTargetSelector(ability.target, caster, state, rng);
     if (targetIds.length === 0) continue;
-    if (ability.aiCondition && !checkAiCondition(ability.aiCondition, caster, targetIds)) continue;
+    if (ability.aiCondition && !checkAiCondition(ability.aiCondition, caster, targetIds, state)) continue;
 
     // If a higher-priority ability is blocked SOLELY by canCastFrom, prefer
     // shuffle over this lower-priority pick. Avoids the Knight-at-slot-3
@@ -51,11 +51,16 @@ function checkAiCondition(
   cond: AiCondition,
   caster: Combatant,
   targetIds: readonly CombatantId[],
+  state: CombatState,
 ): boolean {
   switch (cond.kind) {
     case 'minTargets':
       return targetIds.length >= cond.n;
     case 'casterHpBelow':
       return caster.maxHp > 0 && caster.currentHp / caster.maxHp < cond.ratio;
+    case 'petAlive':
+      return state.combatants.some(
+        (c) => c.kind === 'pet' && c.ownerHeroId === caster.id && !c.isDead,
+      );
   }
 }

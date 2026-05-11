@@ -13,8 +13,8 @@ describe('milestones — registry', () => {
     expect(typeof MILESTONES.first_crypt_clear).toBe('function');
   });
 
-  it('has only the spec-2 entries (no stray)', () => {
-    expect(Object.keys(MILESTONES).sort()).toEqual(['first_crypt_clear']);
+  it('has only the registered milestone ids', () => {
+    expect(Object.keys(MILESTONES).sort()).toEqual(['first_crypt_clear', 'first_sunken_keep_clear']);
   });
 });
 
@@ -32,14 +32,14 @@ describe('detectBossMilestones', () => {
     expect(detectBossMilestones('crypt', 10)).toEqual([]);
   });
 
-  it('returns [] for sunken_keep clears (no spec-2 handler for that)', () => {
-    expect(detectBossMilestones('sunken_keep', 3)).toEqual([]);
+  it('returns [first_sunken_keep_clear] for sunken_keep canonical-final', () => {
+    expect(detectBossMilestones('sunken_keep', 3)).toEqual(['first_sunken_keep_clear']);
   });
 });
 
 describe('first_crypt_clear handler', () => {
   it('appends sunken_keep to unlocks.dungeons on a fresh state', () => {
-    const before = makeFakeSave({ classes: [], dungeons: ['crypt'] });
+    const before = makeFakeSave({ classes: [], dungeons: ['crypt'], buildings: [] });
     const after = MILESTONES.first_crypt_clear(before);
     expect(after.unlocks.dungeons).toContain('sunken_keep');
     expect(after.unlocks.dungeons).toContain('crypt');  // preserves existing
@@ -49,6 +49,7 @@ describe('first_crypt_clear handler', () => {
     const before = makeFakeSave({
       classes: ['knight', 'paladin'],
       dungeons: ['crypt', 'sunken_keep'],
+      buildings: [],
     });
     const after = MILESTONES.first_crypt_clear(before);
     expect(after).toBe(before);  // identity return on full no-op
@@ -58,6 +59,7 @@ describe('first_crypt_clear handler', () => {
     const before = makeFakeSave({
       classes: ['knight', 'archer', 'priest'],
       dungeons: ['crypt'],
+      buildings: [],
     });
     const after = MILESTONES.first_crypt_clear(before);
     expect(after.unlocks.classes).toContain('paladin');
@@ -70,6 +72,7 @@ describe('first_crypt_clear handler', () => {
     const before = makeFakeSave({
       classes: ['knight'],
       dungeons: ['crypt', 'sunken_keep'],
+      buildings: [],
     });
     const after = MILESTONES.first_crypt_clear(before);
     expect(after.unlocks.classes).toContain('paladin');
@@ -80,6 +83,7 @@ describe('first_crypt_clear handler', () => {
     const before = makeFakeSave({
       classes: ['knight', 'paladin'],
       dungeons: ['crypt'],
+      buildings: [],
     });
     const after = MILESTONES.first_crypt_clear(before);
     expect(after.unlocks.dungeons).toContain('sunken_keep');
@@ -89,14 +93,81 @@ describe('first_crypt_clear handler', () => {
 
 describe('applyPendingMilestones', () => {
   it('returns input unchanged for empty id list', () => {
-    const state = makeFakeSave({ classes: [], dungeons: ['crypt'] });
+    const state = makeFakeSave({ classes: [], dungeons: ['crypt'], buildings: [] });
     expect(applyPendingMilestones(state, [])).toBe(state);
   });
 
   it('runs the first_crypt_clear handler when id is in list', () => {
-    const before = makeFakeSave({ classes: ['knight'], dungeons: ['crypt'] });
+    const before = makeFakeSave({ classes: ['knight'], dungeons: ['crypt'], buildings: [] });
     const after = applyPendingMilestones(before, ['first_crypt_clear']);
     expect(after.unlocks.dungeons).toContain('sunken_keep');
     expect(after.unlocks.classes).toContain('paladin');
+  });
+});
+
+describe('first_sunken_keep_clear handler', () => {
+  it('appends hunter to unlocks.classes on a fresh state', () => {
+    const before = makeFakeSave({
+      classes: ['knight', 'archer', 'priest', 'paladin'],
+      dungeons: ['crypt', 'sunken_keep'],
+      buildings: [],
+    });
+    const after = MILESTONES.first_sunken_keep_clear(before);
+    expect(after.unlocks.classes).toContain('hunter');
+    expect(after.unlocks.classes).toContain('paladin');  // preserves
+  });
+
+  it('is idempotent', () => {
+    const before = makeFakeSave({
+      classes: ['knight', 'hunter'],
+      dungeons: ['crypt', 'sunken_keep'],
+      buildings: ['chapel'],
+    });
+    const after = MILESTONES.first_sunken_keep_clear(before);
+    expect(after).toBe(before);
+  });
+
+  it('appends chapel to unlocks.buildings on a fresh state', () => {
+    const before = makeFakeSave({
+      classes: ['knight'],
+      dungeons: ['crypt', 'sunken_keep'],
+      buildings: [],
+    });
+    const after = MILESTONES.first_sunken_keep_clear(before);
+    expect(after.unlocks.buildings).toContain('chapel');
+  });
+
+  it('appends only chapel when hunter already unlocked', () => {
+    const before = makeFakeSave({
+      classes: ['knight', 'hunter'],
+      dungeons: ['crypt', 'sunken_keep'],
+      buildings: [],
+    });
+    const after = MILESTONES.first_sunken_keep_clear(before);
+    expect(after.unlocks.buildings).toContain('chapel');
+    expect(after.unlocks.classes).toEqual(['knight', 'hunter']);
+  });
+
+  it('appends only hunter when chapel already unlocked', () => {
+    const before = makeFakeSave({
+      classes: ['knight'],
+      dungeons: ['crypt', 'sunken_keep'],
+      buildings: ['chapel'],
+    });
+    const after = MILESTONES.first_sunken_keep_clear(before);
+    expect(after.unlocks.classes).toContain('hunter');
+    expect(after.unlocks.buildings).toEqual(['chapel']);
+  });
+});
+
+describe('applyPendingMilestones — first_sunken_keep_clear', () => {
+  it('runs the handler when id is in list', () => {
+    const before = makeFakeSave({
+      classes: ['knight'],
+      dungeons: ['crypt', 'sunken_keep'],
+      buildings: [],
+    });
+    const after = applyPendingMilestones(before, ['first_sunken_keep_clear']);
+    expect(after.unlocks.classes).toContain('hunter');
   });
 });

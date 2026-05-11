@@ -1298,6 +1298,83 @@ describe('completeSurpriseCombat', () => {
   });
 });
 
+function makePartyWithHunter(): Hero[] {
+  return [
+    createHero('knight', 'K', 'h0', 'quick', 'body1'),
+    createHero('archer', 'A', 'h1', 'quick', 'body1'),
+    createHero('hunter', 'R', 'h_hunter', 'quick', 'body1', undefined, undefined, 'wolf'),
+  ];
+}
+
+function mockCombatResultWithPet(
+  party: readonly Hero[],
+  hunterId: string,
+  petIsDead: boolean,
+  outcome: CombatResult['outcome'],
+): CombatResult {
+  const combatants = party.map((hero, i) =>
+    createHeroCombatant(hero.classId, (i + 1) as SlotIndex, `p${i}`, {
+      baseStats: hero.baseStats,
+      currentHp: hero.currentHp,
+      maxHp: hero.maxHp,
+      isDead: false,
+    }),
+  );
+  combatants.push({
+    id: `pet_${hunterId}`,
+    side: 'player',
+    slot: 4,
+    kind: 'pet',
+    ownerHeroId: hunterId,
+    petSpeciesId: 'wolf',
+    baseStats: { hp: 14, attack: 6, defense: 2, speed: 5, mind: 0, crit: 10, dodge: 10 },
+    currentHp: petIsDead ? 0 : 14,
+    maxHp: 14,
+    statuses: {},
+    cooldowns: {},
+    abilities: ['wolf_bite', 'wolf_howl'],
+    aiPriority: ['wolf_howl', 'wolf_bite'],
+    preferredSlots: [4],
+    tags: ['beast'],
+    isDead: petIsDead,
+  });
+  const state: CombatState = { combatants, round: 1, exhaustionLevel: 0 };
+  return { finalState: state, events: [], outcome };
+}
+
+describe('petsDownByHeroId — post-combat bookkeeping', () => {
+  it('completeCombat appends ownerHeroId when pet is dead in finalState', () => {
+    const party = makePartyWithHunter();
+    const seed = 1;
+    let rs = startRun('crypt', party, seed, createRng(seed));
+    rs = advanceToBossNode(rs);
+    const result = mockCombatResultWithPet(party, 'h_hunter', true, 'player_victory');
+    const { runState: after } = completeCombat(rs, result, createRng(2));
+    expect(after.petsDownByHeroId).toContain('h_hunter');
+  });
+
+  it('does not duplicate when ownerHeroId already in petsDownByHeroId', () => {
+    const party = makePartyWithHunter();
+    const seed = 1;
+    let rs = startRun('crypt', party, seed, createRng(seed));
+    rs = advanceToBossNode(rs);
+    rs = { ...rs, petsDownByHeroId: ['h_hunter'] };
+    const result = mockCombatResultWithPet(party, 'h_hunter', true, 'player_victory');
+    const { runState: after } = completeCombat(rs, result, createRng(2));
+    expect(after.petsDownByHeroId.filter((id) => id === 'h_hunter')).toHaveLength(1);
+  });
+
+  it('does not append when pet is alive in finalState', () => {
+    const party = makePartyWithHunter();
+    const seed = 1;
+    let rs = startRun('crypt', party, seed, createRng(seed));
+    rs = advanceToBossNode(rs);
+    const result = mockCombatResultWithPet(party, 'h_hunter', false, 'player_victory');
+    const { runState: after } = completeCombat(rs, result, createRng(2));
+    expect(after.petsDownByHeroId).not.toContain('h_hunter');
+  });
+});
+
 describe('completeCombat — pendingMilestones populate', () => {
   it('canonical-final-boss defeat populates pendingMilestones with first_crypt_clear', () => {
     let rs = startRun('crypt', makeParty(), 1, createRng(1));
@@ -1465,5 +1542,14 @@ describe('completeCombat — credit matches nodeRewardGold for elite nodes', () 
       createRng(99),
     );
     expect(after.pack.gold - goldBefore).toBe(expectedReward);
+  });
+});
+
+describe('petsDownByHeroId — initialization', () => {
+  it('startRun seeds petsDownByHeroId to []', () => {
+    const party = makeParty();  // existing helper in this test file
+    const seed = 1;
+    const rs = startRun('crypt', party, seed, createRng(seed));
+    expect(rs.petsDownByHeroId).toEqual([]);
   });
 });

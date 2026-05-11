@@ -27,6 +27,9 @@ export const BUILDING_LEVELS: Record<BuildingId, readonly BuildingLevelDef[]> = 
     { level: 2, upgradeCost: 200, unlockDescription: '2 treatments per run' },
     { level: 3, upgradeCost: 500, unlockDescription: '3 treatments per run · 2× time-heal' },
   ],
+  chapel: [
+    { level: 1, upgradeCost: 0, unlockDescription: 'Add or replace traits on heroes' },
+  ],
 };
 
 // Aligned with createRoster's DEFAULT_ROSTER_CAPACITY = 12 (BARRACKS_CAPACITY[1]).

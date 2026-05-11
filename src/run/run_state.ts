@@ -30,6 +30,7 @@ export interface RunState {
   readonly traversedNodeIds: readonly string[];
   readonly surprisesThisFloor: number;
   readonly pendingMilestones: readonly MilestoneId[];
+  readonly petsDownByHeroId: readonly string[];
 }
 
 export interface CashoutOutcome {
@@ -97,6 +98,7 @@ export function startRun(
     traversedNodeIds: [startNodeId],
     surprisesThisFloor: 0,
     pendingMilestones: [],
+    petsDownByHeroId: [],
   };
 }
 
@@ -215,6 +217,15 @@ export function completeCombat(
     }
   }
 
+  // Pet-down bookkeeping. Hero ids are 'p0'/'p1'/'p2'; pet ids are 'pet_${heroId}',
+  // so the hero loop above naturally skipped them.
+  const newPetsDown: string[] = [...runState.petsDownByHeroId];
+  for (const c of result.finalState.combatants) {
+    if (c.kind === 'pet' && c.isDead && c.ownerHeroId && !newPetsDown.includes(c.ownerHeroId)) {
+      newPetsDown.push(c.ownerHeroId);
+    }
+  }
+
   if (result.outcome === 'player_defeat') {
     const allLost: Hero[] = [
       ...runState.fallen,
@@ -295,6 +306,7 @@ export function completeCombat(
         pack: newPack,
         status: 'camp_screen',
         pendingMilestones: [...runState.pendingMilestones, ...triggered],
+        petsDownByHeroId: newPetsDown,
       },
     };
   }
@@ -313,6 +325,7 @@ export function completeCombat(
       pack: newPack,
       status: 'in_dungeon',
       awaitingFork: true,
+      petsDownByHeroId: newPetsDown,
     },
   };
 }
@@ -345,6 +358,15 @@ export function completeSurpriseCombat(
       newFallen.push(updated);
     } else {
       updatedPartyLiving.push(updated);
+    }
+  }
+
+  // Pet-down bookkeeping. Hero ids are 'p0'/'p1'/'p2'; pet ids are 'pet_${heroId}',
+  // so the hero loop above naturally skipped them.
+  const newPetsDown: string[] = [...runState.petsDownByHeroId];
+  for (const c of result.finalState.combatants) {
+    if (c.kind === 'pet' && c.isDead && c.ownerHeroId && !newPetsDown.includes(c.ownerHeroId)) {
+      newPetsDown.push(c.ownerHeroId);
     }
   }
 
@@ -410,6 +432,7 @@ export function completeSurpriseCombat(
       party: partyAfterXp,
       fallen: [...runState.fallen, ...newFallen],
       pack: newPack,
+      petsDownByHeroId: newPetsDown,
     },
   };
 }

@@ -3,7 +3,7 @@ import { ABILITIES } from '../abilities';
 import { CLASSES } from '../classes';
 import type { ClassId } from '../types';
 
-const EXPECTED_IDS: readonly ClassId[] = ['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage', 'paladin'];
+const EXPECTED_IDS: readonly ClassId[] = ['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage', 'paladin', 'hunter'];
 const STATS: readonly ('hp' | 'attack' | 'defense' | 'speed')[] = [
   'hp',
   'attack',
@@ -191,5 +191,33 @@ describe('Paladin', () => {
       axe: 'paladin_cleaving_smite',
       daggers: 'paladin_quick_smite',
     });
+  });
+});
+
+describe('hunter class', () => {
+  it('has the expected chassis', () => {
+    const c = CLASSES.hunter;
+    expect(c.id).toBe('hunter');
+    expect(c.baseStats).toEqual({
+      hp: 14, attack: 4, defense: 2, speed: 4, mind: 0, crit: 10, dodge: 10,
+    });
+    expect(c.primaryStat).toBe('attack');
+    expect(c.preferredWeapon).toBe('bow');
+    expect(c.weaponFamily).toBe('ranged');
+  });
+
+  it('has the expected ability set', () => {
+    const c = CLASSES.hunter;
+    expect(c.basicAbility).toBe('hunter_shoot');
+    expect([...c.abilities].sort()).toEqual(
+      ['command_strike', 'crippling_shot', 'hunter_shoot', 'hunters_mark']
+    );
+    expect(c.aiPriority[0]).toBe('command_strike');
+  });
+
+  it('starter loadout is bow_basic only (no shield, no spear)', () => {
+    const c = CLASSES.hunter;
+    expect(c.starterLoadout.weapon).toBe('bow_basic');
+    expect(c.starterLoadout.shield).toBeUndefined();
   });
 });

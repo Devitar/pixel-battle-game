@@ -5,6 +5,7 @@ import type {
   CombatantTag,
   EnemyId,
   PerkId,
+  PetSpeciesId,
   SlotIndex,
   StatusId,
   TraitId,
@@ -36,9 +37,11 @@ export interface Combatant {
   id: CombatantId;
   side: CombatSide;
   slot: SlotIndex;
-  kind: 'hero' | 'enemy';
+  kind: 'hero' | 'enemy' | 'pet';
   classId?: ClassId;
   enemyId?: EnemyId;
+  ownerHeroId?: string;          // pet → owning Hunter's Hero.id
+  petSpeciesId?: PetSpeciesId;   // pet → species id (for sprite resolution)
   baseStats: Stats;
   currentHp: number;
   maxHp: number;
@@ -48,7 +51,7 @@ export interface Combatant {
   aiPriority: readonly AbilityId[];
   preferredSlots?: readonly SlotIndex[];
   tags?: readonly CombatantTag[];
-  traitId?: TraitId;
+  traitIds?: readonly TraitId[];
   perkId?: PerkId;
   damageTakenMultiplier?: number;
   // Candidates for consolidation into a `passives` bag once 3+ more land.

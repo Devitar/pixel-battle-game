@@ -5,7 +5,7 @@ import { PERKS } from '@data/perks';
 import { TRAITS } from '@data/traits';
 import type {
   ClassId, HeroEquipment, Item, ItemBaseId, ItemSlot,
-  PerkDef, PerkId, StarterLoadout, TraitDef, TraitHpEffect, TraitId, Wound,
+  PerkDef, PerkId, PetSpeciesId, StarterLoadout, TraitDef, TraitHpEffect, TraitId, Wound,
 } from '@data/types';
 import type { Stats } from '@combat/types';
 
@@ -16,7 +16,7 @@ export interface Hero {
   baseStats: Stats;
   currentHp: number;
   maxHp: number;
-  traitId: TraitId;
+  traitIds: readonly TraitId[];
   bodySpriteId: string;
   legsSpriteId: string;
   feetSpriteId: string;
@@ -26,6 +26,7 @@ export interface Hero {
   level: number;
   pendingPerk: boolean;
   perkId?: PerkId;
+  petSpeciesId?: PetSpeciesId;
 }
 
 export function createHero(
@@ -36,10 +37,11 @@ export function createHero(
   bodySpriteId: string,
   legsSpriteId: string = DEFAULT_LEGS_SPRITE,
   feetSpriteId: string = DEFAULT_FEET_SPRITE,
+  petSpeciesId?: PetSpeciesId,
 ): Hero {
   const def = CLASSES[classId];
   const equipment = buildStarterEquipment(id, def.starterLoadout);
-  const maxHp = computeMaxHp(def.baseStats.hp, TRAITS[traitId], equipment);
+  const maxHp = computeMaxHp(def.baseStats.hp, [TRAITS[traitId]], equipment);
   return {
     id,
     classId,
@@ -47,7 +49,7 @@ export function createHero(
     baseStats: { ...def.baseStats },
     currentHp: maxHp,
     maxHp,
-    traitId,
+    traitIds: [traitId],
     bodySpriteId,
     legsSpriteId,
     feetSpriteId,
@@ -56,26 +58,29 @@ export function createHero(
     xp: 0,
     level: 1,
     pendingPerk: false,
+    ...(petSpeciesId !== undefined && classId === 'hunter' ? { petSpeciesId } : {}),
   };
 }
 
 export function computeMaxHp(
   classBaseHp: number,
-  trait: TraitDef,
+  traits: readonly TraitDef[],
   equipment: HeroEquipment,
   perk?: PerkDef,
 ): number {
   let base = classBaseHp;
-  if (trait.hpEffect) base = applyHpEffect(base, trait.hpEffect);
+  for (const trait of traits) {
+    if (trait.hpEffect) base = applyHpEffect(base, trait.hpEffect);
+  }
   if (perk?.hpEffect) base = applyHpEffect(base, perk.hpEffect);
   return base + gearTotal(equipment);
 }
 
 export function recomputeMaxHp(hero: Hero): Hero {
   const classDef = CLASSES[hero.classId];
-  const trait = TRAITS[hero.traitId];
+  const traits = hero.traitIds.map((id) => TRAITS[id]);
   const perk = hero.perkId ? PERKS[hero.perkId] : undefined;
-  const newMaxHp = computeMaxHp(classDef.baseStats.hp, trait, hero.equipment, perk);
+  const newMaxHp = computeMaxHp(classDef.baseStats.hp, traits, hero.equipment, perk);
   return {
     ...hero,
     maxHp: newMaxHp,
