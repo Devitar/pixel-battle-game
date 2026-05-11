@@ -16,20 +16,23 @@ export function applyCampNodeEffect(
   choice: Exclude<CampNodeChoice, { kind: 'leave' }>,
   _rng: Rng,
 ): RunState {
+  // Reset pets-down regardless of choice. The pet rests at camp.
+  const respawned: RunState = { ...runState, petsDownByHeroId: [] };
+
   if (choice.kind === 'heal_party') {
-    const newParty = runState.party.map((hero) => {
+    const newParty = respawned.party.map((hero) => {
       const healed = Math.round(hero.maxHp * HEAL_PARTY_PERCENT);
       return { ...hero, currentHp: Math.min(hero.maxHp, hero.currentHp + healed) };
     });
-    return { ...runState, party: newParty };
+    return { ...respawned, party: newParty };
   }
 
-  // treat_wound
+  // treat_wound (operates on respawned)
   const { heroIndex, woundIndex } = choice;
-  if (heroIndex < 0 || heroIndex >= runState.party.length) {
-    throw new Error(`applyCampNodeEffect: heroIndex ${heroIndex} out of range [0, ${runState.party.length})`);
+  if (heroIndex < 0 || heroIndex >= respawned.party.length) {
+    throw new Error(`applyCampNodeEffect: heroIndex ${heroIndex} out of range [0, ${respawned.party.length})`);
   }
-  const hero = runState.party[heroIndex];
+  const hero = respawned.party[heroIndex];
   if (hero.wounds.length === 0) {
     throw new Error(`applyCampNodeEffect: hero at index ${heroIndex} has no wounds to treat`);
   }
@@ -37,8 +40,8 @@ export function applyCampNodeEffect(
     throw new Error(`applyCampNodeEffect: woundIndex ${woundIndex} out of range [0, ${hero.wounds.length})`);
   }
   const newWounds = hero.wounds.filter((_, i) => i !== woundIndex);
-  const newParty = runState.party.map((h, i) =>
+  const newParty = respawned.party.map((h, i) =>
     i === heroIndex ? { ...h, wounds: newWounds } : h,
   );
-  return { ...runState, party: newParty };
+  return { ...respawned, party: newParty };
 }

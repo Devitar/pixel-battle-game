@@ -66,6 +66,7 @@ describe('save / load roundtrip', () => {
       traversedNodeIds: [''],
       surprisesThisFloor: 0,
       pendingMilestones: [],
+      petsDownByHeroId: [],
     };
     const original: SaveFile = {
       ...makeBaseSave(),
@@ -95,6 +96,7 @@ describe('save / load roundtrip', () => {
       traversedNodeIds: [],
       surprisesThisFloor: 0,
       pendingMilestones: [],
+      petsDownByHeroId: [],
     };
     const data: SaveFile = { ...makeBaseSave(), runState: fakeRunState };
     expect(() => save(data, storage)).toThrow();

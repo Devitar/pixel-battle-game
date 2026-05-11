@@ -5,7 +5,7 @@ import { PERKS } from '@data/perks';
 import { TRAITS } from '@data/traits';
 import type {
   ClassId, HeroEquipment, Item, ItemBaseId, ItemSlot,
-  PerkDef, PerkId, StarterLoadout, TraitDef, TraitHpEffect, TraitId, Wound,
+  PerkDef, PerkId, PetSpeciesId, StarterLoadout, TraitDef, TraitHpEffect, TraitId, Wound,
 } from '@data/types';
 import type { Stats } from '@combat/types';
 
@@ -26,6 +26,7 @@ export interface Hero {
   level: number;
   pendingPerk: boolean;
   perkId?: PerkId;
+  petSpeciesId?: PetSpeciesId;
 }
 
 export function createHero(
@@ -36,6 +37,7 @@ export function createHero(
   bodySpriteId: string,
   legsSpriteId: string = DEFAULT_LEGS_SPRITE,
   feetSpriteId: string = DEFAULT_FEET_SPRITE,
+  petSpeciesId?: PetSpeciesId,
 ): Hero {
   const def = CLASSES[classId];
   const equipment = buildStarterEquipment(id, def.starterLoadout);
@@ -56,6 +58,7 @@ export function createHero(
     xp: 0,
     level: 1,
     pendingPerk: false,
+    ...(petSpeciesId !== undefined && classId === 'hunter' ? { petSpeciesId } : {}),
   };
 }
 

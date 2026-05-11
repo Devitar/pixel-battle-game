@@ -84,7 +84,7 @@ A hand-crafted roster, each with a clear role, position preference, and signatur
 | 5 | **Archer** | Ranged DPS | 3 | Bow | Attack / Speed | Piercing Shot (enemy 3–4), Volley (all enemies, low dmg), Flare Arrow (marks a target for bonus damage) |
 | 6 | **Mage** | Caster | 3 | Staff / Wand | Mind | Firebolt (single target, enemy 3–4), Frost Nova (AoE + slow), Arc Shock (chance-stun) |
 | 7 | **Paladin** *(unlock)* | Hybrid frontline | 1–2 | Sword + Holy symbol | Attack / Mind | Smite, Lay on Hands (heal), Consecrate (party HoT). Unlocks: first Crypt clear. |
-| 8 | **Hunter** *(unlock)* | Ranged + beast | 3 | Bow / Spear | Attack | Bonds with a pet that occupies slot 4 and acts on its own priority. Unlocks: first Warren clear. |
+| 8 | **Hunter** *(unlock)* | Ranged + beast | 3 | Bow / Spear | Attack | Bonds with a pet that occupies slot 4 and acts on its own priority. Unlocks: first Sunken Keep clear. |
 
 Each class has 3–4 abilities total plus a universal basic Attack that works with any weapon.
 

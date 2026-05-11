@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '@util/rng';
 import { pickAbility } from '../ability_priority';
+import { createPetCombatant } from '../combatant';
 import { makeEnemyCombatant, makeHeroCombatant, makeTestState } from './helpers';
 
 describe('pickAbility', () => {
@@ -113,5 +114,34 @@ describe('pickAbility', () => {
     const p0 = makeHeroCombatant('knight', 1, 'p0');
     const state = makeTestState([p0], [e0, e1, e2]);
     expect(pickAbility(e2, state, rng)?.abilityId).toBe('bone_throw');
+  });
+});
+
+describe('petAlive AI condition', () => {
+  it('blocks command_strike when the Hunter has no living pet', () => {
+    const hunter = makeHeroCombatant('hunter', 1, 'h_alone');
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e1');
+    const state = makeTestState([hunter], [enemy]);
+    const pick = pickAbility(hunter, state, createRng(1));
+    expect(pick?.abilityId).not.toBe('command_strike');
+  });
+
+  it('allows command_strike when a pet is alive and owned by the Hunter', () => {
+    const hunter = makeHeroCombatant('hunter', 1, 'h_with_pet');
+    const pet = createPetCombatant('wolf', 'h_with_pet', 10);
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e1');
+    const state = makeTestState([hunter, pet], [enemy]);
+    const pick = pickAbility(hunter, state, createRng(1));
+    expect(pick?.abilityId).toBe('command_strike');
+  });
+
+  it('blocks command_strike when the pet is dead', () => {
+    const hunter = makeHeroCombatant('hunter', 1, 'h_dead_pet');
+    const pet = createPetCombatant('wolf', 'h_dead_pet', 10);
+    pet.isDead = true;
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e1');
+    const state = makeTestState([hunter, pet], [enemy]);
+    const pick = pickAbility(hunter, state, createRng(1));
+    expect(pick?.abilityId).not.toBe('command_strike');
   });
 });

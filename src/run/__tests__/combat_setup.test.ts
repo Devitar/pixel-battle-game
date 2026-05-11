@@ -241,6 +241,68 @@ describe('buildCombatState — equipment stats', () => {
   });
 });
 
+import type { Hero } from '@heroes/hero';
+
+function huntersInParty(): Hero[] {
+  const archer = createHero('archer', 'A', 'a1', 'stout', 'body1');
+  const knight = createHero('knight', 'K', 'k1', 'stout', 'body1');
+  const hunter = createHero(
+    'hunter', 'Robin', 'r1', 'stout',
+    'body1', undefined, undefined, 'wolf',
+  );
+  return [knight, archer, hunter];
+}
+
+describe('buildCombatState — pet build pass', () => {
+  it('appends a wolf pet at slot 4 for a Hunter party member', () => {
+    const party = huntersInParty();
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState(party, encounter, []);
+    const pet = state.combatants.find((c) => c.kind === 'pet');
+    expect(pet).toBeDefined();
+    expect(pet!.slot).toBe(4);
+    expect(pet!.ownerHeroId).toBe('r1');
+    expect(pet!.petSpeciesId).toBe('wolf');
+  });
+
+  it('skips the pet when the Hunter\'s id is in petsDownByHeroId', () => {
+    const party = huntersInParty();
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState(party, encounter, ['r1']);
+    const pet = state.combatants.find((c) => c.kind === 'pet');
+    expect(pet).toBeUndefined();
+  });
+
+  it('builds no pet for a Hunter without petSpeciesId (defensive)', () => {
+    const knight = createHero('knight', 'K', 'k1', 'stout', 'body1');
+    const archer = createHero('archer', 'A', 'a1', 'stout', 'body1');
+    const hunterNoPet = createHero('hunter', 'X', 'x1', 'stout', 'body1');
+    const party = [knight, archer, hunterNoPet];
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState(party, encounter, []);
+    expect(state.combatants.find((c) => c.kind === 'pet')).toBeUndefined();
+  });
+
+  it('reads Beastmaster perk and adds petAttackBonus', () => {
+    const knight = createHero('knight', 'K', 'k1', 'stout', 'body1');
+    const archer = createHero('archer', 'A', 'a1', 'stout', 'body1');
+    const hunter = createHero(
+      'hunter', 'B', 'b1', 'stout',
+      'body1', undefined, undefined, 'bear',
+    );
+    hunter.perkId = 'beastmaster';
+    const party = [knight, archer, hunter];
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState(party, encounter, []);
+    const pet = state.combatants.find((c) => c.kind === 'pet');
+    const huntCombatant = state.combatants.find((c) => c.id === 'p2');
+    expect(pet).toBeDefined();
+    // bear scale 0.4 × hunter effective attack + 2 perk bonus
+    const expected = Math.round(0.4 * huntCombatant!.baseStats.attack) + 2;
+    expect(pet!.baseStats.attack).toBe(expected);
+  });
+});
+
 import type { Item } from '@data/types';
 import { resolveCombatAbilities } from '@items/kit';
 

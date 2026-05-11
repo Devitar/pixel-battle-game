@@ -1,6 +1,9 @@
+import { ABILITIES } from '@data/abilities';
 import type { Ability, AbilityEffect } from '@data/types';
 import { HEAVY_HIT_WOUND_THRESHOLD, WOUND_CHANCE_PERCENT, WOUND_IDS } from '@data/wounds';
 import type { Rng } from '@util/rng';
+import { pickAbility } from './ability_priority';
+import { setCooldown } from './cooldowns';
 import { collapseAfterDeath, moveTo, pull, shove, swap } from './positions';
 import { getEffectiveStat } from './statuses';
 import type { Combatant, CombatantId, CombatEvent, CombatState, StatusInstance } from './types';
@@ -230,6 +233,23 @@ function applyEffect(
         swap(caster, occupant, events);
       } else {
         moveTo(caster, effect.slot, events);
+      }
+      return;
+    }
+    case 'commandPet': {
+      const pet = state.combatants.find(
+        (c) => c.kind === 'pet' && c.ownerHeroId === caster.id && !c.isDead,
+      );
+      if (!pet) return;
+      const picked = pickAbility(pet, state, rng);
+      if (!picked) return;
+      const petAbility = ABILITIES[picked.abilityId];
+      // Defensive: a pet ability cannot itself be commandPet (only Hunters have command_strike).
+      // If a future pet kit ever adds commandPet, no-op to avoid infinite recursion.
+      if (petAbility.effects.some((e) => e.kind === 'commandPet')) return;
+      applyAbility(petAbility, pet, picked.targetIds, state, rng, events);
+      if (petAbility.cooldown !== undefined) {
+        setCooldown(pet, petAbility.id, petAbility.cooldown + 1);
       }
       return;
     }

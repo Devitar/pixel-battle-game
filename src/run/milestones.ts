@@ -27,6 +27,13 @@ export const MILESTONES: Record<MilestoneId, MilestoneHandler> = {
     }
     return next;  // identity preserved when both branches no-op
   },
+  first_sunken_keep_clear: (state) => {
+    if (state.unlocks.classes.includes('hunter')) return state;
+    return {
+      ...state,
+      unlocks: { ...state.unlocks, classes: [...state.unlocks.classes, 'hunter'] },
+    };
+  },
 };
 
 /**
@@ -41,6 +48,9 @@ export function detectBossMilestones(
 ): readonly MilestoneId[] {
   if (dungeonId === 'crypt' && floorNumber === DUNGEONS.crypt.floorsPerRun) {
     return ['first_crypt_clear'];
+  }
+  if (dungeonId === 'sunken_keep' && floorNumber === DUNGEONS.sunken_keep.floorsPerRun) {
+    return ['first_sunken_keep_clear'];
   }
   return [];
 }

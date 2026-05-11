@@ -97,4 +97,16 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     aiPriority: ['consecrate', 'lay_on_hands', 'smite', 'paladin_strike'],
     starterLoadout: { weapon: 'sword_basic', shield: 'shield_basic' },
   },
+  hunter: {
+    id: 'hunter',
+    name: 'Hunter',
+    baseStats: { hp: 14, attack: 4, defense: 2, speed: 4, mind: 0, crit: 10, dodge: 10 },
+    primaryStat: 'attack',
+    preferredWeapon: 'bow',
+    weaponFamily: 'ranged',
+    basicAbility: 'hunter_shoot',
+    abilities: ['hunter_shoot', 'hunters_mark', 'crippling_shot', 'command_strike'],
+    aiPriority: ['command_strike', 'hunters_mark', 'crippling_shot', 'hunter_shoot'],
+    starterLoadout: { weapon: 'bow_basic' },
+  },
 };

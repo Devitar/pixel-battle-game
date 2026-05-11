@@ -45,21 +45,6 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 Tier 3 scope from gdd §10. Sunken Keep (Cluster D · 1, 2026-05-06) and Paladin (Cluster D · 3, 2026-05-06) shipped; the Crypt-clear → Paladin/Sunken-Keep cascade is wired. Entries below are the **first-Sunken-Keep-clear cascade** (Hunter + Chapel + Training Grounds, gdd §9), plus future Tier 3 surface (dungeons 3-4, legendary gear, level-10 perks, NG+) that hasn't been broken down yet.
 
-### 4 · Hunter class — second unlockable
-
-- **What:** Add the Hunter class (gdd §3 row 7): ranged + beast pet, prefers slot 3, sword/spear, primary stat Attack. Bonds with a pet that occupies slot 4 and acts on its own AI priority. Unlocks via the existing milestone-unlock infrastructure on first Sunken Keep clear, mirroring how Paladin (Cluster D · 3) unlocks on first Crypt clear.
-- **Why:** First class unlock gated on tier-2 dungeon clear. Completes the "every dungeon clear unlocks a class" pattern through tier 2 (Crypt → Paladin already shipped; Sunken Keep → Hunter). Per gdd §9 meta-progression, first Sunken Keep clear unlocks Hunter + Chapel + Training Grounds + Sunken Keep gear tier; this is one leg of that triple.
-- **Tier:** 3
-- **Acceptance:**
-  - **Needs brainstorming + spec first.** The pet system is the single biggest design risk — gdd §11 flags auto-battler AI priorities as the highest-leverage piece, and Hunter introduces a *separate* AI actor that occupies a party slot. Spec must address: pet stats (HP/attack/etc.), pet abilities, slot-4 occupation rules (does it count toward party-size 3?), target eligibility (pet as ally for heals/buffs?), pet death (Fallen / Lost? respawn? cooldown?), pet+Hunter formation interaction.
-  - Reuse Paladin's milestone-handler pattern: extend or add a `first_sunken_keep_clear` handler that appends `'hunter'` to `unlocks.classes` (idempotent, mirroring Paladin's `first_crypt_clear` handler shape).
-  - Hunter's abilities (3-4 + universal basic) defined in `data/abilities.ts`. Pet behavior likely needs a new system in `combat/` for "secondary actor with own AI."
-  - Spec doc + plan + implementation, mirroring `docs/superpowers/specs/2026-05-06-paladin-class-design.md` structure.
-- **Touches:** `src/data/{classes,abilities,perks}.ts`, `src/run/milestones.ts` (handler), `src/data/types.ts` (ClassId, MilestoneId widening), `src/combat/` (pet-actor system — new files likely), `src/heroes/hero.ts` (if pet state lives on hero), tests in lockstep across all of the above.
-- **Source:** gdd §3 (class table — note: §3 says "first Warren clear" but §9 meta-progression says "first Sunken Keep clear"; §9 is canonical per the Paladin precedent — file a fix to gdd §3 row 7 alongside this work). Cluster D blurb placeholder.
-
----
-
 ### 5 · Chapel building — trait removal
 
 - **What:** Add the Chapel camp building (gdd §6 row 6): L1-only (no tier progression), single function — remove a Trait from a hero for an expensive gold cost. Unlocks via the same `first_sunken_keep_clear` handler as Hunter and Training Grounds.

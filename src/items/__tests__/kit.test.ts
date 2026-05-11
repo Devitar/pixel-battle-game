@@ -45,6 +45,7 @@ const PREFERRED_WEAPON: Record<ClassId, ItemBaseId> = {
   rogue: 'daggers_basic',
   mage: 'staff_basic',
   paladin: 'sword_basic',
+  hunter: 'bow_basic',
 };
 
 describe('resolveCombatAbilities — Band 1 (preferred weapon)', () => {

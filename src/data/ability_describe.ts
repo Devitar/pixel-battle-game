@@ -153,5 +153,7 @@ function describeEffect(e: AbilityEffect): string {
       return `Poison target for ${e.damagePerTurn} dmg/turn (${e.duration} ${turnWord(e.duration)})`;
     case 'regen':
       return `Heal ${e.healPerTurn} HP per turn for ${e.duration} ${turnWord(e.duration)}`;
+    case 'commandPet':
+      return 'Pet performs an immediate action';
   }
 }

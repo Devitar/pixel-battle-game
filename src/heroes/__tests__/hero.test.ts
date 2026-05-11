@@ -164,3 +164,30 @@ describe('recomputeMaxHp', () => {
     expect(recomputed.maxHp).toBe(24);  // bug: would be 22 if perk dropped
   });
 });
+
+describe('createHero — Hunter petSpeciesId', () => {
+  it('stores petSpeciesId on Hunter heroes when provided', () => {
+    const hero = createHero(
+      'hunter', 'Robin', 'h_robin', 'stout',
+      'body1', 'legs_default', 'feet_default',
+      'wolf',
+    );
+    expect(hero.petSpeciesId).toBe('wolf');
+  });
+
+  it('leaves petSpeciesId undefined for non-Hunter classes', () => {
+    const hero = createHero(
+      'knight', 'Aldous', 'h_aldous', 'stout',
+      'body1',
+    );
+    expect(hero.petSpeciesId).toBeUndefined();
+  });
+
+  it('leaves petSpeciesId undefined for a Hunter when not provided', () => {
+    const hero = createHero(
+      'hunter', 'Mute', 'h_mute', 'quick',
+      'body1',
+    );
+    expect(hero.petSpeciesId).toBeUndefined();
+  });
+});

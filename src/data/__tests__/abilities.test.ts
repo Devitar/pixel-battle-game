@@ -58,6 +58,18 @@ const EXPECTED_IDS: readonly AbilityId[] = [
   'consecrate',
   'paladin_cleaving_smite',
   'paladin_quick_smite',
+  // Hunter
+  'hunter_shoot',
+  'hunters_mark',
+  'crippling_shot',
+  'command_strike',
+  // Pet kits
+  'wolf_bite',
+  'wolf_howl',
+  'hawk_dive',
+  'hawk_screech',
+  'bear_maul',
+  'bear_roar',
 ];
 
 const KEBAB_CASE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -296,5 +308,106 @@ describe('paladin_quick_smite (daggers swap variant of smite)', () => {
       expect(dmg.scalingStat).toBe('mind');
       expect(dmg.bonusCrit).toBe(10);
     }
+  });
+});
+
+describe('pet abilities', () => {
+  it('wolf_bite is a melee single-target attack from any slot', () => {
+    const a = ABILITIES.wolf_bite;
+    expect(a.canCastFrom).toEqual([1, 2, 3, 4]);
+    expect(a.target.slots).toEqual([1, 2]);
+    expect(a.effects[0].kind).toBe('damage');
+  });
+
+  it('wolf_howl buffs allies (excluding caster) with blessed +1 attack', () => {
+    const a = ABILITIES.wolf_howl;
+    expect(a.cooldown).toBe(4);
+    expect(a.target.side).toBe('ally');
+    expect(a.target.slots).toBe('all');
+    expect(a.target.includeCaster).toBe(false);
+    const eff = a.effects[0] as Extract<AbilityEffect, { kind: 'buff' }>;
+    expect(eff.statusId).toBe('blessed');
+    expect(eff.stat).toBe('attack');
+    expect(eff.delta).toBe(1);
+  });
+
+  it('hawk_dive targets back-row enemies with bonus crit', () => {
+    const a = ABILITIES.hawk_dive;
+    expect(a.target.slots).toEqual([3, 4]);
+    const eff = a.effects[0] as Extract<AbilityEffect, { kind: 'damage' }>;
+    expect(eff.bonusCrit).toBe(10);
+  });
+
+  it('hawk_screech is AoE enemy damage', () => {
+    const a = ABILITIES.hawk_screech;
+    expect(a.cooldown).toBe(4);
+    expect(a.target.slots).toBe('all');
+    expect(a.effects[0].kind).toBe('damage');
+  });
+
+  it('bear_maul targets slot-1 enemy from any slot', () => {
+    const a = ABILITIES.bear_maul;
+    expect(a.target.slots).toEqual([1]);
+  });
+
+  it('bear_roar is AoE damage with chance-stun', () => {
+    const a = ABILITIES.bear_roar;
+    expect(a.cooldown).toBe(4);
+    expect(a.target.slots).toBe('all');
+    expect(a.effects).toHaveLength(2);
+    const stun = a.effects.find((e) => e.kind === 'stun') as Extract<AbilityEffect, { kind: 'stun' }>;
+    expect(stun).toBeDefined();
+    expect(stun.chance).toBe(0.2);
+    expect(stun.duration).toBe(1);
+  });
+});
+
+describe('hunter abilities', () => {
+  it('hunter_shoot is a basic single-target ranged attack', () => {
+    const a = ABILITIES.hunter_shoot;
+    expect(a.canCastFrom).toEqual([1, 2, 3]);
+    expect(a.target.side).toBe('enemy');
+    expect(a.target.pick).toBe('first');
+    expect(a.effects).toHaveLength(1);
+    const eff = a.effects[0] as Extract<AbilityEffect, { kind: 'damage' }>;
+    expect(eff.kind).toBe('damage');
+    expect(eff.scalingStat).toBe('attack');
+  });
+
+  it('hunters_mark applies marked status with damageBonus', () => {
+    const a = ABILITIES.hunters_mark;
+    expect(a.cooldown).toBe(4);
+    const filter = a.target.filter as Extract<TargetFilter, { kind: 'lacksStatus' }>;
+    expect(filter.kind).toBe('lacksStatus');
+    expect(filter.statusId).toBe('marked');
+    const eff = a.effects[0] as Extract<AbilityEffect, { kind: 'mark' }>;
+    expect(eff.kind).toBe('mark');
+    expect(eff.statusId).toBe('marked');
+    expect(eff.damageBonus).toBe(2);
+    expect(eff.duration).toBe(3);
+  });
+
+  it('crippling_shot deals damage and applies slowed', () => {
+    const a = ABILITIES.crippling_shot;
+    expect(a.cooldown).toBe(3);
+    expect(a.canCastFrom).toEqual([2, 3]);
+    const damage = a.effects.find((e) => e.kind === 'damage');
+    expect(damage).toBeDefined();
+    const debuff = a.effects.find((e) => e.kind === 'debuff') as
+      | Extract<AbilityEffect, { kind: 'debuff' }>
+      | undefined;
+    expect(debuff).toBeDefined();
+    expect(debuff!.statusId).toBe('slowed');
+    expect(debuff!.stat).toBe('speed');
+    expect(debuff!.delta).toBe(-2);
+  });
+
+  it('command_strike has commandPet effect, petAlive aiCondition, self target', () => {
+    const a = ABILITIES.command_strike;
+    expect(a.cooldown).toBe(3);
+    expect(a.target.side).toBe('self');
+    expect(a.aiCondition).toEqual({ kind: 'petAlive' });
+    expect(a.effects).toHaveLength(1);
+    expect(a.effects[0].kind).toBe('commandPet');
   });
 });

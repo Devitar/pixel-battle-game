@@ -449,4 +449,82 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     effects: [{ kind: 'damage', power: 1.0, scalingStat: 'mind', bonusCrit: 10 }],
     tags: ['radiant'],
   },
+
+  hunter_shoot: {
+    id: 'hunter_shoot', name: 'Shoot',
+    canCastFrom: [1, 2, 3],
+    target: { side: 'enemy', slots: [1, 2, 3, 4], pick: 'first' },
+    effects: [{ kind: 'damage', power: 1.0, scalingStat: 'attack' }],
+  },
+  hunters_mark: {
+    id: 'hunters_mark', name: "Hunter's Mark",
+    canCastFrom: [1, 2, 3],
+    target: { side: 'enemy', filter: { kind: 'lacksStatus', statusId: 'marked' }, pick: 'first' },
+    effects: [{ kind: 'mark', damageBonus: 2, duration: 3, statusId: 'marked' }],
+    cooldown: 4,
+  },
+  crippling_shot: {
+    id: 'crippling_shot', name: 'Crippling Shot',
+    canCastFrom: [2, 3],
+    target: { side: 'enemy', slots: [1, 2, 3, 4], pick: 'first' },
+    effects: [
+      { kind: 'damage', power: 0.8, scalingStat: 'attack' },
+      { kind: 'debuff', stat: 'speed', delta: -2, duration: 2, statusId: 'slowed' },
+    ],
+    cooldown: 3,
+  },
+  command_strike: {
+    id: 'command_strike', name: 'Command',
+    canCastFrom: [1, 2, 3],
+    target: { side: 'self' },
+    effects: [{ kind: 'commandPet' }],
+    cooldown: 3,
+    aiCondition: { kind: 'petAlive' },
+  },
+
+  // Wolf
+  wolf_bite: {
+    id: 'wolf_bite', name: 'Bite',
+    canCastFrom: [1, 2, 3, 4],
+    target: { side: 'enemy', slots: [1, 2], pick: 'first' },
+    effects: [{ kind: 'damage', power: 1.0, scalingStat: 'attack' }],
+  },
+  wolf_howl: {
+    id: 'wolf_howl', name: 'Howl',
+    canCastFrom: [1, 2, 3, 4],
+    target: { side: 'ally', slots: 'all', includeCaster: false },
+    effects: [{ kind: 'buff', stat: 'attack', delta: 1, duration: 2, statusId: 'blessed' }],
+    cooldown: 4,
+  },
+  // Hawk
+  hawk_dive: {
+    id: 'hawk_dive', name: 'Dive',
+    canCastFrom: [3, 4],
+    target: { side: 'enemy', slots: [3, 4], pick: 'first' },
+    effects: [{ kind: 'damage', power: 1.1, scalingStat: 'attack', bonusCrit: 10 }],
+  },
+  hawk_screech: {
+    id: 'hawk_screech', name: 'Screech',
+    canCastFrom: [1, 2, 3, 4],
+    target: { side: 'enemy', slots: 'all' },
+    effects: [{ kind: 'damage', power: 0.5, scalingStat: 'attack' }],
+    cooldown: 4,
+  },
+  // Bear
+  bear_maul: {
+    id: 'bear_maul', name: 'Maul',
+    canCastFrom: [1, 2, 3, 4],
+    target: { side: 'enemy', slots: [1], pick: 'first' },
+    effects: [{ kind: 'damage', power: 1.2, scalingStat: 'attack' }],
+  },
+  bear_roar: {
+    id: 'bear_roar', name: 'Roar',
+    canCastFrom: [1, 2, 3, 4],
+    target: { side: 'enemy', slots: 'all' },
+    effects: [
+      { kind: 'damage', power: 0.4, scalingStat: 'attack' },
+      { kind: 'stun', duration: 1, chance: 0.2 },
+    ],
+    cooldown: 4,
+  },
 };

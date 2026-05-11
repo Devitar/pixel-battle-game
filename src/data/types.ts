@@ -1,6 +1,8 @@
 import type { Stats } from '@combat/types';
 
-export type ClassId = 'knight' | 'archer' | 'priest' | 'barbarian' | 'rogue' | 'mage' | 'paladin';
+export type ClassId = 'knight' | 'archer' | 'priest' | 'barbarian' | 'rogue' | 'mage' | 'paladin' | 'hunter';
+
+export type PetSpeciesId = 'wolf' | 'hawk' | 'bear';
 
 export type AbilityId =
   | 'knight_slash'
@@ -57,7 +59,19 @@ export type AbilityId =
   | 'lay_on_hands'
   | 'consecrate'
   | 'paladin_cleaving_smite'
-  | 'paladin_quick_smite';
+  | 'paladin_quick_smite'
+  // Hunter
+  | 'hunter_shoot'
+  | 'hunters_mark'
+  | 'crippling_shot'
+  | 'command_strike'
+  // Pet kits
+  | 'wolf_bite'
+  | 'wolf_howl'
+  | 'hawk_dive'
+  | 'hawk_screech'
+  | 'bear_maul'
+  | 'bear_roar';
 
 export type StatusId = 'bulwark' | 'taunting' | 'marked' | 'blessed' | 'rotting' | 'frailty' | 'stunned' | 'chilled' | 'enraged' | 'poisoned' | 'vanished' | 'slowed' | 'burning' | 'drowning' | 'consecrated';
 
@@ -165,11 +179,13 @@ export type AbilityEffect =
   | { kind: 'debuff'; stat: BuffableStat; delta: number; duration: number; statusId: StatusId; selfTarget?: boolean; chance?: number }
   | { kind: 'mark'; damageBonus: number; duration: number; statusId: StatusId; chance?: number }
   | { kind: 'taunt'; duration: number; statusId: StatusId; chance?: number }
-  | { kind: 'regen'; healPerTurn: number; duration: number; statusId: StatusId; chance?: number };
+  | { kind: 'regen'; healPerTurn: number; duration: number; statusId: StatusId; chance?: number }
+  | { kind: 'commandPet'; chance?: number };
 
 export type AiCondition =
   | { kind: 'minTargets'; n: number }
-  | { kind: 'casterHpBelow'; ratio: number };
+  | { kind: 'casterHpBelow'; ratio: number }
+  | { kind: 'petAlive' };
 
 export interface Ability {
   id: AbilityId;
@@ -271,7 +287,7 @@ export interface DungeonDef {
   unlockRequirement?: string;
 }
 
-export type MilestoneId = 'first_crypt_clear';
+export type MilestoneId = 'first_crypt_clear' | 'first_sunken_keep_clear';
 
 export type TraitId =
   | 'stout'
@@ -319,7 +335,9 @@ export type PerkId =
   | 'lethal' | 'evasive'
   | 'arcane_power' | 'quick_cast'
   // Paladin
-  | 'righteous' | 'vindicator';
+  | 'righteous' | 'vindicator'
+  // Hunter
+  | 'beastmaster' | 'sharpshooter';
 
 export interface PerkDef {
   id: PerkId;
@@ -328,6 +346,7 @@ export interface PerkDef {
   classId: ClassId;
   statEffects?: readonly TraitStatEffect[];
   hpEffect?: TraitHpEffect;
+  petAttackBonus?: number;
 }
 
 export interface Unlocks {

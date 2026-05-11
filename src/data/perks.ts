@@ -99,6 +99,20 @@ export const PERKS: Record<PerkId, PerkDef> = {
     classId: 'paladin',
     statEffects: [{ stat: 'attack', delta: 2 }],
   },
+  beastmaster: {
+    id: 'beastmaster',
+    name: 'Beastmaster',
+    description: '+2 Attack to your pet.',
+    classId: 'hunter',
+    petAttackBonus: 2,
+  },
+  sharpshooter: {
+    id: 'sharpshooter',
+    name: 'Sharpshooter',
+    description: "+2 Attack. Hunter's shots hit harder.",
+    classId: 'hunter',
+    statEffects: [{ stat: 'attack', delta: 2 }],
+  },
 };
 
 export const CLASS_PERK_PAIRS: Record<ClassId, readonly [PerkId, PerkId]> = {
@@ -109,4 +123,5 @@ export const CLASS_PERK_PAIRS: Record<ClassId, readonly [PerkId, PerkId]> = {
   rogue:     ['lethal',       'evasive'],
   mage:      ['arcane_power', 'quick_cast'],
   paladin:   ['righteous',    'vindicator'],
+  hunter:    ['beastmaster',  'sharpshooter'],
 };

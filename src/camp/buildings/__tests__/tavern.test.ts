@@ -146,3 +146,20 @@ describe('generateCandidate — paladin in unlocked pool', () => {
     expect(hero.classId).toBe('paladin');
   });
 });
+
+describe('generateCandidate — Hunter petSpeciesId', () => {
+  it('rolls a petSpeciesId when classId is hunter', () => {
+    const rng = createRng(42);
+    const hero = generateCandidate(rng, ['hunter']);
+    expect(hero.classId).toBe('hunter');
+    expect(hero.petSpeciesId).toBeDefined();
+    expect(['wolf', 'hawk', 'bear']).toContain(hero.petSpeciesId);
+  });
+
+  it('does not roll petSpeciesId for non-Hunter classes', () => {
+    const rng = createRng(42);
+    const hero = generateCandidate(rng, ['knight']);
+    expect(hero.classId).toBe('knight');
+    expect(hero.petSpeciesId).toBeUndefined();
+  });
+});

@@ -29,6 +29,28 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-10 · Hunter class — second unlockable (closes Cluster D · 4)
+
+- **Why:** First class unlock gated on a tier-2 dungeon clear. Completes the "every dungeon clear unlocks a class" pattern through tier 2 (Crypt → Paladin shipped; Sunken Keep → Hunter). Also scaffolds the `first_sunken_keep_clear` milestone for the sibling Cluster D · 5 (Chapel) and · 6 (Training Grounds) to extend.
+- **Decisions:**
+  - **Pet is a free 4th actor, not a 3rd-slot replacement.** GDD-literal reading: pet occupies slot 4, acts on its own AI priority. Hunter parties have 4 turns/round. Balance comes from leaner Hunter chassis (HP 14 / Att 4 vs Archer's 14/5) and per-species attack-scale fractions (wolf 0.6, hawk 0.5, bear 0.4 of Hunter effective Attack).
+  - **Pet-as-peer `Combatant` with new `kind: 'pet'`.** Rejected nesting pet on Hunter or sneaking it in as a `'hero'` — both bloat engine logic. Widening `kind` to `'hero' | 'enemy' | 'pet'` plus `ownerHeroId?`/`petSpeciesId?` optional fields was the smallest viable change; player-side hero-only code paths (wound generation in `effects.ts:134`, hero-HP write-back in `completeCombat`) already use guards that naturally segregate by `kind === 'hero'` or by `id === 'p${i}'` patterns, so no widening cascade.
+  - **Pet HP non-persistent between encounters.** Pet is either alive (full HP at start of every combat) or down for the run (absent until camp). Avoided threading per-pet currentHp through RunState; pet-down is a `readonly string[]` of owner Hero ids — strictly run-scoped, reset at every camp visit (any choice path).
+  - **New effect kind `commandPet`** resolves at apply time by `pickAbility(pet, state, rng)` → `applyAbility(...)` with the pet as caster, plus the standard `setCooldown(pet, picked, cooldown + 1)`. Recursion guard: refuses to recurse if the picked pet ability itself contains a `commandPet` effect (defense-in-depth; no current pet kit has one).
+  - **New AI condition `petAlive`** gates `command_strike` from the Hunter's AI pick when no living pet is owned — avoids wasted-turn-on-cooldown if the player brought a Hunter with a downed pet. Required signature widening: `checkAiCondition` now takes `state: CombatState` (sole call site updated).
+  - **`PerkDef.petAttackBonus?: number` for Beastmaster.** Beastmaster (+2 pet attack) is read at combat-setup pet-build time, NOT via the existing `statEffects` path — the perk doesn't buff the Hunter, only the pet. Paired with Sharpshooter (+2 hero attack via `statEffects`) as the level-5 fork: pet path vs bow path.
+  - **3 species rolled at recruit, fixed for life.** Wolf (melee bruiser, howl ally buff), hawk (back-row diver, AoE screech), bear (tank, AoE roar with chance-stun). All scale attack from Hunter; baseStats.attack is a sentinel 0. Each species' AI priority leads with the cooldown ability.
+  - **Spear deferred.** GDD says "Bow / Spear" but `WeaponType` has no `spear`. Hunter ships bow-only; off-bow drops to basic. Spear is a future Cluster D follow-up.
+- **Surprises:**
+  - **Task 4's implementer pulled Task 5's perk content forward.** Widening `ClassId` to include `'hunter'` triggered `Record<ClassId, ...>` exhaustiveness errors in `chatter.ts`, `perks.ts` (via `CLASS_PERK_PAIRS`), and `items/__tests__/kit.test.ts` (`PREFERRED_WEAPON`). The implementer correctly added all the missing entries inline to keep the build green; Task 5's scope collapsed to just adding the perk test block.
+  - **`AbilityEffect.commandPet` needed an optional `chance?: number`** to satisfy the existing pre-switch `effect.chance !== undefined && !rng.percent(effect.chance)` guard in `applyEffect`. Effectively zero behavioral impact — `command_strike` doesn't set chance — but the field is now part of the variant. Documented in the spec.
+  - **`createPetCombatant.attack = round(scale × hunterEff) + perkBonus`** rounds the scaled component but does NOT clamp to a non-negative floor. At hunter Attack=0 a wolf has attack=0+0=0; at high gear levels the bear sees `round(0.4 × 15) = 6`. Acceptable for now; flagged in spec as a tunable if pets feel weak early.
+  - **`generateStarterRoster` at `tavern.ts:58` is deliberately Knight/Archer/Priest** — the Paladin spec flagged it as possibly-stale, but it's the intentional Tier-1 starter trio (NOT the recruitment pool). No tavern change needed for Hunter to appear in the hire pool; `generateCandidate` already reads `unlockedClasses` correctly.
+  - **`first_sunken_keep_clear` is scaffolded as a SEPARATE handler entry**, not unioned into a mega-handler. Cluster D · 5 and · 6 will extend it the same way Paladin extended `first_crypt_clear`. Deliberate spec choice; verified by the implementer to be cleanly idempotent.
+- **Source:** TODO Cluster D · 4. Spec: `docs/superpowers/specs/2026-05-10-hunter-class-design.md`. Plan: `docs/superpowers/plans/2026-05-10-hunter-class.md`. gdd §3 row 7 patched in the same change (Warren → Sunken Keep).
+
+---
+
 ### 2026-05-10 · Canvas horizontal-centering fix (drop Phaser autoCenter)
 
 - **Why:** User reported the game canvas was not horizontally centered. Diagnosis: `style.css:14-16` set `#game` to `display: flex; justify-content: center; align-items: center` AND `main.ts:33` set `autoCenter: Phaser.Scale.CENTER_BOTH`. Phaser's CENTER_BOTH writes explicit `marginLeft`/`marginTop` pixel values onto the canvas to center it relative to its parent — those margins stack on top of the flex algorithm's positioning, double-offsetting the canvas toward an edge. Worse on widescreens where horizontal letterboxing is larger.
