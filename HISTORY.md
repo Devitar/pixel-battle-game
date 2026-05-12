@@ -29,6 +29,26 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-11 · Tavern pre-leveled hire candidates (closes Cluster B · 42)
+
+- **Why:** The Tavern stops mattering past mid-game — a level-1 hire is irrelevant when the active party is L4-5. This adds a chance for the Tavern to roll pre-leveled (L2/L3) candidates whose hire cost scales with level, giving late-game roster expansion a meaningful gold-vs-XP trade-off.
+- **Decisions:**
+  - **Trigger = Tavern building level extends existing.** Reuses the L1/L2/L3 ladder; no new building, no new milestone, no save migration. L1 unchanged (100% L1). L2 rolls each slot 75/25 (L1/L2). L3 rolls each slot 65/25/10 (L1/L2/L3). Rejected the TODO's two original framings (per-visit 10% chance with separate scaling, Veteran Tavern L4) — extending the existing tier system was strictly simpler.
+  - **Per-slot independent roll, not per-visit.** Each candidate's level rolls independently of the others. Visit-to-visit variance is preserved; rare L3 jackpots are individually unlikely (10% per slot) but reliably appear over multiple visits.
+  - **Cost = 50 / 150 / 400g** (mirrors XP thresholds the player would have grinded: L2=200 XP ≈ 1 run, L3=800 XP ≈ 3-4 runs). Rejected the TODO's `HIRE_COST × N` (50/100/150g, would have undervalued L3 dramatically) and the steeper 50/200/500g (matches Tavern upgrade ladder, felt punishing).
+  - **`xp = LEVEL_THRESHOLDS[N-1]` at hire**, not 0. Avoids the bug case where `xp = 0` causes `levelForXp(xp) < hero.level`, which would freeze the hero at N until they earned enough XP to "catch up." Setting xp to the just-hit-N threshold means natural progression from there.
+  - **Stat bumps via `applyLevelUps(hero, 1, N)` at generation.** Deterministic; matches what a hand-leveled L1 hero would have. No new stat-rolling logic; reuses the existing level-up machinery.
+  - **Pre-leveled candidates ship with starter gear.** Common rarity, no affixes — same as L1 candidates. Keeps gear-progression and level-progression as independent axes; keeps cost reasonable.
+  - **Level roll appended to the tail of `generateCandidate`**, after `createHero` returns. Preserves the RNG-state stream for the class/trait/sprite/name/id rolls so existing test fixtures asserting on those fields are unaffected; only the post-Tavern RNG state shifts.
+  - **No save schema change.** `Hero.level` and `Hero.xp` are pre-existing fields; pre-leveled candidates serialize via the existing JSON path.
+- **Surprises:**
+  - **`pickCandidateLevel` had to be temporarily exported in Task 1** to satisfy `noUnusedLocals` before Task 2 added a real caller. Plan anticipated this; Task 2 reverted it cleanly.
+  - **`HIRE_COST` import had to be dropped from `tavern_panel_scene.ts`** after the header refactor removed the only consumer in that file. The constant is still exported from `tavern.ts` for `isSoftlocked` (via `@save/save`); only the unused import line went away. Tripped `noUnusedLocals`.
+  - **No need to widen `generateStarterRoster` with `tavernLevel`.** Starter heroes are built via `createHero` directly (not via `generateCandidate`) at fresh-save time, when the Tavern doesn't exist yet. Confirmed during Task 2.
+- **Source:** TODO Cluster B · 42. Spec: `docs/superpowers/specs/2026-05-11-tavern-pre-leveled-design.md`. Plan: `docs/superpowers/plans/2026-05-11-tavern-pre-leveled.md`. No gdd patch (mechanic isn't gdd-promised — pure feature suggestion).
+
+---
+
 ### 2026-05-11 · Training Grounds building — passive XP for benched heroes (closes Cluster D · 6)
 
 - **Why:** Third and final Sunken-Keep-gated unlock (Hunter shipped 2026-05-10; Chapel shipped earlier 2026-05-11). Solves the "benched heroes lag behind" problem and gives an extended roster a reason to exist. Closes the first-Sunken-Keep-clear cascade.
