@@ -271,7 +271,7 @@ describe('v4 → v5 migration (Training Grounds)', () => {
     expect(migrated.runState?.traineeXpBase).toBe(0);
   });
 
-  it('full chain v1 → v5 produces a valid v5 save', () => {
+  it('full chain v1 → current produces a valid save', () => {
     const v1raw = {
       version: 1,
       roster: { heroes: [], capacity: 12 },
@@ -283,8 +283,70 @@ describe('v4 → v5 migration (Training Grounds)', () => {
       tavernCandidates: [],
     };
     const migrated = migrate(v1raw) as SaveFile;
-    expect(migrated.version).toBe(5);
+    expect(migrated.version).toBe(CURRENT_SCHEMA_VERSION);
     expect(migrated.buildingLevels.training_grounds).toBe(1);
     expect(migrated.traineeHeroIds).toEqual([null, null]);
+  });
+});
+
+describe('v5 → v6 migration (hero perk shape: singular → plural)', () => {
+  it('migrates pendingPerk:true and perkId:string to arrays', () => {
+    const v5: Record<string, unknown> = {
+      version: 5,
+      roster: {
+        heroes: [
+          { id: 'h1', classId: 'knight', pendingPerk: true, perkId: 'iron_will' },
+          { id: 'h2', classId: 'archer', pendingPerk: false },
+        ],
+      },
+      tavernCandidates: [
+        { id: 'c1', classId: 'priest', pendingPerk: false },
+      ],
+    };
+    const out = migrate(v5) as unknown as Record<string, unknown>;
+    expect(out.version).toBe(6);
+    const heroes = (out.roster as { heroes: Array<Record<string, unknown>> }).heroes;
+    expect(heroes[0].pendingPerks).toEqual(['l5']);
+    expect(heroes[0].pickedPerks).toEqual(['iron_will']);
+    expect(heroes[0].pendingPerk).toBeUndefined();
+    expect(heroes[0].perkId).toBeUndefined();
+    expect(heroes[1].pendingPerks).toEqual([]);
+    expect(heroes[1].pickedPerks).toEqual([]);
+    const candidates = out.tavernCandidates as Array<Record<string, unknown>>;
+    expect(candidates[0].pendingPerks).toEqual([]);
+    expect(candidates[0].pickedPerks).toEqual([]);
+  });
+
+  it('migrates runState.party / fallen / lost heroes too', () => {
+    const v5 = {
+      version: 5,
+      roster: { heroes: [] },
+      runState: {
+        party: [{ id: 'h1', classId: 'knight', pendingPerk: true, perkId: 'iron_will' }],
+        fallen: [{ id: 'h2', classId: 'archer', pendingPerk: false, perkId: 'precise' }],
+        lost: [{ id: 'h3', classId: 'priest', pendingPerk: true }],
+      },
+    };
+    const out = migrate(v5) as unknown as Record<string, unknown>;
+    const party = ((out.runState as Record<string, unknown>).party) as Array<Record<string, unknown>>;
+    expect(party[0].pendingPerks).toEqual(['l5']);
+    expect(party[0].pickedPerks).toEqual(['iron_will']);
+    const fallen = ((out.runState as Record<string, unknown>).fallen) as Array<Record<string, unknown>>;
+    expect(fallen[0].pickedPerks).toEqual(['precise']);
+    expect(fallen[0].pendingPerks).toEqual([]);
+    const lost = ((out.runState as Record<string, unknown>).lost) as Array<Record<string, unknown>>;
+    expect(lost[0].pendingPerks).toEqual(['l5']);
+    expect(lost[0].pickedPerks).toEqual([]);
+  });
+
+  it('is idempotent if applied to an already-v6 save', () => {
+    const v6 = {
+      version: 6,
+      roster: { heroes: [{ id: 'h1', pendingPerks: ['l5'], pickedPerks: [] }] },
+    };
+    const out = migrate(v6) as unknown as Record<string, unknown>;
+    expect(out.version).toBe(6);
+    const heroes = (out.roster as { heroes: Array<Record<string, unknown>> }).heroes;
+    expect(heroes[0].pendingPerks).toEqual(['l5']);
   });
 });

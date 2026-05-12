@@ -290,7 +290,7 @@ describe('buildCombatState — pet build pass', () => {
       'hunter', 'B', 'b1', 'stout',
       'body1', undefined, undefined, 'bear',
     );
-    hunter.perkId = 'beastmaster';
+    hunter.pickedPerks = ['beastmaster'] as const;
     const party = [knight, archer, hunter];
     const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
     const state = buildCombatState(party, encounter, []);

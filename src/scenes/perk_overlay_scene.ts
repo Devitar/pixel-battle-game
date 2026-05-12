@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { listHeroes } from '@camp/roster';
 import { CLASSES } from '@data/classes';
-import { CLASS_PERK_PAIRS, PERKS } from '@data/perks';
+import { CLASS_PERK_TIERS, PERKS } from '@data/perks';
 import type { PerkId } from '@data/types';
 import { applyPerk } from '@heroes/hero';
 import { heroToLoadout } from '@render/hero_loadout';
@@ -49,7 +49,7 @@ export class PerkOverlayScene extends Phaser.Scene {
 
   create(): void {
     const hero = listHeroes(appState.get().roster).find((h) => h.id === this.heroId);
-    if (!hero || !hero.pendingPerk) {
+    if (!hero || hero.pendingPerks.length === 0) {
       this.close();
       return;
     }
@@ -72,8 +72,13 @@ export class PerkOverlayScene extends Phaser.Scene {
       scale: PAPERDOLL_SCALE,
     });
 
-    // Header text block.
+    // Header text block. Tier reflects the oldest outstanding pending perk
+    // (FIFO) — a hero who dinged 5 and then 10 in the same expedition picks
+    // L5 first, then L10 on the re-open.
     const classDef = CLASSES[hero.classId];
+    const currentTier = hero.pendingPerks[0];
+    const tierLevel = currentTier === 'l5' ? 5 : 10;
+    const remaining = hero.pendingPerks.length;
     createBitmapText({
       scene: this,
       x: HEADER_X,
@@ -94,7 +99,10 @@ export class PerkOverlayScene extends Phaser.Scene {
       scene: this,
       x: HEADER_X,
       y: HEADER_LEVEL_Y,
-      text: `Reached Level ${hero.level}!`,
+      text:
+        remaining > 1
+          ? `Reached Level ${tierLevel}! (${remaining} pending)`
+          : `Reached Level ${tierLevel}!`,
       font: 'small',
       size: 16,
     });
@@ -102,13 +110,13 @@ export class PerkOverlayScene extends Phaser.Scene {
       scene: this,
       x: HEADER_X,
       y: HEADER_PROMPT_Y,
-      text: 'Choose a perk:',
+      text: `Choose your Level ${tierLevel} perk:`,
       font: 'small',
       size: 16,
     });
 
     // Perk cards — title + description with hover highlight.
-    const [perkAId, perkBId] = CLASS_PERK_PAIRS[hero.classId];
+    const [perkAId, perkBId] = CLASS_PERK_TIERS[hero.classId][currentTier];
     this.buildPerkCard(CARD_A_X, perkAId);
     this.buildPerkCard(CARD_B_X, perkBId);
 

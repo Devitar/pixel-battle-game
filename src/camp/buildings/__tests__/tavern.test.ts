@@ -5,7 +5,7 @@ import {
   PLAYER_FEET_SPRITES,
   PLAYER_LEGS_SPRITES,
 } from '@data/body_sprites';
-import { LEVEL_THRESHOLDS, MAX_LEVEL } from '@data/leveling';
+import { LEVEL_THRESHOLDS } from '@data/leveling';
 import { NAMES } from '@data/names';
 import { TRAITS } from '@data/traits';
 import type { ClassId } from '@data/types';
@@ -240,11 +240,12 @@ describe('generateCandidate — pre-leveled (Tavern L2/L3)', () => {
     expect(l3!.baseStats[def.primaryStat]).toBe(def.baseStats[def.primaryStat] + primaryBump);
   });
 
-  it('pre-leveled candidates have pendingPerk: false (Tavern caps below MAX_LEVEL)', () => {
+  it('pre-leveled candidates have pendingPerks: [] (Tavern caps at L3, below either perk tier)', () => {
     for (let seed = 1; seed <= 50; seed++) {
       const c = generateCandidate(createRng(seed), TIER1_CLASSES, 3);
-      expect(c.pendingPerk, `seed ${seed}`).toBe(false);
-      expect(c.level).toBeLessThan(MAX_LEVEL);
+      expect(c.pendingPerks, `seed ${seed}`).toEqual([]);
+      // L3 is below both perk tiers (L5 and L10).
+      expect(c.level).toBeLessThanOrEqual(3);
     }
   });
 

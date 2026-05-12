@@ -29,7 +29,55 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 ## Cluster D — Tier 3 content
 
-Tier 3 scope from gdd §10. The Sunken Keep cascade is fully shipped: Sunken Keep dungeon (Cluster D · 1, 2026-05-06), Paladin class (Cluster D · 3, 2026-05-06), Hunter class (Cluster D · 4, 2026-05-10), Chapel building (Cluster D · 5, 2026-05-11), Training Grounds building (Cluster D · 6, 2026-05-11). Future Tier 3 surface (dungeons 3-4, legendary gear, level-10 perks, NG+) hasn't been broken down yet — entries land here when scoped.
+Tier 3 scope from gdd §10. The Sunken Keep cascade is fully shipped: Sunken Keep dungeon (Cluster D · 1, 2026-05-06), Paladin class (Cluster D · 3, 2026-05-06), Hunter class (Cluster D · 4, 2026-05-10), Chapel building (Cluster D · 5, 2026-05-11), Training Grounds building (Cluster D · 6, 2026-05-11), MAX_LEVEL bump + L10 perk tier (Cluster D · 7, 2026-05-12). The remaining "legendary gear + L10 milestone" surface is broken down into entries 8-10 below. Future Tier 3 surface not yet scoped: dungeons 3-4 (Warren, Abyss), NG+ / Infinity mode, milestone achievements ("25 crits"), trait removal.
+
+### 8 · Epic gear tier (rarity 4 of 5)
+
+- **What:** Add `'epic'` to the `Rarity` union between `'rare'` and `'legendary'` (5-tier total per gdd §7). Epic items roll 3 affixes plus a rare-property; appear at deeper floors per an extended `RARITY_TABLE`. Plumb Blacksmith upgrade cost, sell value, and UI rarity color for the new tier.
+- **Why:** Realises the 5-tier curve gdd promised. Independent of MAX_LEVEL (entry 7) and the legendary milestone (entry 9) — can ship anytime. Sets up entry 9 (which adds the 5th tier on top).
+- **Tier:** 3 (originally part of gdd's "legendary tier" cluster).
+- **Acceptance:**
+  - `Rarity` type widens to `'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'` (legendary added type-only until entry 9; Epic is the load-bearing addition here).
+  - `affixCount(rarity, slot)` returns 3 for `'epic'`. `pickRareProperty` valid for Epic on weapon/shield/outfit slots.
+  - `RARITY_TABLE` extends per-row with an `epic` weight, scaled by floor; tier-2 dungeon (Sunken Keep) and deeper floors weight Epic meaningfully.
+  - `BLACKSMITH_UPGRADE_COST['epic']` set (tune relative to rare; e.g., 2× rare cost).
+  - Sell value for Epic tuned proportionally (currently rare yields 60g per `sell.ts` — Epic likely 120-150g).
+  - UI rarity color added (suggested: purple); tooltip border / text color updates everywhere rarity is rendered.
+  - No save migration needed (rarity union widening doesn't invalidate stored values).
+  - Decisions captured in 2026-05-12 brainstorm: Epic is `'epic'`, rolled randomly like other tiers, gated by floor depth (no milestone gate).
+- **Touches:** `src/data/types.ts` (Rarity), `src/dungeon/loot.ts` (RARITY_TABLE, affixCount, pickRareProperty), `src/data/blacksmith.ts` (upgrade cost), `src/items/sell.ts`, `src/render/` + `src/ui/` (rarity color / tooltip), related tests.
+- **Source:** Brainstorm 2026-05-12 (decomposed from "legendary gear + L10 milestone"). Likely benefits from a small brainstorm to settle numbers (RARITY_TABLE weights, blacksmith cost) before writing the plan.
+
+### 9 · Legendary tier + L10 milestone + named boss drops
+
+- **What:** Add `'legendary'` rarity as the 5th tier. Author 4 hand-crafted named legendary items (2 per existing boss: Bone Lich, Drowned King) with fixed stats + a unique passive each. Wire a new milestone `first_hero_l10` that fires at the XP-grant site when any hero crosses L10; the milestone hard-gates legendary drops (pre-milestone, bosses drop a regular next-floor rarity-table roll; post-milestone, bosses drop one of their 2 named legendaries at random).
+- **Why:** Marquee endgame reward; closes the gdd §9 "first hero reaches L10" milestone. Named legendaries are build-defining items that justify L10 leveling as a destination, not a treadmill.
+- **Tier:** 3.
+- **Acceptance:**
+  - Depends on entries 7 (MAX_LEVEL=10) and 8 (Epic tier). Both must ship before this.
+  - `Rarity` union includes `'legendary'`; `Item` shape extends with `legendaryId?: LegendaryId` and `legendaryPassive?: LegendaryPassiveId` (optional fields). Named items carry `legendaryId`; rarity = `'legendary'`; `affixes: []`; stats and passive looked up from a `LEGENDARY_DEFS` registry.
+  - New `MilestoneId 'first_hero_l10'` registered in `src/run/milestones.ts`. Detection fires from the XP-grant code path in `run_state.ts` (both combat and surprise-combat paths) when any party hero crosses from <10 to ≥10. `SaveFile.unlocks.legendaryEnabled: boolean` flag (or `unlocks.rarities` array — pick during brainstorm).
+  - 4 named legendaries authored: 2 themed to Bone Lich (Crypt), 2 themed to Drowned King (Sunken Keep). Each has slot, weaponType (if weapon), bespoke or reused sprite, fixed stats, and a unique passive that reuses entry 7's trigger/action palette.
+  - Boss-drop substitution: at boss-loot resolution, if `unlocks.legendaryEnabled === true` AND the encounter is the dungeon's final boss, replace the loot roll with a random pick from `BOSS_LEGENDARIES[bossId]`. Otherwise normal loot table.
+  - Random legendaries in non-boss content stay suppressed in this entry (entry 10 implements them).
+  - UI rarity color (suggested: orange/gold); tooltip shows the named title + passive description.
+  - Save migration: `unlocks.legendaryEnabled = false` added with default; idempotent.
+- **Touches:** `src/data/types.ts`, `src/data/legendaries.ts` (new — registry + LegendaryPassiveDef table), `src/dungeon/loot.ts` (boss substitution), `src/run/milestones.ts`, `src/run/run_state.ts`, `src/save/save.ts` + migration, `src/combat/perk_hooks.ts` (legendary passives reuse the same hook system as L10 perks), tests.
+- **Source:** Brainstorm 2026-05-12. Should brainstorm again before writing the plan — passive design for 4 named items + naming + flavor text deserves its own creative session.
+
+### 10 · Random legendaries + curated unique-passive pool
+
+- **What:** Allow legendaries to roll randomly from non-boss content (elite drops, chests, shops?) at low rate post-L10-milestone. Each random legendary rolls a unique passive from a curated `LEGENDARY_PASSIVE_POOL` (slot-restricted). Named-from-bosses (entry 9) and random-from-elsewhere are both available post-milestone.
+- **Why:** Fills out the "legendaries appear in the loot pool" gdd §9 promise. Random legendaries give variance and reduce reliance on boss farming; the passive pool is its own creative palette distinct from named items.
+- **Tier:** 3.
+- **Acceptance:**
+  - Depends on entry 9 (Item shape extension, milestone flag, hook system).
+  - `LEGENDARY_PASSIVE_POOL: Record<ItemSlot, readonly LegendaryPassiveId[]>` — curated passives per slot. Each passive reuses entry 7's trigger/action palette (no new engine extensions).
+  - Drop rate: post-milestone, ~1% on elite + chest loot. Probably suppressed on shops (paying gold for legendaries breaks the trade-off feel — confirm in brainstorm).
+  - Random legendaries: `rarity = 'legendary'`, no `legendaryId`, has `legendaryPassive` rolled from `LEGENDARY_PASSIVE_POOL[slot]`. Affixes still roll (e.g., 3 affixes like an epic item) — passive is on top.
+  - Tooltip displays the passive name + description; visually distinguishable from a named legendary (no special title, but legendary border).
+- **Touches:** `src/dungeon/loot.ts`, `src/data/legendaries.ts` (passive pool table), tests.
+- **Source:** Brainstorm 2026-05-12. Brainstorm-first before plan — passive pool curation is the creative work.
 
 ---
 

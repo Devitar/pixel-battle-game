@@ -80,7 +80,7 @@ export function buildCombatState(
         traitIds: hero.traitIds,
         abilities,
         aiPriority,
-        ...(hero.perkId !== undefined ? { perkId: hero.perkId } : {}),
+        pickedPerks: hero.pickedPerks,
         ...(damageTakenMultiplier !== 1 ? { damageTakenMultiplier } : {}),
         ...rareFields,
       }),
@@ -94,8 +94,11 @@ export function buildCombatState(
     if (hero.classId !== 'hunter' || !hero.petSpeciesId) continue;
     if (petsDownByHeroId.includes(hero.id)) continue;
     const heroCombatant = combatants[i];
-    const perk = hero.perkId ? PERKS[hero.perkId] : undefined;
-    const petAttackBonus = perk?.petAttackBonus ?? 0;
+    // Sum petAttackBonus across all picked perks (currently at most one L5 perk).
+    let petAttackBonus = 0;
+    for (const perkId of hero.pickedPerks) {
+      petAttackBonus += PERKS[perkId].petAttackBonus ?? 0;
+    }
     combatants.push(
       createPetCombatant(
         hero.petSpeciesId,

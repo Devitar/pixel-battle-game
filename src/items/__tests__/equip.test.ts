@@ -28,7 +28,8 @@ const fakeHero = (overrides: Partial<Hero> = {}): Hero => ({
   equipment: { weapon: fake('w0', 'weapon') },
   xp: 0,
   level: 1,
-  pendingPerk: false,
+  pendingPerks: [],
+  pickedPerks: [],
   ...overrides,
 });
 

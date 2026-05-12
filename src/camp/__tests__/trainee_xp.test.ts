@@ -28,7 +28,8 @@ function makeHero(id: string, xp = 0, level = 1): Hero {
     },
     xp,
     level,
-    pendingPerk: false,
+    pendingPerks: [],
+    pickedPerks: [],
   };
 }
 
@@ -39,7 +40,7 @@ function makeSaveFile(opts: {
   level?: 1 | 2 | 3;
 }): SaveFile {
   return {
-    version: 5,
+    version: 6,
     roster: { heroes: [...opts.heroes], capacity: 12 },
     vault: { gold: 0 },
     stash: { items: [] },
@@ -165,7 +166,7 @@ describe('grantTraineeXp', () => {
 
   it('L5 trainee receives XP but level stays at 5', () => {
     const h1 = makeHero('h1', 4000, 5);
-    h1.pendingPerk = true;
+    h1.pendingPerks = ['l5'];
     const state = makeSaveFile({
       heroes: [h1], traineeHeroIds: ['h1'], trainingUnlocked: true,
     });
@@ -173,6 +174,6 @@ describe('grantTraineeXp', () => {
     const after = result.state.roster.heroes.find((h) => h.id === 'h1');
     expect(after?.xp).toBe(4060);
     expect(after?.level).toBe(5);
-    expect(after?.pendingPerk).toBe(true);
+    expect(after?.pendingPerks).toEqual(['l5']);
   });
 });

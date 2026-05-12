@@ -29,6 +29,29 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-12 · MAX_LEVEL bump (5→10) + L10 perk tier (closes Cluster D · 7)
+
+- **Why:** Unblock the gdd §9 "first hero reaches L10" milestone, which was unreachable with MAX_LEVEL=5. Also establishes a reusable 5×5 trigger/action palette in the combat resolver (`onCrit` / `onKill` / `onStruck` / `firstAttack` / `whenBelowHp` × `gainStat` / `damageMod` / `damageMitigation` / `lifesteal` / `applyStatus`) that sister specs 9-10 will reuse for legendary passives.
+- **Decisions:**
+  - **Two-tier perks (L5 stays + L10 added), not three.** Rejected an L3/L6/L10 split because L5's existing perks stay untouched (smaller migration risk) and 16 new perks is already substantial content.
+  - **Constrained 5×5 hook palette over open-ended effects.** Rejected ambitious one-off mechanics (positional swap on dodge, mid-combat extra turn, summon-on-kill, ability-specific modifiers like "Lay on Hands cleanses one debuff") because each would be its own engine extension. The palette delivers build-defining perks for all 8 classes without sprawl.
+  - **Global 5-stack cap with refresh-all-at-cap.** Snowballs (Rampage, Spellweaver, Crusader, Pack Tactics, Killer Instinct) stay alive while triggering but stop growing. Individual stacks decay independently when no fresh trigger fires.
+  - **L5 perks numerically unchanged** — only `tier: 'l5'` field added (mechanical). Resisted a balance pass.
+  - **Enemy scaling at L10 deferred.** L10 heroes will steamroll Crypt/Sunken Keep; accepted because Warren/Abyss/difficulty-selection are the real L10 challenge. Difficulty selection (gdd §5) is its own future spec.
+  - **`whenBelowHp` as continuous aura, not one-shot trigger.** Implemented as a synthetic `perk_aura_<perkId>` status recomputed at every HP-mutation site (damage, heal, lifesteal, thorns, healOnKill, hp-buff apply+expire, round-start regen, combat-start, after tickStatuses). Re-entrancy-safe because `applyPerkAction`'s untimed-gainStat branch only writes to `statuses`, never HP.
+  - **`firstAttack` fires on first non-stunned turn**, not first damaging action. Simpler semantic; `pendingDamageMod` stays stashed until consumed by the next damage instance.
+  - **`Combatant.pickedPerks: readonly PerkId[]`** (renamed from singular `perkId`). Matches the new Hero shape. `getEffectiveStat` iterates and sums.
+  - **L10 perks split work as `damageMod` (stashed) vs. everything else (applied as state).** `pendingDamageMod` on Combatant carries the multiplier; `applyDamage` consumes once per outgoing damage instance and resets to 1.
+- **Surprises:**
+  - **Spec had wrong old field name.** Spec said `Hero.pickedPerkId` but the actual pre-existing field was `Hero.perkId` (singular). Caught during plan-writing; spec and plan both fixed inline.
+  - **`'regen'` is not a `StatusId`.** Spec described Holy Vigor's status as `'regen'`, but `'regen'` is the `AbilityEffect.kind`, not the status id. Real status id is `'blessed'`. `synthesizeStatusEffect` maps `'blessed' → kind: 'regen'`. `holy_vigor.description` rephrased to "Gain Blessed" to match the in-game status name.
+  - **Two missed HP-mutation sites caught at end-of-task review.** `effects.ts:259` (hp-buff/debuff apply clamps `currentHp` against new `maxHp`) and `statuses.ts:82` (hp-buff expiry restores `maxHp`) both shift the `currentHp / maxHp` ratio. Without recompute, a `whenBelowHp` perk + frailty status could desync until the next damage/heal. Fixed by adding recompute calls at both sites.
+  - **`'rampage'` and `'backstab'` perk ids collide with existing AbilityIds of the same name.** Benign because `PerkId` and `AbilityId` are separate string-literal unions and the lookup tables (`PERKS` vs `ABILITIES`) are keyed independently. Tests for Backstab perk restrict the rogue's abilities to `rogue_strike` to avoid confusion with the `backstab` ability.
+  - **Spec note about "may need to author 'mark'/'regen' statuses" was unnecessary.** Both `StatusId` values already existed in the union; the implementation took the reuse path.
+- **Source:** Brainstorm + spec + plan + 19-task subagent-driven execution, all 2026-05-12. Spec: `docs/superpowers/specs/2026-05-12-max-level-and-perk-tiers-design.md`. Plan: `docs/superpowers/plans/2026-05-12-max-level-and-perk-tiers.md`. Final test count: 2105 (was 1940 at start; +165 net). Schema bumped to v6 with v5→v6 migration covering roster/tavernCandidates/runState.party-fallen-lost.
+
+---
+
 ### 2026-05-11 · Tavern pre-leveled hire candidates (closes Cluster B · 42)
 
 - **Why:** The Tavern stops mattering past mid-game — a level-1 hire is irrelevant when the active party is L4-5. This adds a chance for the Tavern to roll pre-leveled (L2/L3) candidates whose hire cost scales with level, giving late-game roster expansion a meaningful gold-vs-XP trade-off.

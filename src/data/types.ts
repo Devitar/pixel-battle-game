@@ -337,16 +337,55 @@ export type PerkId =
   // Paladin
   | 'righteous' | 'vindicator'
   // Hunter
-  | 'beastmaster' | 'sharpshooter';
+  | 'beastmaster' | 'sharpshooter'
+  // L10 tier
+  | 'unbreakable' | 'last_stand'
+  | 'eagles_mark' | 'first_strike'
+  | 'sanctity' | 'holy_vigor'
+  | 'rampage' | 'bloodlust'
+  | 'backstab' | 'phantom'
+  | 'spellweaver' | 'arcane_surge'
+  | 'crusader' | 'aegis'
+  | 'pack_tactics' | 'killer_instinct';
+
+export type PerkTier = 'l5' | 'l10';
+
+// Triggered-effect system for L10 perks (and reusable for future content).
+export type PerkTrigger =
+  | { kind: 'onCrit' }
+  | { kind: 'onKill' }
+  | { kind: 'onStruck'; whenAtFullHp?: boolean }
+  | { kind: 'firstAttack' }
+  | { kind: 'whenBelowHp'; ratio: number };
+
+export type PerkAction =
+  | { kind: 'gainStat'; stat: BuffableStat; delta: number; duration?: number; stacking?: boolean }
+  | { kind: 'damageMod'; multiplier: number }
+  | { kind: 'damageMitigation'; multiplier: number }
+  | { kind: 'lifesteal'; ratio: number }
+  | {
+      kind: 'applyStatus';
+      statusId: StatusId;
+      duration: number;
+      target: 'self' | 'other';
+      payload?: { damageBonus?: number; healPerTurn?: number; damagePerTurn?: number };
+    };
+
+export interface TriggeredEffect {
+  trigger: PerkTrigger;
+  action: PerkAction;
+}
 
 export interface PerkDef {
   id: PerkId;
   name: string;
   description: string;
   classId: ClassId;
+  tier: PerkTier;
   statEffects?: readonly TraitStatEffect[];
   hpEffect?: TraitHpEffect;
   petAttackBonus?: number;
+  triggeredEffect?: TriggeredEffect;
 }
 
 export type BuildingId =

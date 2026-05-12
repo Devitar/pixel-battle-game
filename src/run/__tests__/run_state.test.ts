@@ -450,7 +450,7 @@ describe('completeCombat — XP awards', () => {
     expect(knight.baseStats.defense).toBe(5); // base 4 + 1
   });
 
-  it('crossing to level 5 sets pendingPerk', () => {
+  it('crossing to level 5 pushes l5 onto pendingPerks', () => {
     let rs = startRun('crypt', makeParty(), 1, createRng(1));
     rs = {
       ...rs,
@@ -461,7 +461,7 @@ describe('completeCombat — XP awards', () => {
     for (const hero of rs2.party) {
       expect(hero.xp).toBe(4000);
       expect(hero.level).toBe(5);
-      expect(hero.pendingPerk).toBe(true);
+      expect(hero.pendingPerks).toEqual(['l5']);
     }
   });
 });
@@ -1336,6 +1336,7 @@ function mockCombatResultWithPet(
     aiPriority: ['wolf_howl', 'wolf_bite'],
     preferredSlots: [4],
     tags: ['beast'],
+    pickedPerks: [],
     isDead: petIsDead,
   });
   const state: CombatState = { combatants, round: 1, exhaustionLevel: 0 };

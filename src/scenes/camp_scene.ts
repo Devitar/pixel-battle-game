@@ -156,7 +156,7 @@ export class CampScene extends Phaser.Scene {
   }
 
   private maybeLaunchPerkPicker(): void {
-    const pending = listHeroes(appState.get().roster).find((h) => h.pendingPerk);
+    const pending = listHeroes(appState.get().roster).find((h) => h.pendingPerks.length > 0);
     if (!pending) return;
     this.scene.launch('perk_overlay', { heroId: pending.id });
     this.scene.pause();

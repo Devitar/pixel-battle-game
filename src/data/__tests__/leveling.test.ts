@@ -15,12 +15,12 @@ function makeHero(classId: Parameters<typeof createHero>[0]): Hero {
 }
 
 describe('LEVEL_THRESHOLDS and MAX_LEVEL', () => {
-  it('MAX_LEVEL is 5', () => {
-    expect(MAX_LEVEL).toBe(5);
+  it('MAX_LEVEL is 10', () => {
+    expect(MAX_LEVEL).toBe(10);
   });
 
-  it('thresholds are [0, 200, 800, 2000, 4000]', () => {
-    expect(LEVEL_THRESHOLDS).toEqual([0, 200, 800, 2000, 4000]);
+  it('has 10 entries matching the spec', () => {
+    expect(LEVEL_THRESHOLDS).toEqual([0, 200, 800, 2000, 4000, 6000, 9000, 12500, 16000, 20000]);
   });
 });
 
@@ -39,16 +39,30 @@ describe('xpForCombatNode / xpForBossNode', () => {
 });
 
 describe('levelForXp', () => {
-  it('xp 0 → level 1', () => { expect(levelForXp(0)).toBe(1); });
-  it('xp 199 → level 1 (just below)', () => { expect(levelForXp(199)).toBe(1); });
-  it('xp 200 → level 2 (boundary)', () => { expect(levelForXp(200)).toBe(2); });
-  it('xp 799 → level 2', () => { expect(levelForXp(799)).toBe(2); });
-  it('xp 800 → level 3', () => { expect(levelForXp(800)).toBe(3); });
-  it('xp 1999 → level 3', () => { expect(levelForXp(1999)).toBe(3); });
-  it('xp 2000 → level 4', () => { expect(levelForXp(2000)).toBe(4); });
-  it('xp 3999 → level 4', () => { expect(levelForXp(3999)).toBe(4); });
-  it('xp 4000 → level 5', () => { expect(levelForXp(4000)).toBe(5); });
-  it('xp 99999 → level 5 (capped at MAX_LEVEL)', () => { expect(levelForXp(99999)).toBe(5); });
+  it.each([
+    [0,     1],
+    [199,   1],
+    [200,   2],
+    [799,   2],
+    [800,   3],
+    [1999,  3],
+    [2000,  4],
+    [3999,  4],
+    [4000,  5],
+    [5999,  5],
+    [6000,  6],
+    [8999,  6],
+    [9000,  7],
+    [12499, 7],
+    [12500, 8],
+    [15999, 8],
+    [16000, 9],
+    [19999, 9],
+    [20000, 10],
+    [99999, 10],
+  ])('xp=%d → level %d', (xp, level) => {
+    expect(levelForXp(xp)).toBe(level);
+  });
 });
 
 describe('applyLevelUps', () => {
@@ -58,7 +72,7 @@ describe('applyLevelUps', () => {
     expect(result).toEqual(h);
   });
 
-  it('Knight L1→L2: +2 maxHp, +2 currentHp, +1 defense, level=2, no pendingPerk', () => {
+  it('Knight L1→L2: +2 maxHp, +2 currentHp, +1 defense, level=2, no pendingPerks', () => {
     const h = makeHero('knight');
     const baseHp = h.maxHp;
     const baseDef = h.baseStats.defense;
@@ -67,7 +81,7 @@ describe('applyLevelUps', () => {
     expect(result.currentHp).toBe(h.currentHp + 2);
     expect(result.baseStats.defense).toBe(baseDef + 1);
     expect(result.level).toBe(2);
-    expect(result.pendingPerk).toBe(false);
+    expect(result.pendingPerks).toEqual([]);
   });
 
   it('Rogue L1→L2: +2 crit (crit-primary special case)', () => {
@@ -77,7 +91,7 @@ describe('applyLevelUps', () => {
     expect(result.baseStats.crit).toBe(baseCrit + 2);
   });
 
-  it('Knight L1→L5 multi-level jump: +8 maxHp, +4 defense, pendingPerk=true', () => {
+  it('Knight L1→L5 multi-level jump: +8 maxHp, +4 defense, pendingPerks=[l5]', () => {
     const h = makeHero('knight');
     const baseHp = h.maxHp;
     const baseDef = h.baseStats.defense;
@@ -85,18 +99,18 @@ describe('applyLevelUps', () => {
     expect(result.maxHp).toBe(baseHp + 8);
     expect(result.baseStats.defense).toBe(baseDef + 4);
     expect(result.level).toBe(5);
-    expect(result.pendingPerk).toBe(true);
+    expect(result.pendingPerks).toEqual(['l5']);
   });
 
-  it('L4→L5 sets pendingPerk', () => {
+  it('L4→L5 pushes l5 onto pendingPerks', () => {
     const h = makeHero('archer');
     const result = applyLevelUps({ ...h, level: 4 }, 4, 5);
-    expect(result.pendingPerk).toBe(true);
+    expect(result.pendingPerks).toEqual(['l5']);
   });
 
-  it('L5→L5 no-op preserves pendingPerk if already true', () => {
+  it('L5→L5 no-op preserves pendingPerks if already set', () => {
     const h = makeHero('archer');
-    const atFive = { ...h, level: 5, pendingPerk: true };
+    const atFive = { ...h, level: 5, pendingPerks: ['l5'] as const };
     const result = applyLevelUps(atFive, 5, 5);
     expect(result).toEqual(atFive);
   });
@@ -118,5 +132,50 @@ describe('applyLevelUps', () => {
       expect(result.baseStats[def.primaryStat], `class ${classId}`)
         .toBeGreaterThan(baseValue);
     }
+  });
+});
+
+describe('applyLevelUps tier-push', () => {
+  function baseHero(level: number): Hero {
+    const h = makeHero('knight');
+    return { ...h, level };
+  }
+
+  it('L4→L5 pushes "l5" to pendingPerks', () => {
+    const before = baseHero(4);
+    const after = applyLevelUps(before, 4, 5);
+    expect(after.pendingPerks).toEqual(['l5']);
+  });
+
+  it('L9→L10 pushes "l10" to pendingPerks', () => {
+    const before = baseHero(9);
+    const after = applyLevelUps(before, 9, 10);
+    expect(after.pendingPerks).toEqual(['l10']);
+  });
+
+  it('L4→L10 pushes both ["l5", "l10"] in order', () => {
+    const before = baseHero(4);
+    const after = applyLevelUps(before, 4, 10);
+    expect(after.pendingPerks).toEqual(['l5', 'l10']);
+  });
+
+  it('L6→L7 does not push any tier (no boundary crossed)', () => {
+    const before = baseHero(6);
+    const after = applyLevelUps(before, 6, 7);
+    expect(after.pendingPerks).toEqual([]);
+  });
+
+  it('appends to existing pendingPerks rather than overwriting', () => {
+    const before = { ...baseHero(4), pendingPerks: ['l5'] as const };
+    const after = applyLevelUps(before, 4, 10);
+    // Existing 'l5' preserved (not duplicated), 'l10' appended.
+    expect(after.pendingPerks).toEqual(['l5', 'l10']);
+  });
+
+  it('per-level HP and primary-stat bumps apply per level (L4→L10 = 6 levels)', () => {
+    const before = baseHero(4);
+    const after = applyLevelUps(before, 4, 10);
+    expect(after.maxHp).toBe(before.maxHp + 6 * 2);     // 2 HP per level
+    expect(after.baseStats.defense).toBe(before.baseStats.defense + 6 * 1); // Knight primary = defense, +1/level
   });
 });

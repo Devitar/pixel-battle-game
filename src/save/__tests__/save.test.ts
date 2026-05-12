@@ -295,7 +295,7 @@ describe('load — buildingLevels normalizer', () => {
   });
 });
 
-describe('load — normalize legacy heroes missing xp/level/pendingPerk', () => {
+describe('load — normalize legacy heroes missing xp/level/pendingPerks', () => {
   it('fills defaults on heroes from a save predating leveling', () => {
     const storage = new MemoryStorage();
     const legacyHero = {
@@ -319,7 +319,7 @@ describe('load — normalize legacy heroes missing xp/level/pendingPerk', () => 
           floorRolledAt: 1,
         },
       },
-      // xp / level / pendingPerk intentionally absent
+      // xp / level / pendingPerks / pickedPerks intentionally absent
     };
     const legacy = {
       version: 1,
@@ -335,8 +335,8 @@ describe('load — normalize legacy heroes missing xp/level/pendingPerk', () => 
     const hero = loaded!.roster.heroes[0];
     expect(hero.xp).toBe(0);
     expect(hero.level).toBe(1);
-    expect(hero.pendingPerk).toBe(false);
-    expect(hero.perkId).toBeUndefined();
+    expect(hero.pendingPerks).toEqual([]);
+    expect(hero.pickedPerks).toEqual([]);
     // Cluster B · 41: legs + feet default to black sprites for legacy heroes.
     expect(hero.legsSpriteId).toBe('3'); // SPRITE_NAMES.legs.black
     expect(hero.feetSpriteId).toBe('4'); // SPRITE_NAMES.feet.black
@@ -380,7 +380,7 @@ describe('save normalizer — runState.lost default', () => {
       currentHp: 0, maxHp: 20,
       traitId: 'quick', bodySpriteId: 'body1',
       wounds: [], equipment: {},
-      xp: 0, level: 1, pendingPerk: false,
+      xp: 0, level: 1, pendingPerks: [], pickedPerks: [],
     };
     const storage = new MemoryStorage();
     storage.setItem(STORAGE_KEY, JSON.stringify({

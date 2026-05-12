@@ -163,15 +163,31 @@ export function normalizeSaveFile(file: SaveFile): SaveFile {
 function normalizeHero(hero: Hero): Hero {
   // Legacy saves (pre-traitIds) stored a single `traitId: TraitId` field.
   // Wrap it in an array when upgrading from that shape.
-  const raw = hero as Hero & { traitId?: string };
+  const raw = hero as Hero & {
+    traitId?: string;
+    pendingPerk?: boolean;
+    perkId?: import('@data/types').PerkId;
+  };
   const traitIds: readonly string[] = hero.traitIds
     ?? (raw.traitId !== undefined ? [raw.traitId] : []);
+  // Defensive backfill for hero perk fields. The v5→v6 migration already
+  // converts legacy singular `pendingPerk`/`perkId` to the plural arrays, so
+  // post-migration saves should always have `pendingPerks`/`pickedPerks`.
+  // This shim covers: (a) heroes built by tests without these fields, and
+  // (b) any path where a hero reaches load without passing through migrate().
+  // The legacy-singular fallback branches are redundant for migrated saves
+  // but kept as belt-and-braces against fixtures / edge cases.
+  const pendingPerks: readonly import('@data/types').PerkTier[] = hero.pendingPerks
+    ?? (raw.pendingPerk ? (['l5'] as const) : []);
+  const pickedPerks: readonly import('@data/types').PerkId[] = hero.pickedPerks
+    ?? (raw.perkId !== undefined ? [raw.perkId] : []);
   return {
     ...hero,
     traitIds: traitIds as Hero['traitIds'],
     xp: hero.xp ?? 0,
     level: hero.level ?? 1,
-    pendingPerk: hero.pendingPerk ?? false,
+    pendingPerks,
+    pickedPerks,
     legsSpriteId: hero.legsSpriteId ?? DEFAULT_LEGS_SPRITE,
     feetSpriteId: hero.feetSpriteId ?? DEFAULT_FEET_SPRITE,
   };
