@@ -85,7 +85,7 @@ export type WeaponFamily = 'melee' | 'ranged' | 'magic';
 
 export type ItemSlot = 'weapon' | 'shield' | 'outfit' | 'hat';
 
-export type Rarity = 'common' | 'uncommon' | 'rare';
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic';
 
 export type ItemBaseId =
   | 'sword_basic' | 'bow_basic' | 'mace_basic'

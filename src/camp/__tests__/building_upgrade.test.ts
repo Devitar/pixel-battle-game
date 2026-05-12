@@ -72,12 +72,22 @@ describe('applyBuildingUpgrade', () => {
     expect(after.roster.capacity).toBe(12);
   });
 
-  it('Blacksmith L2 throws (L3 waits on epic rarity)', () => {
+  it('Blacksmith L2 → L3: deducts 500g, bumps level (unlocks rare → epic upgrades)', () => {
     const at_l2: SaveFile = {
       ...makeBaseState(),
       buildingLevels: { tavern: 1, barracks: 1, blacksmith: 2, hospital: 1, chapel: 1, training_grounds: 1 },
     };
-    expect(() => applyBuildingUpgrade(at_l2, 'blacksmith')).toThrow(/already at max/);
+    const after = applyBuildingUpgrade(at_l2, 'blacksmith');
+    expect(after.buildingLevels.blacksmith).toBe(3);
+    expect(after.vault.gold).toBe(500);  // 1000 - 500
+  });
+
+  it('Blacksmith L3 throws (max level)', () => {
+    const at_l3: SaveFile = {
+      ...makeBaseState(),
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 3, hospital: 1, chapel: 1, training_grounds: 1 },
+    };
+    expect(() => applyBuildingUpgrade(at_l3, 'blacksmith')).toThrow(/already at max/);
   });
 
   it('Hospital L1 → L2: deducts 200g, bumps level, refills treatments to new cap (2)', () => {

@@ -33,14 +33,14 @@ const WEAPON_FAMILY_TO_BASE: Record<WeaponType, ItemBaseId> = {
 const OUTFIT_BASES: readonly ItemBaseId[] = ['outfit_cloth', 'outfit_leather'];
 const HAT_BASES: readonly ItemBaseId[] = ['hat_cap', 'hat_hood'];
 
-interface RarityRow { floor: number; common: number; uncommon: number; rare: number }
+interface RarityRow { floor: number; common: number; uncommon: number; rare: number; epic: number }
 const RARITY_TABLE: readonly RarityRow[] = [
-  { floor: 1,  common: 90, uncommon: 10, rare:  0 },
-  { floor: 3,  common: 80, uncommon: 18, rare:  2 },
-  { floor: 5,  common: 70, uncommon: 25, rare:  5 },
-  { floor: 8,  common: 55, uncommon: 32, rare: 13 },
-  { floor: 10, common: 45, uncommon: 35, rare: 20 },
-  { floor: 15, common: 30, uncommon: 40, rare: 30 },
+  { floor: 1,  common: 90, uncommon: 10, rare:  0, epic:  0 },
+  { floor: 3,  common: 80, uncommon: 18, rare:  2, epic:  0 },
+  { floor: 5,  common: 70, uncommon: 24, rare:  5, epic:  1 },
+  { floor: 8,  common: 55, uncommon: 30, rare: 12, epic:  3 },
+  { floor: 10, common: 45, uncommon: 32, rare: 18, epic:  5 },
+  { floor: 15, common: 30, uncommon: 35, rare: 25, epic: 10 },
 ];
 
 const TIER_RARITY_FLOOR_BONUS: Record<DungeonTier, number> = {
@@ -50,7 +50,7 @@ const TIER_RARITY_FLOOR_BONUS: Record<DungeonTier, number> = {
   4: 0,
 };
 
-function rarityWeightsAt(floor: number, tier: DungeonTier): { common: number; uncommon: number; rare: number } {
+function rarityWeightsAt(floor: number, tier: DungeonTier): { common: number; uncommon: number; rare: number; epic: number } {
   const effectiveFloor = floor + TIER_RARITY_FLOOR_BONUS[tier];
   if (effectiveFloor <= RARITY_TABLE[0].floor) return pluckWeights(RARITY_TABLE[0]);
   if (effectiveFloor >= RARITY_TABLE[RARITY_TABLE.length - 1].floor) {
@@ -65,13 +65,14 @@ function rarityWeightsAt(floor: number, tier: DungeonTier): { common: number; un
         common: lerp(lo.common, hi.common, t),
         uncommon: lerp(lo.uncommon, hi.uncommon, t),
         rare: lerp(lo.rare, hi.rare, t),
+        epic: lerp(lo.epic, hi.epic, t),
       };
     }
   }
   return pluckWeights(RARITY_TABLE[RARITY_TABLE.length - 1]);
 }
 
-function pluckWeights(r: RarityRow) { return { common: r.common, uncommon: r.uncommon, rare: r.rare }; }
+function pluckWeights(r: RarityRow) { return { common: r.common, uncommon: r.uncommon, rare: r.rare, epic: r.epic }; }
 function lerp(a: number, b: number, t: number): number { return a + (b - a) * t; }
 
 // Affix values are intentionally tier-agnostic — uses tier-1 slope at every tier.
@@ -82,12 +83,13 @@ function scaleByFloor(baseValue: number, floor: number): number {
   return Math.round(baseValue * floorScale(floor).hp);
 }
 
-function pickRarity(rng: Rng, floor: number, tier: DungeonTier = 1): Rarity {
+export function pickRarity(rng: Rng, floor: number, tier: DungeonTier = 1): Rarity {
   const w = rarityWeightsAt(floor, tier);
   const opts: WeightedOption<Rarity>[] = [
-    { value: 'common', weight: w.common },
+    { value: 'common',   weight: w.common },
     { value: 'uncommon', weight: w.uncommon },
-    { value: 'rare', weight: w.rare },
+    { value: 'rare',     weight: w.rare },
+    { value: 'epic',     weight: w.epic },
   ];
   return rng.weighted(opts);
 }
@@ -95,7 +97,8 @@ function pickRarity(rng: Rng, floor: number, tier: DungeonTier = 1): Rarity {
 function affixCount(rarity: Rarity, slot: ItemSlot): number {
   if (rarity === 'common') return 0;
   if (rarity === 'uncommon') return 1;
-  return slot === 'hat' ? 3 : 2;
+  if (rarity === 'rare') return slot === 'hat' ? 3 : 2;
+  return slot === 'hat' ? 4 : 3; // epic
 }
 
 function pickAffixes(rng: Rng, count: number): AffixId[] {
@@ -152,7 +155,9 @@ export function rollEventItem(rng: Rng, floorNumber: number, rarity: Rarity, tie
     affixId: id,
     value: rollAffixValue(id, floorNumber),
   }));
-  const rareProperty = rarity === 'rare' ? pickRareProperty(rng, slot, floorNumber) : undefined;
+  const rareProperty = (rarity === 'rare' || rarity === 'epic')
+    ? pickRareProperty(rng, slot, floorNumber)
+    : undefined;
   const id = generateItemId(rng);
   return {
     id,
@@ -179,7 +184,9 @@ export function rollShopItem(rng: Rng, slot: ItemSlot, floor: number, tier: Dung
     value: rollAffixValue(id, floor),
   }));
 
-  const rareProperty = rarity === 'rare' ? pickRareProperty(rng, slot, floor) : undefined;
+  const rareProperty = (rarity === 'rare' || rarity === 'epic')
+    ? pickRareProperty(rng, slot, floor)
+    : undefined;
 
   const id = generateItemId(rng);
   return {
@@ -221,7 +228,9 @@ export function rollLoot(rng: Rng, floorNumber: number, kind: LootKind, tier: Du
     value: rollAffixValue(id, floorNumber),
   }));
 
-  const rareProperty = rarity === 'rare' ? pickRareProperty(rng, slot, floorNumber) : undefined;
+  const rareProperty = (rarity === 'rare' || rarity === 'epic')
+    ? pickRareProperty(rng, slot, floorNumber)
+    : undefined;
 
   const id = generateItemId(rng);
   const item: Item = {

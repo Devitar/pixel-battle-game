@@ -9,6 +9,7 @@ const BASE_PRICE_BY_RARITY = {
   common: 30,
   uncommon: 80,
   rare: 200,
+  epic: 500,
 } as const;
 
 const PRICE_VARIANCE = 0.15;

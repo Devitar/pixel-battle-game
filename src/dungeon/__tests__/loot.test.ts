@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '@util/rng';
-import { rollEventItem, rollLoot, rollShopItem } from '../loot';
+import { pickRarity, rollEventItem, rollLoot, rollShopItem } from '../loot';
 
 describe('rollLoot — drop gate', () => {
   it('drops at roughly 10% on a non-boss combat node (Phase 5 retune from 50%)', () => {
@@ -139,10 +139,10 @@ describe('rollLoot — of_vigor ×3 multiplier', () => {
 });
 
 describe('rollLoot — rare property gating', () => {
-  it('non-rare items never have rareProperty', () => {
+  it('common/uncommon items never have rareProperty', () => {
     for (let seed = 1; seed <= 500; seed++) {
       const item = rollLoot(createRng(seed), 5, 'boss');
-      if (item && item.rarity !== 'rare') {
+      if (item && (item.rarity === 'common' || item.rarity === 'uncommon')) {
         expect(item.rareProperty).toBeUndefined();
       }
     }
@@ -311,7 +311,7 @@ describe('rollLoot — treasure kind', () => {
     expect(rare).toBe(0);
   });
 
-  it('floor 5 treasure rarity distribution roughly matches the floor-5 table (70/25/5)', () => {
+  it('floor 5 treasure rarity distribution roughly matches the floor-5 table (70/24/5/1)', () => {
     const counts: Record<string, number> = { common: 0, uncommon: 0, rare: 0 };
     for (let seed = 1; seed <= 1000; seed++) {
       const item = rollLoot(createRng(seed), 5, 'treasure');
@@ -390,5 +390,154 @@ describe('loot — tier parameter parity (tier=1 default)', () => {
       const b = rollEventItem(createRng(seed), 5, 'rare', 1);
       expect(a).toEqual(b);
     }
+  });
+});
+
+describe('pickRarity — Epic tier curve', () => {
+  it('produces 0 epic at floor 1 (tier 1) over a large sample', () => {
+    const rng = createRng(12345);
+    let epic = 0;
+    for (let i = 0; i < 1000; i++) {
+      if (pickRarity(rng, 1, 1) === 'epic') epic++;
+    }
+    expect(epic).toBe(0);
+  });
+
+  it('produces 0 epic at floor 3 (tier 1) over a large sample', () => {
+    const rng = createRng(12345);
+    let epic = 0;
+    for (let i = 0; i < 1000; i++) {
+      if (pickRarity(rng, 3, 1) === 'epic') epic++;
+    }
+    expect(epic).toBe(0);
+  });
+
+  it('produces ~1% epic at floor 5 over a large sample (tolerance ±1.5%)', () => {
+    const rng = createRng(12345);
+    let epic = 0;
+    const N = 10000;
+    for (let i = 0; i < N; i++) {
+      if (pickRarity(rng, 5, 1) === 'epic') epic++;
+    }
+    const pct = (epic / N) * 100;
+    expect(pct).toBeGreaterThan(0);
+    expect(pct).toBeLessThan(2.5);
+  });
+
+  it('produces ~10% epic at floor 15 over a large sample (tolerance ±2%)', () => {
+    const rng = createRng(12345);
+    let epic = 0;
+    const N = 10000;
+    for (let i = 0; i < N; i++) {
+      if (pickRarity(rng, 15, 1) === 'epic') epic++;
+    }
+    const pct = (epic / N) * 100;
+    expect(pct).toBeGreaterThan(8);
+    expect(pct).toBeLessThan(12);
+  });
+
+  it('produces ~2-3% epic at floor 4 in tier 2 (Sunken Keep boss effective floor 7)', () => {
+    const rng = createRng(12345);
+    let epic = 0;
+    const N = 10000;
+    for (let i = 0; i < N; i++) {
+      if (pickRarity(rng, 4, 2) === 'epic') epic++;
+    }
+    const pct = (epic / N) * 100;
+    expect(pct).toBeGreaterThan(1);
+    expect(pct).toBeLessThan(4);
+  });
+});
+
+describe('Epic items — affix count and rare-property', () => {
+  it('epic non-hat items roll 3 affixes', () => {
+    // Sample until we get a non-hat. Avoids the seed-12345 lottery where a single
+    // hat roll would silently bypass the 3-affix assertion.
+    for (let seed = 1; seed <= 100; seed++) {
+      const rng = createRng(seed);
+      const item = rollEventItem(rng, 10, 'epic', 1);
+      if (item.slot !== 'hat') {
+        expect(item.affixes).toHaveLength(3);
+        return;
+      }
+    }
+    throw new Error('No epic non-hat rolled in 100 seeds — slot pick may be deterministic');
+  });
+
+  it('epic hat items roll 4 affixes', () => {
+    // Sample until we get a hat (rollEventItem picks slot uniformly)
+    for (let seed = 1; seed <= 100; seed++) {
+      const rng = createRng(seed);
+      const item = rollEventItem(rng, 10, 'epic', 1);
+      if (item.slot === 'hat') {
+        expect(item.affixes).toHaveLength(4);
+        return;
+      }
+    }
+    throw new Error('No epic hat rolled in 100 seeds — slot pick may be deterministic');
+  });
+
+  it('epic weapon/shield/outfit items have a rare-property', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const rng = createRng(seed);
+      const item = rollEventItem(rng, 10, 'epic', 1);
+      if (item.slot === 'weapon' || item.slot === 'shield' || item.slot === 'outfit') {
+        expect(item.rareProperty, `seed ${seed}, slot ${item.slot}`).toBeDefined();
+      }
+    }
+  });
+
+  it('epic hat items have no rare-property (hats never get one)', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const rng = createRng(seed);
+      const item = rollEventItem(rng, 10, 'epic', 1);
+      if (item.slot === 'hat') {
+        expect(item.rareProperty).toBeUndefined();
+        return;
+      }
+    }
+    throw new Error('No epic hat rolled in 100 seeds');
+  });
+});
+
+describe('Epic — end-to-end integration', () => {
+  it('rollLoot at floor 15 produces some Epic items in a large sample', () => {
+    let epic = 0;
+    const N = 1000;
+    for (let seed = 1; seed <= N; seed++) {
+      const item = rollLoot(createRng(seed), 15, 'treasure', 1);
+      if (item?.rarity === 'epic') epic++;
+    }
+    // At floor 15, Epic weight is 10%. Expect ~100 in 1000.
+    expect(epic).toBeGreaterThan(50);
+    expect(epic).toBeLessThan(150);
+  });
+
+  it('rollShopItem at floor 12 (tier 2) produces some Epic items', () => {
+    // floor 12 in tier 2 = effective floor 15, which is the cap row (10% epic).
+    let epic = 0;
+    const N = 1000;
+    for (let seed = 1; seed <= N; seed++) {
+      const item = rollShopItem(createRng(seed), 'weapon', 12, 2);
+      if (item.rarity === 'epic') epic++;
+    }
+    // Bracketed both sides: lower catches a regression where epic never rolls;
+    // upper catches a regression where rarity weights collapse to all-epic.
+    expect(epic).toBeGreaterThan(50);
+    expect(epic).toBeLessThan(150);
+  });
+
+  it('Sunken Keep boss (floor 4, tier 2) occasionally drops Epic', () => {
+    // floor 4 in tier 2 = effective floor 7. Boss uses NEXT-floor weights
+    // (effectiveFloor + 1 = 8), so Epic weight is 3%.
+    let epic = 0;
+    const N = 10000;
+    for (let seed = 1; seed <= N; seed++) {
+      const item = rollLoot(createRng(seed), 4, 'boss', 2);
+      if (item?.rarity === 'epic') epic++;
+    }
+    const pct = (epic / N) * 100;
+    expect(pct).toBeGreaterThan(1);
+    expect(pct).toBeLessThan(6);
   });
 });

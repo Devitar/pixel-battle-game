@@ -29,24 +29,7 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 ## Cluster D — Tier 3 content
 
-Tier 3 scope from gdd §10. The Sunken Keep cascade is fully shipped: Sunken Keep dungeon (Cluster D · 1, 2026-05-06), Paladin class (Cluster D · 3, 2026-05-06), Hunter class (Cluster D · 4, 2026-05-10), Chapel building (Cluster D · 5, 2026-05-11), Training Grounds building (Cluster D · 6, 2026-05-11), MAX_LEVEL bump + L10 perk tier (Cluster D · 7, 2026-05-12). The remaining "legendary gear + L10 milestone" surface is broken down into entries 8-10 below. Future Tier 3 surface not yet scoped: dungeons 3-4 (Warren, Abyss), NG+ / Infinity mode, milestone achievements ("25 crits"), trait removal.
-
-### 8 · Epic gear tier (rarity 4 of 5)
-
-- **What:** Add `'epic'` to the `Rarity` union between `'rare'` and `'legendary'` (5-tier total per gdd §7). Epic items roll 3 affixes plus a rare-property; appear at deeper floors per an extended `RARITY_TABLE`. Plumb Blacksmith upgrade cost, sell value, and UI rarity color for the new tier.
-- **Why:** Realises the 5-tier curve gdd promised. Independent of MAX_LEVEL (entry 7) and the legendary milestone (entry 9) — can ship anytime. Sets up entry 9 (which adds the 5th tier on top).
-- **Tier:** 3 (originally part of gdd's "legendary tier" cluster).
-- **Acceptance:**
-  - `Rarity` type widens to `'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'` (legendary added type-only until entry 9; Epic is the load-bearing addition here).
-  - `affixCount(rarity, slot)` returns 3 for `'epic'`. `pickRareProperty` valid for Epic on weapon/shield/outfit slots.
-  - `RARITY_TABLE` extends per-row with an `epic` weight, scaled by floor; tier-2 dungeon (Sunken Keep) and deeper floors weight Epic meaningfully.
-  - `BLACKSMITH_UPGRADE_COST['epic']` set (tune relative to rare; e.g., 2× rare cost).
-  - Sell value for Epic tuned proportionally (currently rare yields 60g per `sell.ts` — Epic likely 120-150g).
-  - UI rarity color added (suggested: purple); tooltip border / text color updates everywhere rarity is rendered.
-  - No save migration needed (rarity union widening doesn't invalidate stored values).
-  - Decisions captured in 2026-05-12 brainstorm: Epic is `'epic'`, rolled randomly like other tiers, gated by floor depth (no milestone gate).
-- **Touches:** `src/data/types.ts` (Rarity), `src/dungeon/loot.ts` (RARITY_TABLE, affixCount, pickRareProperty), `src/data/blacksmith.ts` (upgrade cost), `src/items/sell.ts`, `src/render/` + `src/ui/` (rarity color / tooltip), related tests.
-- **Source:** Brainstorm 2026-05-12 (decomposed from "legendary gear + L10 milestone"). Likely benefits from a small brainstorm to settle numbers (RARITY_TABLE weights, blacksmith cost) before writing the plan.
+Tier 3 scope from gdd §10. The Sunken Keep cascade is fully shipped: Sunken Keep dungeon (Cluster D · 1, 2026-05-06), Paladin class (Cluster D · 3, 2026-05-06), Hunter class (Cluster D · 4, 2026-05-10), Chapel building (Cluster D · 5, 2026-05-11), Training Grounds building (Cluster D · 6, 2026-05-11), MAX_LEVEL bump + L10 perk tier (Cluster D · 7, 2026-05-12), Epic gear tier (Cluster D · 8, 2026-05-12). The remaining "legendary gear + L10 milestone" surface is broken down into entries 9-10 below. Future Tier 3 surface not yet scoped: dungeons 3-4 (Warren, Abyss), NG+ / Infinity mode, milestone achievements ("25 crits"), trait removal.
 
 ### 9 · Legendary tier + L10 milestone + named boss drops
 

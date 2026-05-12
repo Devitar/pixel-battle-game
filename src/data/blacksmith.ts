@@ -4,4 +4,5 @@ import type { Rarity } from './types';
 export const BLACKSMITH_UPGRADE_COST: Record<Exclude<Rarity, 'common'>, number> = {
   uncommon: 100,
   rare: 300,
+  epic: 900,
 };

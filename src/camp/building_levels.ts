@@ -20,7 +20,7 @@ export const BUILDING_LEVELS: Record<BuildingId, readonly BuildingLevelDef[]> = 
   blacksmith: [
     { level: 1, upgradeCost: 0,   unlockDescription: 'Common → Uncommon' },
     { level: 2, upgradeCost: 200, unlockDescription: 'Common → Rare' },
-    // L3 (rare → epic) waits on the epic rarity itself shipping.
+    { level: 3, upgradeCost: 500, unlockDescription: 'Common → Epic' },
   ],
   hospital: [
     { level: 1, upgradeCost: 0,   unlockDescription: '1 treatment per run' },

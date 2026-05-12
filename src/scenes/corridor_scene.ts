@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { resolveCombat } from '@combat/combat';
 import type { CombatantId, CombatResult, CombatState } from '@combat/types';
-import type { Item, Rarity } from '@data/types';
+import type { Item } from '@data/types';
 import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels';
 import { removeHero, tickRosterWounds } from '@camp/roster';
 import { grantTraineeXp } from '@camp/trainee_xp';
@@ -13,6 +13,7 @@ import type { Hero } from '@heroes/hero';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { CombatActor } from '@render/combat_actor';
 import { ENEMY_VISUALS } from '@render/enemy_sprites';
+import { RARITY_COLOR_HEX } from '@render/rarity_colors';
 import { buildCombatState } from '@run/combat_setup';
 import { applyPendingMilestones } from '@run/milestones';
 import {
@@ -73,12 +74,6 @@ const BOSS_BODY_SCALE = 4.5;
 
 const ENEMY_SLIDE_IN_MS = 600;       // duration of enemy slide-in from off-screen right
 const ENEMY_SLIDE_IN_OFFSET = 80;    // px past SCENE_W where enemies spawn before sliding in
-
-const RARITY_HEX: Record<Rarity, string> = {
-  common: '#cccccc',
-  uncommon: '#4488ff',
-  rare: '#ffcc66',
-};
 
 interface HeroVisual {
   actor: CombatActor;
@@ -625,7 +620,7 @@ export class CorridorScene extends Phaser.Scene {
             .text(0, y, text, {
               fontFamily: 'monospace',
               fontSize: '10px',
-              color: RARITY_HEX[item.rarity],
+              color: RARITY_COLOR_HEX[item.rarity],
             })
             .setOrigin(0.5),
         );
@@ -1165,7 +1160,7 @@ export class CorridorScene extends Phaser.Scene {
             .text(0, y, text, {
               fontFamily: 'monospace',
               fontSize: '10px',
-              color: RARITY_HEX[item.rarity],
+              color: RARITY_COLOR_HEX[item.rarity],
             })
             .setOrigin(0.5),
         );

@@ -51,8 +51,14 @@ describe('nextLevel', () => {
     expect(nextLevel('blacksmith', 1)?.unlockDescription).toBe('Common → Rare');
   });
 
-  it('Blacksmith L2 → null (L3 waits on epic rarity)', () => {
-    expect(nextLevel('blacksmith', 2)).toBeNull();
+  it('Blacksmith L2 → L3 def (Common→Epic unlock at 500g)', () => {
+    expect(nextLevel('blacksmith', 2)?.level).toBe(3);
+    expect(nextLevel('blacksmith', 2)?.upgradeCost).toBe(500);
+    expect(nextLevel('blacksmith', 2)?.unlockDescription).toBe('Common → Epic');
+  });
+
+  it('Blacksmith L3 → null (max level)', () => {
+    expect(nextLevel('blacksmith', 3)).toBeNull();
   });
 
   it('Hospital L1 → L2 def (2 treatments/run at 200g)', () => {

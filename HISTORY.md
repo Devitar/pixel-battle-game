@@ -29,6 +29,26 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-12 · Epic gear tier (rarity 4 of 5) (closes Cluster D · 8)
+
+- **Why:** Realises the 5-tier rarity curve promised by gdd §7. Sister Spec 2 of 4 in the legendary cascade (Spec 1 — MAX_LEVEL+L10 perks — shipped same day). Independent of Spec 1; needed before Spec 3 (Legendary + L10 milestone) can land into a clean Epic substrate.
+- **Decisions:**
+  - **Conservative drop curve** — Epic 0% to floor 3, ramping to 10% by floor 15. Rare nudges down (0/2/5/12/18/25 vs old 0/2/5/13/20/30) and uncommon adjusts (10/18/24/30/32/35 vs old 10/18/25/32/35/40) to make room. Each RARITY_TABLE row still sums to 100. Sunken Keep's +3 tier bonus organically lifts Epic to ~2-3% at the floor-4 boss; Crypt stays Epic-free.
+  - **Affix asymmetry preserved.** Epic non-hat = 3 affixes; epic hat = 4. Extends the +1-per-tier curve AND the existing rare-hat-bonus pattern. Epic non-hats also get a guaranteed rare-property (the gate at three `loot.ts` call sites widened from `rarity === 'rare'` to `rare || epic`).
+  - **Geometric cost curves preserved.** Blacksmith upgrade 100→300→900; sell value 10→30→80→200. Both continue the ~3× / ~2.5× ratios.
+  - **L3 Blacksmith gate for rare→epic (spec patched mid-execution).** Extends L1/L2 pattern; an existing test name "rare items remain unupgradeable at L3 (epic rarity not yet shipped)" had explicitly anticipated this. Pattern: `canBlacksmithUpgrade` gains `if (rarity === 'rare' && level < 3) return false;`.
+  - **Only `'epic'` in this spec, not `'epic' + 'legendary'`.** Revised the 2026-05-12 brainstorm note: TypeScript has no "type-only" enum values — adding `'legendary'` would force every `Record<Rarity, X>` to pick sentinel values that Spec 3 should pick when it has the gameplay context.
+  - **Centralized rarity colors** at `src/render/rarity_colors.ts`. Removed three local duplicates (`equip_scene`, `event_overlay_scene`, `corridor_scene`). Spec 3's Legendary color becomes a one-file edit. Epic = `#a060ff` (classic purple, clear contrast vs gold-rare).
+  - **Sell-confirm gate widened, not generalized to `nextRarity===null`.** The plan asked the implementer to substitute the cap check at `blacksmith_panel_scene.ts:685` — but that line turned out to be a sell-confirm gate, not a max-rarity indicator. Literal substitution would have *removed* the rare-confirm step (UX regression). Implementer correctly widened to `rare || epic` with dynamic `Sell ${rarity} item?` text.
+  - **Rare-property preserved (not rerolled) on rare→epic upgrade.** Mirrors the existing transition semantics in `upgradeItem`; tested explicitly.
+- **Surprises:**
+  - **`BUILDING_LEVELS.blacksmith` had no L3 entry.** Caught at the holistic end-of-branch review, not in per-task reviews. The spec patch added the L3 gate to `canBlacksmithUpgrade` but didn't direct adding the L3 building-level def. Without the fix (cost 500g, description "Common → Epic", same as L1/L2 pattern), Epic upgrades were permanently unreachable in-game. Two test files (`building_levels.test.ts`, `building_upgrade.test.ts`) actively enforced the dead-end with tests literally named "(L3 waits on epic rarity)" — updated in lockstep. Process lesson: when a spec patch adds a gameplay constraint, audit reachability across systems, not just the immediate file.
+  - **Forced widening surface larger than planned.** `RARITY_LABEL` and two `rarityOrder` records in `blacksmith_panel_scene.ts`, `RARITY_HEX` in `corridor_scene.ts`, `BASE_PRICE_BY_RARITY` in `dungeon/shop.ts`, and `RARITY_ORDER` in `equip_scene.ts` all needed widening — only the color records were anticipated. Centralization (Task 4) covered the colors; label / sort-order / price records correctly stayed local since they're not color concerns.
+  - **Shop Epic price (500g placeholder) is steep.** Existing formula multiplies by floor with ±15% variance; at floor 8 (first meaningful Epic appearance) that's ~4600g. Tuning was explicitly out-of-scope per the spec, but worth a follow-up TODO for an economy-balance pass.
+- **Source:** Brainstorm + spec + plan + 5-task subagent-driven execution, all 2026-05-12. Spec: `docs/superpowers/specs/2026-05-12-epic-gear-tier-design.md`. Plan: `docs/superpowers/plans/2026-05-12-epic-gear-tier.md`. Final test count: 2126 (was 2112 at start; +14 net). No schema migration needed (Rarity widening doesn't invalidate stored values; `CURRENT_SCHEMA_VERSION` stays at 6).
+
+---
+
 ### 2026-05-12 · MAX_LEVEL bump (5→10) + L10 perk tier (closes Cluster D · 7)
 
 - **Why:** Unblock the gdd §9 "first hero reaches L10" milestone, which was unreachable with MAX_LEVEL=5. Also establishes a reusable 5×5 trigger/action palette in the combat resolver (`onCrit` / `onKill` / `onStruck` / `firstAttack` / `whenBelowHp` × `gainStat` / `damageMod` / `damageMitigation` / `lifesteal` / `applyStatus`) that sister specs 9-10 will reuse for legendary passives.

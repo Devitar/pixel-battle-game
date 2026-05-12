@@ -47,6 +47,16 @@ describe('itemSellValue', () => {
   });
 });
 
+describe('itemSellValue — Epic tier', () => {
+  it('returns 200 for an epic item', () => {
+    const item: Item = {
+      id: 't0', baseId: 'sword_basic', slot: 'weapon', rarity: 'epic',
+      weaponType: 'sword', affixes: [], floorRolledAt: 10,
+    };
+    expect(itemSellValue(item)).toBe(200);
+  });
+});
+
 describe('applyItemSell', () => {
   it('removes the item from stash and credits the vault by its sell value', () => {
     const item = makeItem('w', 'uncommon');

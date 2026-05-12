@@ -61,6 +61,7 @@ const RARITY_LABEL: Record<Rarity, string> = {
   common: '[common]',
   uncommon: '[uncommon]',
   rare: '[rare]',
+  epic: '[epic]',
 };
 
 type Location =
@@ -313,7 +314,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
   }
 
   private collectSellable(items: readonly Item[]): readonly Item[] {
-    const rarityOrder: Record<Rarity, number> = { common: 2, uncommon: 1, rare: 0 };
+    const rarityOrder: Record<Rarity, number> = { common: 3, uncommon: 2, rare: 1, epic: 0 };
     return [...items].sort((a, b) => {
       const ra = rarityOrder[a.rarity] - rarityOrder[b.rarity];
       if (ra !== 0) return ra;
@@ -348,7 +349,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
     }
     const stashSection = entries.filter((e) => e.location.kind === 'stash');
     const equippedSection = entries.filter((e) => e.location.kind === 'equipped');
-    const rarityOrder: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2 };
+    const rarityOrder: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3 };
     const sortFn = (a: UpgradeEntry, b: UpgradeEntry): number => {
       const ra = rarityOrder[a.item.rarity] - rarityOrder[b.item.rarity];
       if (ra !== 0) return ra;
@@ -680,8 +681,8 @@ export class BlacksmithPanelScene extends Phaser.Scene {
   }
 
   private requestSell(item: Item): void {
-    // Rare items get a confirm step. Common/uncommon sell instantly.
-    if (item.rarity === 'rare') {
+    // Rare and epic items get a confirm step. Common/uncommon sell instantly.
+    if (item.rarity === 'rare' || item.rarity === 'epic') {
       _sellConfirmItem = item;
       this.scene.restart();
       return;
@@ -698,7 +699,7 @@ export class BlacksmithPanelScene extends Phaser.Scene {
         scene: this,
         x: cx,
         y: dialog.frameY + 30,
-        text: 'Sell rare item?',
+        text: `Sell ${item.rarity} item?`,
         font: 'medium',
         size: 16,
         originX: 0.5,
