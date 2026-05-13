@@ -25,6 +25,7 @@ export function createHeroCombatant(
     abilities: def.abilities,
     aiPriority: def.aiPriority,
     pickedPerks: [],
+    equippedLegendaryIds: [],
     isDead: false,
     ...overrides,
   };
@@ -53,6 +54,7 @@ export function createEnemyCombatant(
     preferredSlots: def.preferredSlots,
     tags: def.tags,
     pickedPerks: [],
+    equippedLegendaryIds: [],
     isDead: false,
     ...overrides,
   };
@@ -85,6 +87,7 @@ export function createPetCombatant(
     preferredSlots: def.preferredSlots,
     tags: def.tags,
     pickedPerks: [],
+    equippedLegendaryIds: [],
     isDead: false,
   };
 }

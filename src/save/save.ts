@@ -116,6 +116,7 @@ export function createDefaultUnlocks(): Unlocks {
     classes: ['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage'],
     dungeons: ['crypt'],
     buildings: [],
+    legendaryEnabled: false,
   };
 }
 
@@ -131,8 +132,15 @@ function isPlausibleRawSave(parsed: unknown): parsed is { version: number } {
 // defaults here stay until each is folded into an explicit migration.
 // Single point of defaulting — do not scatter `?? createStash()` reads.
 export function normalizeSaveFile(file: SaveFile): SaveFile {
+  // Defensive backfill for unlocks.legendaryEnabled. The v6→v7 migration sets
+  // this for all persisted saves; the shim covers fixtures / paths that reach
+  // load without passing through migrate().
+  const unlocks: Unlocks = typeof file.unlocks?.legendaryEnabled === 'boolean'
+    ? file.unlocks
+    : { ...file.unlocks, legendaryEnabled: false };
   const withDefaults: SaveFile = {
     ...file,
+    unlocks,
     stash: file.stash ?? createStash(),
     buildingLevels: file.buildingLevels ?? {
       tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 1,

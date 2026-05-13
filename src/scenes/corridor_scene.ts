@@ -512,7 +512,7 @@ export class CorridorScene extends Phaser.Scene {
     const prePackLen = run.pack.items.length;
 
     const rng = createRngFromState(rngStateAfter);
-    const { runState: nextRun, wipe } = completeSurpriseCombat(run, result, rng);
+    const { runState: nextRun, wipe } = completeSurpriseCombat(run, result, rng, appState.get().unlocks);
     this.combatLoot = nextRun.pack.items.slice(prePackLen);
 
     appState.update((s) => ({
@@ -1027,7 +1027,7 @@ export class CorridorScene extends Phaser.Scene {
     // Loot roll consumes RNG; thread it through completeCombat so the post-loot
     // state is what gets persisted.
     const rng = createRngFromState(rngStateAfter);
-    const { runState: nextRun, wipe } = completeCombat(run, result, rng);
+    const { runState: nextRun, wipe } = completeCombat(run, result, rng, appState.get().unlocks);
     // Items added during this fight = rollLoot drop + recovered fallen-hero gear.
     // addItem appends, so the tail of pack.items past the pre-fight length is
     // exactly what was added. Stash for the result panel.

@@ -12,6 +12,7 @@ const SELL_VALUE: Record<Rarity, number> = {
   uncommon: 30,
   rare: 80,
   epic: 200,
+  legendary: 500,
 };
 
 export function itemSellValue(item: Item): number {

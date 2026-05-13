@@ -1,6 +1,7 @@
 import { DEFAULT_FEET_SPRITE, DEFAULT_LEGS_SPRITE } from '@data/body_sprites';
 import { BASE_ITEMS, BASE_ITEM_STATS } from '@data/items';
 import { CLASSES } from '@data/classes';
+import { LEGENDARY_DEFS } from '@data/legendaries';
 import { PERKS } from '@data/perks';
 import { TRAITS } from '@data/traits';
 import type {
@@ -115,6 +116,13 @@ function gearTotal(equipment: HeroEquipment): number {
   for (const slot of ['weapon', 'shield', 'outfit', 'hat'] as const) {
     const item = equipment[slot];
     if (!item) continue;
+    // Legendary items contribute hpBonus only; they bypass the per-baseId base
+    // HP and of_vigor affix aggregation (the legendary's stats record is the
+    // sole stat source, applied separately by applyEquipmentStats).
+    if (item.legendaryId !== undefined) {
+      gear += LEGENDARY_DEFS[item.legendaryId].hpBonus ?? 0;
+      continue;
+    }
     const baseStats = BASE_ITEM_STATS[item.baseId];
     if (baseStats.hp !== undefined) gear += baseStats.hp;
     for (const a of item.affixes) {

@@ -1,10 +1,9 @@
 import { ABILITIES } from '@data/abilities';
-import { PERKS } from '@data/perks';
 import type { Rng } from '@util/rng';
 import { pickAbility } from './ability_priority';
 import { setCooldown, tickCooldowns } from './cooldowns';
 import { applyAbility } from './effects';
-import { applyPerkAction, recomputeBelowHpAuras } from './perk_hooks';
+import { applyPerkAction, gatherTriggeredEffects, recomputeBelowHpAuras } from './perk_hooks';
 import { collapseAfterDeath, shuffle, shuffleWouldProgress } from './positions';
 import { tickStatuses } from './statuses';
 import { computeInitiative } from './turn_order';
@@ -112,21 +111,19 @@ export function resolveCombat(initialState: CombatState, rng: Rng): CombatResult
       if (willBeStunned) {
         events.push({ kind: 'turn_skipped', combatantId: id, reason: 'stunned' });
       } else {
-        // Fire firstAttack perks the actor hasn't fired yet. Runs BEFORE
-        // action execution so any `damageMod` is stashed on the combatant
-        // before applyDamage looks at it. `damageMod` actions are not
-        // applied as state — they set pendingDamageMod, which applyDamage
-        // consumes once on the next outgoing hit. Non-damageMod actions
-        // (gainStat, applyStatus, etc.) fire through applyPerkAction.
-        const firedSet = new Set(combatant.firstAttackFiredPerkIds ?? []);
+        // Fire firstAttack triggered effects the actor hasn't fired yet
+        // (picked perks + equipped legendaries). Runs BEFORE action execution
+        // so any `damageMod` is stashed on the combatant before applyDamage
+        // looks at it. `damageMod` actions are not applied as state — they
+        // set pendingDamageMod, which applyDamage consumes once on the next
+        // outgoing hit. Non-damageMod actions (gainStat, applyStatus, etc.)
+        // fire through applyPerkAction.
+        const firedSet = new Set<string>(combatant.firstAttackFiredSourceIds ?? []);
         let firedAny = false;
-        for (const perkId of combatant.pickedPerks) {
-          const perk = PERKS[perkId];
-          if (!perk) continue;
-          const t = perk.triggeredEffect;
-          if (!t || t.trigger.kind !== 'firstAttack') continue;
-          if (firedSet.has(perkId)) continue;
-          firedSet.add(perkId);
+        for (const { sourceId, effect: t } of gatherTriggeredEffects(combatant)) {
+          if (t.trigger.kind !== 'firstAttack') continue;
+          if (firedSet.has(sourceId)) continue;
+          firedSet.add(sourceId);
           firedAny = true;
           if (t.action.kind === 'damageMod') {
             combatant.pendingDamageMod =
@@ -135,14 +132,14 @@ export function resolveCombat(initialState: CombatState, rng: Rng): CombatResult
             applyPerkAction({
               self: combatant,
               other: undefined,
-              perkId,
+              sourceId,
               action: t.action,
               events,
             });
           }
         }
         if (firedAny) {
-          combatant.firstAttackFiredPerkIds = Array.from(firedSet);
+          combatant.firstAttackFiredSourceIds = Array.from(firedSet);
         }
 
         const picked = pickAbility(combatant, state, rng);

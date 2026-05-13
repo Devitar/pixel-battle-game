@@ -2,7 +2,7 @@ import { ENEMIES } from '@data/enemies';
 import { MODIFIERS, type ModifierId } from '@data/modifiers';
 import { resolveCombatAbilities } from '@items/kit';
 import { applyEquipmentStats, rarePropertyFields } from '@items/stats';
-import type { EnemyId, SlotIndex, Wound } from '@data/types';
+import type { EnemyId, HeroEquipment, LegendaryId, SlotIndex, Wound } from '@data/types';
 import { WOUNDS } from '@data/wounds';
 import { createEnemyCombatant, createHeroCombatant, createPetCombatant } from '@combat/combatant';
 import { PERKS } from '@data/perks';
@@ -44,6 +44,15 @@ function computeDamageTakenMultiplier(wounds: readonly Wound[]): number {
   return mult;
 }
 
+function gatherEquippedLegendaryIds(equipment: HeroEquipment): readonly LegendaryId[] {
+  const out: LegendaryId[] = [];
+  for (const slot of ['weapon', 'shield', 'outfit', 'hat'] as const) {
+    const item = equipment[slot];
+    if (item?.legendaryId !== undefined) out.push(item.legendaryId);
+  }
+  return out;
+}
+
 function scaleEnemyStats(enemyId: EnemyId, scale: ScaleFactors): Stats {
   const base = ENEMIES[enemyId].baseStats;
   return {
@@ -81,6 +90,7 @@ export function buildCombatState(
         abilities,
         aiPriority,
         pickedPerks: hero.pickedPerks,
+        equippedLegendaryIds: gatherEquippedLegendaryIds(hero.equipment),
         ...(damageTakenMultiplier !== 1 ? { damageTakenMultiplier } : {}),
         ...rareFields,
       }),

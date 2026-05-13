@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+﻿import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PERKS } from '@data/perks';
 import type { PerkDef } from '@data/types';
 import { createRng } from '@util/rng';
@@ -411,7 +411,7 @@ describe('onKill triggered perks', () => {
       applyPerkAction({
         self: knight,
         other: dummy,
-        perkId: 'iron_will',
+        sourceId: 'iron_will',
         action,
         events: [],
       });
@@ -485,7 +485,7 @@ describe('firstAttack triggered perks', () => {
     // Confirm the tracker was set on the final-state knight.
     const finalKnight = result.finalState.combatants.find((c) => c.id === 'p0');
     expect(finalKnight).toBeDefined();
-    expect(finalKnight!.firstAttackFiredPerkIds).toContain('iron_will');
+    expect(finalKnight!.firstAttackFiredSourceIds).toContain('iron_will');
     // And the pendingDamageMod was consumed (back to 1).
     expect(finalKnight!.pendingDamageMod ?? 1).toBe(1);
   });
@@ -573,7 +573,7 @@ describe('firstAttack triggered perks', () => {
     expect(firstHit.amount).toBe(secondHit.amount);
 
     const finalKnight = result.finalState.combatants.find((c) => c.id === 'p0');
-    expect(finalKnight!.firstAttackFiredPerkIds ?? []).toHaveLength(0);
+    expect(finalKnight!.firstAttackFiredSourceIds ?? []).toHaveLength(0);
   });
 });
 
@@ -972,7 +972,7 @@ describe('Killer Instinct (Hunter onCrit → +2 Attack self, 2 turns, stacking)'
       applyPerkAction({
         self: hunter,
         other: dummy,
-        perkId: 'killer_instinct',
+        sourceId: 'killer_instinct',
         action,
         events: [],
       });
@@ -1082,7 +1082,7 @@ describe('Rampage (Barbarian onKill → +2 Attack self, 3 turns, stacking)', () 
       applyPerkAction({
         self: barbarian,
         other: dummy,
-        perkId: 'rampage',
+        sourceId: 'rampage',
         action,
         events: [],
       });
@@ -1181,7 +1181,7 @@ describe('Spellweaver (Mage onKill → +2 Mind self, 3 turns, stacking)', () => 
       applyPerkAction({
         self: mage,
         other: dummy,
-        perkId: 'spellweaver',
+        sourceId: 'spellweaver',
         action,
         events: [],
       });
@@ -1277,7 +1277,7 @@ describe('Crusader (Paladin onKill → +2 Mind self, 3 turns, stacking)', () => 
       applyPerkAction({
         self: paladin,
         other: dummy,
-        perkId: 'crusader',
+        sourceId: 'crusader',
         action,
         events: [],
       });
@@ -1372,7 +1372,7 @@ describe('Pack Tactics (Hunter onKill → +1 Speed self, 2 turns, stacking)', ()
       applyPerkAction({
         self: hunter,
         other: dummy,
-        perkId: 'pack_tactics',
+        sourceId: 'pack_tactics',
         action,
         events: [],
       });
@@ -1682,7 +1682,7 @@ describe('First Strike (Archer firstAttack → damageMod 2.0)', () => {
     // The firstAttack tracker should record that first_strike fired.
     const finalArcher = result.finalState.combatants.find((c) => c.id === 'p0');
     expect(finalArcher).toBeDefined();
-    expect(finalArcher!.firstAttackFiredPerkIds).toContain('first_strike');
+    expect(finalArcher!.firstAttackFiredSourceIds).toContain('first_strike');
     // And pendingDamageMod should be back to 1 (consumed by the first hit;
     // proves it didn't leak through to the second hit).
     expect(finalArcher!.pendingDamageMod ?? 1).toBe(1);
@@ -1731,7 +1731,7 @@ describe('Backstab (Rogue firstAttack → damageMod 2.5)', () => {
     // The firstAttack tracker should record that backstab fired.
     const finalRogue = result.finalState.combatants.find((c) => c.id === 'p0');
     expect(finalRogue).toBeDefined();
-    expect(finalRogue!.firstAttackFiredPerkIds).toContain('backstab');
+    expect(finalRogue!.firstAttackFiredSourceIds).toContain('backstab');
     // And pendingDamageMod should be back to 1 (consumed by the first hit;
     // proves it didn't leak through to the second hit).
     expect(finalRogue!.pendingDamageMod ?? 1).toBe(1);
@@ -1876,3 +1876,214 @@ describe('Aegis (Paladin whenBelowHp 0.4 → +3 Defense)', () => {
     expect(getEffectiveStat(paladin, 'defense')).toBe(paladin.baseStats.defense);
   });
 });
+
+// === Legendary-item triggered effects ===
+// Smoke test that the hook system iterates `equippedLegendaryIds` alongside
+// `pickedPerks`. Uses Lich's Crown (onKill → +2 mind, dur 3, stacking): wires
+// the legendary on a hero whose `pickedPerks` is empty, forces a kill, and
+// asserts the per-legendary stack key appears on the combatant. The stack-key
+// shape is `perk_stack_${sourceId}_${i}` for any sourceId — perk or legendary.
+describe('Legendary equipped → triggered passive fires (smoke)', () => {
+  it("a hero with Lich's Crown equipped gets onKill stacks via equippedLegendaryIds", () => {
+    const knight = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 30, attack: 20, defense: 4, speed: 9, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 30,
+      currentHp: 30,
+      pickedPerks: [],
+      equippedLegendaryIds: ['lichs_crown'],
+    });
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 1, attack: 1, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 1,
+      currentHp: 1,
+    });
+    const state = makeTestState([knight], [enemy]);
+    const result = resolveCombat(state, createRng(1));
+
+    // Sanity: the knight landed a lethal hit.
+    const knightLethalHits = result.events.filter(
+      (e) => e.kind === 'damage_applied' && e.sourceId === 'p0' && e.lethal,
+    );
+    expect(knightLethalHits.length).toBeGreaterThan(0);
+
+    // Verify a perk_stack_lichs_crown_* status was produced (live or expired).
+    const finalKnight = result.finalState.combatants.find((c) => c.id === 'p0');
+    expect(finalKnight).toBeDefined();
+    const liveStackKeys = Object.keys(finalKnight!.statuses).filter((k) =>
+      k.startsWith('perk_stack_lichs_crown_'),
+    );
+    const stackExpiredEvents = result.events.filter(
+      (e) =>
+        e.kind === 'status_expired' &&
+        typeof e.statusId === 'string' &&
+        e.statusId.startsWith('perk_stack_lichs_crown_'),
+    );
+    expect(liveStackKeys.length + stackExpiredEvents.length).toBeGreaterThan(0);
+  });
+});
+
+// === Per-legendary integration tests ===
+// Same pattern as the Lich's Crown smoke test above: wire a real legendary id
+// via `equippedLegendaryIds` on a hero whose `pickedPerks` is empty, drive the
+// trigger via resolveCombat (or recomputeBelowHpAuras for whenBelowHp), and
+// assert the legendary's specific action payload landed. No monkey-patching —
+// the LEGENDARY_DEFS entries themselves are under test.
+
+describe('Phylactery (onStruck → rotting on attacker)', () => {
+  it('applies rotting status to the attacker when the bearer is hit', () => {
+    // Hero defender with phylactery equipped. Enemy attacks; the legendary's
+    // onStruck should apply 'rotting' (poison-kind AbilityEffect, damagePerTurn=3,
+    // duration=2) to the attacker. Restrict the priest's abilities to priest_strike
+    // so no priest ability contaminates the assertion (priest_strike is damage-only).
+    const priest = makeHeroCombatant('priest', 1, 'p0', {
+      baseStats: { hp: 60, attack: 2, defense: 2, speed: 2, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 60,
+      currentHp: 60,
+      pickedPerks: [],
+      equippedLegendaryIds: ['phylactery'],
+      abilities: ['priest_strike'],
+      aiPriority: ['priest_strike'],
+    });
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 9999, attack: 6, defense: 2, speed: 5, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 9999,
+      currentHp: 9999,
+    });
+    const state = makeTestState([priest], [enemy]);
+    const result = resolveCombat(state, createRng(1));
+
+    // Sanity: the priest took at least one hit.
+    const hitsOnPriest = result.events.filter(
+      (e) => e.kind === 'damage_applied' && e.targetId === 'p0',
+    );
+    expect(hitsOnPriest.length).toBeGreaterThan(0);
+
+    // status_applied event for 'rotting' targeting the enemy, sourced from p0
+    // (the perk-bearer is `self`; legendary onStruck targets `other` = attacker).
+    const rottingEvents = result.events.filter(
+      (e) =>
+        e.kind === 'status_applied' &&
+        e.statusId === 'rotting' &&
+        e.sourceId === 'p0' &&
+        e.targetId === 'e0',
+    );
+    expect(rottingEvents.length).toBeGreaterThan(0);
+
+    // The enemy should bear 'rotting' on the final state (poison kind, damagePerTurn=3).
+    // Accept either a live status OR a status_expired event proving one was created
+    // (duration=2 may have ticked away in a long combat).
+    const finalEnemy = result.finalState.combatants.find((c) => c.id === 'e0');
+    expect(finalEnemy).toBeDefined();
+    const rotting = finalEnemy!.statuses['rotting'];
+    const expiredEvents = result.events.filter(
+      (e) =>
+        e.kind === 'status_expired' &&
+        typeof e.statusId === 'string' &&
+        e.statusId === 'rotting',
+    );
+    expect((rotting ? 1 : 0) + expiredEvents.length).toBeGreaterThan(0);
+
+    if (rotting) {
+      expect(rotting.effect.kind).toBe('poison');
+      if (rotting.effect.kind === 'poison') {
+        expect(rotting.effect.damagePerTurn).toBe(3);
+        expect(rotting.effect.duration).toBe(2);
+      }
+    }
+  });
+});
+
+describe('Tidewalker Helm (whenBelowHp 0.5 → +4 Defense)', () => {
+  it('applies +4 defense aura via equippedLegendaryIds when HP drops below 50%, removes when healed above', () => {
+    // Hero with tidewalker_helm equipped (no perks), full HP. Drive HP across
+    // the 0.5 threshold via direct mutation + recomputeBelowHpAuras — same
+    // pattern as the real-perk whenBelowHp tests above. The aura key uses the
+    // legendary id: `perk_aura_tidewalker_helm`.
+    const knight = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 100, attack: 4, defense: 4, speed: 3, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 100,
+      currentHp: 100,
+      pickedPerks: [],
+      equippedLegendaryIds: ['tidewalker_helm'],
+    });
+    const events: CombatEvent[] = [];
+
+    // Above threshold: aura inactive, defense at base.
+    recomputeBelowHpAuras(knight, events);
+    expect(knight.statuses['perk_aura_tidewalker_helm']).toBeUndefined();
+    expect(getEffectiveStat(knight, 'defense')).toBe(knight.baseStats.defense);
+
+    // Below threshold (40%): aura active, defense +4.
+    knight.currentHp = 40;
+    recomputeBelowHpAuras(knight, events);
+    expect(knight.statuses['perk_aura_tidewalker_helm']).toBeDefined();
+    expect(getEffectiveStat(knight, 'defense')).toBe(knight.baseStats.defense + 4);
+
+    // Heal above threshold (60%): aura removed, defense back to base.
+    knight.currentHp = 60;
+    recomputeBelowHpAuras(knight, events);
+    expect(knight.statuses['perk_aura_tidewalker_helm']).toBeUndefined();
+    expect(getEffectiveStat(knight, 'defense')).toBe(knight.baseStats.defense);
+  });
+});
+
+describe("King's Aegis (onStruck → drowning on attacker)", () => {
+  it('applies drowning status to the attacker when the bearer is hit', () => {
+    // Same pattern as Phylactery: hero with kings_aegis equipped (no perks);
+    // enemy attacks; the legendary's onStruck should apply 'drowning'
+    // (poison-kind, damagePerTurn=3, duration=3) to the attacker.
+    const priest = makeHeroCombatant('priest', 1, 'p0', {
+      baseStats: { hp: 60, attack: 2, defense: 2, speed: 2, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 60,
+      currentHp: 60,
+      pickedPerks: [],
+      equippedLegendaryIds: ['kings_aegis'],
+      abilities: ['priest_strike'],
+      aiPriority: ['priest_strike'],
+    });
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 9999, attack: 6, defense: 2, speed: 5, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 9999,
+      currentHp: 9999,
+    });
+    const state = makeTestState([priest], [enemy]);
+    const result = resolveCombat(state, createRng(1));
+
+    // Sanity: the priest took at least one hit.
+    const hitsOnPriest = result.events.filter(
+      (e) => e.kind === 'damage_applied' && e.targetId === 'p0',
+    );
+    expect(hitsOnPriest.length).toBeGreaterThan(0);
+
+    // status_applied event for 'drowning' targeting the enemy, sourced from p0.
+    const drowningEvents = result.events.filter(
+      (e) =>
+        e.kind === 'status_applied' &&
+        e.statusId === 'drowning' &&
+        e.sourceId === 'p0' &&
+        e.targetId === 'e0',
+    );
+    expect(drowningEvents.length).toBeGreaterThan(0);
+
+    // The enemy should bear 'drowning' on the final state (poison kind, damagePerTurn=3).
+    const finalEnemy = result.finalState.combatants.find((c) => c.id === 'e0');
+    expect(finalEnemy).toBeDefined();
+    const drowning = finalEnemy!.statuses['drowning'];
+    const expiredEvents = result.events.filter(
+      (e) =>
+        e.kind === 'status_expired' &&
+        typeof e.statusId === 'string' &&
+        e.statusId === 'drowning',
+    );
+    expect((drowning ? 1 : 0) + expiredEvents.length).toBeGreaterThan(0);
+
+    if (drowning) {
+      expect(drowning.effect.kind).toBe('poison');
+      if (drowning.effect.kind === 'poison') {
+        expect(drowning.effect.damagePerTurn).toBe(3);
+        expect(drowning.effect.duration).toBe(3);
+      }
+    }
+  });
+});
+

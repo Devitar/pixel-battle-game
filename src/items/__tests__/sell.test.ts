@@ -57,6 +57,16 @@ describe('itemSellValue — Epic tier', () => {
   });
 });
 
+describe('itemSellValue — Legendary tier', () => {
+  it('returns 500 for a legendary item', () => {
+    const item: Item = {
+      id: 't0', baseId: 'hat_hood', slot: 'hat', rarity: 'legendary',
+      affixes: [], floorRolledAt: 10, legendaryId: 'lichs_crown',
+    };
+    expect(itemSellValue(item)).toBe(500);
+  });
+});
+
 describe('applyItemSell', () => {
   it('removes the item from stash and credits the vault by its sell value', () => {
     const item = makeItem('w', 'uncommon');

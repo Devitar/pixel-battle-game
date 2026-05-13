@@ -48,6 +48,7 @@ function makeSaveFile(opts: {
       classes: ['knight'],
       dungeons: ['crypt'],
       buildings: opts.trainingUnlocked ? ['training_grounds'] : [],
+      legendaryEnabled: false,
     },
     buildingLevels: {
       tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1,

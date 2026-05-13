@@ -29,24 +29,7 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 ## Cluster D — Tier 3 content
 
-Tier 3 scope from gdd §10. The Sunken Keep cascade is fully shipped: Sunken Keep dungeon (Cluster D · 1, 2026-05-06), Paladin class (Cluster D · 3, 2026-05-06), Hunter class (Cluster D · 4, 2026-05-10), Chapel building (Cluster D · 5, 2026-05-11), Training Grounds building (Cluster D · 6, 2026-05-11), MAX_LEVEL bump + L10 perk tier (Cluster D · 7, 2026-05-12), Epic gear tier (Cluster D · 8, 2026-05-12). The remaining "legendary gear + L10 milestone" surface is broken down into entries 9-10 below. Future Tier 3 surface not yet scoped: dungeons 3-4 (Warren, Abyss), NG+ / Infinity mode, milestone achievements ("25 crits"), trait removal.
-
-### 9 · Legendary tier + L10 milestone + named boss drops
-
-- **What:** Add `'legendary'` rarity as the 5th tier. Author 4 hand-crafted named legendary items (2 per existing boss: Bone Lich, Drowned King) with fixed stats + a unique passive each. Wire a new milestone `first_hero_l10` that fires at the XP-grant site when any hero crosses L10; the milestone hard-gates legendary drops (pre-milestone, bosses drop a regular next-floor rarity-table roll; post-milestone, bosses drop one of their 2 named legendaries at random).
-- **Why:** Marquee endgame reward; closes the gdd §9 "first hero reaches L10" milestone. Named legendaries are build-defining items that justify L10 leveling as a destination, not a treadmill.
-- **Tier:** 3.
-- **Acceptance:**
-  - Depends on entries 7 (MAX_LEVEL=10) and 8 (Epic tier). Both must ship before this.
-  - `Rarity` union includes `'legendary'`; `Item` shape extends with `legendaryId?: LegendaryId` and `legendaryPassive?: LegendaryPassiveId` (optional fields). Named items carry `legendaryId`; rarity = `'legendary'`; `affixes: []`; stats and passive looked up from a `LEGENDARY_DEFS` registry.
-  - New `MilestoneId 'first_hero_l10'` registered in `src/run/milestones.ts`. Detection fires from the XP-grant code path in `run_state.ts` (both combat and surprise-combat paths) when any party hero crosses from <10 to ≥10. `SaveFile.unlocks.legendaryEnabled: boolean` flag (or `unlocks.rarities` array — pick during brainstorm).
-  - 4 named legendaries authored: 2 themed to Bone Lich (Crypt), 2 themed to Drowned King (Sunken Keep). Each has slot, weaponType (if weapon), bespoke or reused sprite, fixed stats, and a unique passive that reuses entry 7's trigger/action palette.
-  - Boss-drop substitution: at boss-loot resolution, if `unlocks.legendaryEnabled === true` AND the encounter is the dungeon's final boss, replace the loot roll with a random pick from `BOSS_LEGENDARIES[bossId]`. Otherwise normal loot table.
-  - Random legendaries in non-boss content stay suppressed in this entry (entry 10 implements them).
-  - UI rarity color (suggested: orange/gold); tooltip shows the named title + passive description.
-  - Save migration: `unlocks.legendaryEnabled = false` added with default; idempotent.
-- **Touches:** `src/data/types.ts`, `src/data/legendaries.ts` (new — registry + LegendaryPassiveDef table), `src/dungeon/loot.ts` (boss substitution), `src/run/milestones.ts`, `src/run/run_state.ts`, `src/save/save.ts` + migration, `src/combat/perk_hooks.ts` (legendary passives reuse the same hook system as L10 perks), tests.
-- **Source:** Brainstorm 2026-05-12. Should brainstorm again before writing the plan — passive design for 4 named items + naming + flavor text deserves its own creative session.
+Tier 3 scope from gdd §10. The Sunken Keep cascade is fully shipped: Sunken Keep dungeon (Cluster D · 1, 2026-05-06), Paladin class (Cluster D · 3, 2026-05-06), Hunter class (Cluster D · 4, 2026-05-10), Chapel building (Cluster D · 5, 2026-05-11), Training Grounds building (Cluster D · 6, 2026-05-11), MAX_LEVEL bump + L10 perk tier (Cluster D · 7, 2026-05-12), Epic gear tier (Cluster D · 8, 2026-05-12), Legendary tier + L10 milestone + named boss drops (Cluster D · 9, 2026-05-12). The remaining "legendary gear" surface is entry 10 below (random legendaries from non-boss content). Future Tier 3 surface not yet scoped: dungeons 3-4 (Warren, Abyss), NG+ / Infinity mode, milestone achievements ("25 crits"), trait removal.
 
 ### 10 · Random legendaries + curated unique-passive pool
 

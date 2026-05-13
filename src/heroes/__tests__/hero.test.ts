@@ -208,6 +208,96 @@ describe('multi-trait Hero shape', () => {
   });
 });
 
+describe('computeMaxHp — legendary hpBonus via gearTotal', () => {
+  it('Phylactery adds +15 HP via gearTotal', () => {
+    const hero = createHero('knight', 'Bran', 'h1', 'quick', 'body1');
+    const baseMaxHp = hero.maxHp;
+    const equipped: Hero = {
+      ...hero,
+      equipment: {
+        ...hero.equipment,
+        outfit: {
+          id: 'o0', baseId: 'outfit_cloth', slot: 'outfit', rarity: 'legendary',
+          affixes: [], floorRolledAt: 10, legendaryId: 'phylactery',
+        },
+      },
+    };
+    const newHero = recomputeMaxHp(equipped);
+    expect(newHero.maxHp).toBe(baseMaxHp + 15);
+  });
+
+  it('Tidewalker Helm adds +5 HP', () => {
+    const hero = createHero('knight', 'Bran', 'h1', 'quick', 'body1');
+    const baseMaxHp = hero.maxHp;
+    const equipped: Hero = {
+      ...hero,
+      equipment: {
+        ...hero.equipment,
+        hat: {
+          id: 'h0', baseId: 'hat_cap', slot: 'hat', rarity: 'legendary',
+          affixes: [], floorRolledAt: 10, legendaryId: 'tidewalker_helm',
+        },
+      },
+    };
+    const newHero = recomputeMaxHp(equipped);
+    expect(newHero.maxHp).toBe(baseMaxHp + 5);
+  });
+
+  it("King's Aegis adds +10 HP", () => {
+    const hero = createHero('knight', 'Bran', 'h1', 'quick', 'body1');
+    const baseMaxHp = hero.maxHp;
+    const equipped: Hero = {
+      ...hero,
+      equipment: {
+        ...hero.equipment,
+        shield: {
+          id: 's0', baseId: 'shield_basic', slot: 'shield', rarity: 'legendary',
+          affixes: [], floorRolledAt: 10, legendaryId: 'kings_aegis',
+        },
+      },
+    };
+    const newHero = recomputeMaxHp(equipped);
+    expect(newHero.maxHp).toBe(baseMaxHp + 10);
+  });
+
+  it("Lich's Crown adds 0 HP (no hpBonus)", () => {
+    const hero = createHero('knight', 'Bran', 'h1', 'quick', 'body1');
+    const baseMaxHp = hero.maxHp;
+    const equipped: Hero = {
+      ...hero,
+      equipment: {
+        ...hero.equipment,
+        hat: {
+          id: 'h0', baseId: 'hat_hood', slot: 'hat', rarity: 'legendary',
+          affixes: [], floorRolledAt: 10, legendaryId: 'lichs_crown',
+        },
+      },
+    };
+    const newHero = recomputeMaxHp(equipped);
+    expect(newHero.maxHp).toBe(baseMaxHp);
+  });
+
+  it('legendary skips base-stats HP and of_vigor affixes (no double-dipping)', () => {
+    const hero = createHero('knight', 'Bran', 'h1', 'quick', 'body1');
+    const baseMaxHp = hero.maxHp;
+    // outfit_cloth has +6 HP base stats — would normally add. Phylactery's
+    // hpBonus is +15. Verify we only see +15, not 6+15 or 6 alone.
+    const equipped: Hero = {
+      ...hero,
+      equipment: {
+        ...hero.equipment,
+        outfit: {
+          id: 'o0', baseId: 'outfit_cloth', slot: 'outfit', rarity: 'legendary',
+          affixes: [{ affixId: 'of_vigor', value: 99 }], // should be ignored
+          floorRolledAt: 10, legendaryId: 'phylactery',
+        },
+      },
+    };
+    const newHero = recomputeMaxHp(equipped);
+    expect(newHero.maxHp).toBe(baseMaxHp + 15);
+  });
+});
+
 describe('createHero — Hunter petSpeciesId', () => {
   it('stores petSpeciesId on Hunter heroes when provided', () => {
     const hero = createHero(

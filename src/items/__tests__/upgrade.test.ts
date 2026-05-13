@@ -100,6 +100,15 @@ describe('nextRarity — Epic tier', () => {
   });
 });
 
+describe('nextRarity — Legendary tier (cap)', () => {
+  it('epic still does not upgrade (Blacksmith caps at epic)', () => {
+    expect(nextRarity('epic')).toBeNull();
+  });
+  it('legendary does not upgrade (it is also a cap)', () => {
+    expect(nextRarity('legendary')).toBeNull();
+  });
+});
+
 describe('canUpgrade', () => {
   it('returns true for common, uncommon, and rare; false for epic', () => {
     expect(canUpgrade(commonSwordAtFloor(5))).toBe(true);

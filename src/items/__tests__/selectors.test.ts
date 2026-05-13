@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Item } from '@data/types';
 import type { Pack } from '@run/pack';
-import { filterPackBySlot, itemAffixDescription, itemDisplayName } from '../selectors';
+import { filterPackBySlot, itemAffixDescription, itemDisplayName, itemFlavor } from '../selectors';
 
 const sword = (id: string, overrides: Partial<Item> = {}): Item => ({
   id, baseId: 'sword_basic', slot: 'weapon', rarity: 'common',
@@ -42,6 +42,28 @@ describe('itemDisplayName', () => {
       rareProperty: { propertyId: 'of_burning', value: 2 },
     });
     expect(itemDisplayName(item)).toBe('Sword of Burning');
+  });
+
+  it('legendary item: returns the LegendaryDef name (not the baseId name)', () => {
+    const item: Item = {
+      id: 'i', baseId: 'hat_hood', slot: 'hat', rarity: 'legendary',
+      affixes: [], floorRolledAt: 10, legendaryId: 'lichs_crown',
+    };
+    expect(itemDisplayName(item)).toBe("Lich's Crown");
+  });
+});
+
+describe('itemFlavor', () => {
+  it('returns the LegendaryDef.flavor for legendary items', () => {
+    const item: Item = {
+      id: 'i', baseId: 'hat_hood', slot: 'hat', rarity: 'legendary',
+      affixes: [], floorRolledAt: 10, legendaryId: 'lichs_crown',
+    };
+    expect(itemFlavor(item)).toContain('vertebrae');
+  });
+
+  it('returns undefined for non-legendary items', () => {
+    expect(itemFlavor(sword('a'))).toBeUndefined();
   });
 });
 

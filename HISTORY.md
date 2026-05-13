@@ -29,6 +29,33 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-12 · Legendary tier + L10 milestone + named boss drops (closes Cluster D · 9)
+
+- **Why:** Marquee endgame reward, closing the gdd §9 "first hero reaches L10" milestone. Spec 3 of the 4-spec legendary cascade (Specs 1 + 2 shipped earlier same day). Named legendaries make L10 leveling a destination instead of a treadmill, and the L10 milestone is the gate that turns the cascade on.
+- **Decisions:**
+  - **5 tiers locked in.** `Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'`. UI rarity color orange `#ff8800`. `Item.legendaryId?: LegendaryId` is the discriminator for named items — when set: `affixes: []`, `rarity: 'legendary'`, stats/passive/name/flavor looked up from `LEGENDARY_DEFS[id]`.
+  - **Hard L10 gate via `unlocks.legendaryEnabled`.** Pre-milestone: bosses drop normal next-floor rarity-table loot. Post-milestone: every final-boss kill produces a guaranteed named legendary (1 of 2 per boss, random pick, duplicates allowed). Detection at the XP-grant sites in `completeCombat` + `completeSurpriseCombat`; idempotent handler flips the unlocks flag.
+  - **`LegendaryDef.stats` typed `Partial<Record<Exclude<BuffableStat, 'hp'>, number>>`.** Mid-review type tightening — makes the HP-via-stats vs HP-via-hpBonus divergence unrepresentable. `hpBonus?` is the only HP path.
+  - **Hook system unified.** `applyPerkAction`'s `perkId` parameter widened to `sourceId: PerkId | LegendaryId`. New `gatherTriggeredEffects(combatant)` iterator yields BOTH `pickedPerks`- and `equippedLegendaryIds`-derived triggered effects. Used at every fire site (firePerkTrigger / fireOnStruckNonMitigation / recomputeBelowHpAuras / inline damageMitigation in applyDamage / firstAttack loop in combat.ts). Stack-key prefixes work identically across both source types (both string-literal unions).
+  - **`firstAttackFiredPerkIds` renamed to `firstAttackFiredSourceIds`** (typed `readonly string[]`). Future-proofing for Spec 4 random legendaries that may use firstAttack triggers. None of the 4 named legendaries in this spec use it.
+  - **Legendary is the upgrade cap; no Blacksmith path.** `NEXT_RARITY.epic` stays `null` (unchanged from Spec 2). `BLACKSMITH_UPGRADE_COST` exclude widens to `'common' | 'legendary'` — TypeScript rejects any future attempt to add a legendary upgrade cost. Legendaries are boss-drop-only.
+  - **The 4 named legendaries** (slot variety: 2 hats, 1 outfit, 1 shield — all universal-equipable):
+    - *Lich's Crown* (hat, Bone Lich) — +5 Mind, +5 Crit; onKill → +2 Mind, 3 turns, stacking.
+    - *Phylactery* (outfit, Bone Lich) — +15 HP, +2 Def; onStruck → rotting on attacker (3 dmg/turn, 2 turns).
+    - *Tidewalker Helm* (hat, Drowned King) — +5 HP, +3 Def; whenBelowHp 0.5 → +4 Def aura.
+    - *King's Aegis* (shield, Drowned King) — +10 HP, +3 Def; onStruck → drowning on attacker (3 dmg/turn, 3 turns).
+  - **Sell value `SELL_VALUE.legendary = 500`** continues the geometric curve (10/30/80/200/500). Duplicates from farming get vault gold.
+  - **`'drowning'` already in the `StatusId` union** — single-line addition to `synthesizeStatusEffect` (mapped to poison-kind, grouped with rotting/burning/poisoned).
+  - **L10 milestone takes effect at run END**, not mid-run. Consistent with existing milestone patterns (`first_crypt_clear`, `first_sunken_keep_clear` also drain at cashout/wipe). For boss drops specifically: a hero crossing L10 *on the boss kill itself* won't see that same kill substitute to a legendary — the next dungeon run's boss kill is the first to substitute. Frames the unlock as "earn it first, rewards flow on subsequent kills."
+- **Surprises:**
+  - **Task 5 bossId bug, caught by Task 9.** Initial implementation extracted `bossId` from `encounter.enemies[0]` — but `composeBossEncounter` places the boss at slot 3 alongside two frontliner minions in slots 1-2. So `enemies[0]` was a minion, and the legendary substitution would have silently never fired in production. The unit test of `rollLoot` accepted `bossId` as an argument so it never validated the production call site. Fixed during Task 9 to read `DUNGEONS[runState.dungeonId].bossId` (the dungeon definition knows its boss directly). Process lesson worth remembering: unit tests of helpers that accept a constructed value don't validate the construction logic — test the bridge with an end-to-end integration test.
+  - **`completeCombat` signature drift.** The plan's Task 3 sketch read `state.unlocks` — but `completeCombat`/`completeSurpriseCombat` take `RunState`, not `SaveFile`. Resolved with an OPTIONAL `unlocks?: Unlocks` parameter (sentinel default `legendaryEnabled: false`). Real callers (scenes) pass `appState.get().unlocks`; tests get the default. Safe because the handler is idempotent.
+  - **`normalizeSaveFile` shim alongside the v6→v7 migration.** Several `save.test.ts` fixtures construct raw saves with `version: CURRENT_SCHEMA_VERSION` and bypass `migrate()`. The defensive normalizer ensures `unlocks.legendaryEnabled` is always backfilled on load even for those paths. Belt-and-braces with the migration; pattern matches the earlier traitId / pendingPerks shims.
+  - **Forced widening surface larger than planned.** Beyond the spec's listed consumers, `RARITY_LABEL` + 2× `rarityOrder` records in `blacksmith_panel_scene.ts`, `RARITY_HEX` in `corridor_scene.ts`, `BASE_PRICE_BY_RARITY` in `dungeon/shop.ts`, and `RARITY_ORDER` in `equip_scene.ts` all surfaced via tsc. All extended with sensible placeholder values; shop epic/legendary prices (500/1500) flagged as a follow-up tuning item per spec scope.
+- **Source:** Brainstorm + spec + plan + 9-task subagent-driven execution, all 2026-05-12. Spec: `docs/superpowers/specs/2026-05-12-legendary-tier-named-boss-drops-design.md`. Plan: `docs/superpowers/plans/2026-05-12-legendary-tier-named-boss-drops.md`. Final test count: 2179 (was 2152 at start of this spec; +27 net). Schema bumped to v7 with v6→v7 migration backfilling `unlocks.legendaryEnabled = false`.
+
+---
+
 ### 2026-05-12 · Epic gear tier (rarity 4 of 5) (closes Cluster D · 8)
 
 - **Why:** Realises the 5-tier rarity curve promised by gdd §7. Sister Spec 2 of 4 in the legendary cascade (Spec 1 — MAX_LEVEL+L10 perks — shipped same day). Independent of Spec 1; needed before Spec 3 (Legendary + L10 milestone) can land into a clean Epic substrate.

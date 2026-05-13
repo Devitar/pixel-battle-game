@@ -1,11 +1,15 @@
 import { ABILITIES } from '@data/abilities';
-import { PERKS } from '@data/perks';
 import type { Ability, AbilityEffect } from '@data/types';
 import { HEAVY_HIT_WOUND_THRESHOLD, WOUND_CHANCE_PERCENT, WOUND_IDS } from '@data/wounds';
 import type { Rng } from '@util/rng';
 import { pickAbility } from './ability_priority';
 import { setCooldown } from './cooldowns';
-import { fireOnStruckNonMitigation, firePerkTrigger, recomputeBelowHpAuras } from './perk_hooks';
+import {
+  fireOnStruckNonMitigation,
+  firePerkTrigger,
+  gatherTriggeredEffects,
+  recomputeBelowHpAuras,
+} from './perk_hooks';
 import { collapseAfterDeath, moveTo, pull, shove, swap } from './positions';
 import { getEffectiveStat } from './statuses';
 import type { Combatant, CombatantId, CombatEvent, CombatState, StatusInstance } from './types';
@@ -70,12 +74,10 @@ function applyDamage(
   if (!target.isDead) {
     const wasFullHp = target.currentHp >= target.maxHp;
     // Pass 1: collect & apply damageMitigation multipliers from matching
-    // onStruck perks. Multiple multipliers stack multiplicatively. The
-    // existing 1-damage floor is preserved.
-    for (const perkId of target.pickedPerks) {
-      const perk = PERKS[perkId];
-      const t = perk?.triggeredEffect;
-      if (!t || t.trigger.kind !== 'onStruck') continue;
+    // onStruck triggered effects (perks + equipped legendaries). Multiple
+    // multipliers stack multiplicatively. The existing 1-damage floor is preserved.
+    for (const { effect: t } of gatherTriggeredEffects(target)) {
+      if (t.trigger.kind !== 'onStruck') continue;
       if (t.trigger.whenAtFullHp && !wasFullHp) continue;
       if (t.action.kind === 'damageMitigation') {
         mitigated = Math.max(1, Math.round(mitigated * t.action.multiplier));

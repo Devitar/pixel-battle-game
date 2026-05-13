@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { applyPendingMilestones, detectBossMilestones, MILESTONES } from '../milestones';
+import { applyPendingMilestones, detectBossMilestones, detectXpMilestones, MILESTONES } from '../milestones';
 import type { SaveFile } from '@save/save';
+import type { Hero } from '@heroes/hero';
 import type { Unlocks } from '@data/types';
 
-function makeFakeSave(unlocks: Unlocks): SaveFile {
-  return { unlocks } as unknown as SaveFile;
+function makeFakeSave(unlocks: Omit<Unlocks, 'legendaryEnabled'> & Partial<Pick<Unlocks, 'legendaryEnabled'>>): SaveFile {
+  const fullUnlocks: Unlocks = {
+    ...unlocks,
+    legendaryEnabled: unlocks.legendaryEnabled ?? false,
+  };
+  return { unlocks: fullUnlocks } as unknown as SaveFile;
 }
 
 describe('milestones — registry', () => {
@@ -14,7 +19,7 @@ describe('milestones — registry', () => {
   });
 
   it('has only the registered milestone ids', () => {
-    expect(Object.keys(MILESTONES).sort()).toEqual(['first_crypt_clear', 'first_sunken_keep_clear']);
+    expect(Object.keys(MILESTONES).sort()).toEqual(['first_crypt_clear', 'first_hero_l10', 'first_sunken_keep_clear']);
   });
 });
 
@@ -202,5 +207,104 @@ describe('applyPendingMilestones — first_sunken_keep_clear', () => {
     });
     const after = applyPendingMilestones(before, ['first_sunken_keep_clear']);
     expect(after.unlocks.classes).toContain('hunter');
+  });
+});
+
+function makeHero(level: number): Hero {
+  return {
+    id: 'h0',
+    classId: 'knight',
+    name: 'Test',
+    baseStats: { hp: 30, attack: 5, defense: 2, speed: 5, mind: 1, crit: 5, dodge: 5 },
+    currentHp: 30,
+    maxHp: 30,
+    traitIds: ['quick'],
+    bodySpriteId: 'body1',
+    legsSpriteId: 'legs1',
+    feetSpriteId: 'feet1',
+    wounds: [],
+    equipment: {
+      weapon: {
+        id: 'w',
+        baseId: 'sword_basic',
+        slot: 'weapon',
+        rarity: 'common',
+        weaponType: 'sword',
+        affixes: [],
+        floorRolledAt: 1,
+      },
+    },
+    xp: 0,
+    level,
+    pendingPerks: [],
+    pickedPerks: [],
+  };
+}
+
+const NO_LEGENDARY: Unlocks = {
+  classes: [],
+  dungeons: [],
+  buildings: [],
+  legendaryEnabled: false,
+};
+
+describe('detectXpMilestones', () => {
+  it('returns first_hero_l10 when a hero crosses 9 → 10', () => {
+    const before = [makeHero(9)];
+    const after = [makeHero(10)];
+    expect(detectXpMilestones(before, after, NO_LEGENDARY)).toEqual(['first_hero_l10']);
+  });
+
+  it('returns [] when no hero crosses 10', () => {
+    const before = [makeHero(5)];
+    const after = [makeHero(6)];
+    expect(detectXpMilestones(before, after, NO_LEGENDARY)).toEqual([]);
+  });
+
+  it('returns [] when unlocks.legendaryEnabled is already true (idempotency)', () => {
+    const before = [makeHero(9)];
+    const after = [makeHero(10)];
+    const unlocked: Unlocks = { ...NO_LEGENDARY, legendaryEnabled: true };
+    expect(detectXpMilestones(before, after, unlocked)).toEqual([]);
+  });
+
+  it('returns first_hero_l10 even if only one of multiple heroes crossed', () => {
+    const before = [makeHero(5), makeHero(9), makeHero(7)];
+    const after = [makeHero(5), makeHero(10), makeHero(7)];
+    expect(detectXpMilestones(before, after, NO_LEGENDARY)).toEqual(['first_hero_l10']);
+  });
+
+  it('returns [] when hero was already at 10 before (no crossing)', () => {
+    const before = [makeHero(10)];
+    const after = [makeHero(10)];
+    expect(detectXpMilestones(before, after, NO_LEGENDARY)).toEqual([]);
+  });
+});
+
+describe('MILESTONES.first_hero_l10 handler', () => {
+  it('flips unlocks.legendaryEnabled from false to true', () => {
+    const before = makeFakeSave({
+      classes: ['knight'],
+      dungeons: ['crypt'],
+      buildings: [],
+      legendaryEnabled: false,
+    });
+    const after = MILESTONES.first_hero_l10(before);
+    expect(after.unlocks.legendaryEnabled).toBe(true);
+    // preserves other unlocks
+    expect(after.unlocks.classes).toEqual(['knight']);
+    expect(after.unlocks.dungeons).toEqual(['crypt']);
+    expect(after.unlocks.buildings).toEqual([]);
+  });
+
+  it('is idempotent (no-op if already true)', () => {
+    const before = makeFakeSave({
+      classes: ['knight'],
+      dungeons: ['crypt'],
+      buildings: [],
+      legendaryEnabled: true,
+    });
+    const after = MILESTONES.first_hero_l10(before);
+    expect(after).toBe(before);
   });
 });

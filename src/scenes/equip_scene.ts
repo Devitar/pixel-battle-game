@@ -6,7 +6,7 @@ import { ABILITIES } from '@data/abilities';
 import type { Hero } from '@heroes/hero';
 import { applyEquipmentStats } from '@items/stats';
 import { describeKitStatus, resolveCombatAbilities, resolveAbilityDiff } from '@items/kit';
-import { itemAffixDescription, itemDisplayName, previewStats, type StatPreview } from '@items/selectors';
+import { itemAffixDescription, itemDisplayName, itemFlavor, previewStats, type StatPreview } from '@items/selectors';
 import type { Stats } from '@combat/types';
 import { equipFromStash, unequipToStash } from '@items/equip_camp';
 import { equipFromPack, unequipToPack } from '@run/equip_run';
@@ -97,6 +97,7 @@ const RARITY_ORDER: Record<Rarity, number> = {
   uncommon: 1,
   rare: 2,
   epic: 3,
+  legendary: 4,
 };
 
 const SLOT_ORDER: Record<ItemSlot, number> = {
@@ -673,6 +674,20 @@ export class EquipScene extends Phaser.Scene {
             fontFamily: 'monospace',
             fontSize: '11px',
             color: '#aaaaaa',
+          })
+          .setOrigin(0.5),
+      );
+    }
+
+    const flavor = itemFlavor(item);
+    if (flavor !== undefined) {
+      container.add(
+        this.add
+          .text(cx, cy + 18, flavor, {
+            fontFamily: 'monospace',
+            fontSize: '10px',
+            color: '#bb8866',
+            fontStyle: 'italic',
           })
           .setOrigin(0.5),
       );

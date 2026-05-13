@@ -1,11 +1,14 @@
+import { LEGENDARY_DEFS } from '@data/legendaries';
 import { PERKS } from '@data/perks';
 import type {
   AbilityEffect,
   BuffableStat,
+  LegendaryId,
   PerkAction,
   PerkId,
   PerkTrigger,
   StatusId,
+  TriggeredEffect,
 } from '@data/types';
 import type { Combatant, CombatEvent } from './types';
 
@@ -31,7 +34,10 @@ const DEFAULT_POISON_DAMAGE_PER_TURN = 3;
 export interface ApplyPerkActionArgs {
   self: Combatant;
   other: Combatant | undefined;
-  perkId: PerkId;
+  /** The triggered-effect source: either a picked perk id or an equipped legendary id.
+   *  Both are string-literal types at compile time and behave identically at runtime
+   *  (used as the prefix for stack/aura status keys). */
+  sourceId: PerkId | LegendaryId;
   action: PerkAction;
   events: CombatEvent[];
 }
@@ -43,14 +49,14 @@ export interface ApplyPerkActionArgs {
  * via the compute* helpers below.
  */
 export function applyPerkAction(args: ApplyPerkActionArgs): void {
-  const { self, other, perkId, action, events } = args;
+  const { self, other, sourceId, action, events } = args;
   switch (action.kind) {
     case 'gainStat':
       if (action.duration !== undefined && action.stacking) {
-        addStack(self, perkId, action);
+        addStack(self, sourceId, action);
       } else if (action.duration !== undefined) {
         // Timed non-stacking: keep a single slot; subsequent triggers overwrite.
-        const key = `perk_stack_${perkId}_0`;
+        const key = `perk_stack_${sourceId}_0`;
         self.statuses[key] = {
           statusId: key as StatusId,
           remainingTurns: action.duration,
@@ -59,7 +65,7 @@ export function applyPerkAction(args: ApplyPerkActionArgs): void {
         };
       } else {
         // Untimed aura: applied/removed in lockstep with whenBelowHp transitions.
-        const key = `perk_aura_${perkId}`;
+        const key = `perk_aura_${sourceId}`;
         self.statuses[key] = {
           statusId: key as StatusId,
           remainingTurns: Number.POSITIVE_INFINITY,
@@ -96,11 +102,11 @@ export function applyPerkAction(args: ApplyPerkActionArgs): void {
 
 function addStack(
   self: Combatant,
-  perkId: PerkId,
+  sourceId: PerkId | LegendaryId,
   action: Extract<PerkAction, { kind: 'gainStat' }>,
 ): void {
   for (let i = 0; i < STACK_CAP; i++) {
-    const key = `perk_stack_${perkId}_${i}`;
+    const key = `perk_stack_${sourceId}_${i}`;
     if (!self.statuses[key]) {
       self.statuses[key] = {
         statusId: key as StatusId,
@@ -112,12 +118,16 @@ function addStack(
     }
   }
   // All STACK_CAP slots full: refresh existing stacks to full duration.
-  refreshAllStackDurations(self, perkId, action.duration!);
+  refreshAllStackDurations(self, sourceId, action.duration!);
 }
 
-function refreshAllStackDurations(self: Combatant, perkId: PerkId, duration: number): void {
+function refreshAllStackDurations(
+  self: Combatant,
+  sourceId: PerkId | LegendaryId,
+  duration: number,
+): void {
   for (let i = 0; i < STACK_CAP; i++) {
-    const key = `perk_stack_${perkId}_${i}`;
+    const key = `perk_stack_${sourceId}_${i}`;
     if (self.statuses[key]) {
       self.statuses[key].remainingTurns = duration;
     }
@@ -125,15 +135,36 @@ function refreshAllStackDurations(self: Combatant, perkId: PerkId, duration: num
 }
 
 /**
- * Remove the continuous-aura status associated with a perk, if present.
+ * Remove the continuous-aura status associated with a perk or legendary, if present.
  * Used by whenBelowHp recompute (Task 11) to drop the aura when the bearer
  * crosses back above the threshold.
  */
-export function clearPerkAura(self: Combatant, perkId: PerkId): void {
-  const key = `perk_aura_${perkId}`;
+export function clearPerkAura(self: Combatant, sourceId: PerkId | LegendaryId): void {
+  const key = `perk_aura_${sourceId}`;
   if (self.statuses[key]) {
     delete self.statuses[key];
   }
+}
+
+/**
+ * Collect all triggered effects for a combatant from both perk and legendary sources.
+ * Perks lookup via PERKS (skipping perks without a triggeredEffect); legendaries lookup
+ * via LEGENDARY_DEFS (all defs have a triggeredEffect by interface). Returned in
+ * iteration order: perks first, then legendaries. The returned `sourceId` is the
+ * stack-key prefix used by applyPerkAction.
+ */
+export function gatherTriggeredEffects(
+  combatant: Combatant,
+): readonly { sourceId: PerkId | LegendaryId; effect: TriggeredEffect }[] {
+  const out: { sourceId: PerkId | LegendaryId; effect: TriggeredEffect }[] = [];
+  for (const perkId of combatant.pickedPerks) {
+    const e = PERKS[perkId]?.triggeredEffect;
+    if (e) out.push({ sourceId: perkId, effect: e });
+  }
+  for (const legId of combatant.equippedLegendaryIds) {
+    out.push({ sourceId: legId, effect: LEGENDARY_DEFS[legId].triggeredEffect });
+  }
+  return out;
 }
 
 /**
@@ -157,18 +188,15 @@ export function recomputeBelowHpAuras(self: Combatant, events: CombatEvent[]): v
   if (self.isDead) return;
   if (self.maxHp <= 0) return;
   const hpRatio = self.currentHp / self.maxHp;
-  for (const perkId of self.pickedPerks) {
-    const perk = PERKS[perkId];
-    if (!perk) continue;
-    const t = perk.triggeredEffect;
-    if (!t || t.trigger.kind !== 'whenBelowHp') continue;
+  for (const { sourceId, effect: t } of gatherTriggeredEffects(self)) {
+    if (t.trigger.kind !== 'whenBelowHp') continue;
     const shouldBeActive = hpRatio < t.trigger.ratio;
-    const auraKey = `perk_aura_${perkId}`;
+    const auraKey = `perk_aura_${sourceId}`;
     const currentlyActive = self.statuses[auraKey] !== undefined;
     if (shouldBeActive && !currentlyActive) {
-      applyPerkAction({ self, other: undefined, perkId, action: t.action, events });
+      applyPerkAction({ self, other: undefined, sourceId, action: t.action, events });
     } else if (!shouldBeActive && currentlyActive) {
-      clearPerkAura(self, perkId);
+      clearPerkAura(self, sourceId);
     }
   }
 }
@@ -188,21 +216,18 @@ export interface FirePerkTriggerArgs {
 }
 
 /**
- * Iterate the perk-bearer's picked perks; for each whose triggeredEffect matches
- * the fired trigger kind, apply the bound PerkAction. `whenBelowHp` triggers are
- * not handled here — they're recomputed by a separate path on HP transitions.
+ * Iterate the bearer's triggered-effect sources (picked perks + equipped legendaries);
+ * for each whose triggeredEffect matches the fired trigger kind, apply the bound
+ * PerkAction. `whenBelowHp` triggers are not handled here — they're recomputed by a
+ * separate path on HP transitions.
  */
 export function firePerkTrigger(args: FirePerkTriggerArgs): void {
-  for (const perkId of args.self.pickedPerks) {
-    const perk = PERKS[perkId];
-    if (!perk) continue;
-    const t = perk.triggeredEffect;
-    if (!t) continue;
+  for (const { sourceId, effect: t } of gatherTriggeredEffects(args.self)) {
     if (!matchesTrigger(t.trigger, args)) continue;
     applyPerkAction({
       self: args.self,
       other: args.other,
-      perkId,
+      sourceId,
       action: t.action,
       events: args.events,
     });
@@ -230,14 +255,11 @@ export function fireOnStruckNonMitigation(
   wasFullHp: boolean,
   events: CombatEvent[],
 ): void {
-  for (const perkId of self.pickedPerks) {
-    const perk = PERKS[perkId];
-    if (!perk) continue;
-    const t = perk.triggeredEffect;
-    if (!t || t.trigger.kind !== 'onStruck') continue;
+  for (const { sourceId, effect: t } of gatherTriggeredEffects(self)) {
+    if (t.trigger.kind !== 'onStruck') continue;
     if (t.trigger.whenAtFullHp && !wasFullHp) continue;
     if (t.action.kind === 'damageMitigation') continue; // handled inline at the applyDamage call site
-    applyPerkAction({ self, other: attacker, perkId, action: t.action, events });
+    applyPerkAction({ self, other: attacker, sourceId, action: t.action, events });
   }
 }
 
@@ -291,6 +313,7 @@ function synthesizeStatusEffect(
     case 'poisoned':
     case 'burning':
     case 'rotting':
+    case 'drowning':
       return {
         kind: 'poison',
         damagePerTurn: payload?.damagePerTurn ?? DEFAULT_POISON_DAMAGE_PER_TURN,

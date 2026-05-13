@@ -1,5 +1,6 @@
 import { DUNGEONS } from '@data/dungeons';
-import type { DungeonId, MilestoneId } from '@data/types';
+import type { DungeonId, MilestoneId, Unlocks } from '@data/types';
+import type { Hero } from '@heroes/hero';
 import type { SaveFile } from '@save/save';
 
 export type MilestoneHandler = (state: SaveFile) => SaveFile;
@@ -7,6 +8,9 @@ export type MilestoneHandler = (state: SaveFile) => SaveFile;
 /**
  * Spec 2 introduced 'first_crypt_clear' (Sunken Keep dungeon unlock).
  * Spec 3 (Paladin) extended the handler to also unlock the Paladin class.
+ * Spec (Legendary) added 'first_hero_l10' — flips unlocks.legendaryEnabled
+ * the first time any hero reaches L10. Detection lives in detectXpMilestones
+ * (called from the two XP-grant sites in run_state).
  *
  * Handlers are responsible for their own idempotency.
  */
@@ -49,6 +53,13 @@ export const MILESTONES: Record<MilestoneId, MilestoneHandler> = {
     }
     return next;  // identity preserved when all branches no-op
   },
+  first_hero_l10: (state) => {
+    if (state.unlocks.legendaryEnabled) return state;
+    return {
+      ...state,
+      unlocks: { ...state.unlocks, legendaryEnabled: true },
+    };
+  },
 };
 
 /**
@@ -68,6 +79,28 @@ export function detectBossMilestones(
     return ['first_sunken_keep_clear'];
   }
   return [];
+}
+
+/**
+ * Returns ['first_hero_l10'] when any hero crossed level 10 (from < 10 to >= 10)
+ * in this XP-grant, and the milestone hasn't already fired. Otherwise [].
+ *
+ * The before/after arrays must be parallel (same hero ids at same indices) —
+ * the two XP-grant sites in run_state (completeCombat + completeSurpriseCombat)
+ * build `partyAfterXp` by mapping over `updatedPartyLiving` 1:1, so this
+ * invariant holds there.
+ */
+export function detectXpMilestones(
+  partyBefore: readonly Hero[],
+  partyAfter: readonly Hero[],
+  unlocks: Unlocks,
+): readonly MilestoneId[] {
+  if (unlocks.legendaryEnabled) return [];
+  const crossed = partyAfter.some((hAfter, i) => {
+    const hBefore = partyBefore[i];
+    return hBefore !== undefined && hAfter.level >= 10 && hBefore.level < 10;
+  });
+  return crossed ? ['first_hero_l10'] : [];
 }
 
 /**

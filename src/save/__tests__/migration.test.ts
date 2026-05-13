@@ -304,7 +304,7 @@ describe('v5 → v6 migration (hero perk shape: singular → plural)', () => {
       ],
     };
     const out = migrate(v5) as unknown as Record<string, unknown>;
-    expect(out.version).toBe(6);
+    expect(out.version).toBe(CURRENT_SCHEMA_VERSION);
     const heroes = (out.roster as { heroes: Array<Record<string, unknown>> }).heroes;
     expect(heroes[0].pendingPerks).toEqual(['l5']);
     expect(heroes[0].pickedPerks).toEqual(['iron_will']);
@@ -345,8 +345,45 @@ describe('v5 → v6 migration (hero perk shape: singular → plural)', () => {
       roster: { heroes: [{ id: 'h1', pendingPerks: ['l5'], pickedPerks: [] }] },
     };
     const out = migrate(v6) as unknown as Record<string, unknown>;
-    expect(out.version).toBe(6);
+    // v6 chains through v7; final version is CURRENT_SCHEMA_VERSION
+    expect(out.version).toBe(CURRENT_SCHEMA_VERSION);
     const heroes = (out.roster as { heroes: Array<Record<string, unknown>> }).heroes;
     expect(heroes[0].pendingPerks).toEqual(['l5']);
+  });
+});
+
+describe('v6 → v7 migration (legendaryEnabled unlock flag)', () => {
+  it('adds unlocks.legendaryEnabled = false to existing saves', () => {
+    const v6: Record<string, unknown> = {
+      version: 6,
+      roster: { heroes: [] },
+      unlocks: { classes: [], dungeons: [], buildings: [] },
+    };
+    const out = migrate(v6) as unknown as Record<string, unknown>;
+    expect(out.version).toBe(7);
+    const unlocks = out.unlocks as Record<string, unknown>;
+    expect(unlocks.legendaryEnabled).toBe(false);
+  });
+
+  it('preserves an existing legendaryEnabled value on a freshly-migrated save', () => {
+    const v6: Record<string, unknown> = {
+      version: 6,
+      roster: { heroes: [] },
+      unlocks: { classes: [], dungeons: [], buildings: [], legendaryEnabled: true },
+    };
+    const out = migrate(v6) as unknown as Record<string, unknown>;
+    expect(out.version).toBe(7);
+    const unlocks = out.unlocks as Record<string, unknown>;
+    expect(unlocks.legendaryEnabled).toBe(true);
+  });
+
+  it('is idempotent on a v7 save', () => {
+    const v7: Record<string, unknown> = {
+      version: 7,
+      unlocks: { classes: [], dungeons: [], buildings: [], legendaryEnabled: true },
+    };
+    const out = migrate(v7) as unknown as Record<string, unknown>;
+    expect(out.version).toBe(7);
+    expect((out.unlocks as Record<string, unknown>).legendaryEnabled).toBe(true);
   });
 });

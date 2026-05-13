@@ -1,4 +1,4 @@
-import type { DungeonId, DungeonTier, Item, MilestoneId, Wound } from '@data/types';
+import type { DungeonId, DungeonTier, Item, MilestoneId, Unlocks, Wound } from '@data/types';
 import { applyLevelUps, levelForXp, xpForBossNode, xpForCombatNode, xpForEliteNode } from '@data/leveling';
 import { DEFAULT_WOUND_RUNS_REMAINING } from '@data/wounds';
 import { DUNGEONS } from '@data/dungeons';
@@ -11,7 +11,7 @@ import type { CombatEvent, CombatResult } from '@combat/types';
 import type { Hero } from '@heroes/hero';
 import type { Rng } from '@util/rng';
 import { addGold, addItem, createPack, spendGold, type Pack, totalGold } from './pack';
-import { detectBossMilestones } from './milestones';
+import { detectBossMilestones, detectXpMilestones } from './milestones';
 
 export type RunStatus = 'in_dungeon' | 'camp_screen' | 'ended';
 
@@ -196,10 +196,27 @@ export function loseHero(runState: RunState, heroIndex: number): RunState {
   };
 }
 
+/**
+ * Sentinel `Unlocks` used when callers (mostly tests) don't thread real unlocks
+ * into completeCombat / completeSurpriseCombat. Production callers (corridor_scene)
+ * pass `appState.get().unlocks`. Safe because:
+ *  - `legendaryEnabled: false` means `detectXpMilestones` always evaluates the
+ *    level-crossing check (worst case: a spurious 'first_hero_l10' enqueue).
+ *  - The `first_hero_l10` handler is idempotent (no-op if flag already true), so
+ *    a double-fire from the sentinel path is harmless on the SaveFile.
+ */
+const DEFAULT_UNLOCKS_FOR_DETECTION: Unlocks = {
+  classes: [],
+  dungeons: [],
+  buildings: [],
+  legendaryEnabled: false,
+};
+
 export function completeCombat(
   runState: RunState,
   result: CombatResult,
   rng: Rng,
+  unlocks: Unlocks = DEFAULT_UNLOCKS_FOR_DETECTION,
 ): { runState: RunState; wipe?: WipeOutcome } {
   if (runState.status !== 'in_dungeon') {
     throw new Error(`completeCombat: status must be 'in_dungeon', got '${runState.status}'`);
@@ -285,10 +302,31 @@ export function completeCombat(
     return applyLevelUps({ ...hero, xp: newXp }, hero.level, newLevel);
   });
 
+  // L10 milestone detection (Legendary spec): fire 'first_hero_l10' the first
+  // time any hero crosses level 10. updatedPartyLiving = pre-XP-grant; the
+  // post-XP party (partyAfterXp) is built parallel-indexed so the detection
+  // sees the same heroes before/after applyLevelUps.
+  const xpMilestones = detectXpMilestones(updatedPartyLiving, partyAfterXp, unlocks);
+
   const reward = nodeRewardGold(kind, runState.currentFloorNumber, dungeonTierOf(runState));
   let newPack = addGold(runState.pack, reward);
 
-  const drop = rollLoot(rng, runState.currentFloorNumber, kind, dungeonTierOf(runState));
+  // Boss-drop substitution post-L10: pass legendaryEnabled + the boss's enemyId
+  // so rollLoot can swap the normal drop for a named legendary when the boss
+  // has a registered BOSS_LEGENDARIES pool. Non-boss kinds pass undefined. We
+  // read the dungeon's `bossId` rather than `encounter.enemies[0]` because the
+  // boss-encounter composer puts the boss in slot 3 alongside two minion
+  // placements (composeBossEncounter in src/dungeon/encounter.ts), so the first
+  // enemy in the placement list is a front-liner minion, not the boss itself.
+  const bossEnemyId = kind === 'boss' ? DUNGEONS[runState.dungeonId].bossId : undefined;
+  const drop = rollLoot(
+    rng,
+    runState.currentFloorNumber,
+    kind,
+    dungeonTierOf(runState),
+    unlocks.legendaryEnabled,
+    bossEnemyId,
+  );
   if (drop) {
     newPack = addItem(newPack, drop);
   }
@@ -316,7 +354,7 @@ export function completeCombat(
         fallen: [...runState.fallen, ...newFallen],
         pack: newPack,
         status: 'camp_screen',
-        pendingMilestones: [...runState.pendingMilestones, ...triggered],
+        pendingMilestones: [...runState.pendingMilestones, ...triggered, ...xpMilestones],
         petsDownByHeroId: newPetsDown,
         traineeXpBase: runState.traineeXpBase + xpReward,
       },
@@ -337,6 +375,7 @@ export function completeCombat(
       pack: newPack,
       status: 'in_dungeon',
       awaitingFork: true,
+      pendingMilestones: [...runState.pendingMilestones, ...xpMilestones],
       petsDownByHeroId: newPetsDown,
       traineeXpBase: runState.traineeXpBase + xpReward,
     },
@@ -347,6 +386,7 @@ export function completeSurpriseCombat(
   runState: RunState,
   result: CombatResult,
   rng: Rng,
+  unlocks: Unlocks = DEFAULT_UNLOCKS_FOR_DETECTION,
 ): { runState: RunState; wipe?: WipeOutcome } {
   if (runState.status !== 'in_dungeon') {
     throw new Error(`completeSurpriseCombat: status must be 'in_dungeon', got '${runState.status}'`);
@@ -417,6 +457,10 @@ export function completeSurpriseCombat(
     return applyLevelUps({ ...hero, xp: newXp }, hero.level, newLevel);
   });
 
+  // L10 milestone detection (Legendary spec): mirrors completeCombat. Surprises
+  // also grant XP, so a level-10 crossing here must trigger the milestone.
+  const xpMilestones = detectXpMilestones(updatedPartyLiving, partyAfterXp, unlocks);
+
   // Reduced gold reward.
   const reward = surpriseRewardGold(runState.currentFloorNumber, dungeonTierOf(runState));
   let newPack = addGold(runState.pack, reward);
@@ -446,6 +490,9 @@ export function completeSurpriseCombat(
       party: partyAfterXp,
       fallen: [...runState.fallen, ...newFallen],
       pack: newPack,
+      pendingMilestones: xpMilestones.length > 0
+        ? [...runState.pendingMilestones, ...xpMilestones]
+        : runState.pendingMilestones,
       petsDownByHeroId: newPetsDown,
       traineeXpBase: runState.traineeXpBase + xpReward,
     },

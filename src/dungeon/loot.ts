@@ -1,10 +1,13 @@
 import { AFFIXES, RARE_PROPERTIES } from '@data/items';
+import { BOSS_LEGENDARIES, LEGENDARY_DEFS } from '@data/legendaries';
 import type {
   AffixId,
   DungeonTier,
+  EnemyId,
   ItemBaseId,
   ItemSlot,
   Item,
+  LegendaryId,
   Rarity,
   RarePropertyId,
   RolledAffix,
@@ -203,9 +206,45 @@ export function rollShopItem(rng: Rng, slot: ItemSlot, floor: number, tier: Dung
 
 export type LootKind = 'combat' | 'elite' | 'boss' | 'treasure';
 
-export function rollLoot(rng: Rng, floorNumber: number, kind: LootKind, tier: DungeonTier = 1): Item | null {
+/**
+ * Construct a named legendary Item for a specific `legendaryId`. Affixes are
+ * empty (legendaries carry their power via `LEGENDARY_DEFS[id]`, not affixes).
+ * Used by `rollLoot` when the post-L10 boss-drop substitution fires.
+ */
+export function rollNamedLegendary(rng: Rng, legendaryId: LegendaryId, floor: number): Item {
+  const def = LEGENDARY_DEFS[legendaryId];
+  return {
+    id: generateItemId(rng),
+    baseId: def.baseId,
+    slot: def.slot,
+    rarity: 'legendary',
+    affixes: [],
+    floorRolledAt: floor,
+    legendaryId,
+  };
+}
+
+export function rollLoot(
+  rng: Rng,
+  floorNumber: number,
+  kind: LootKind,
+  tier: DungeonTier = 1,
+  legendaryEnabled = false,
+  bossId?: EnemyId,
+): Item | null {
   if (kind === 'combat') {
     if (rng.next() >= 0.1) return null;
+  }
+
+  // Post-L10 boss-drop substitution: when the player has unlocked the Legendary
+  // tier (`legendaryEnabled`), boss kills swap their normal drop for a named
+  // legendary uniformly picked from the boss's `BOSS_LEGENDARIES` pool. Bosses
+  // without a registered pool fall through to the normal rarity-roll path below.
+  if (kind === 'boss' && legendaryEnabled && bossId !== undefined) {
+    const pool = BOSS_LEGENDARIES[bossId];
+    if (pool !== undefined && pool.length > 0) {
+      return rollNamedLegendary(rng, rng.pick(pool), floorNumber);
+    }
   }
   // Per-kind policy:
   //   combat:    10% drop gate (above), current-floor rarity table, current-floor scaling.

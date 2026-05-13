@@ -62,6 +62,7 @@ const RARITY_LABEL: Record<Rarity, string> = {
   uncommon: '[uncommon]',
   rare: '[rare]',
   epic: '[epic]',
+  legendary: '[legendary]',
 };
 
 type Location =
@@ -314,7 +315,8 @@ export class BlacksmithPanelScene extends Phaser.Scene {
   }
 
   private collectSellable(items: readonly Item[]): readonly Item[] {
-    const rarityOrder: Record<Rarity, number> = { common: 3, uncommon: 2, rare: 1, epic: 0 };
+    // Sell list: best-rarity-first (legendary highest sell value, sorts to top).
+    const rarityOrder: Record<Rarity, number> = { common: 4, uncommon: 3, rare: 2, epic: 1, legendary: 0 };
     return [...items].sort((a, b) => {
       const ra = rarityOrder[a.rarity] - rarityOrder[b.rarity];
       if (ra !== 0) return ra;
@@ -349,7 +351,8 @@ export class BlacksmithPanelScene extends Phaser.Scene {
     }
     const stashSection = entries.filter((e) => e.location.kind === 'stash');
     const equippedSection = entries.filter((e) => e.location.kind === 'equipped');
-    const rarityOrder: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3 };
+    // Upgrade list: ascending rarity (legendary at the end — though it can't actually be upgraded).
+    const rarityOrder: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
     const sortFn = (a: UpgradeEntry, b: UpgradeEntry): number => {
       const ra = rarityOrder[a.item.rarity] - rarityOrder[b.item.rarity];
       if (ra !== 0) return ra;
@@ -681,8 +684,8 @@ export class BlacksmithPanelScene extends Phaser.Scene {
   }
 
   private requestSell(item: Item): void {
-    // Rare and epic items get a confirm step. Common/uncommon sell instantly.
-    if (item.rarity === 'rare' || item.rarity === 'epic') {
+    // Rare, epic, and legendary items get a confirm step. Common/uncommon sell instantly.
+    if (item.rarity === 'rare' || item.rarity === 'epic' || item.rarity === 'legendary') {
       _sellConfirmItem = item;
       this.scene.restart();
       return;

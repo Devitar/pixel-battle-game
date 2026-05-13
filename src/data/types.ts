@@ -85,7 +85,30 @@ export type WeaponFamily = 'melee' | 'ranged' | 'magic';
 
 export type ItemSlot = 'weapon' | 'shield' | 'outfit' | 'hat';
 
-export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic';
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+
+export type LegendaryId =
+  | 'lichs_crown'
+  | 'phylactery'
+  | 'tidewalker_helm'
+  | 'kings_aegis';
+
+export interface LegendaryDef {
+  id: LegendaryId;
+  name: string;
+  flavor: string;
+  slot: ItemSlot;
+  baseId: ItemBaseId;
+  /**
+   * Stat bonuses (attack/defense/speed/mind/crit/dodge). HP is expressed via
+   * `hpBonus` separately so that `gearTotal` (HP aggregation) and `applyEquipmentStats`
+   * (Stats aggregation) don't double-count. Excluding `'hp'` from this record
+   * makes the invariant unrepresentable.
+   */
+  stats: Partial<Record<Exclude<BuffableStat, 'hp'>, number>>;
+  hpBonus?: number;
+  triggeredEffect: TriggeredEffect;
+}
 
 export type ItemBaseId =
   | 'sword_basic' | 'bow_basic' | 'mace_basic'
@@ -136,6 +159,7 @@ export interface Item {
   readonly affixes: readonly RolledAffix[];
   readonly rareProperty?: RolledRareProperty;
   readonly floorRolledAt: number;
+  readonly legendaryId?: LegendaryId;
 }
 
 export interface HeroEquipment {
@@ -287,7 +311,10 @@ export interface DungeonDef {
   unlockRequirement?: string;
 }
 
-export type MilestoneId = 'first_crypt_clear' | 'first_sunken_keep_clear';
+export type MilestoneId =
+  | 'first_crypt_clear'
+  | 'first_sunken_keep_clear'
+  | 'first_hero_l10';
 
 export type TraitId =
   | 'stout'
@@ -400,4 +427,5 @@ export interface Unlocks {
   classes: readonly ClassId[];
   dungeons: readonly DungeonId[];
   buildings: readonly BuildingId[];
+  legendaryEnabled: boolean;
 }

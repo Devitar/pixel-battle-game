@@ -9,14 +9,18 @@ const ALL_AFFIX_IDS: readonly AffixId[] = [
   'of_swiftness', 'of_the_hawk', 'of_evasion',
 ];
 
-const NEXT_RARITY: Record<Rarity, Exclude<Rarity, 'common'> | null> = {
+// Blacksmith targets exclude 'common' (start) and 'legendary' (cap — legendaries
+// are boss drops, not upgradeable). Both 'epic' and 'legendary' map to null:
+// 'epic' is the Blacksmith ceiling; 'legendary' is unreachable here.
+const NEXT_RARITY: Record<Rarity, Exclude<Rarity, 'common' | 'legendary'> | null> = {
   common: 'uncommon',
   uncommon: 'rare',
   rare: 'epic',
-  epic: null,
+  epic: null,        // unchanged — Blacksmith caps at epic
+  legendary: null,
 };
 
-export function nextRarity(r: Rarity): Exclude<Rarity, 'common'> | null {
+export function nextRarity(r: Rarity): Exclude<Rarity, 'common' | 'legendary'> | null {
   return NEXT_RARITY[r];
 }
 

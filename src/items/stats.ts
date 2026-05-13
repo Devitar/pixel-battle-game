@@ -1,4 +1,5 @@
 import { BASE_ITEM_STATS } from '@data/items';
+import { LEGENDARY_DEFS } from '@data/legendaries';
 import type {
   AffixId, BuffableStat, HeroEquipment, RarePropertyId, RolledRareProperty,
 } from '@data/types';
@@ -19,6 +20,17 @@ export function applyEquipmentStats(stats: Stats, equipment: HeroEquipment): Sta
   for (const slot of ['weapon', 'shield', 'outfit', 'hat'] as const) {
     const item = equipment[slot];
     if (!item) continue;
+    // Legendary items carry a fixed stat record from LEGENDARY_DEFS and bypass
+    // the per-baseId base stats and affix aggregation entirely. The legendary's
+    // hpBonus is summed by gearTotal (see heroes/hero.ts), not here.
+    if (item.legendaryId !== undefined) {
+      const def = LEGENDARY_DEFS[item.legendaryId];
+      for (const k of Object.keys(def.stats) as Exclude<BuffableStat, 'hp'>[]) {
+        const delta = def.stats[k];
+        if (delta !== undefined) result[k] = result[k] + delta;
+      }
+      continue;
+    }
     const base = BASE_ITEM_STATS[item.baseId];
     for (const k of Object.keys(base) as (keyof Stats)[]) {
       result[k] = result[k] + (base[k] ?? 0);

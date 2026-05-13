@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '@util/rng';
-import { pickRarity, rollEventItem, rollLoot, rollShopItem } from '../loot';
+import { LEGENDARY_DEFS } from '@data/legendaries';
+import { pickRarity, rollEventItem, rollLoot, rollNamedLegendary, rollShopItem } from '../loot';
 
 describe('rollLoot — drop gate', () => {
   it('drops at roughly 10% on a non-boss combat node (Phase 5 retune from 50%)', () => {
@@ -539,5 +540,69 @@ describe('Epic — end-to-end integration', () => {
     const pct = (epic / N) * 100;
     expect(pct).toBeGreaterThan(1);
     expect(pct).toBeLessThan(6);
+  });
+});
+
+describe('rollLoot — boss-drop substitution post-L10', () => {
+  it('with legendaryEnabled=true and bossId=bone_lich, returns a named legendary', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const item = rollLoot(createRng(seed), 5, 'boss', 1, true, 'bone_lich');
+      expect(item).not.toBeNull();
+      expect(item!.rarity).toBe('legendary');
+      expect(item!.legendaryId).toBeDefined();
+      expect(['lichs_crown', 'phylactery']).toContain(item!.legendaryId!);
+    }
+  });
+
+  it('with legendaryEnabled=true and bossId=drowned_king, returns tidewalker_helm or kings_aegis', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const item = rollLoot(createRng(seed), 5, 'boss', 2, true, 'drowned_king');
+      expect(item!.legendaryId).toBeDefined();
+      expect(['tidewalker_helm', 'kings_aegis']).toContain(item!.legendaryId!);
+    }
+  });
+
+  it('with legendaryEnabled=true and bossId=bone_lich, picks both ids over many seeds (no degeneracy)', () => {
+    const ids = new Set<string>();
+    for (let seed = 1; seed <= 200; seed++) {
+      const item = rollLoot(createRng(seed), 5, 'boss', 1, true, 'bone_lich');
+      if (item?.legendaryId) ids.add(item.legendaryId);
+    }
+    expect(ids.has('lichs_crown')).toBe(true);
+    expect(ids.has('phylactery')).toBe(true);
+  });
+
+  it('with legendaryEnabled=false, boss-kind returns normal loot (no legendary)', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const item = rollLoot(createRng(seed), 5, 'boss', 1, false, 'bone_lich');
+      expect(item!.legendaryId).toBeUndefined();
+    }
+  });
+
+  it('with legendaryEnabled=true but kind=combat, returns normal loot (only boss-kind substitutes)', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const item = rollLoot(createRng(seed), 5, 'combat', 1, true, undefined);
+      if (item) expect(item.legendaryId).toBeUndefined();
+    }
+  });
+
+  it('with legendaryEnabled=true and bossId missing from BOSS_LEGENDARIES, falls through to normal loot', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const item = rollLoot(createRng(seed), 5, 'boss', 1, true, 'skeleton_warrior');
+      expect(item!.legendaryId).toBeUndefined();
+    }
+  });
+});
+
+describe('rollNamedLegendary', () => {
+  it('constructs an Item with the right legendaryId, rarity, empty affixes', () => {
+    const item = rollNamedLegendary(createRng(1), 'lichs_crown', 10);
+    expect(item.legendaryId).toBe('lichs_crown');
+    expect(item.rarity).toBe('legendary');
+    expect(item.affixes).toEqual([]);
+    expect(item.slot).toBe(LEGENDARY_DEFS.lichs_crown.slot);
+    expect(item.baseId).toBe(LEGENDARY_DEFS.lichs_crown.baseId);
+    expect(item.floorRolledAt).toBe(10);
+    expect(item.rareProperty).toBeUndefined();
   });
 });

@@ -4,7 +4,7 @@ import type { SaveFile } from './save';
 // like Hero, Roster, RunState, Vault, Unlocks, Preferences) and register a
 // migration in MIGRATIONS[previousVersion] that maps old raw shape to new.
 // Loaders newer than CURRENT_SCHEMA_VERSION are rejected at save.ts:load.
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 type MigrationFn = (raw: Record<string, unknown>) => Record<string, unknown>;
 
@@ -139,6 +139,17 @@ const MIGRATIONS: Record<number, MigrationFn> = {
       if (lost) runState.lost = lost.map(migrateHero);
     }
 
+    return out;
+  },
+
+  // v6 → v7: introduce unlocks.legendaryEnabled (default false).
+  // Legendary tier + L10 milestone spec, 2026-05-12.
+  6: (raw) => {
+    const out: Record<string, unknown> = { ...raw, version: 7 };
+    const unlocks = out.unlocks as Record<string, unknown> | undefined;
+    if (unlocks && typeof unlocks.legendaryEnabled !== 'boolean') {
+      out.unlocks = { ...unlocks, legendaryEnabled: false };
+    }
     return out;
   },
 };
