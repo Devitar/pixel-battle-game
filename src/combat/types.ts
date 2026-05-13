@@ -5,6 +5,7 @@ import type {
   CombatantTag,
   EnemyId,
   LegendaryId,
+  LegendaryPassiveId,
   PerkId,
   PetSpeciesId,
   SlotIndex,
@@ -58,6 +59,9 @@ export interface Combatant {
    *  the triggered-effect hook system (legendary items' triggered effects fire
    *  just like perks). Always present; defaults to `[]` in creators. */
   equippedLegendaryIds: readonly LegendaryId[];
+  /** Equipped random-legendary passive ids (one per slot at most). Always
+   *  present; defaults to `[]` in creators. */
+  equippedLegendaryPassiveIds: readonly LegendaryPassiveId[];
   /** Per-combat tracker for firstAttack-triggered sources (perks and legendaries).
    *  Cleared at combat start. Holds source ids (`PerkId | LegendaryId`) that have
    *  already fired their firstAttack trigger this combat. Stored as string[] so

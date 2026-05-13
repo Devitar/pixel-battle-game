@@ -2087,3 +2087,289 @@ describe("King's Aegis (onStruck → drowning on attacker)", () => {
   });
 });
 
+describe('Vampiric weapon (onHit + lifesteal 0.15)', () => {
+  it('heals 15% of damage dealt on every outgoing hit', () => {
+    // Hero attacker with equippedLegendaryPassiveIds: ['vampiric'].
+    // Abilities restricted to knight_slash (power=1.0) so every hit deals
+    // floor(attack * 0.15) lifesteal heal. attack=20 → 20 damage → 3 HP per hit.
+    // Enemy has attack=0 so the knight takes no damage (min-1 floor still applies,
+    // but with defense=4 the enemy would need > 4 attack to deal damage, and the
+    // floor-1 only fires on raw>0). Actually raw=0 → final=max(1,-4)=1 → always 1
+    // damage. Defense is set to 999 to absorb this.
+    const knight = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 100, attack: 20, defense: 999, speed: 10, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 100,
+      currentHp: 50,
+      pickedPerks: [],
+      equippedLegendaryIds: [],
+      equippedLegendaryPassiveIds: ['vampiric'],
+      abilities: ['knight_slash'],
+      aiPriority: ['knight_slash'],
+    });
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 200, attack: 5, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 200,
+      currentHp: 200,
+    });
+    const state = makeTestState([knight], [enemy]);
+    const result = resolveCombat(state, createRng(1));
+
+    // Sanity: the knight landed at least one hit.
+    const knightHits = result.events.filter(
+      (e) => e.kind === 'damage_applied' && e.sourceId === 'p0',
+    );
+    expect(knightHits.length).toBeGreaterThan(0);
+
+    // Knight's HP should have increased above 50 from lifesteal heals.
+    const finalKnight = result.finalState.combatants.find((c) => c.id === 'p0');
+    expect(finalKnight).toBeDefined();
+    expect(finalKnight!.currentHp).toBeGreaterThan(50);
+  });
+
+  it('does not heal when caster is at full HP (no headroom)', () => {
+    // Knight at full HP (100/100) with a 1-HP enemy that dies on the first hit.
+    // Knight attacks first (speed 10 >> enemy speed 1), kills the enemy instantly,
+    // and never takes a hit. Lifesteal tries to fire but actual = min(heal, 0) = 0,
+    // so no heal_applied event is pushed and HP stays at maxHp.
+    const knight = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 100, attack: 20, defense: 999, speed: 10, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 100,
+      currentHp: 100,
+      pickedPerks: [],
+      equippedLegendaryIds: [],
+      equippedLegendaryPassiveIds: ['vampiric'],
+      abilities: ['knight_slash'],
+      aiPriority: ['knight_slash'],
+    });
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 1, attack: 5, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 1,
+      currentHp: 1,
+    });
+    const state = makeTestState([knight], [enemy]);
+    const result = resolveCombat(state, createRng(1));
+
+    // Knight's HP must not exceed maxHp (no overheal).
+    const finalKnight = result.finalState.combatants.find((c) => c.id === 'p0');
+    expect(finalKnight).toBeDefined();
+    expect(finalKnight!.currentHp).toBeLessThanOrEqual(100);
+
+    // No heal_applied event sourced from the knight (nothing to heal into).
+    const vampiricHeals = result.events.filter(
+      (e) => e.kind === 'heal_applied' && e.sourceId === 'p0',
+    );
+    expect(vampiricHeals.length).toBe(0);
+  });
+
+  it('emits heal_applied events with hero as source and target', () => {
+    // Hero with Vampiric weapon, low HP. Verify heal_applied events appear in
+    // the event stream with sourceId === targetId === hero.id and amount > 0.
+    const knight = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 100, attack: 20, defense: 999, speed: 10, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 100,
+      currentHp: 50,
+      pickedPerks: [],
+      equippedLegendaryIds: [],
+      equippedLegendaryPassiveIds: ['vampiric'],
+      abilities: ['knight_slash'],
+      aiPriority: ['knight_slash'],
+    });
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 200, attack: 5, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 200,
+      currentHp: 200,
+    });
+    const state = makeTestState([knight], [enemy]);
+    const result = resolveCombat(state, createRng(1));
+
+    const vampiricHeals = result.events.filter(
+      (e) =>
+        e.kind === 'heal_applied' &&
+        e.sourceId === 'p0' &&
+        e.targetId === 'p0' &&
+        e.amount > 0,
+    );
+    expect(vampiricHeals.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Fortified shield (onStruck → damageMitigation 0.8)', () => {
+  it('reduces incoming damage by ~20% on every hit', () => {
+    // Two parallel runs: one hero with Fortified equipped, one without.
+    // The Fortified run should deal ~80% of the damage of the baseline run.
+    // Hero stats: high HP to survive multiple hits, low defense to keep damage
+    // observable (no defense absorption). Enemy attack=20 so raw damage is well
+    // above 0; Math.round(20 * 0.8) = 16 vs 20 baseline.
+    const makeKnight = (withFortified: boolean) =>
+      makeHeroCombatant('knight', 1, 'p0', {
+        baseStats: { hp: 500, attack: 1, defense: 0, speed: 2, mind: 0, crit: 0, dodge: 0 },
+        maxHp: 500,
+        currentHp: 500,
+        pickedPerks: [],
+        equippedLegendaryIds: [],
+        equippedLegendaryPassiveIds: withFortified ? ['fortified'] : [],
+        abilities: ['knight_slash'],
+        aiPriority: ['knight_slash'],
+      });
+    const makeEnemy = () =>
+      makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+        baseStats: { hp: 9999, attack: 20, defense: 0, speed: 5, mind: 0, crit: 0, dodge: 0 },
+        maxHp: 9999,
+        currentHp: 9999,
+      });
+
+    const fortifiedResult = resolveCombat(
+      makeTestState([makeKnight(true)], [makeEnemy()]),
+      createRng(1),
+    );
+    const baselineResult = resolveCombat(
+      makeTestState([makeKnight(false)], [makeEnemy()]),
+      createRng(1),
+    );
+
+    const fortifiedHits = fortifiedResult.events.filter(
+      (e) => e.kind === 'damage_applied' && e.targetId === 'p0',
+    );
+    const baselineHits = baselineResult.events.filter(
+      (e) => e.kind === 'damage_applied' && e.targetId === 'p0',
+    );
+    expect(fortifiedHits.length).toBeGreaterThan(0);
+    expect(baselineHits.length).toBeGreaterThan(0);
+
+    const fortifiedFirst = fortifiedHits[0];
+    const baselineFirst = baselineHits[0];
+    if (fortifiedFirst.kind !== 'damage_applied' || baselineFirst.kind !== 'damage_applied') {
+      throw new Error('expected damage_applied events');
+    }
+    // Fortified multiplier is 0.8; the first hit should be ~80% of the baseline.
+    expect(fortifiedFirst.amount).toBeLessThan(baselineFirst.amount);
+    expect(fortifiedFirst.amount).toBe(Math.max(1, Math.round(baselineFirst.amount * 0.8)));
+  });
+});
+
+describe('Vital outfit (onStruck → applyStatus blessed self)', () => {
+  it('applies Blessed (+5 HP/turn, 3 turns) to the hero when struck', () => {
+    // Knight defender with Vital (outfit) equipped. When the enemy lands a hit
+    // the passive should self-apply 'blessed' (regen, healPerTurn=5, duration=3).
+    // Restrict the knight's abilities to knight_slash (no ability applies blessed)
+    // and give the knight dodge=0 so the enemy hits reliably.
+    const knight = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 60, attack: 2, defense: 2, speed: 2, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 60,
+      currentHp: 60,
+      pickedPerks: [],
+      equippedLegendaryIds: [],
+      equippedLegendaryPassiveIds: ['vital'],
+      abilities: ['knight_slash'],
+      aiPriority: ['knight_slash'],
+    });
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 9999, attack: 6, defense: 2, speed: 5, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 9999,
+      currentHp: 9999,
+    });
+    const state = makeTestState([knight], [enemy]);
+    const result = resolveCombat(state, createRng(1));
+
+    // Sanity: the knight took at least one hit.
+    const hitsOnKnight = result.events.filter(
+      (e) => e.kind === 'damage_applied' && e.targetId === 'p0',
+    );
+    expect(hitsOnKnight.length).toBeGreaterThan(0);
+
+    // status_applied event for blessed must originate from the knight (perk
+    // self-target — sourceId is p0 because the perk-bearer fired the trigger).
+    const blessedEvents = result.events.filter(
+      (e) => e.kind === 'status_applied' && e.statusId === 'blessed' && e.sourceId === 'p0',
+    );
+    expect(blessedEvents.length).toBeGreaterThan(0);
+
+    // Accept a live blessed status OR a status_expired event — the 3-turn
+    // duration may have decayed if the combat ran long enough.
+    const finalKnight = result.finalState.combatants.find((c) => c.id === 'p0');
+    expect(finalKnight).toBeDefined();
+    const blessed = finalKnight!.statuses['blessed'];
+    const expiredEvents = result.events.filter(
+      (e) =>
+        e.kind === 'status_expired' &&
+        typeof e.statusId === 'string' &&
+        e.statusId === 'blessed',
+    );
+    expect((blessed ? 1 : 0) + expiredEvents.length).toBeGreaterThan(0);
+
+    // If still live, verify the shape: regen kind, healPerTurn 5, duration 3.
+    if (blessed) {
+      expect(blessed.effect.kind).toBe('regen');
+      if (blessed.effect.kind === 'regen') {
+        expect(blessed.effect.healPerTurn).toBe(5);
+        expect(blessed.effect.duration).toBe(3);
+      }
+      expect(blessed.remainingTurns).toBeGreaterThan(0);
+      expect(blessed.remainingTurns).toBeLessThanOrEqual(3);
+    }
+  });
+});
+
+describe('Cunning hat (onCrit → +15 Dodge for 2 turns)', () => {
+  it('applies a +15 dodge stack on crit', () => {
+    // Hero with Cunning (hat) equipped and crit=100 so every attack crits.
+    // After the first crit the passive should create perk_stack_cunning_0
+    // (timed non-stacking slot) with +15 dodge, duration 2. Restrict abilities
+    // to knight_slash so every turn produces a damaging hit. Enemy has high HP
+    // and low speed so the hero attacks first and survives multiple turns.
+    const knight = makeHeroCombatant('knight', 1, 'p0', {
+      baseStats: { hp: 100, attack: 5, defense: 2, speed: 9, mind: 0, crit: 100, dodge: 0 },
+      maxHp: 100,
+      currentHp: 100,
+      pickedPerks: [],
+      equippedLegendaryIds: [],
+      equippedLegendaryPassiveIds: ['cunning'],
+      abilities: ['knight_slash'],
+      aiPriority: ['knight_slash'],
+    });
+    const enemy = makeEnemyCombatant('skeleton_warrior', 1, 'e0', {
+      baseStats: { hp: 9999, attack: 1, defense: 0, speed: 1, mind: 0, crit: 0, dodge: 0 },
+      maxHp: 9999,
+      currentHp: 9999,
+    });
+    const state = makeTestState([knight], [enemy]);
+    const result = resolveCombat(state, createRng(1));
+
+    // Sanity: the knight landed at least one crit.
+    const knightCrits = result.events.filter(
+      (e) => e.kind === 'damage_applied' && e.sourceId === 'p0' && e.wasCrit,
+    );
+    expect(knightCrits.length).toBeGreaterThan(0);
+
+    // Cunning is non-stacking (no stacking:true) → single slot perk_stack_cunning_0
+    // overwritten on each crit. Accept either a live stack OR a status_expired event.
+    const finalKnight = result.finalState.combatants.find((c) => c.id === 'p0');
+    expect(finalKnight).toBeDefined();
+    const liveStack = finalKnight!.statuses['perk_stack_cunning_0'];
+    const expiredEvents = result.events.filter(
+      (e) =>
+        e.kind === 'status_expired' &&
+        typeof e.statusId === 'string' &&
+        e.statusId.startsWith('perk_stack_cunning_'),
+    );
+    expect((liveStack ? 1 : 0) + expiredEvents.length).toBeGreaterThan(0);
+
+    // If still live, verify shape: +15 dodge, duration 2.
+    if (liveStack) {
+      expect(liveStack.effect.kind).toBe('buff');
+      if (liveStack.effect.kind === 'buff') {
+        expect(liveStack.effect.stat).toBe('dodge');
+        expect(liveStack.effect.delta).toBe(15);
+      }
+      expect(liveStack.remainingTurns).toBeGreaterThan(0);
+      expect(liveStack.remainingTurns).toBeLessThanOrEqual(2);
+    }
+
+    // Non-stacking: no perk_stack_cunning_1 / _2 / ... should exist.
+    const extraSlots = Object.keys(finalKnight!.statuses).filter(
+      (k) => k.startsWith('perk_stack_cunning_') && k !== 'perk_stack_cunning_0',
+    );
+    expect(extraSlots).toHaveLength(0);
+  });
+});
+

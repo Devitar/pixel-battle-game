@@ -1,5 +1,5 @@
 import { AFFIXES, RARE_PROPERTIES } from '@data/items';
-import { BOSS_LEGENDARIES, LEGENDARY_DEFS } from '@data/legendaries';
+import { BOSS_LEGENDARIES, LEGENDARY_DEFS, LEGENDARY_PASSIVES_BY_SLOT } from '@data/legendaries';
 import type {
   AffixId,
   DungeonTier,
@@ -224,6 +224,29 @@ export function rollNamedLegendary(rng: Rng, legendaryId: LegendaryId, floor: nu
   };
 }
 
+export function rollRandomLegendary(rng: Rng, floor: number): Item {
+  const slot = rng.pick(ALL_SLOTS);
+  const base = pickBaseId(rng, slot);
+  const pool = LEGENDARY_PASSIVES_BY_SLOT[slot];
+  const passiveId = rng.pick(pool);
+  const count = slot === 'hat' ? 4 : 3;
+  const affixIds = pickAffixes(rng, count);
+  const affixes: RolledAffix[] = affixIds.map((id) => ({
+    affixId: id,
+    value: rollAffixValue(id, floor),
+  }));
+  return {
+    id: generateItemId(rng),
+    baseId: base.baseId,
+    slot,
+    rarity: 'legendary',
+    ...(base.weaponType !== undefined ? { weaponType: base.weaponType } : {}),
+    affixes,
+    floorRolledAt: floor,
+    legendaryPassive: passiveId,
+  };
+}
+
 export function rollLoot(
   rng: Rng,
   floorNumber: number,
@@ -246,6 +269,11 @@ export function rollLoot(
       return rollNamedLegendary(rng, rng.pick(pool), floorNumber);
     }
   }
+  // NEW (Spec 4): random legendary substitution on elite + treasure post-L10.
+  if ((kind === 'elite' || kind === 'treasure') && legendaryEnabled && rng.percent(1)) {
+    return rollRandomLegendary(rng, floorNumber);
+  }
+
   // Per-kind policy:
   //   combat:    10% drop gate (above), current-floor rarity table, current-floor scaling.
   //              Phase 5 dropped this from 50% → 10% to make treasure rooms the

@@ -29,21 +29,7 @@ Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entrie
 
 ## Cluster D — Tier 3 content
 
-Tier 3 scope from gdd §10. The Sunken Keep cascade is fully shipped: Sunken Keep dungeon (Cluster D · 1, 2026-05-06), Paladin class (Cluster D · 3, 2026-05-06), Hunter class (Cluster D · 4, 2026-05-10), Chapel building (Cluster D · 5, 2026-05-11), Training Grounds building (Cluster D · 6, 2026-05-11), MAX_LEVEL bump + L10 perk tier (Cluster D · 7, 2026-05-12), Epic gear tier (Cluster D · 8, 2026-05-12), Legendary tier + L10 milestone + named boss drops (Cluster D · 9, 2026-05-12). The remaining "legendary gear" surface is entry 10 below (random legendaries from non-boss content). Future Tier 3 surface not yet scoped: dungeons 3-4 (Warren, Abyss), NG+ / Infinity mode, milestone achievements ("25 crits"), trait removal.
-
-### 10 · Random legendaries + curated unique-passive pool
-
-- **What:** Allow legendaries to roll randomly from non-boss content (elite drops, chests, shops?) at low rate post-L10-milestone. Each random legendary rolls a unique passive from a curated `LEGENDARY_PASSIVE_POOL` (slot-restricted). Named-from-bosses (entry 9) and random-from-elsewhere are both available post-milestone.
-- **Why:** Fills out the "legendaries appear in the loot pool" gdd §9 promise. Random legendaries give variance and reduce reliance on boss farming; the passive pool is its own creative palette distinct from named items.
-- **Tier:** 3.
-- **Acceptance:**
-  - Depends on entry 9 (Item shape extension, milestone flag, hook system).
-  - `LEGENDARY_PASSIVE_POOL: Record<ItemSlot, readonly LegendaryPassiveId[]>` — curated passives per slot. Each passive reuses entry 7's trigger/action palette (no new engine extensions).
-  - Drop rate: post-milestone, ~1% on elite + chest loot. Probably suppressed on shops (paying gold for legendaries breaks the trade-off feel — confirm in brainstorm).
-  - Random legendaries: `rarity = 'legendary'`, no `legendaryId`, has `legendaryPassive` rolled from `LEGENDARY_PASSIVE_POOL[slot]`. Affixes still roll (e.g., 3 affixes like an epic item) — passive is on top.
-  - Tooltip displays the passive name + description; visually distinguishable from a named legendary (no special title, but legendary border).
-- **Touches:** `src/dungeon/loot.ts`, `src/data/legendaries.ts` (passive pool table), tests.
-- **Source:** Brainstorm 2026-05-12. Brainstorm-first before plan — passive pool curation is the creative work.
+Tier 3 scope from gdd §10. The Sunken Keep cascade is fully shipped: Sunken Keep dungeon (Cluster D · 1, 2026-05-06), Paladin class (Cluster D · 3, 2026-05-06), Hunter class (Cluster D · 4, 2026-05-10), Chapel building (Cluster D · 5, 2026-05-11), Training Grounds building (Cluster D · 6, 2026-05-11), MAX_LEVEL bump + L10 perk tier (Cluster D · 7, 2026-05-12), Epic gear tier (Cluster D · 8, 2026-05-12), Legendary tier + L10 milestone + named boss drops (Cluster D · 9, 2026-05-12), Random legendaries + curated unique-passive pool (Cluster D · 10, 2026-05-12). The full legendary cascade is complete. Future Tier 3 surface not yet scoped: dungeons 3-4 (Warren, Abyss), NG+ / Infinity mode, milestone achievements ("25 crits"), trait removal.
 
 ---
 

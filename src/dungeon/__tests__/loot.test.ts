@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '@util/rng';
-import { LEGENDARY_DEFS } from '@data/legendaries';
-import { pickRarity, rollEventItem, rollLoot, rollNamedLegendary, rollShopItem } from '../loot';
+import { LEGENDARY_DEFS, LEGENDARY_PASSIVES_BY_SLOT } from '@data/legendaries';
+import { pickRarity, rollEventItem, rollLoot, rollNamedLegendary, rollRandomLegendary, rollShopItem } from '../loot';
 
 describe('rollLoot — drop gate', () => {
   it('drops at roughly 10% on a non-boss combat node (Phase 5 retune from 50%)', () => {
@@ -604,5 +604,79 @@ describe('rollNamedLegendary', () => {
     expect(item.baseId).toBe(LEGENDARY_DEFS.lichs_crown.baseId);
     expect(item.floorRolledAt).toBe(10);
     expect(item.rareProperty).toBeUndefined();
+  });
+});
+
+describe('rollRandomLegendary (Task 5)', () => {
+  it('constructs an Item with rarity legendary, legendaryPassive set, no legendaryId, Epic-equivalent affixes', () => {
+    const item = rollRandomLegendary(createRng(1), 10);
+    expect(item.rarity).toBe('legendary');
+    expect(item.legendaryPassive).toBeDefined();
+    expect(item.legendaryId).toBeUndefined();
+    expect(item.rareProperty).toBeUndefined();
+    const expectedAffixCount = item.slot === 'hat' ? 4 : 3;
+    expect(item.affixes).toHaveLength(expectedAffixCount);
+    expect(item.floorRolledAt).toBe(10);
+  });
+
+  it('rolled legendaryPassive belongs to the rolled slot pool', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const item = rollRandomLegendary(createRng(seed), 10);
+      const pool = LEGENDARY_PASSIVES_BY_SLOT[item.slot];
+      expect(pool).toContain(item.legendaryPassive!);
+    }
+  });
+});
+
+describe('rollLoot — random legendary substitution post-L10 (Task 5)', () => {
+  it('with legendaryEnabled=true, ELITE kind substitutes random legendary at ~1% rate (large sample)', () => {
+    let legendaries = 0;
+    const N = 10000;
+    for (let seed = 1; seed <= N; seed++) {
+      const item = rollLoot(createRng(seed), 5, 'elite', 1, true);
+      if (item?.legendaryPassive !== undefined) legendaries++;
+    }
+    const pct = (legendaries / N) * 100;
+    expect(pct).toBeGreaterThan(0.5);
+    expect(pct).toBeLessThan(2.0);
+  });
+
+  it('with legendaryEnabled=true, TREASURE kind substitutes random legendary at ~1% rate', () => {
+    let legendaries = 0;
+    const N = 10000;
+    for (let seed = 1; seed <= N; seed++) {
+      const item = rollLoot(createRng(seed), 5, 'treasure', 1, true);
+      if (item?.legendaryPassive !== undefined) legendaries++;
+    }
+    const pct = (legendaries / N) * 100;
+    expect(pct).toBeGreaterThan(0.5);
+    expect(pct).toBeLessThan(2.0);
+  });
+
+  it('with legendaryEnabled=false, neither elite nor treasure produces random legendaries', () => {
+    for (let seed = 1; seed <= 500; seed++) {
+      const elite = rollLoot(createRng(seed), 5, 'elite', 1, false);
+      expect(elite?.legendaryPassive).toBeUndefined();
+      const treasure = rollLoot(createRng(seed), 5, 'treasure', 1, false);
+      expect(treasure?.legendaryPassive).toBeUndefined();
+    }
+  });
+
+  it('combat kind never substitutes (even with legendaryEnabled=true)', () => {
+    for (let seed = 1; seed <= 500; seed++) {
+      const item = rollLoot(createRng(seed), 5, 'combat', 1, true);
+      if (item) expect(item.legendaryPassive).toBeUndefined();
+    }
+  });
+
+  it('boss kind without bossId in BOSS_LEGENDARIES does not substitute random legendaries (only boss substitution applies)', () => {
+    // bossId=skeleton_warrior is NOT in BOSS_LEGENDARIES — the boss-substitution branch
+    // falls through. Random substitution is gated to elite|treasure only, so boss-kind
+    // never picks up random legendaries either.
+    for (let seed = 1; seed <= 100; seed++) {
+      const item = rollLoot(createRng(seed), 5, 'boss', 1, true, 'skeleton_warrior');
+      expect(item?.legendaryPassive).toBeUndefined();
+      expect(item?.legendaryId).toBeUndefined();
+    }
   });
 });

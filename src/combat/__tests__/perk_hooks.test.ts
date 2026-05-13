@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { applyPerkAction, clearPerkAura, STACK_CAP } from '../perk_hooks';
+import { applyPerkAction, clearPerkAura, gatherTriggeredEffects, STACK_CAP } from '../perk_hooks';
 import type { Combatant, CombatEvent } from '../types';
 import type { PerkAction, PerkId } from '@data/types';
+import { LEGENDARY_PASSIVE_DEFS } from '@data/legendaries';
 
 function makeCombatant(overrides: Partial<Combatant> = {}): Combatant {
   return {
@@ -24,7 +25,7 @@ function makeCombatant(overrides: Partial<Combatant> = {}): Combatant {
 }
 
 describe('applyPerkAction', () => {
-  // Stand-in for the stack-key prefix; the prop is now `sourceId` (PerkId | LegendaryId).
+  // Stand-in for the stack-key prefix; the prop is now `sourceId` (PerkId | LegendaryId | LegendaryPassiveId).
   const sourceId: PerkId = 'iron_will';
 
   describe('gainStat untimed (continuous aura)', () => {
@@ -322,4 +323,34 @@ describe('applyPerkAction', () => {
     });
   });
 
+});
+
+describe('gatherTriggeredEffects — legendary passives (Spec 4)', () => {
+  it('yields a passive entry when equippedLegendaryPassiveIds contains a passive', () => {
+    const combatant = makeCombatant({
+      pickedPerks: [],
+      equippedLegendaryIds: [],
+      equippedLegendaryPassiveIds: ['vampiric'],
+    });
+    const out = gatherTriggeredEffects(combatant);
+    expect(out).toHaveLength(1);
+    expect(out[0].sourceId).toBe('vampiric');
+    expect(out[0].effect).toEqual(LEGENDARY_PASSIVE_DEFS.vampiric.triggeredEffect);
+  });
+
+  it('combines perk + named-legendary + passive sources in one iteration', () => {
+    // unbreakable is a knight l10 perk with a triggeredEffect (onStruck damageMitigation)
+    // lichs_crown is a named legendary with a triggeredEffect (onKill gainStat)
+    const combatant = makeCombatant({
+      pickedPerks: ['unbreakable'],
+      equippedLegendaryIds: ['lichs_crown'],
+      equippedLegendaryPassiveIds: ['vampiric'],
+    });
+    const out = gatherTriggeredEffects(combatant);
+    const sourceIds = out.map((e) => e.sourceId);
+    expect(sourceIds).toContain('unbreakable');
+    expect(sourceIds).toContain('lichs_crown');
+    expect(sourceIds).toContain('vampiric');
+    expect(out).toHaveLength(3);
+  });
 });

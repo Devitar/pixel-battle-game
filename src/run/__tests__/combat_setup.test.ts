@@ -303,7 +303,7 @@ describe('buildCombatState — pet build pass', () => {
   });
 });
 
-import type { Item } from '@data/types';
+import type { Item, LegendaryPassiveId } from '@data/types';
 import { resolveCombatAbilities } from '@items/kit';
 
 describe('buildCombatState — kit resolution', () => {
@@ -413,5 +413,45 @@ describe('buildCombatState — modifierIds', () => {
     expect(enemy.venomousDamage).toBeUndefined();
     expect(enemy.enragedThreshold).toBeUndefined();
     expect(enemy.baseStats.defense).toBe(ENEMIES.skeleton_warrior.baseStats.defense);
+  });
+});
+
+describe('combat_setup — gatherEquippedLegendaryPassiveIds (Task 3)', () => {
+  it('populates Combatant.equippedLegendaryPassiveIds from hero.equipment slots with legendaryPassive set', () => {
+    const hero = createHero('knight', 'K', 'h0', 'quick', '0');
+    const vampiricWeapon: Item = {
+      id: 'w_vamp', baseId: 'sword_basic', slot: 'weapon', rarity: 'legendary',
+      weaponType: 'sword', affixes: [], floorRolledAt: 3,
+      legendaryPassive: 'vampiric' as LegendaryPassiveId,
+    };
+    hero.equipment = { ...hero.equipment, weapon: vampiricWeapon };
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    expect(state.combatants[0].equippedLegendaryPassiveIds).toEqual(['vampiric']);
+  });
+
+  it('returns empty array when no equipment slot has legendaryPassive set', () => {
+    const hero = createHero('knight', 'K', 'h0', 'quick', 'body1');
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    expect(state.combatants[0].equippedLegendaryPassiveIds).toEqual([]);
+  });
+
+  it('gathers multiple legendary passives across slots in deterministic order weapon→shield→outfit→hat', () => {
+    const hero = createHero('knight', 'K', 'h0', 'quick', '0');
+    const devastatingWeapon: Item = {
+      id: 'w_dev', baseId: 'sword_basic', slot: 'weapon', rarity: 'legendary',
+      weaponType: 'sword', affixes: [], floorRolledAt: 3,
+      legendaryPassive: 'devastating' as LegendaryPassiveId,
+    };
+    const vitalOutfit: Item = {
+      id: 'o_vit', baseId: 'outfit_cloth', slot: 'outfit', rarity: 'legendary',
+      affixes: [], floorRolledAt: 3,
+      legendaryPassive: 'vital' as LegendaryPassiveId,
+    };
+    hero.equipment = { ...hero.equipment, weapon: devastatingWeapon, outfit: vitalOutfit };
+    const encounter: Encounter = { enemies: [], scale: FLAT_SCALE };
+    const state = buildCombatState([hero], encounter);
+    expect(state.combatants[0].equippedLegendaryPassiveIds).toEqual(['devastating', 'vital']);
   });
 });

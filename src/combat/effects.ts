@@ -122,6 +122,28 @@ function applyDamage(
       }
     }
   }
+  // NEW (Spec 4): fire onHit triggers from gathered TriggeredEffects on the caster.
+  // Currently only Vampiric uses onHit + lifesteal. Other onHit + action kind
+  // combinations will need their own branches here when authored.
+  for (const { effect: t } of gatherTriggeredEffects(caster)) {
+    if (t.trigger.kind !== 'onHit') continue;
+    if (t.action.kind === 'lifesteal') {
+      const heal = Math.floor(mitigated * t.action.ratio);
+      if (heal > 0) {
+        const actual = Math.min(heal, caster.maxHp - caster.currentHp);
+        if (actual > 0) {
+          caster.currentHp += actual;
+          recomputeBelowHpAuras(caster, events);
+          events.push({
+            kind: 'heal_applied',
+            sourceId: caster.id,
+            targetId: caster.id,
+            amount: actual,
+          });
+        }
+      }
+    }
+  }
   if (caster.burningWeaponDamage !== undefined && !lethal) {
     target.statuses['burning'] = {
       statusId: 'burning',

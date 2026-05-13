@@ -29,6 +29,25 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-12 · Random legendaries + curated unique-passive pool (closes Cluster D · 10)
+
+- **Why:** Closes the legendary cascade (Spec 4 of 4). Spec 3's named-from-bosses path made L10 a destination; this adds the variance side — 1% substitution at elite + treasure drops post-`first_hero_l10` milestone, rolling a random unique passive from a curated 16-entry pool. Without it, legendaries would only come from boss farming, and the §9 promise of "legendaries appear in the loot pool" stays half-delivered.
+- **Decisions:**
+  - **16 passives, 4 per slot, adjective-prefix naming.** Larger than the brainstorm's 13 — gives each slot meaningful variety. Display: "Vampiric Sword" via `${adjective} ${baseName}` in `itemDisplayName`, sitting between `legendaryId` (named → LegendaryDef.name) and the rare-property suffix branch.
+  - **1% rate on elite + treasure only.** Combat drops (already 10%-gated) and shops stay legendary-free. Shops would let players gold-grind to legendaries, undermining the boss-farming + chest-luck loop. Substitution branch placed AFTER Spec 3's boss-substitution and BEFORE the normal rarity-roll path in `rollLoot`.
+  - **New `PerkTrigger.onHit` variant, EXCLUDED from `FireableTriggerKind`.** Vampiric needs lifesteal on every outgoing hit; existing `firstAttack` consumes once, existing rare-property `of_vampirism` uses a separate `caster.lifestealPercent` field. Added as a new trigger kind consumed by a NEW block in `applyDamage` immediately after the rare-property lifesteal block. `firePerkTrigger` does NOT iterate `onHit` (parallels `whenBelowHp`'s exclusion). Comment near `FireableTriggerKind` and a comment in the consume site both flag the rationale.
+  - **`Item.legendaryId` and `Item.legendaryPassive` mutually exclusive at runtime, not type-enforced.** Both flow through `rarity: 'legendary'`; the discriminator is which field is set. `itemDisplayName` checks `legendaryId` first so named takes precedence if both somehow set.
+  - **Epic-equivalent affix counts on random legendaries** (3 non-hat / 4 hat) + the passive. No `rareProperty` — the passive replaces it conceptually. Stats flow through the existing baseId + affix aggregation path; `applyEquipmentStats` only short-circuits on `legendaryId`.
+  - **`gatherTriggeredEffects` extended to a third loop**, sourceId widened to `PerkId | LegendaryId | LegendaryPassiveId`. All three are disjoint string-literal unions (asserted by a disjointness test).
+  - **`Combatant.equippedLegendaryPassiveIds: readonly LegendaryPassiveId[]`** — combat-state mirror of hero equipment. Gathered in `combat_setup.ts` alongside `equippedLegendaryIds`, defaults `[]` in all 3 creators.
+  - **No save migration.** `Item.legendaryPassive?` is optional; `Combatant.equippedLegendaryPassiveIds` is combat-state rebuilt every combat. `CURRENT_SCHEMA_VERSION` stays at 7.
+- **Surprises:**
+  - **Vampiric heal test required fixture tuning.** First Task 6 attempt used `attack: 10` with default knight abilities — `shield_bash` (power 0.6) was selected first by aiPriority, producing `mitigated=6`, and `Math.floor(6 * 0.15) = 0`. Heal silently no-oped. Fix: restrict abilities to `['knight_slash']` (power 1.0) + `attack=20` so `floor(20 * 0.15) = 3` per hit. Low-multiplier passives need fixture attention or they floor to 0 silently.
+  - **Distribution tests need ≥10,000 samples for 1% rates.** Smaller samples surface false negatives on the `0.5% < pct < 2.0%` band. Matches existing perk-distribution conventions.
+- **Source:** Brainstorm + spec + plan + 8-task subagent-driven execution, all 2026-05-12. Spec: `docs/superpowers/specs/2026-05-12-random-legendaries-passive-pool-design.md`. Plan: `docs/superpowers/plans/2026-05-12-random-legendaries-passive-pool.md`. Final test count: 2242 (was 2179 at start; +63 net). No schema bump.
+
+---
+
 ### 2026-05-12 · Legendary tier + L10 milestone + named boss drops (closes Cluster D · 9)
 
 - **Why:** Marquee endgame reward, closing the gdd §9 "first hero reaches L10" milestone. Spec 3 of the 4-spec legendary cascade (Specs 1 + 2 shipped earlier same day). Named legendaries make L10 leveling a destination instead of a treadmill, and the L10 milestone is the gate that turns the cascade on.

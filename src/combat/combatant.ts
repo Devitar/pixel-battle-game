@@ -26,6 +26,7 @@ export function createHeroCombatant(
     aiPriority: def.aiPriority,
     pickedPerks: [],
     equippedLegendaryIds: [],
+    equippedLegendaryPassiveIds: [],
     isDead: false,
     ...overrides,
   };
@@ -55,6 +56,7 @@ export function createEnemyCombatant(
     tags: def.tags,
     pickedPerks: [],
     equippedLegendaryIds: [],
+    equippedLegendaryPassiveIds: [],
     isDead: false,
     ...overrides,
   };
@@ -88,6 +90,7 @@ export function createPetCombatant(
     tags: def.tags,
     pickedPerks: [],
     equippedLegendaryIds: [],
+    equippedLegendaryPassiveIds: [],
     isDead: false,
   };
 }

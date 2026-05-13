@@ -1,9 +1,10 @@
-import { LEGENDARY_DEFS } from '@data/legendaries';
+import { LEGENDARY_DEFS, LEGENDARY_PASSIVE_DEFS } from '@data/legendaries';
 import { PERKS } from '@data/perks';
 import type {
   AbilityEffect,
   BuffableStat,
   LegendaryId,
+  LegendaryPassiveId,
   PerkAction,
   PerkId,
   PerkTrigger,
@@ -34,10 +35,11 @@ const DEFAULT_POISON_DAMAGE_PER_TURN = 3;
 export interface ApplyPerkActionArgs {
   self: Combatant;
   other: Combatant | undefined;
-  /** The triggered-effect source: either a picked perk id or an equipped legendary id.
-   *  Both are string-literal types at compile time and behave identically at runtime
-   *  (used as the prefix for stack/aura status keys). */
-  sourceId: PerkId | LegendaryId;
+  /** The triggered-effect source: a picked perk id, an equipped named-legendary id,
+   *  or an equipped random-legendary passive id. All three are string-literal types
+   *  at compile time and behave identically at runtime (used as the prefix for
+   *  stack/aura status keys). */
+  sourceId: PerkId | LegendaryId | LegendaryPassiveId;
   action: PerkAction;
   events: CombatEvent[];
 }
@@ -102,7 +104,7 @@ export function applyPerkAction(args: ApplyPerkActionArgs): void {
 
 function addStack(
   self: Combatant,
-  sourceId: PerkId | LegendaryId,
+  sourceId: PerkId | LegendaryId | LegendaryPassiveId,
   action: Extract<PerkAction, { kind: 'gainStat' }>,
 ): void {
   for (let i = 0; i < STACK_CAP; i++) {
@@ -123,7 +125,7 @@ function addStack(
 
 function refreshAllStackDurations(
   self: Combatant,
-  sourceId: PerkId | LegendaryId,
+  sourceId: PerkId | LegendaryId | LegendaryPassiveId,
   duration: number,
 ): void {
   for (let i = 0; i < STACK_CAP; i++) {
@@ -139,7 +141,7 @@ function refreshAllStackDurations(
  * Used by whenBelowHp recompute (Task 11) to drop the aura when the bearer
  * crosses back above the threshold.
  */
-export function clearPerkAura(self: Combatant, sourceId: PerkId | LegendaryId): void {
+export function clearPerkAura(self: Combatant, sourceId: PerkId | LegendaryId | LegendaryPassiveId): void {
   const key = `perk_aura_${sourceId}`;
   if (self.statuses[key]) {
     delete self.statuses[key];
@@ -147,22 +149,27 @@ export function clearPerkAura(self: Combatant, sourceId: PerkId | LegendaryId): 
 }
 
 /**
- * Collect all triggered effects for a combatant from both perk and legendary sources.
- * Perks lookup via PERKS (skipping perks without a triggeredEffect); legendaries lookup
- * via LEGENDARY_DEFS (all defs have a triggeredEffect by interface). Returned in
- * iteration order: perks first, then legendaries. The returned `sourceId` is the
+ * Collect all triggered effects for a combatant from all three sources: perks,
+ * named legendaries, and random-legendary passives. Perks lookup via PERKS (skipping
+ * perks without a triggeredEffect); named legendaries lookup via LEGENDARY_DEFS (all
+ * defs have a triggeredEffect by interface); random-legendary passives lookup via
+ * LEGENDARY_PASSIVE_DEFS (likewise). Returned in iteration order: perks first, then
+ * named legendaries, then passive legendaries. The returned `sourceId` is the
  * stack-key prefix used by applyPerkAction.
  */
 export function gatherTriggeredEffects(
   combatant: Combatant,
-): readonly { sourceId: PerkId | LegendaryId; effect: TriggeredEffect }[] {
-  const out: { sourceId: PerkId | LegendaryId; effect: TriggeredEffect }[] = [];
+): readonly { sourceId: PerkId | LegendaryId | LegendaryPassiveId; effect: TriggeredEffect }[] {
+  const out: { sourceId: PerkId | LegendaryId | LegendaryPassiveId; effect: TriggeredEffect }[] = [];
   for (const perkId of combatant.pickedPerks) {
     const e = PERKS[perkId]?.triggeredEffect;
     if (e) out.push({ sourceId: perkId, effect: e });
   }
   for (const legId of combatant.equippedLegendaryIds) {
     out.push({ sourceId: legId, effect: LEGENDARY_DEFS[legId].triggeredEffect });
+  }
+  for (const passId of combatant.equippedLegendaryPassiveIds) {
+    out.push({ sourceId: passId, effect: LEGENDARY_PASSIVE_DEFS[passId].triggeredEffect });
   }
   return out;
 }
@@ -202,9 +209,12 @@ export function recomputeBelowHpAuras(self: Combatant, events: CombatEvent[]): v
 }
 
 /**
- * The set of trigger kinds that flow through `firePerkTrigger`. Excludes
- * `whenBelowHp`, which is a continuous-aura trigger re-evaluated on HP changes
- * (Task 11) — not a one-shot event fire.
+ * The set of trigger kinds that flow through `firePerkTrigger`. Excludes:
+ *  - `whenBelowHp` — continuous-aura trigger re-evaluated on HP changes
+ *    (see recomputeBelowHpAuras).
+ *  - `onHit` — fires once per outgoing damage instance; consumed by the
+ *    lifesteal block in applyDamage. `firePerkTrigger` does NOT iterate
+ *    onHit triggers to avoid double-firing.
  */
 export type FireableTriggerKind = 'onCrit' | 'onKill' | 'onStruck' | 'firstAttack';
 

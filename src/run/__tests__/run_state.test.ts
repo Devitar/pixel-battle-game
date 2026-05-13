@@ -1338,6 +1338,7 @@ function mockCombatResultWithPet(
     tags: ['beast'],
     pickedPerks: [],
     equippedLegendaryIds: [],
+    equippedLegendaryPassiveIds: [],
     isDead: petIsDead,
   });
   const state: CombatState = { combatants, round: 1, exhaustionLevel: 0 };

@@ -110,6 +110,24 @@ export interface LegendaryDef {
   triggeredEffect: TriggeredEffect;
 }
 
+export type LegendaryPassiveId =
+  // Weapons
+  | 'vampiric' | 'devastating' | 'cleaving' | 'hexing'
+  // Shields
+  | 'fortified' | 'reinforced' | 'thorny' | 'warded'
+  // Outfits
+  | 'vital' | 'resolute' | 'evasive' | 'enduring'
+  // Hats
+  | 'insightful' | 'prescient' | 'cunning' | 'wise';
+
+export interface LegendaryPassiveDef {
+  id: LegendaryPassiveId;
+  adjective: string;       // 'Vampiric' — used as display-name prefix
+  description: string;     // tooltip body line
+  slot: ItemSlot;          // exactly one slot per passive
+  triggeredEffect: TriggeredEffect;
+}
+
 export type ItemBaseId =
   | 'sword_basic' | 'bow_basic' | 'mace_basic'
   | 'axe_basic' | 'daggers_basic' | 'staff_basic'
@@ -159,7 +177,8 @@ export interface Item {
   readonly affixes: readonly RolledAffix[];
   readonly rareProperty?: RolledRareProperty;
   readonly floorRolledAt: number;
-  readonly legendaryId?: LegendaryId;
+  readonly legendaryId?: LegendaryId;          // named legendaries
+  readonly legendaryPassive?: LegendaryPassiveId;  // NEW — random legendaries
 }
 
 export interface HeroEquipment {
@@ -383,7 +402,8 @@ export type PerkTrigger =
   | { kind: 'onKill' }
   | { kind: 'onStruck'; whenAtFullHp?: boolean }
   | { kind: 'firstAttack' }
-  | { kind: 'whenBelowHp'; ratio: number };
+  | { kind: 'whenBelowHp'; ratio: number }
+  | { kind: 'onHit' };  // NEW — fires once per outgoing damage instance; consumed at applyDamage lifesteal site
 
 export type PerkAction =
   | { kind: 'gainStat'; stat: BuffableStat; delta: number; duration?: number; stacking?: boolean }
