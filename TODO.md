@@ -27,38 +27,9 @@ One section per task.
 
 Original Tier 2 scope from gdd §10 is complete (entries 1–28 shipped). Entries 29+ surface deferred Tier 2 polish discovered in the 2026-05-01 post-Tier-2 audit — items that match the gdd's Tier 2 design but weren't part of the original cut.
 
-### 42 · Tavern: pre-leveled hero candidates at higher cost (deferred)
-
-- **What:** Tavern hires are always level-1 fresh recruits regardless of when in the run progression you visit. User suggested higher-level pre-leveled candidates appearing at proportionally higher cost.
-- **Why:** Late-game Tavern hires are weak compared to surviving roster heroes; the pre-leveled-at-cost mechanic gives late-game players a meaningful Tavern decision. Not gdd-promised; pure feature suggestion.
-- **Tier:** 3 (post-launch / Tier 3 feature)
-- **Acceptance:**
-  - **Needs brainstorming first** to define the level-rolling and cost-scaling rules.
-  - Possible model: 10% chance per Tavern visit of a level-N candidate where N scales with player progression; cost = `HIRE_COST × N`.
-  - Or: separate "Veteran Tavern" L4 building unlock that always rolls level-N candidates.
-- **Touches:** `src/camp/buildings/tavern.ts` (candidate generation), `src/scenes/tavern_panel_scene.ts` (cost display per candidate), possibly `src/camp/building_levels.ts` (Tavern L4).
-- **Source:** bugs.md (2026-05-01) — feature suggestion bundled with the Tavern reroll bug (split during scoping).
-
----
-
 ## Cluster D — Tier 3 content
 
-Tier 3 scope from gdd §10. Sunken Keep (Cluster D · 1, 2026-05-06) and Paladin (Cluster D · 3, 2026-05-06) shipped; the Crypt-clear → Paladin/Sunken-Keep cascade is wired. Entries below are the **first-Sunken-Keep-clear cascade** (Hunter + Chapel + Training Grounds, gdd §9), plus future Tier 3 surface (dungeons 3-4, legendary gear, level-10 perks, NG+) that hasn't been broken down yet.
-
-### 6 · Training Grounds building — passive XP for benched heroes
-
-- **What:** Add the Training Grounds camp building (gdd §6 row 7): benched heroes assigned to trainee slots gain pro-rated XP from every completed run. L1-3 progression: L1=2 slots / 25% / L2=3 / 40% / L3=4 / 55%. XP awarded on both cashout AND wipe (wipe pays less per gdd). Unlocks via the `first_sunken_keep_clear` handler.
-- **Why:** Solves the "benched heroes lag behind" problem — players keep an extended roster only if there's a reason to invest in non-active heroes. Makes the Tavern → Barracks → expedition path more meaningful for backups. Most mechanically novel of the three Sunken Keep-gated unlocks (introduces a new XP-economy channel).
-- **Tier:** 3
-- **Acceptance:**
-  - **Needs brainstorming first** to nail down the XP math: "pro-rated against what an active hero of the same level would have earned on that run, so deep runs train better" (gdd §6) — spec must define the calculation (sum of XP earned by an active hero of matched level across all completed nodes? Just the boss node? Per-floor?), the wipe-pays-less rate, and the trainee slot management UI.
-  - New camp scene: `training_grounds_panel_scene.ts` for trainee-slot assignment (pick hero → assign to slot, similar to Expeditions's party-slot picker).
-  - Run-completion hook: `cashout` and `wipe` paths in `run/run_state.ts` need to compute trainee XP gain alongside their existing logic.
-  - Trainee-slot state lives in `SaveFile` (new field, e.g., `traineeHeroIds: readonly string[]` capped at building level). Schema bump required.
-  - `BuildingId` widens to include `'training_grounds'`; `BuildingLevels` already supports tiers via existing pattern (Tavern/Barracks/Blacksmith/Hospital all 1-3).
-  - Camp scene gets a new training-grounds tile, hidden until the milestone fires.
-- **Touches:** `src/scenes/training_grounds_panel_scene.ts` (new), `src/scenes/camp_scene.ts` (new tile), `src/camp/buildings/training_grounds.ts` (new), `src/camp/building_levels.ts` (training_grounds tier costs), `src/run/run_state.ts` (XP gain hook in cashout/wipe), `src/save/save.ts` + migration (schema bump for traineeHeroIds), `src/data/types.ts` (BuildingId), `src/run/milestones.ts` (extend handler).
-- **Source:** gdd §6 (buildings table) + §9 (meta-progression). Cluster D blurb placeholder.
+Tier 3 scope from gdd §10. The Sunken Keep cascade is fully shipped: Sunken Keep dungeon (Cluster D · 1, 2026-05-06), Paladin class (Cluster D · 3, 2026-05-06), Hunter class (Cluster D · 4, 2026-05-10), Chapel building (Cluster D · 5, 2026-05-11), Training Grounds building (Cluster D · 6, 2026-05-11), MAX_LEVEL bump + L10 perk tier (Cluster D · 7, 2026-05-12), Epic gear tier (Cluster D · 8, 2026-05-12), Legendary tier + L10 milestone + named boss drops (Cluster D · 9, 2026-05-12), Random legendaries + curated unique-passive pool (Cluster D · 10, 2026-05-12). The full legendary cascade is complete. Future Tier 3 surface not yet scoped: dungeons 3-4 (Warren, Abyss), NG+ / Infinity mode, milestone achievements ("25 crits"), trait removal.
 
 ---
 

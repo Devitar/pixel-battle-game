@@ -4,6 +4,12 @@ import { HEAVY_HIT_WOUND_THRESHOLD, WOUND_CHANCE_PERCENT, WOUND_IDS } from '@dat
 import type { Rng } from '@util/rng';
 import { pickAbility } from './ability_priority';
 import { setCooldown } from './cooldowns';
+import {
+  fireOnStruckNonMitigation,
+  firePerkTrigger,
+  gatherTriggeredEffects,
+  recomputeBelowHpAuras,
+} from './perk_hooks';
 import { collapseAfterDeath, moveTo, pull, shove, swap } from './positions';
 import { getEffectiveStat } from './statuses';
 import type { Combatant, CombatantId, CombatEvent, CombatState, StatusInstance } from './types';
@@ -32,12 +38,27 @@ function applyDamage(
   const bonus = tagBonusMultiplier(ability, target);
   const scalingStat = effect.scalingStat ?? 'attack';
   let raw = Math.round(effect.power * getEffectiveStat(caster, scalingStat) * bonus);
+  // Consume a stashed firstAttack damageMod, if present. Applies before mark
+  // amplification, defense, and crit doubling so the multiplier scales the
+  // base attack value rather than the post-defense final.
+  if (caster.pendingDamageMod !== undefined && caster.pendingDamageMod !== 1) {
+    raw = Math.round(raw * caster.pendingDamageMod);
+    caster.pendingDamageMod = 1;
+  }
   const mark = target.statuses['marked'];
   if (mark && mark.effect.kind === 'mark') {
     raw = Math.round(raw * (1 + mark.effect.damageBonus));
   }
   const wasCrit = rng.percent(getEffectiveStat(caster, 'crit') + (effect.bonusCrit ?? 0));
-  if (wasCrit) raw = raw * 2;
+  if (wasCrit) {
+    raw = raw * 2;
+    firePerkTrigger({
+      self: caster,
+      other: target,
+      triggerKind: 'onCrit',
+      events,
+    });
+  }
   const final = Math.max(1, raw - getEffectiveStat(target, 'defense'));
   const exhAmp =
     target.side === 'player' && state.exhaustionLevel > 0
@@ -47,28 +68,79 @@ function applyDamage(
     target.damageTakenMultiplier !== undefined && target.damageTakenMultiplier !== 1
       ? Math.max(1, Math.round(exhAmp * target.damageTakenMultiplier))
       : exhAmp;
-  target.currentHp -= amplified;
+  // onStruck — captured BEFORE the HP write so `whenAtFullHp` reflects the
+  // bearer's HP at the moment of being struck.
+  let mitigated = amplified;
+  if (!target.isDead) {
+    const wasFullHp = target.currentHp >= target.maxHp;
+    // Pass 1: collect & apply damageMitigation multipliers from matching
+    // onStruck triggered effects (perks + equipped legendaries). Multiple
+    // multipliers stack multiplicatively. The existing 1-damage floor is preserved.
+    for (const { effect: t } of gatherTriggeredEffects(target)) {
+      if (t.trigger.kind !== 'onStruck') continue;
+      if (t.trigger.whenAtFullHp && !wasFullHp) continue;
+      if (t.action.kind === 'damageMitigation') {
+        mitigated = Math.max(1, Math.round(mitigated * t.action.multiplier));
+      }
+    }
+    // Pass 2: fire non-damageMitigation onStruck actions (status applies,
+    // gainStat, etc.). These are evaluated against the same pre-write HP.
+    fireOnStruckNonMitigation(target, caster, wasFullHp, events);
+  }
+  target.currentHp -= mitigated;
+  recomputeBelowHpAuras(target, events);
   const lethal = target.currentHp <= 0;
+  if (lethal) {
+    firePerkTrigger({
+      self: caster,
+      other: target,
+      triggerKind: 'onKill',
+      events,
+    });
+  }
   events.push({
     kind: 'damage_applied',
     sourceId: caster.id,
     targetId: target.id,
-    amount: amplified,
+    amount: mitigated,
     lethal,
     wasCrit,
   });
   if (caster.lifestealPercent !== undefined && caster.lifestealPercent > 0) {
-    const heal = Math.floor(amplified * caster.lifestealPercent / 100);
+    const heal = Math.floor(mitigated * caster.lifestealPercent / 100);
     if (heal > 0) {
       const actual = Math.min(heal, caster.maxHp - caster.currentHp);
       if (actual > 0) {
         caster.currentHp += actual;
+        recomputeBelowHpAuras(caster, events);
         events.push({
           kind: 'heal_applied',
           sourceId: caster.id,
           targetId: caster.id,
           amount: actual,
         });
+      }
+    }
+  }
+  // NEW (Spec 4): fire onHit triggers from gathered TriggeredEffects on the caster.
+  // Currently only Vampiric uses onHit + lifesteal. Other onHit + action kind
+  // combinations will need their own branches here when authored.
+  for (const { effect: t } of gatherTriggeredEffects(caster)) {
+    if (t.trigger.kind !== 'onHit') continue;
+    if (t.action.kind === 'lifesteal') {
+      const heal = Math.floor(mitigated * t.action.ratio);
+      if (heal > 0) {
+        const actual = Math.min(heal, caster.maxHp - caster.currentHp);
+        if (actual > 0) {
+          caster.currentHp += actual;
+          recomputeBelowHpAuras(caster, events);
+          events.push({
+            kind: 'heal_applied',
+            sourceId: caster.id,
+            targetId: caster.id,
+            amount: actual,
+          });
+        }
       }
     }
   }
@@ -106,6 +178,7 @@ function applyDamage(
   if (target.thornsDamage !== undefined && target.thornsDamage > 0 && !caster.isDead) {
     const thorn = target.thornsDamage;
     caster.currentHp -= thorn;
+    recomputeBelowHpAuras(caster, events);
     const sourceLethal = caster.currentHp <= 0;
     events.push({
       kind: 'damage_applied',
@@ -127,6 +200,7 @@ function applyDamage(
       const healAmount = Math.round(effect.healOnKill * getEffectiveStat(caster, scalingStat));
       const actual = Math.min(healAmount, caster.maxHp - caster.currentHp);
       caster.currentHp += actual;
+      recomputeBelowHpAuras(caster, events);
       events.push({
         kind: 'heal_applied',
         sourceId: caster.id,
@@ -135,7 +209,7 @@ function applyDamage(
       });
     }
   } else if (target.kind === 'hero') {
-    const isHeavy = amplified >= target.maxHp * HEAVY_HIT_WOUND_THRESHOLD;
+    const isHeavy = mitigated >= target.maxHp * HEAVY_HIT_WOUND_THRESHOLD;
     if ((isHeavy || wasCrit) && rng.percent(WOUND_CHANCE_PERCENT)) {
       const woundId = rng.pick(WOUND_IDS);
       events.push({ kind: 'wound_inflicted', combatantId: target.id, woundId });
@@ -153,6 +227,7 @@ function applyHeal(
   const amount = Math.round(effect.power * getEffectiveStat(caster, scalingStat));
   const actual = Math.min(amount, target.maxHp - target.currentHp);
   target.currentHp += actual;
+  recomputeBelowHpAuras(target, events);
   events.push({ kind: 'heal_applied', sourceId: caster.id, targetId: target.id, amount: actual });
 }
 
@@ -205,6 +280,9 @@ function applyEffect(
       if (effect.stat === 'hp') {
         target.maxHp += effect.delta;
         target.currentHp = Math.min(target.currentHp, target.maxHp);
+        // hp-debuff shifts both currentHp (via clamp) and maxHp denominator;
+        // resync any whenBelowHp aura against the new ratio.
+        recomputeBelowHpAuras(target, events);
       }
       storeStatus(caster, target, effect.statusId, effect, effect.duration, events);
       return;

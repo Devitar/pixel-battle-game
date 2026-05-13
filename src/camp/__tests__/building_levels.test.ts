@@ -6,6 +6,8 @@ import {
   hospitalTreatmentCap,
   nextLevel,
   tavernCandidateCount,
+  TRAINEE_PRO_RATE,
+  TRAINEE_SLOT_CAPACITY,
 } from '../building_levels';
 
 describe('BUILDING_LEVELS shape', () => {
@@ -49,8 +51,14 @@ describe('nextLevel', () => {
     expect(nextLevel('blacksmith', 1)?.unlockDescription).toBe('Common → Rare');
   });
 
-  it('Blacksmith L2 → null (L3 waits on epic rarity)', () => {
-    expect(nextLevel('blacksmith', 2)).toBeNull();
+  it('Blacksmith L2 → L3 def (Common→Epic unlock at 500g)', () => {
+    expect(nextLevel('blacksmith', 2)?.level).toBe(3);
+    expect(nextLevel('blacksmith', 2)?.upgradeCost).toBe(500);
+    expect(nextLevel('blacksmith', 2)?.unlockDescription).toBe('Common → Epic');
+  });
+
+  it('Blacksmith L3 → null (max level)', () => {
+    expect(nextLevel('blacksmith', 3)).toBeNull();
   });
 
   it('Hospital L1 → L2 def (2 treatments/run at 200g)', () => {
@@ -109,5 +117,35 @@ describe('chapel building levels (L1-only)', () => {
 
   it('chapel has no L2 upgrade path', () => {
     expect(nextLevel('chapel', 1)).toBeNull();
+  });
+});
+
+describe('training_grounds building levels', () => {
+  it('registers training_grounds with three tiers and the standard cost ladder', () => {
+    expect(BUILDING_LEVELS.training_grounds).toHaveLength(3);
+    expect(BUILDING_LEVELS.training_grounds[0]?.level).toBe(1);
+    expect(BUILDING_LEVELS.training_grounds[0]?.upgradeCost).toBe(0);
+    expect(BUILDING_LEVELS.training_grounds[1]?.level).toBe(2);
+    expect(BUILDING_LEVELS.training_grounds[1]?.upgradeCost).toBe(200);
+    expect(BUILDING_LEVELS.training_grounds[2]?.level).toBe(3);
+    expect(BUILDING_LEVELS.training_grounds[2]?.upgradeCost).toBe(500);
+  });
+
+  it('training_grounds has no L4 upgrade path', () => {
+    expect(nextLevel('training_grounds', 3)).toBeNull();
+  });
+});
+
+describe('trainee constants', () => {
+  it('TRAINEE_SLOT_CAPACITY maps L1=2, L2=3, L3=4', () => {
+    expect(TRAINEE_SLOT_CAPACITY[1]).toBe(2);
+    expect(TRAINEE_SLOT_CAPACITY[2]).toBe(3);
+    expect(TRAINEE_SLOT_CAPACITY[3]).toBe(4);
+  });
+
+  it('TRAINEE_PRO_RATE maps L1=0.25, L2=0.40, L3=0.55', () => {
+    expect(TRAINEE_PRO_RATE[1]).toBe(0.25);
+    expect(TRAINEE_PRO_RATE[2]).toBe(0.40);
+    expect(TRAINEE_PRO_RATE[3]).toBe(0.55);
   });
 });

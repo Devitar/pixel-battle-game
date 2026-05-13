@@ -29,6 +29,134 @@ Not every field is required for every entry — a small bug fix may only need *W
 
 <!-- Add completed entries below this line. Newest at the top. -->
 
+### 2026-05-12 · Random legendaries + curated unique-passive pool (closes Cluster D · 10)
+
+- **Why:** Closes the legendary cascade (Spec 4 of 4). Spec 3's named-from-bosses path made L10 a destination; this adds the variance side — 1% substitution at elite + treasure drops post-`first_hero_l10` milestone, rolling a random unique passive from a curated 16-entry pool. Without it, legendaries would only come from boss farming, and the §9 promise of "legendaries appear in the loot pool" stays half-delivered.
+- **Decisions:**
+  - **16 passives, 4 per slot, adjective-prefix naming.** Larger than the brainstorm's 13 — gives each slot meaningful variety. Display: "Vampiric Sword" via `${adjective} ${baseName}` in `itemDisplayName`, sitting between `legendaryId` (named → LegendaryDef.name) and the rare-property suffix branch.
+  - **1% rate on elite + treasure only.** Combat drops (already 10%-gated) and shops stay legendary-free. Shops would let players gold-grind to legendaries, undermining the boss-farming + chest-luck loop. Substitution branch placed AFTER Spec 3's boss-substitution and BEFORE the normal rarity-roll path in `rollLoot`.
+  - **New `PerkTrigger.onHit` variant, EXCLUDED from `FireableTriggerKind`.** Vampiric needs lifesteal on every outgoing hit; existing `firstAttack` consumes once, existing rare-property `of_vampirism` uses a separate `caster.lifestealPercent` field. Added as a new trigger kind consumed by a NEW block in `applyDamage` immediately after the rare-property lifesteal block. `firePerkTrigger` does NOT iterate `onHit` (parallels `whenBelowHp`'s exclusion). Comment near `FireableTriggerKind` and a comment in the consume site both flag the rationale.
+  - **`Item.legendaryId` and `Item.legendaryPassive` mutually exclusive at runtime, not type-enforced.** Both flow through `rarity: 'legendary'`; the discriminator is which field is set. `itemDisplayName` checks `legendaryId` first so named takes precedence if both somehow set.
+  - **Epic-equivalent affix counts on random legendaries** (3 non-hat / 4 hat) + the passive. No `rareProperty` — the passive replaces it conceptually. Stats flow through the existing baseId + affix aggregation path; `applyEquipmentStats` only short-circuits on `legendaryId`.
+  - **`gatherTriggeredEffects` extended to a third loop**, sourceId widened to `PerkId | LegendaryId | LegendaryPassiveId`. All three are disjoint string-literal unions (asserted by a disjointness test).
+  - **`Combatant.equippedLegendaryPassiveIds: readonly LegendaryPassiveId[]`** — combat-state mirror of hero equipment. Gathered in `combat_setup.ts` alongside `equippedLegendaryIds`, defaults `[]` in all 3 creators.
+  - **No save migration.** `Item.legendaryPassive?` is optional; `Combatant.equippedLegendaryPassiveIds` is combat-state rebuilt every combat. `CURRENT_SCHEMA_VERSION` stays at 7.
+- **Surprises:**
+  - **Vampiric heal test required fixture tuning.** First Task 6 attempt used `attack: 10` with default knight abilities — `shield_bash` (power 0.6) was selected first by aiPriority, producing `mitigated=6`, and `Math.floor(6 * 0.15) = 0`. Heal silently no-oped. Fix: restrict abilities to `['knight_slash']` (power 1.0) + `attack=20` so `floor(20 * 0.15) = 3` per hit. Low-multiplier passives need fixture attention or they floor to 0 silently.
+  - **Distribution tests need ≥10,000 samples for 1% rates.** Smaller samples surface false negatives on the `0.5% < pct < 2.0%` band. Matches existing perk-distribution conventions.
+- **Source:** Brainstorm + spec + plan + 8-task subagent-driven execution, all 2026-05-12. Spec: `docs/superpowers/specs/2026-05-12-random-legendaries-passive-pool-design.md`. Plan: `docs/superpowers/plans/2026-05-12-random-legendaries-passive-pool.md`. Final test count: 2242 (was 2179 at start; +63 net). No schema bump.
+
+---
+
+### 2026-05-12 · Legendary tier + L10 milestone + named boss drops (closes Cluster D · 9)
+
+- **Why:** Marquee endgame reward, closing the gdd §9 "first hero reaches L10" milestone. Spec 3 of the 4-spec legendary cascade (Specs 1 + 2 shipped earlier same day). Named legendaries make L10 leveling a destination instead of a treadmill, and the L10 milestone is the gate that turns the cascade on.
+- **Decisions:**
+  - **5 tiers locked in.** `Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'`. UI rarity color orange `#ff8800`. `Item.legendaryId?: LegendaryId` is the discriminator for named items — when set: `affixes: []`, `rarity: 'legendary'`, stats/passive/name/flavor looked up from `LEGENDARY_DEFS[id]`.
+  - **Hard L10 gate via `unlocks.legendaryEnabled`.** Pre-milestone: bosses drop normal next-floor rarity-table loot. Post-milestone: every final-boss kill produces a guaranteed named legendary (1 of 2 per boss, random pick, duplicates allowed). Detection at the XP-grant sites in `completeCombat` + `completeSurpriseCombat`; idempotent handler flips the unlocks flag.
+  - **`LegendaryDef.stats` typed `Partial<Record<Exclude<BuffableStat, 'hp'>, number>>`.** Mid-review type tightening — makes the HP-via-stats vs HP-via-hpBonus divergence unrepresentable. `hpBonus?` is the only HP path.
+  - **Hook system unified.** `applyPerkAction`'s `perkId` parameter widened to `sourceId: PerkId | LegendaryId`. New `gatherTriggeredEffects(combatant)` iterator yields BOTH `pickedPerks`- and `equippedLegendaryIds`-derived triggered effects. Used at every fire site (firePerkTrigger / fireOnStruckNonMitigation / recomputeBelowHpAuras / inline damageMitigation in applyDamage / firstAttack loop in combat.ts). Stack-key prefixes work identically across both source types (both string-literal unions).
+  - **`firstAttackFiredPerkIds` renamed to `firstAttackFiredSourceIds`** (typed `readonly string[]`). Future-proofing for Spec 4 random legendaries that may use firstAttack triggers. None of the 4 named legendaries in this spec use it.
+  - **Legendary is the upgrade cap; no Blacksmith path.** `NEXT_RARITY.epic` stays `null` (unchanged from Spec 2). `BLACKSMITH_UPGRADE_COST` exclude widens to `'common' | 'legendary'` — TypeScript rejects any future attempt to add a legendary upgrade cost. Legendaries are boss-drop-only.
+  - **The 4 named legendaries** (slot variety: 2 hats, 1 outfit, 1 shield — all universal-equipable):
+    - *Lich's Crown* (hat, Bone Lich) — +5 Mind, +5 Crit; onKill → +2 Mind, 3 turns, stacking.
+    - *Phylactery* (outfit, Bone Lich) — +15 HP, +2 Def; onStruck → rotting on attacker (3 dmg/turn, 2 turns).
+    - *Tidewalker Helm* (hat, Drowned King) — +5 HP, +3 Def; whenBelowHp 0.5 → +4 Def aura.
+    - *King's Aegis* (shield, Drowned King) — +10 HP, +3 Def; onStruck → drowning on attacker (3 dmg/turn, 3 turns).
+  - **Sell value `SELL_VALUE.legendary = 500`** continues the geometric curve (10/30/80/200/500). Duplicates from farming get vault gold.
+  - **`'drowning'` already in the `StatusId` union** — single-line addition to `synthesizeStatusEffect` (mapped to poison-kind, grouped with rotting/burning/poisoned).
+  - **L10 milestone takes effect at run END**, not mid-run. Consistent with existing milestone patterns (`first_crypt_clear`, `first_sunken_keep_clear` also drain at cashout/wipe). For boss drops specifically: a hero crossing L10 *on the boss kill itself* won't see that same kill substitute to a legendary — the next dungeon run's boss kill is the first to substitute. Frames the unlock as "earn it first, rewards flow on subsequent kills."
+- **Surprises:**
+  - **Task 5 bossId bug, caught by Task 9.** Initial implementation extracted `bossId` from `encounter.enemies[0]` — but `composeBossEncounter` places the boss at slot 3 alongside two frontliner minions in slots 1-2. So `enemies[0]` was a minion, and the legendary substitution would have silently never fired in production. The unit test of `rollLoot` accepted `bossId` as an argument so it never validated the production call site. Fixed during Task 9 to read `DUNGEONS[runState.dungeonId].bossId` (the dungeon definition knows its boss directly). Process lesson worth remembering: unit tests of helpers that accept a constructed value don't validate the construction logic — test the bridge with an end-to-end integration test.
+  - **`completeCombat` signature drift.** The plan's Task 3 sketch read `state.unlocks` — but `completeCombat`/`completeSurpriseCombat` take `RunState`, not `SaveFile`. Resolved with an OPTIONAL `unlocks?: Unlocks` parameter (sentinel default `legendaryEnabled: false`). Real callers (scenes) pass `appState.get().unlocks`; tests get the default. Safe because the handler is idempotent.
+  - **`normalizeSaveFile` shim alongside the v6→v7 migration.** Several `save.test.ts` fixtures construct raw saves with `version: CURRENT_SCHEMA_VERSION` and bypass `migrate()`. The defensive normalizer ensures `unlocks.legendaryEnabled` is always backfilled on load even for those paths. Belt-and-braces with the migration; pattern matches the earlier traitId / pendingPerks shims.
+  - **Forced widening surface larger than planned.** Beyond the spec's listed consumers, `RARITY_LABEL` + 2× `rarityOrder` records in `blacksmith_panel_scene.ts`, `RARITY_HEX` in `corridor_scene.ts`, `BASE_PRICE_BY_RARITY` in `dungeon/shop.ts`, and `RARITY_ORDER` in `equip_scene.ts` all surfaced via tsc. All extended with sensible placeholder values; shop epic/legendary prices (500/1500) flagged as a follow-up tuning item per spec scope.
+- **Source:** Brainstorm + spec + plan + 9-task subagent-driven execution, all 2026-05-12. Spec: `docs/superpowers/specs/2026-05-12-legendary-tier-named-boss-drops-design.md`. Plan: `docs/superpowers/plans/2026-05-12-legendary-tier-named-boss-drops.md`. Final test count: 2179 (was 2152 at start of this spec; +27 net). Schema bumped to v7 with v6→v7 migration backfilling `unlocks.legendaryEnabled = false`.
+
+---
+
+### 2026-05-12 · Epic gear tier (rarity 4 of 5) (closes Cluster D · 8)
+
+- **Why:** Realises the 5-tier rarity curve promised by gdd §7. Sister Spec 2 of 4 in the legendary cascade (Spec 1 — MAX_LEVEL+L10 perks — shipped same day). Independent of Spec 1; needed before Spec 3 (Legendary + L10 milestone) can land into a clean Epic substrate.
+- **Decisions:**
+  - **Conservative drop curve** — Epic 0% to floor 3, ramping to 10% by floor 15. Rare nudges down (0/2/5/12/18/25 vs old 0/2/5/13/20/30) and uncommon adjusts (10/18/24/30/32/35 vs old 10/18/25/32/35/40) to make room. Each RARITY_TABLE row still sums to 100. Sunken Keep's +3 tier bonus organically lifts Epic to ~2-3% at the floor-4 boss; Crypt stays Epic-free.
+  - **Affix asymmetry preserved.** Epic non-hat = 3 affixes; epic hat = 4. Extends the +1-per-tier curve AND the existing rare-hat-bonus pattern. Epic non-hats also get a guaranteed rare-property (the gate at three `loot.ts` call sites widened from `rarity === 'rare'` to `rare || epic`).
+  - **Geometric cost curves preserved.** Blacksmith upgrade 100→300→900; sell value 10→30→80→200. Both continue the ~3× / ~2.5× ratios.
+  - **L3 Blacksmith gate for rare→epic (spec patched mid-execution).** Extends L1/L2 pattern; an existing test name "rare items remain unupgradeable at L3 (epic rarity not yet shipped)" had explicitly anticipated this. Pattern: `canBlacksmithUpgrade` gains `if (rarity === 'rare' && level < 3) return false;`.
+  - **Only `'epic'` in this spec, not `'epic' + 'legendary'`.** Revised the 2026-05-12 brainstorm note: TypeScript has no "type-only" enum values — adding `'legendary'` would force every `Record<Rarity, X>` to pick sentinel values that Spec 3 should pick when it has the gameplay context.
+  - **Centralized rarity colors** at `src/render/rarity_colors.ts`. Removed three local duplicates (`equip_scene`, `event_overlay_scene`, `corridor_scene`). Spec 3's Legendary color becomes a one-file edit. Epic = `#a060ff` (classic purple, clear contrast vs gold-rare).
+  - **Sell-confirm gate widened, not generalized to `nextRarity===null`.** The plan asked the implementer to substitute the cap check at `blacksmith_panel_scene.ts:685` — but that line turned out to be a sell-confirm gate, not a max-rarity indicator. Literal substitution would have *removed* the rare-confirm step (UX regression). Implementer correctly widened to `rare || epic` with dynamic `Sell ${rarity} item?` text.
+  - **Rare-property preserved (not rerolled) on rare→epic upgrade.** Mirrors the existing transition semantics in `upgradeItem`; tested explicitly.
+- **Surprises:**
+  - **`BUILDING_LEVELS.blacksmith` had no L3 entry.** Caught at the holistic end-of-branch review, not in per-task reviews. The spec patch added the L3 gate to `canBlacksmithUpgrade` but didn't direct adding the L3 building-level def. Without the fix (cost 500g, description "Common → Epic", same as L1/L2 pattern), Epic upgrades were permanently unreachable in-game. Two test files (`building_levels.test.ts`, `building_upgrade.test.ts`) actively enforced the dead-end with tests literally named "(L3 waits on epic rarity)" — updated in lockstep. Process lesson: when a spec patch adds a gameplay constraint, audit reachability across systems, not just the immediate file.
+  - **Forced widening surface larger than planned.** `RARITY_LABEL` and two `rarityOrder` records in `blacksmith_panel_scene.ts`, `RARITY_HEX` in `corridor_scene.ts`, `BASE_PRICE_BY_RARITY` in `dungeon/shop.ts`, and `RARITY_ORDER` in `equip_scene.ts` all needed widening — only the color records were anticipated. Centralization (Task 4) covered the colors; label / sort-order / price records correctly stayed local since they're not color concerns.
+  - **Shop Epic price (500g placeholder) is steep.** Existing formula multiplies by floor with ±15% variance; at floor 8 (first meaningful Epic appearance) that's ~4600g. Tuning was explicitly out-of-scope per the spec, but worth a follow-up TODO for an economy-balance pass.
+- **Source:** Brainstorm + spec + plan + 5-task subagent-driven execution, all 2026-05-12. Spec: `docs/superpowers/specs/2026-05-12-epic-gear-tier-design.md`. Plan: `docs/superpowers/plans/2026-05-12-epic-gear-tier.md`. Final test count: 2126 (was 2112 at start; +14 net). No schema migration needed (Rarity widening doesn't invalidate stored values; `CURRENT_SCHEMA_VERSION` stays at 6).
+
+---
+
+### 2026-05-12 · MAX_LEVEL bump (5→10) + L10 perk tier (closes Cluster D · 7)
+
+- **Why:** Unblock the gdd §9 "first hero reaches L10" milestone, which was unreachable with MAX_LEVEL=5. Also establishes a reusable 5×5 trigger/action palette in the combat resolver (`onCrit` / `onKill` / `onStruck` / `firstAttack` / `whenBelowHp` × `gainStat` / `damageMod` / `damageMitigation` / `lifesteal` / `applyStatus`) that sister specs 9-10 will reuse for legendary passives.
+- **Decisions:**
+  - **Two-tier perks (L5 stays + L10 added), not three.** Rejected an L3/L6/L10 split because L5's existing perks stay untouched (smaller migration risk) and 16 new perks is already substantial content.
+  - **Constrained 5×5 hook palette over open-ended effects.** Rejected ambitious one-off mechanics (positional swap on dodge, mid-combat extra turn, summon-on-kill, ability-specific modifiers like "Lay on Hands cleanses one debuff") because each would be its own engine extension. The palette delivers build-defining perks for all 8 classes without sprawl.
+  - **Global 5-stack cap with refresh-all-at-cap.** Snowballs (Rampage, Spellweaver, Crusader, Pack Tactics, Killer Instinct) stay alive while triggering but stop growing. Individual stacks decay independently when no fresh trigger fires.
+  - **L5 perks numerically unchanged** — only `tier: 'l5'` field added (mechanical). Resisted a balance pass.
+  - **Enemy scaling at L10 deferred.** L10 heroes will steamroll Crypt/Sunken Keep; accepted because Warren/Abyss/difficulty-selection are the real L10 challenge. Difficulty selection (gdd §5) is its own future spec.
+  - **`whenBelowHp` as continuous aura, not one-shot trigger.** Implemented as a synthetic `perk_aura_<perkId>` status recomputed at every HP-mutation site (damage, heal, lifesteal, thorns, healOnKill, hp-buff apply+expire, round-start regen, combat-start, after tickStatuses). Re-entrancy-safe because `applyPerkAction`'s untimed-gainStat branch only writes to `statuses`, never HP.
+  - **`firstAttack` fires on first non-stunned turn**, not first damaging action. Simpler semantic; `pendingDamageMod` stays stashed until consumed by the next damage instance.
+  - **`Combatant.pickedPerks: readonly PerkId[]`** (renamed from singular `perkId`). Matches the new Hero shape. `getEffectiveStat` iterates and sums.
+  - **L10 perks split work as `damageMod` (stashed) vs. everything else (applied as state).** `pendingDamageMod` on Combatant carries the multiplier; `applyDamage` consumes once per outgoing damage instance and resets to 1.
+- **Surprises:**
+  - **Spec had wrong old field name.** Spec said `Hero.pickedPerkId` but the actual pre-existing field was `Hero.perkId` (singular). Caught during plan-writing; spec and plan both fixed inline.
+  - **`'regen'` is not a `StatusId`.** Spec described Holy Vigor's status as `'regen'`, but `'regen'` is the `AbilityEffect.kind`, not the status id. Real status id is `'blessed'`. `synthesizeStatusEffect` maps `'blessed' → kind: 'regen'`. `holy_vigor.description` rephrased to "Gain Blessed" to match the in-game status name.
+  - **Two missed HP-mutation sites caught at end-of-task review.** `effects.ts:259` (hp-buff/debuff apply clamps `currentHp` against new `maxHp`) and `statuses.ts:82` (hp-buff expiry restores `maxHp`) both shift the `currentHp / maxHp` ratio. Without recompute, a `whenBelowHp` perk + frailty status could desync until the next damage/heal. Fixed by adding recompute calls at both sites.
+  - **`'rampage'` and `'backstab'` perk ids collide with existing AbilityIds of the same name.** Benign because `PerkId` and `AbilityId` are separate string-literal unions and the lookup tables (`PERKS` vs `ABILITIES`) are keyed independently. Tests for Backstab perk restrict the rogue's abilities to `rogue_strike` to avoid confusion with the `backstab` ability.
+  - **Spec note about "may need to author 'mark'/'regen' statuses" was unnecessary.** Both `StatusId` values already existed in the union; the implementation took the reuse path.
+- **Source:** Brainstorm + spec + plan + 19-task subagent-driven execution, all 2026-05-12. Spec: `docs/superpowers/specs/2026-05-12-max-level-and-perk-tiers-design.md`. Plan: `docs/superpowers/plans/2026-05-12-max-level-and-perk-tiers.md`. Final test count: 2105 (was 1940 at start; +165 net). Schema bumped to v6 with v5→v6 migration covering roster/tavernCandidates/runState.party-fallen-lost.
+
+---
+
+### 2026-05-11 · Tavern pre-leveled hire candidates (closes Cluster B · 42)
+
+- **Why:** The Tavern stops mattering past mid-game — a level-1 hire is irrelevant when the active party is L4-5. This adds a chance for the Tavern to roll pre-leveled (L2/L3) candidates whose hire cost scales with level, giving late-game roster expansion a meaningful gold-vs-XP trade-off.
+- **Decisions:**
+  - **Trigger = Tavern building level extends existing.** Reuses the L1/L2/L3 ladder; no new building, no new milestone, no save migration. L1 unchanged (100% L1). L2 rolls each slot 75/25 (L1/L2). L3 rolls each slot 65/25/10 (L1/L2/L3). Rejected the TODO's two original framings (per-visit 10% chance with separate scaling, Veteran Tavern L4) — extending the existing tier system was strictly simpler.
+  - **Per-slot independent roll, not per-visit.** Each candidate's level rolls independently of the others. Visit-to-visit variance is preserved; rare L3 jackpots are individually unlikely (10% per slot) but reliably appear over multiple visits.
+  - **Cost = 50 / 150 / 400g** (mirrors XP thresholds the player would have grinded: L2=200 XP ≈ 1 run, L3=800 XP ≈ 3-4 runs). Rejected the TODO's `HIRE_COST × N` (50/100/150g, would have undervalued L3 dramatically) and the steeper 50/200/500g (matches Tavern upgrade ladder, felt punishing).
+  - **`xp = LEVEL_THRESHOLDS[N-1]` at hire**, not 0. Avoids the bug case where `xp = 0` causes `levelForXp(xp) < hero.level`, which would freeze the hero at N until they earned enough XP to "catch up." Setting xp to the just-hit-N threshold means natural progression from there.
+  - **Stat bumps via `applyLevelUps(hero, 1, N)` at generation.** Deterministic; matches what a hand-leveled L1 hero would have. No new stat-rolling logic; reuses the existing level-up machinery.
+  - **Pre-leveled candidates ship with starter gear.** Common rarity, no affixes — same as L1 candidates. Keeps gear-progression and level-progression as independent axes; keeps cost reasonable.
+  - **Level roll appended to the tail of `generateCandidate`**, after `createHero` returns. Preserves the RNG-state stream for the class/trait/sprite/name/id rolls so existing test fixtures asserting on those fields are unaffected; only the post-Tavern RNG state shifts.
+  - **No save schema change.** `Hero.level` and `Hero.xp` are pre-existing fields; pre-leveled candidates serialize via the existing JSON path.
+- **Surprises:**
+  - **`pickCandidateLevel` had to be temporarily exported in Task 1** to satisfy `noUnusedLocals` before Task 2 added a real caller. Plan anticipated this; Task 2 reverted it cleanly.
+  - **`HIRE_COST` import had to be dropped from `tavern_panel_scene.ts`** after the header refactor removed the only consumer in that file. The constant is still exported from `tavern.ts` for `isSoftlocked` (via `@save/save`); only the unused import line went away. Tripped `noUnusedLocals`.
+  - **No need to widen `generateStarterRoster` with `tavernLevel`.** Starter heroes are built via `createHero` directly (not via `generateCandidate`) at fresh-save time, when the Tavern doesn't exist yet. Confirmed during Task 2.
+- **Source:** TODO Cluster B · 42. Spec: `docs/superpowers/specs/2026-05-11-tavern-pre-leveled-design.md`. Plan: `docs/superpowers/plans/2026-05-11-tavern-pre-leveled.md`. No gdd patch (mechanic isn't gdd-promised — pure feature suggestion).
+
+---
+
+### 2026-05-11 · Training Grounds building — passive XP for benched heroes (closes Cluster D · 6)
+
+- **Why:** Third and final Sunken-Keep-gated unlock (Hunter shipped 2026-05-10; Chapel shipped earlier 2026-05-11). Solves the "benched heroes lag behind" problem and gives an extended roster a reason to exist. Closes the first-Sunken-Keep-clear cascade.
+- **Decisions:**
+  - **XP base = sum of cleared-node XP yields** (not per-trainee-level scaled). Simplest reading of "deep runs train better" — depth already lives in the per-node yield. `RunState.traineeXpBase` accumulates in-engine at the two existing XP grant sites (`completeCombat`, `completeSurpriseCombat`); cashout reads it from `runState`, wipe carries it through `WipeOutcome`.
+  - **Wipes pay full, not less.** User pivoted from gdd's "wipes pay less" framing to "time spent training" — what matters is run depth, not outcome. gdd §6 row 7 patched in the same change.
+  - **`SaveFile.traineeHeroIds: readonly (string | null)[]`** — nullable-fixed-length, not variable-length. Slot positions stay stable across drag-out/drag-in interactions. `normalizeSaveFile` scrubs orphan ids and pads/truncates to `TRAINEE_SLOT_CAPACITY[level]` on every load.
+  - **Drag UX modeled on Expeditions party_picker.** Eligible-grid → slot, slot → slot swap, slot → outside unassigns. State writes are live (no Confirm button), mirroring Equip/Stash.
+  - **Lookup-driven camp tile loop** replaces the 4-way Chapel-on/off conditional. Adaptive `STEP_X` (125 when ≥7 tiles, 130 otherwise) fits Chapel + Training Grounds + Expeditions within 960px.
+  - **Same `grantTraineeXp` helper used for both preview and actual grant.** Pure function called twice (`create()` for the toast, `onLeave`/`onWipeReturn` for the side effect) — determinism falls out of `cashout()` literally assigning `outcome.heroesReturned/Fallen/Lost = runState.party/fallen/lost`, so the two activeId sets are bit-equal.
+- **Surprises:**
+  - **`HeroCard` is a container-based widget** — drag handlers must mutate `card.container.x/y`, not `card.x/y`. The plan's direct-assignment code would compile but not visually move the card; Task 8's implementer caught this by reading the Expeditions reference before writing.
+  - **Plan's `Stats` fixture had wrong field names** (`accuracy: 95` doesn't exist; real shape has `mind`). Task 2's implementer worked around by using `createHero(...)` instead of inline literals. Lesson: when writing test fixtures in plans, grep the actual interface rather than hand-rolling shapes.
+  - **`normalizeSaveFile` widened from private to exported** so the new orphan-scrub tests can exercise it directly. Single intentional API surface widening; `normalizeTraineeSlots` stays private (only used internally).
+  - **Task 7's uniform x-spacing introduced minor visual drift** vs. the original hand-tuned tile positions (Blacksmith +10px, Hospital −10px, Expeditions −20px in the 5-tile case). Trade-off accepted as part of the lookup-driven refactor; trivially revertable to per-tile X coords if the layout reads worse in practice.
+- **Source:** TODO Cluster D · 6. Spec: `docs/superpowers/specs/2026-05-11-training-grounds-design.md`. Plan: `docs/superpowers/plans/2026-05-11-training-grounds.md`. gdd §6 row 7 patched in the same change.
+
+---
+
 ### 2026-05-11 · Chapel building — Add or Replace traits (closes Cluster D · 5)
 
 - **Why:** Second of three Sunken-Keep-gated unlocks (Hunter shipped 2026-05-10; Training Grounds follows as Cluster D · 6). Original gdd framed Chapel as "remove a negative Trait, expensive" — brainstorming pivoted the feature toward a *growth* model: heroes can accumulate up to 3 traits across their lifetime via two distinct actions (Replace / Add). gdd §6 row 6 patched in same change.

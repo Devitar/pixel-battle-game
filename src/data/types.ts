@@ -85,7 +85,48 @@ export type WeaponFamily = 'melee' | 'ranged' | 'magic';
 
 export type ItemSlot = 'weapon' | 'shield' | 'outfit' | 'hat';
 
-export type Rarity = 'common' | 'uncommon' | 'rare';
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+
+export type LegendaryId =
+  | 'lichs_crown'
+  | 'phylactery'
+  | 'tidewalker_helm'
+  | 'kings_aegis';
+
+export interface LegendaryDef {
+  id: LegendaryId;
+  name: string;
+  flavor: string;
+  slot: ItemSlot;
+  baseId: ItemBaseId;
+  /**
+   * Stat bonuses (attack/defense/speed/mind/crit/dodge). HP is expressed via
+   * `hpBonus` separately so that `gearTotal` (HP aggregation) and `applyEquipmentStats`
+   * (Stats aggregation) don't double-count. Excluding `'hp'` from this record
+   * makes the invariant unrepresentable.
+   */
+  stats: Partial<Record<Exclude<BuffableStat, 'hp'>, number>>;
+  hpBonus?: number;
+  triggeredEffect: TriggeredEffect;
+}
+
+export type LegendaryPassiveId =
+  // Weapons
+  | 'vampiric' | 'devastating' | 'cleaving' | 'hexing'
+  // Shields
+  | 'fortified' | 'reinforced' | 'thorny' | 'warded'
+  // Outfits
+  | 'vital' | 'resolute' | 'evasive' | 'enduring'
+  // Hats
+  | 'insightful' | 'prescient' | 'cunning' | 'wise';
+
+export interface LegendaryPassiveDef {
+  id: LegendaryPassiveId;
+  adjective: string;       // 'Vampiric' — used as display-name prefix
+  description: string;     // tooltip body line
+  slot: ItemSlot;          // exactly one slot per passive
+  triggeredEffect: TriggeredEffect;
+}
 
 export type ItemBaseId =
   | 'sword_basic' | 'bow_basic' | 'mace_basic'
@@ -136,6 +177,8 @@ export interface Item {
   readonly affixes: readonly RolledAffix[];
   readonly rareProperty?: RolledRareProperty;
   readonly floorRolledAt: number;
+  readonly legendaryId?: LegendaryId;          // named legendaries
+  readonly legendaryPassive?: LegendaryPassiveId;  // NEW — random legendaries
 }
 
 export interface HeroEquipment {
@@ -287,7 +330,10 @@ export interface DungeonDef {
   unlockRequirement?: string;
 }
 
-export type MilestoneId = 'first_crypt_clear' | 'first_sunken_keep_clear';
+export type MilestoneId =
+  | 'first_crypt_clear'
+  | 'first_sunken_keep_clear'
+  | 'first_hero_l10';
 
 export type TraitId =
   | 'stout'
@@ -337,22 +383,69 @@ export type PerkId =
   // Paladin
   | 'righteous' | 'vindicator'
   // Hunter
-  | 'beastmaster' | 'sharpshooter';
+  | 'beastmaster' | 'sharpshooter'
+  // L10 tier
+  | 'unbreakable' | 'last_stand'
+  | 'eagles_mark' | 'first_strike'
+  | 'sanctity' | 'holy_vigor'
+  | 'rampage' | 'bloodlust'
+  | 'backstab' | 'phantom'
+  | 'spellweaver' | 'arcane_surge'
+  | 'crusader' | 'aegis'
+  | 'pack_tactics' | 'killer_instinct';
+
+export type PerkTier = 'l5' | 'l10';
+
+// Triggered-effect system for L10 perks (and reusable for future content).
+export type PerkTrigger =
+  | { kind: 'onCrit' }
+  | { kind: 'onKill' }
+  | { kind: 'onStruck'; whenAtFullHp?: boolean }
+  | { kind: 'firstAttack' }
+  | { kind: 'whenBelowHp'; ratio: number }
+  | { kind: 'onHit' };  // NEW — fires once per outgoing damage instance; consumed at applyDamage lifesteal site
+
+export type PerkAction =
+  | { kind: 'gainStat'; stat: BuffableStat; delta: number; duration?: number; stacking?: boolean }
+  | { kind: 'damageMod'; multiplier: number }
+  | { kind: 'damageMitigation'; multiplier: number }
+  | { kind: 'lifesteal'; ratio: number }
+  | {
+      kind: 'applyStatus';
+      statusId: StatusId;
+      duration: number;
+      target: 'self' | 'other';
+      payload?: { damageBonus?: number; healPerTurn?: number; damagePerTurn?: number };
+    };
+
+export interface TriggeredEffect {
+  trigger: PerkTrigger;
+  action: PerkAction;
+}
 
 export interface PerkDef {
   id: PerkId;
   name: string;
   description: string;
   classId: ClassId;
+  tier: PerkTier;
   statEffects?: readonly TraitStatEffect[];
   hpEffect?: TraitHpEffect;
   petAttackBonus?: number;
+  triggeredEffect?: TriggeredEffect;
 }
 
-export type BuildingId = 'tavern' | 'barracks' | 'blacksmith' | 'hospital' | 'chapel';
+export type BuildingId =
+  | 'tavern'
+  | 'barracks'
+  | 'blacksmith'
+  | 'hospital'
+  | 'chapel'
+  | 'training_grounds';
 
 export interface Unlocks {
   classes: readonly ClassId[];
   dungeons: readonly DungeonId[];
   buildings: readonly BuildingId[];
+  legendaryEnabled: boolean;
 }

@@ -5,7 +5,7 @@ import {
   ensureCandidatesForCap,
   generateCandidate,
   generateCandidates,
-  HIRE_COST,
+  HIRE_COST_BY_LEVEL,
   REROLL_COST,
 } from '@camp/buildings/tavern';
 import { addHero, canAdd } from '@camp/roster';
@@ -73,6 +73,7 @@ export class TavernPanelScene extends Phaser.Scene {
       targetCount,
       rng,
       state.unlocks.classes,
+      tavernLevel,
     );
     // ensureCandidatesForCap only advances rng when it generates new
     // candidates — so a list-unchanged result implies an rng-unchanged result.
@@ -91,7 +92,7 @@ export class TavernPanelScene extends Phaser.Scene {
     // Title (top strip).
     const headerText = free
       ? 'Tavern - Hires are free until you recover'
-      : `Tavern - Hire Cost: ${HIRE_COST}g`;
+      : 'Tavern';
     createBitmapText({
       scene: this,
       x: 480,
@@ -148,14 +149,8 @@ export class TavernPanelScene extends Phaser.Scene {
       });
     }
 
-    // Hire eligibility (shared across all candidate slots).
+    // Per-card hire eligibility is computed inside the loop (cost varies by candidate level).
     const canAddHero = canAdd(state.roster);
-    const canAffordHire = free || vaultGold >= HIRE_COST;
-    const canHire = canAddHero && canAffordHire;
-
-    let hireReason = '';
-    if (!canAffordHire) hireReason = 'Not enough gold';
-    else if (!canAddHero) hireReason = 'Roster full';
 
     // Candidate cards + per-slot Hire buttons.
     const slotXs = SLOT_X_BY_COUNT[candidates.length as 3 | 4 | 5];
@@ -171,22 +166,32 @@ export class TavernPanelScene extends Phaser.Scene {
         size: 'small',
       });
 
+      const candidateCost = HIRE_COST_BY_LEVEL[candidate.level as 1 | 2 | 3];
+      const canAffordThis = free || vaultGold >= candidateCost;
+      const canHireThis = canAddHero && canAffordThis;
+
+      let thisHireReason = '';
+      if (!canAffordThis) thisHireReason = 'Not enough gold';
+      else if (!canAddHero) thisHireReason = 'Roster full';
+
+      const buttonText = free ? 'Hire (free)' : `Hire (${candidateCost}g)`;
+
       new Button({
         scene: this,
         x: slotX - HIRE_BUTTON_W / 2,
         y: HIRE_BUTTON_Y,
         width: HIRE_BUTTON_W,
         height: HIRE_BUTTON_H,
-        enabled: canHire,
-        text: free ? 'Hire (free)' : `Hire (${HIRE_COST}g)`,
+        enabled: canHireThis,
+        text: buttonText,
         font: 'medium',
         fontSize: 16,
         onClick: () => this.hire(i, candidates),
       });
 
-      if (!canHire && hireReason) {
+      if (!canHireThis && thisHireReason) {
         this.add
-          .text(slotX, HIRE_REASON_Y, hireReason, {
+          .text(slotX, HIRE_REASON_Y, thisHireReason, {
             fontFamily: 'monospace',
             fontSize: '11px',
             color: '#cc6666',
@@ -216,17 +221,20 @@ export class TavernPanelScene extends Phaser.Scene {
     const state = appState.get();
     const free = isSoftlocked(state);
     if (!canAdd(state.roster)) return;
-    if (!free && balance(state.vault) < HIRE_COST) return;
 
     const hired = candidates[slotIndex];
+    const cost = HIRE_COST_BY_LEVEL[hired.level as 1 | 2 | 3];
+    if (!free && balance(state.vault) < cost) return;
+
     const rng = createRngFromState(state.campRngState);
-    const replacement = generateCandidate(rng, state.unlocks.classes);
+    const tavernLevel = state.buildingLevels.tavern;
+    const replacement = generateCandidate(rng, state.unlocks.classes, tavernLevel);
     const newCandidates = [...candidates];
     newCandidates[slotIndex] = replacement;
 
     appState.update((s) => ({
       ...s,
-      vault: free ? s.vault : spend(s.vault, HIRE_COST),
+      vault: free ? s.vault : spend(s.vault, cost),
       roster: addHero(s.roster, hired),
       tavernCandidates: newCandidates,
       campRngState: rng.getState(),
@@ -245,6 +253,7 @@ export class TavernPanelScene extends Phaser.Scene {
       rng,
       state.unlocks.classes,
       tavernCandidateCount(tavernLevel),
+      tavernLevel,
     );
 
     appState.update((s) => ({

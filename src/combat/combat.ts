@@ -3,6 +3,7 @@ import type { Rng } from '@util/rng';
 import { pickAbility } from './ability_priority';
 import { setCooldown, tickCooldowns } from './cooldowns';
 import { applyAbility } from './effects';
+import { applyPerkAction, gatherTriggeredEffects, recomputeBelowHpAuras } from './perk_hooks';
 import { collapseAfterDeath, shuffle, shuffleWouldProgress } from './positions';
 import { tickStatuses } from './statuses';
 import { computeInitiative } from './turn_order';
@@ -42,6 +43,13 @@ export function resolveCombat(initialState: CombatState, rng: Rng): CombatResult
     enemies: livingBySide(state, 'enemy').map((c) => c.id),
   });
 
+  // Combat-start init: actors who begin below their whenBelowHp threshold
+  // (e.g. wounded heroes returning to the fight) need the aura applied from
+  // turn 1 rather than waiting for the next HP write.
+  for (const c of state.combatants) {
+    recomputeBelowHpAuras(c, events);
+  }
+
   for (let round = 1; round <= ROUND_CAP; round++) {
     state.round = round;
 
@@ -64,6 +72,7 @@ export function resolveCombat(initialState: CombatState, rng: Rng): CombatResult
       const heal = Math.min(c.regenPerRound, c.maxHp - c.currentHp);
       if (heal > 0) {
         c.currentHp += heal;
+        recomputeBelowHpAuras(c, events);
         events.push({
           kind: 'heal_applied',
           sourceId: c.id,
@@ -85,6 +94,10 @@ export function resolveCombat(initialState: CombatState, rng: Rng): CombatResult
 
       const willBeStunned = 'stunned' in combatant.statuses;
       tickStatuses(combatant, events);
+      // tickStatuses can mutate HP via poison ticks (damage) and regen ticks
+      // (heal). Recompute the whenBelowHp aura after both directions are
+      // resolved for this combatant's turn.
+      recomputeBelowHpAuras(combatant, events);
 
       if (combatant.isDead) {
         // Poison (or future tick-damage status) killed them on their own turn.
@@ -98,6 +111,37 @@ export function resolveCombat(initialState: CombatState, rng: Rng): CombatResult
       if (willBeStunned) {
         events.push({ kind: 'turn_skipped', combatantId: id, reason: 'stunned' });
       } else {
+        // Fire firstAttack triggered effects the actor hasn't fired yet
+        // (picked perks + equipped legendaries). Runs BEFORE action execution
+        // so any `damageMod` is stashed on the combatant before applyDamage
+        // looks at it. `damageMod` actions are not applied as state — they
+        // set pendingDamageMod, which applyDamage consumes once on the next
+        // outgoing hit. Non-damageMod actions (gainStat, applyStatus, etc.)
+        // fire through applyPerkAction.
+        const firedSet = new Set<string>(combatant.firstAttackFiredSourceIds ?? []);
+        let firedAny = false;
+        for (const { sourceId, effect: t } of gatherTriggeredEffects(combatant)) {
+          if (t.trigger.kind !== 'firstAttack') continue;
+          if (firedSet.has(sourceId)) continue;
+          firedSet.add(sourceId);
+          firedAny = true;
+          if (t.action.kind === 'damageMod') {
+            combatant.pendingDamageMod =
+              (combatant.pendingDamageMod ?? 1) * t.action.multiplier;
+          } else {
+            applyPerkAction({
+              self: combatant,
+              other: undefined,
+              sourceId,
+              action: t.action,
+              events,
+            });
+          }
+        }
+        if (firedAny) {
+          combatant.firstAttackFiredSourceIds = Array.from(firedSet);
+        }
+
         const picked = pickAbility(combatant, state, rng);
         if (picked) {
           const ability = ABILITIES[picked.abilityId];

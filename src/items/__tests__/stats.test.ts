@@ -60,6 +60,56 @@ describe('applyEquipmentStats', () => {
   });
 });
 
+describe('applyEquipmentStats — legendary items', () => {
+  const NONZERO_STATS: Stats = { hp: 30, attack: 5, defense: 2, speed: 5, mind: 1, crit: 5, dodge: 5 };
+
+  it("Lich's Crown contributes +5 Mind and +5 Crit", () => {
+    const equipment: HeroEquipment = {
+      weapon: sword('w0'),
+      hat: {
+        id: 'h0', baseId: 'hat_hood', slot: 'hat', rarity: 'legendary',
+        affixes: [], floorRolledAt: 10, legendaryId: 'lichs_crown',
+      },
+    };
+    const result = applyEquipmentStats(NONZERO_STATS, equipment);
+    expect(result.mind).toBe(NONZERO_STATS.mind + 5);
+    expect(result.crit).toBe(NONZERO_STATS.crit + 5);
+    // Defense untouched by Lich's Crown
+    expect(result.defense).toBe(NONZERO_STATS.defense);
+  });
+
+  it('Phylactery contributes +2 Defense (HP not added here)', () => {
+    const equipment: HeroEquipment = {
+      weapon: sword('w0'),
+      outfit: {
+        id: 'o0', baseId: 'outfit_cloth', slot: 'outfit', rarity: 'legendary',
+        affixes: [], floorRolledAt: 10, legendaryId: 'phylactery',
+      },
+    };
+    const result = applyEquipmentStats(NONZERO_STATS, equipment);
+    expect(result.defense).toBe(NONZERO_STATS.defense + 2);
+    // HP is computed via gearTotal/computeMaxHp, not here — outfit_cloth would add
+    // +6 HP normally, but legendary path skips base stats. So HP is unchanged.
+    expect(result.hp).toBe(NONZERO_STATS.hp);
+  });
+
+  it('legendary item skips base stats and affixes (no double-dipping)', () => {
+    const equipment: HeroEquipment = {
+      // legendary hat with hat_hood baseId: hat_hood has no base stats anyway,
+      // but verify even a baseId with stats wouldn't add.
+      weapon: sword('w0'),
+      outfit: {
+        id: 'o0', baseId: 'outfit_cloth', slot: 'outfit', rarity: 'legendary',
+        affixes: [{ affixId: 'of_power', value: 99 }], // should be ignored
+        floorRolledAt: 10, legendaryId: 'phylactery',
+      },
+    };
+    const result = applyEquipmentStats(NONZERO_STATS, equipment);
+    // of_power affix would add +99 attack normally, but legendary skips affixes.
+    expect(result.attack).toBe(NONZERO_STATS.attack + 1); // sword base only
+  });
+});
+
 describe('rarePropertyFields', () => {
   it('returns burningWeaponDamage for of_burning weapon', () => {
     const eq: HeroEquipment = {

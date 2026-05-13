@@ -4,6 +4,8 @@ import type {
   ClassId,
   CombatantTag,
   EnemyId,
+  LegendaryId,
+  LegendaryPassiveId,
   PerkId,
   PetSpeciesId,
   SlotIndex,
@@ -52,7 +54,22 @@ export interface Combatant {
   preferredSlots?: readonly SlotIndex[];
   tags?: readonly CombatantTag[];
   traitIds?: readonly TraitId[];
-  perkId?: PerkId;
+  pickedPerks: readonly PerkId[];
+  /** Equipped named-legendary item ids. Used alongside `pickedPerks` to drive
+   *  the triggered-effect hook system (legendary items' triggered effects fire
+   *  just like perks). Always present; defaults to `[]` in creators. */
+  equippedLegendaryIds: readonly LegendaryId[];
+  /** Equipped random-legendary passive ids (one per slot at most). Always
+   *  present; defaults to `[]` in creators. */
+  equippedLegendaryPassiveIds: readonly LegendaryPassiveId[];
+  /** Per-combat tracker for firstAttack-triggered sources (perks and legendaries).
+   *  Cleared at combat start. Holds source ids (`PerkId | LegendaryId`) that have
+   *  already fired their firstAttack trigger this combat. Stored as string[] so
+   *  the union widens cleanly without per-id discrimination. */
+  firstAttackFiredSourceIds?: readonly string[];
+  /** Stashed multiplier for the next outgoing damage instance. Used by firstAttack
+   *  perks with damageMod action. Consumed once at applyDamage and reset to 1. */
+  pendingDamageMod?: number;
   damageTakenMultiplier?: number;
   // Candidates for consolidation into a `passives` bag once 3+ more land.
   lifestealPercent?: number;

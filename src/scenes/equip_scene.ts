@@ -1,16 +1,17 @@
 import * as Phaser from 'phaser';
 import { CLASSES } from '@data/classes';
-import type { AbilityId, Item, ItemSlot } from '@data/types';
+import type { AbilityId, Item, ItemSlot, Rarity } from '@data/types';
 import { BASE_ITEMS } from '@data/items';
 import { ABILITIES } from '@data/abilities';
 import type { Hero } from '@heroes/hero';
 import { applyEquipmentStats } from '@items/stats';
 import { describeKitStatus, resolveCombatAbilities, resolveAbilityDiff } from '@items/kit';
-import { itemAffixDescription, itemDisplayName, previewStats, type StatPreview } from '@items/selectors';
+import { itemAffixDescription, itemDisplayName, itemFlavor, previewStats, type StatPreview } from '@items/selectors';
 import type { Stats } from '@combat/types';
 import { equipFromStash, unequipToStash } from '@items/equip_camp';
 import { equipFromPack, unequipToPack } from '@run/equip_run';
 import { heroToLoadout } from '@render/hero_loadout';
+import { RARITY_COLOR_HEX, RARITY_COLOR_NUM } from '@render/rarity_colors';
 import { SHEET } from '@render/frames';
 import {
   Button,
@@ -53,18 +54,6 @@ const HERO_LIST_VISIBLE_ROWS = 4;
 
 const SELECTION_GOLD = 0xffcc66;
 
-const RARITY_COLOR_NUM: Record<'common' | 'uncommon' | 'rare', number> = {
-  common: 0xcccccc,
-  uncommon: 0x4488ff,
-  rare: 0xffcc66,
-};
-
-const RARITY_COLOR_HEX: Record<'common' | 'uncommon' | 'rare', string> = {
-  common: '#cccccc',
-  uncommon: '#4488ff',
-  rare: '#ffcc66',
-};
-
 const RIGHT_PANE_X = LEFT_PANE_X + LEFT_PANE_W + 10;
 const RIGHT_PANE_Y = PANEL_Y + 70;
 const RIGHT_PANE_W = 620;
@@ -103,10 +92,12 @@ const SLOT_TAG: Record<ItemSlot, string> = {
   hat: '[h]',
 };
 
-const RARITY_ORDER: Record<'common' | 'uncommon' | 'rare', number> = {
+const RARITY_ORDER: Record<Rarity, number> = {
   common: 0,
   uncommon: 1,
   rare: 2,
+  epic: 3,
+  legendary: 4,
 };
 
 const SLOT_ORDER: Record<ItemSlot, number> = {
@@ -683,6 +674,20 @@ export class EquipScene extends Phaser.Scene {
             fontFamily: 'monospace',
             fontSize: '11px',
             color: '#aaaaaa',
+          })
+          .setOrigin(0.5),
+      );
+    }
+
+    const flavor = itemFlavor(item);
+    if (flavor !== undefined) {
+      container.add(
+        this.add
+          .text(cx, cy + 18, flavor, {
+            fontFamily: 'monospace',
+            fontSize: '10px',
+            color: '#bb8866',
+            fontStyle: 'italic',
           })
           .setOrigin(0.5),
       );

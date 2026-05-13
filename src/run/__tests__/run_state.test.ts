@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createHeroCombatant } from '@combat/combatant';
 import type { CombatResult, CombatState } from '@combat/types';
-import { xpForEliteNode } from '@data/leveling';
-import type { Item, SlotIndex } from '@data/types';
+import { xpForBossNode, xpForCombatNode, xpForEliteNode } from '@data/leveling';
+import type { Item, SlotIndex, Unlocks } from '@data/types';
 import { DUNGEONS } from '@data/dungeons';
 import type { Encounter, Node } from '@dungeon/node';
 import { createHero, type Hero } from '@heroes/hero';
@@ -450,7 +450,7 @@ describe('completeCombat — XP awards', () => {
     expect(knight.baseStats.defense).toBe(5); // base 4 + 1
   });
 
-  it('crossing to level 5 sets pendingPerk', () => {
+  it('crossing to level 5 pushes l5 onto pendingPerks', () => {
     let rs = startRun('crypt', makeParty(), 1, createRng(1));
     rs = {
       ...rs,
@@ -461,7 +461,7 @@ describe('completeCombat — XP awards', () => {
     for (const hero of rs2.party) {
       expect(hero.xp).toBe(4000);
       expect(hero.level).toBe(5);
-      expect(hero.pendingPerk).toBe(true);
+      expect(hero.pendingPerks).toEqual(['l5']);
     }
   });
 });
@@ -1336,6 +1336,9 @@ function mockCombatResultWithPet(
     aiPriority: ['wolf_howl', 'wolf_bite'],
     preferredSlots: [4],
     tags: ['beast'],
+    pickedPerks: [],
+    equippedLegendaryIds: [],
+    equippedLegendaryPassiveIds: [],
     isDead: petIsDead,
   });
   const state: CombatState = { combatants, round: 1, exhaustionLevel: 0 };
@@ -1458,6 +1461,85 @@ describe('pressOn — pendingMilestones persists across floor advance', () => {
   });
 });
 
+describe('L10 milestone end-to-end flow', () => {
+  // Sentinel Unlocks fixtures threaded through completeCombat. The real
+  // production caller (corridor_scene) passes `appState.get().unlocks`; tests
+  // build minimal fixtures here so we can flip `legendaryEnabled` independently.
+  const UNLOCKS_PRE: Unlocks = {
+    classes: [],
+    dungeons: ['crypt'],
+    buildings: [],
+    legendaryEnabled: false,
+  };
+  const UNLOCKS_POST: Unlocks = {
+    classes: [],
+    dungeons: ['crypt'],
+    buildings: [],
+    legendaryEnabled: true,
+  };
+
+  it('completing a boss combat that crosses a hero to L10 pushes first_hero_l10 onto pendingMilestones', () => {
+    // Walk to the floor-1 boss node, then inject XP=19999 (L9) into the party
+    // so the next XP grant — xpForBossNode(1) = 30 — crosses every hero to L10.
+    // legendaryEnabled=false so detectXpMilestones evaluates the level-crossing.
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = advanceToBossNode(rs);
+    rs = {
+      ...rs,
+      party: rs.party.map((h) => ({ ...h, xp: 19999, level: 9 })),
+    };
+    expect(xpForBossNode(rs.currentFloorNumber)).toBeGreaterThan(0);
+
+    const bossResult = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const { runState: after } = completeCombat(rs, bossResult, createRng(99), UNLOCKS_PRE);
+
+    expect(after.party[0].level).toBeGreaterThanOrEqual(10);
+    expect(after.pendingMilestones).toContain('first_hero_l10');
+  });
+
+  it('post-milestone boss kill drops a named legendary (one of the bone_lich pool)', () => {
+    // Walk to the floor-1 boss node (bone_lich). With legendaryEnabled=true,
+    // rollLoot's boss-drop substitution swaps the normal drop for a named
+    // legendary from BOSS_LEGENDARIES.bone_lich = ['lichs_crown', 'phylactery'].
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = advanceToBossNode(rs);
+
+    // Sanity: we're at a boss node. The Crypt dungeon's bossId is bone_lich,
+    // which is what completeCombat reads (via DUNGEONS[dungeonId].bossId) to
+    // pass into rollLoot's BOSS_LEGENDARIES lookup.
+    expect(currentNode(rs).type).toBe('boss');
+    expect(DUNGEONS.crypt.bossId).toBe('bone_lich');
+
+    const preItemCount = rs.pack.items.length;
+    const bossResult = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const { runState: after } = completeCombat(rs, bossResult, createRng(99), UNLOCKS_POST);
+
+    // Boss drops are guaranteed; pack item count must increase by exactly one.
+    expect(after.pack.items.length).toBe(preItemCount + 1);
+    const drop = after.pack.items[after.pack.items.length - 1];
+    expect(drop.rarity).toBe('legendary');
+    expect(drop.legendaryId).toBeDefined();
+    expect(['lichs_crown', 'phylactery']).toContain(drop.legendaryId);
+  });
+
+  it('pre-milestone boss kill drops normal loot (no legendaryId)', () => {
+    // Same setup but legendaryEnabled=false: rollLoot's boss-drop substitution
+    // is skipped, so the drop goes through the normal rarity-table path. The
+    // resulting Item must have no `legendaryId` field.
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = advanceToBossNode(rs);
+
+    const preItemCount = rs.pack.items.length;
+    const bossResult = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const { runState: after } = completeCombat(rs, bossResult, createRng(99), UNLOCKS_PRE);
+
+    expect(after.pack.items.length).toBe(preItemCount + 1);
+    const drop = after.pack.items[after.pack.items.length - 1];
+    expect(drop.legendaryId).toBeUndefined();
+    expect(drop.rarity).not.toBe('legendary');
+  });
+});
+
 describe('end-to-end — Crypt clear unlocks Sunken Keep', () => {
   it('full canonical Crypt run: cashout SaveFile gets sunken_keep unlocked', () => {
     // Walk a Crypt run to floor 3, defeat the boss, cash out, apply milestones.
@@ -1551,5 +1633,117 @@ describe('petsDownByHeroId — initialization', () => {
     const seed = 1;
     const rs = startRun('crypt', party, seed, createRng(seed));
     expect(rs.petsDownByHeroId).toEqual([]);
+  });
+});
+
+describe('traineeXpBase accumulator', () => {
+  // Run parked at a non-combat destination so completeSurpriseCombat is valid.
+  // Mirrors the helper in the completeSurpriseCombat describe block.
+  function runAtNonCombatNode(): ReturnType<typeof startRun> {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    while (true) {
+      const node = currentNode(rs);
+      if (
+        node.type === 'shop' ||
+        node.type === 'camp' ||
+        node.type === 'event' ||
+        node.type === 'treasure'
+      ) {
+        return rs;
+      }
+      if (rs.awaitingFork) {
+        const choices = nextNodeChoices(rs);
+        const nonCombat = choices.find(
+          (n) => n.type === 'shop' || n.type === 'camp' || n.type === 'event' || n.type === 'treasure',
+        );
+        rs = chooseNextNode(rs, (nonCombat ?? choices[0]).id);
+        continue;
+      }
+      if (node.type === 'combat' || node.type === 'elite') {
+        rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+        continue;
+      }
+      throw new Error('no non-combat node reached before boss in test setup');
+    }
+  }
+
+  it('startRun initializes traineeXpBase to 0', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    expect(rs.traineeXpBase).toBe(0);
+  });
+
+  it('completeCombat victory at a combat node increments by xpForCombatNode(floor)', () => {
+    const rs = startRun('crypt', makeParty(), 1, createRng(1));
+    // Start node is row-0 combat. xpForCombatNode(1) = 5.
+    expect(currentNode(rs).type).toBe('combat');
+    const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const before = rs.traineeXpBase;
+    const { runState: next } = completeCombat(rs, result, createRng(99));
+    expect(next.traineeXpBase).toBe(before + xpForCombatNode(rs.currentFloorNumber));
+  });
+
+  it('completeCombat victory at an elite node increments by xpForEliteNode(floor)', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    // Find an elite node on floor 1.
+    const eliteNode = rs.currentFloorNodes.find((n): n is Extract<Node, { type: 'elite' }> => n.type === 'elite');
+    if (!eliteNode) {
+      // Skip if seed didn't place an elite on floor 1.
+      return;
+    }
+    // Mirror the same pattern used in the elite-gold test above: jump straight
+    // to the elite by overwriting currentNodeId; we're testing accumulator math,
+    // not traversal.
+    rs = { ...rs, currentNodeId: eliteNode.id };
+    const before = rs.traineeXpBase;
+    const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const { runState: next } = completeCombat(rs, result, createRng(99));
+    expect(next.traineeXpBase).toBe(before + xpForEliteNode(rs.currentFloorNumber));
+  });
+
+  it('completeCombat victory at a boss node increments by xpForBossNode(floor)', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = advanceToBossNode(rs);
+    expect(currentNode(rs).type).toBe('boss');
+    const before = rs.traineeXpBase;
+    const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const { runState: next } = completeCombat(rs, result, createRng(99));
+    expect(next.traineeXpBase).toBe(before + xpForBossNode(rs.currentFloorNumber));
+  });
+
+  it('completeSurpriseCombat victory increments by xpForCombatNode(floor)', () => {
+    const rs = runAtNonCombatNode();
+    const before = rs.traineeXpBase;
+    const result = mockCombatResult(rs.party, [20, 14, 15], 'player_victory');
+    const { runState: next } = completeSurpriseCombat(rs, result, createRng(99));
+    expect(next.traineeXpBase).toBe(before + xpForCombatNode(rs.currentFloorNumber));
+  });
+
+  it('player_defeat at completeCombat carries traineeXpBase into the WipeOutcome (no increment)', () => {
+    const rs0 = startRun('crypt', makeParty(), 1, createRng(1));
+    const rs = { ...rs0, traineeXpBase: 50 };
+    const result = mockCombatResult(rs.party, [0, 0, 0], 'player_defeat');
+    const { wipe } = completeCombat(rs, result, createRng(99));
+    expect(wipe).toBeDefined();
+    expect(wipe!.traineeXpBase).toBe(50);
+  });
+
+  it('player_defeat at completeSurpriseCombat carries traineeXpBase into the WipeOutcome (no increment)', () => {
+    const rs0 = runAtNonCombatNode();
+    const rs = { ...rs0, traineeXpBase: 75 };
+    const result = mockCombatResult(rs.party, [0, 0, 0], 'player_defeat');
+    const { wipe } = completeSurpriseCombat(rs, result, createRng(99));
+    expect(wipe).toBeDefined();
+    expect(wipe!.traineeXpBase).toBe(75);
+  });
+
+  it('pressOn preserves traineeXpBase across floor advancement', () => {
+    let rs = startRun('crypt', makeParty(), 1, createRng(1));
+    rs = advanceToBossNode(rs);
+    rs = completeCombat(rs, mockCombatResult(rs.party, [20, 14, 15], 'player_victory'), createRng(99)).runState;
+    // Inject a known value before pressOn so the assertion isn't sensitive to
+    // the boss-XP accumulation that just happened.
+    const tagged = { ...rs, traineeXpBase: 120 };
+    const next = pressOn(tagged, createRng(99));
+    expect(next.traineeXpBase).toBe(120);
   });
 });

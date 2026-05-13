@@ -2,7 +2,7 @@ import { ENEMIES } from '@data/enemies';
 import { MODIFIERS, type ModifierId } from '@data/modifiers';
 import { resolveCombatAbilities } from '@items/kit';
 import { applyEquipmentStats, rarePropertyFields } from '@items/stats';
-import type { EnemyId, SlotIndex, Wound } from '@data/types';
+import type { EnemyId, HeroEquipment, LegendaryId, LegendaryPassiveId, SlotIndex, Wound } from '@data/types';
 import { WOUNDS } from '@data/wounds';
 import { createEnemyCombatant, createHeroCombatant, createPetCombatant } from '@combat/combatant';
 import { PERKS } from '@data/perks';
@@ -44,6 +44,26 @@ function computeDamageTakenMultiplier(wounds: readonly Wound[]): number {
   return mult;
 }
 
+function gatherEquippedLegendaryIds(equipment: HeroEquipment): readonly LegendaryId[] {
+  const out: LegendaryId[] = [];
+  for (const slot of ['weapon', 'shield', 'outfit', 'hat'] as const) {
+    const item = equipment[slot];
+    if (item?.legendaryId !== undefined) out.push(item.legendaryId);
+  }
+  return out;
+}
+
+function gatherEquippedLegendaryPassiveIds(
+  equipment: HeroEquipment,
+): readonly LegendaryPassiveId[] {
+  const out: LegendaryPassiveId[] = [];
+  for (const slot of ['weapon', 'shield', 'outfit', 'hat'] as const) {
+    const item = equipment[slot];
+    if (item?.legendaryPassive !== undefined) out.push(item.legendaryPassive);
+  }
+  return out;
+}
+
 function scaleEnemyStats(enemyId: EnemyId, scale: ScaleFactors): Stats {
   const base = ENEMIES[enemyId].baseStats;
   return {
@@ -80,7 +100,9 @@ export function buildCombatState(
         traitIds: hero.traitIds,
         abilities,
         aiPriority,
-        ...(hero.perkId !== undefined ? { perkId: hero.perkId } : {}),
+        pickedPerks: hero.pickedPerks,
+        equippedLegendaryIds: gatherEquippedLegendaryIds(hero.equipment),
+        equippedLegendaryPassiveIds: gatherEquippedLegendaryPassiveIds(hero.equipment),
         ...(damageTakenMultiplier !== 1 ? { damageTakenMultiplier } : {}),
         ...rareFields,
       }),
@@ -94,8 +116,11 @@ export function buildCombatState(
     if (hero.classId !== 'hunter' || !hero.petSpeciesId) continue;
     if (petsDownByHeroId.includes(hero.id)) continue;
     const heroCombatant = combatants[i];
-    const perk = hero.perkId ? PERKS[hero.perkId] : undefined;
-    const petAttackBonus = perk?.petAttackBonus ?? 0;
+    // Sum petAttackBonus across all picked perks (currently at most one L5 perk).
+    let petAttackBonus = 0;
+    for (const perkId of hero.pickedPerks) {
+      petAttackBonus += PERKS[perkId].petAttackBonus ?? 0;
+    }
     combatants.push(
       createPetCombatant(
         hero.petSpeciesId,

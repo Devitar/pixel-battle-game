@@ -25,9 +25,10 @@ function makeState(items: readonly Item[], gold = 0): SaveFile {
     vault: credit(createVault(), gold),
     stash: addItems(createStash(), items),
     unlocks: createDefaultUnlocks(),
-    buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
+    buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 1 },
     hospitalTreatmentsRemaining: 1,
     tavernCandidates: [],
+    traineeHeroIds: [null, null],
     campRngState: 0,
   };
 }
@@ -43,6 +44,26 @@ describe('itemSellValue', () => {
 
   it('returns 80g for rare', () => {
     expect(itemSellValue(makeItem('w', 'rare'))).toBe(80);
+  });
+});
+
+describe('itemSellValue — Epic tier', () => {
+  it('returns 200 for an epic item', () => {
+    const item: Item = {
+      id: 't0', baseId: 'sword_basic', slot: 'weapon', rarity: 'epic',
+      weaponType: 'sword', affixes: [], floorRolledAt: 10,
+    };
+    expect(itemSellValue(item)).toBe(200);
+  });
+});
+
+describe('itemSellValue — Legendary tier', () => {
+  it('returns 500 for a legendary item', () => {
+    const item: Item = {
+      id: 't0', baseId: 'hat_hood', slot: 'hat', rarity: 'legendary',
+      affixes: [], floorRolledAt: 10, legendaryId: 'lichs_crown',
+    };
+    expect(itemSellValue(item)).toBe(500);
   });
 });
 

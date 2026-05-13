@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels';
 import { removeHero, tickRosterWounds, updateHero } from '@camp/roster';
 import { addItems } from '@camp/stash';
+import { grantTraineeXp } from '@camp/trainee_xp';
 import { credit } from '@camp/vault';
 import { applyPendingMilestones } from '@run/milestones';
 import { cashout, pressOn, type RunState } from '@run/run_state';
@@ -76,6 +77,30 @@ export class CampScreenScene extends Phaser.Scene {
         color: '#ffcc66',
       })
       .setOrigin(0.5);
+
+    // Training Grounds preview — show would-be trainee xp grant (pure preview,
+    // does not mutate state; the actual grant runs in onLeave).
+    {
+      const previewState = appState.get();
+      const previewActiveIds = [
+        ...run.party.map((h) => h.id),
+        ...run.fallen.map((h) => h.id),
+        ...run.lost.map((h) => h.id),
+      ];
+      const preview = grantTraineeXp(previewState, run.traineeXpBase, previewActiveIds);
+      if (preview.eligibleCount > 0) {
+        const trainees = preview.eligibleCount;
+        const xp = preview.xpPerTrainee;
+        this.add
+          .text(
+            480,
+            180,
+            `Training Grounds: ${trainees} trainee${trainees === 1 ? '' : 's'} will gain ${xp} XP.`,
+            { fontFamily: 'monospace', fontSize: '14px', color: '#aaddaa' },
+          )
+          .setOrigin(0.5);
+      }
+    }
 
     // Party row — 3 large hero cards. Wound badges auto-render.
     for (let i = 0; i < run.party.length; i++) {
@@ -174,6 +199,12 @@ export class CampScreenScene extends Phaser.Scene {
     const fallenIds = new Set(outcome.heroesFallen.map((h) => h.id));
     const lostIds = new Set(outcome.heroesLost.map((h) => h.id));
 
+    const activeIds = [
+      ...outcome.heroesReturned.map((h) => h.id),
+      ...outcome.heroesFallen.map((h) => h.id),
+      ...outcome.heroesLost.map((h) => h.id),
+    ];
+
     appState.update((s) => {
       const vault = credit(s.vault, outcome.goldBanked);
       const stash = addItems(s.stash, outcome.itemsBanked);
@@ -203,7 +234,8 @@ export class CampScreenScene extends Phaser.Scene {
         runState: undefined,
         runRngState: undefined,
       };
-      return applyPendingMilestones(next, outcome.milestonesTriggered);
+      const grant = grantTraineeXp(next, run.traineeXpBase, activeIds);
+      return applyPendingMilestones(grant.state, outcome.milestonesTriggered);
     });
 
     this.scene.start('camp');

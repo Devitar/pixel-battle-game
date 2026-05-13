@@ -14,16 +14,29 @@ export class CampScene extends Phaser.Scene {
   create(): void {
     this.buildHud();
     this.buildGround();
-    this.buildBuilding('Tavern', 180, 0x664433, 100, 110, 'tavern_panel');
-    this.buildBuilding('Blacksmith', 300, 0x665533, 100, 120, 'blacksmith_panel');
-    this.buildBuilding('Barracks', 440, 0x555555, 100, 130, 'barracks_panel');
-    this.buildBuilding('Hospital', 580, 0x885566, 100, 100, 'hospital_panel');
-    if (appState.get().unlocks.buildings.includes('chapel')) {
-      this.buildBuilding('Chapel', 720, 0x886688, 90, 110, 'chapel_panel');
-      this.buildBuilding('Expeditions', 850, 0x998866, 80, 60, 'expeditions_panel');
-    } else {
-      this.buildBuilding('Expeditions', 720, 0x998866, 80, 60, 'expeditions_panel');
+    type CampTile = {
+      name: string; key: string; color: number; width: number; height: number;
+    };
+    const tiles: CampTile[] = [
+      { name: 'Tavern',     key: 'tavern_panel',     color: 0x664433, width: 100, height: 110 },
+      { name: 'Blacksmith', key: 'blacksmith_panel', color: 0x665533, width: 100, height: 120 },
+      { name: 'Barracks',   key: 'barracks_panel',   color: 0x555555, width: 100, height: 130 },
+      { name: 'Hospital',   key: 'hospital_panel',   color: 0x885566, width: 100, height: 100 },
+    ];
+    const unlockedBuildings = appState.get().unlocks.buildings;
+    if (unlockedBuildings.includes('chapel')) {
+      tiles.push({ name: 'Chapel', key: 'chapel_panel', color: 0x886688, width: 90, height: 110 });
     }
+    if (unlockedBuildings.includes('training_grounds')) {
+      tiles.push({ name: 'Training', key: 'training_grounds_panel', color: 0x668866, width: 100, height: 120 });
+    }
+    tiles.push({ name: 'Expeditions', key: 'expeditions_panel', color: 0x998866, width: 80, height: 60 });
+
+    const FIRST_X = 180;
+    const STEP_X  = tiles.length >= 7 ? 125 : 130;
+    tiles.forEach((tile, i) => {
+      this.buildBuilding(tile.name, FIRST_X + i * STEP_X, tile.color, tile.width, tile.height, tile.key);
+    });
     this.buildDevHints();
     this.maybeBuildResetButton();
 
@@ -143,7 +156,7 @@ export class CampScene extends Phaser.Scene {
   }
 
   private maybeLaunchPerkPicker(): void {
-    const pending = listHeroes(appState.get().roster).find((h) => h.pendingPerk);
+    const pending = listHeroes(appState.get().roster).find((h) => h.pendingPerks.length > 0);
     if (!pending) return;
     this.scene.launch('perk_overlay', { heroId: pending.id });
     this.scene.pause();

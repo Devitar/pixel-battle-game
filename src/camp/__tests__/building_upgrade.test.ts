@@ -13,9 +13,10 @@ function makeBaseState(gold = 1000): SaveFile {
     vault: credit(createVault(), gold),
     stash: createStash(),
     unlocks: createDefaultUnlocks(),
-    buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
+    buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 1 },
     hospitalTreatmentsRemaining: 1,
     tavernCandidates: [],
+    traineeHeroIds: [null, null],
     campRngState: 0,
   };
 }
@@ -40,7 +41,7 @@ describe('applyBuildingUpgrade', () => {
   it('Barracks L2 → L3 deducts 500g and grows capacity to 20', () => {
     const at_l2: SaveFile = {
       ...makeBaseState(),
-      buildingLevels: { tavern: 1, barracks: 2, blacksmith: 1, hospital: 1, chapel: 1 },
+      buildingLevels: { tavern: 1, barracks: 2, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 1 },
       roster: { ...createRoster(), capacity: 16 },
     };
     const after = applyBuildingUpgrade(at_l2, 'barracks');
@@ -52,7 +53,7 @@ describe('applyBuildingUpgrade', () => {
   it('throws when attempting to upgrade past max', () => {
     const at_l3: SaveFile = {
       ...makeBaseState(),
-      buildingLevels: { tavern: 3, barracks: 3, blacksmith: 1, hospital: 1, chapel: 1 },
+      buildingLevels: { tavern: 3, barracks: 3, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 1 },
     };
     expect(() => applyBuildingUpgrade(at_l3, 'tavern')).toThrow(/already at max/);
     expect(() => applyBuildingUpgrade(at_l3, 'barracks')).toThrow(/already at max/);
@@ -71,12 +72,22 @@ describe('applyBuildingUpgrade', () => {
     expect(after.roster.capacity).toBe(12);
   });
 
-  it('Blacksmith L2 throws (L3 waits on epic rarity)', () => {
+  it('Blacksmith L2 → L3: deducts 500g, bumps level (unlocks rare → epic upgrades)', () => {
     const at_l2: SaveFile = {
       ...makeBaseState(),
-      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 2, hospital: 1, chapel: 1 },
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 2, hospital: 1, chapel: 1, training_grounds: 1 },
     };
-    expect(() => applyBuildingUpgrade(at_l2, 'blacksmith')).toThrow(/already at max/);
+    const after = applyBuildingUpgrade(at_l2, 'blacksmith');
+    expect(after.buildingLevels.blacksmith).toBe(3);
+    expect(after.vault.gold).toBe(500);  // 1000 - 500
+  });
+
+  it('Blacksmith L3 throws (max level)', () => {
+    const at_l3: SaveFile = {
+      ...makeBaseState(),
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 3, hospital: 1, chapel: 1, training_grounds: 1 },
+    };
+    expect(() => applyBuildingUpgrade(at_l3, 'blacksmith')).toThrow(/already at max/);
   });
 
   it('Hospital L1 → L2: deducts 200g, bumps level, refills treatments to new cap (2)', () => {
@@ -90,7 +101,7 @@ describe('applyBuildingUpgrade', () => {
   it('Hospital L2 → L3: deducts 500g and refills treatments to new cap (3)', () => {
     const at_l2: SaveFile = {
       ...makeBaseState(),
-      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 2, chapel: 1 },
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 2, chapel: 1, training_grounds: 1 },
       hospitalTreatmentsRemaining: 1,
     };
     const after = applyBuildingUpgrade(at_l2, 'hospital');
@@ -102,7 +113,7 @@ describe('applyBuildingUpgrade', () => {
   it('Hospital L3 throws (max level)', () => {
     const at_l3: SaveFile = {
       ...makeBaseState(),
-      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 3, chapel: 1 },
+      buildingLevels: { tavern: 1, barracks: 1, blacksmith: 1, hospital: 3, chapel: 1, training_grounds: 1 },
     };
     expect(() => applyBuildingUpgrade(at_l3, 'hospital')).toThrow(/already at max/);
   });

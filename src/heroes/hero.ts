@@ -1,11 +1,12 @@
 import { DEFAULT_FEET_SPRITE, DEFAULT_LEGS_SPRITE } from '@data/body_sprites';
 import { BASE_ITEMS, BASE_ITEM_STATS } from '@data/items';
 import { CLASSES } from '@data/classes';
+import { LEGENDARY_DEFS } from '@data/legendaries';
 import { PERKS } from '@data/perks';
 import { TRAITS } from '@data/traits';
 import type {
   ClassId, HeroEquipment, Item, ItemBaseId, ItemSlot,
-  PerkDef, PerkId, PetSpeciesId, StarterLoadout, TraitDef, TraitHpEffect, TraitId, Wound,
+  PerkDef, PerkId, PerkTier, PetSpeciesId, StarterLoadout, TraitDef, TraitHpEffect, TraitId, Wound,
 } from '@data/types';
 import type { Stats } from '@combat/types';
 
@@ -24,8 +25,8 @@ export interface Hero {
   equipment: HeroEquipment;
   xp: number;
   level: number;
-  pendingPerk: boolean;
-  perkId?: PerkId;
+  pendingPerks: readonly PerkTier[];
+  pickedPerks: readonly PerkId[];
   petSpeciesId?: PetSpeciesId;
 }
 
@@ -57,7 +58,8 @@ export function createHero(
     equipment,
     xp: 0,
     level: 1,
-    pendingPerk: false,
+    pendingPerks: [],
+    pickedPerks: [],
     ...(petSpeciesId !== undefined && classId === 'hunter' ? { petSpeciesId } : {}),
   };
 }
@@ -66,21 +68,23 @@ export function computeMaxHp(
   classBaseHp: number,
   traits: readonly TraitDef[],
   equipment: HeroEquipment,
-  perk?: PerkDef,
+  perks: readonly PerkDef[] = [],
 ): number {
   let base = classBaseHp;
   for (const trait of traits) {
     if (trait.hpEffect) base = applyHpEffect(base, trait.hpEffect);
   }
-  if (perk?.hpEffect) base = applyHpEffect(base, perk.hpEffect);
+  for (const perk of perks) {
+    if (perk.hpEffect) base = applyHpEffect(base, perk.hpEffect);
+  }
   return base + gearTotal(equipment);
 }
 
 export function recomputeMaxHp(hero: Hero): Hero {
   const classDef = CLASSES[hero.classId];
   const traits = hero.traitIds.map((id) => TRAITS[id]);
-  const perk = hero.perkId ? PERKS[hero.perkId] : undefined;
-  const newMaxHp = computeMaxHp(classDef.baseStats.hp, traits, hero.equipment, perk);
+  const perks = hero.pickedPerks.map((id) => PERKS[id]);
+  const newMaxHp = computeMaxHp(classDef.baseStats.hp, traits, hero.equipment, perks);
   return {
     ...hero,
     maxHp: newMaxHp,
@@ -90,7 +94,9 @@ export function recomputeMaxHp(hero: Hero): Hero {
 
 export function applyPerk(hero: Hero, perkId: PerkId): Hero {
   const perk = PERKS[perkId];
-  const updated: Hero = { ...hero, perkId, pendingPerk: false };
+  const nextPending = hero.pendingPerks.length > 0 ? hero.pendingPerks.slice(1) : [];
+  const nextPicked = [...hero.pickedPerks, perkId];
+  const updated: Hero = { ...hero, pendingPerks: nextPending, pickedPerks: nextPicked };
   if (perk.hpEffect) {
     const newMaxHp = applyHpEffect(hero.maxHp, perk.hpEffect);
     const ratio = hero.maxHp > 0 ? newMaxHp / hero.maxHp : 1;
@@ -110,6 +116,13 @@ function gearTotal(equipment: HeroEquipment): number {
   for (const slot of ['weapon', 'shield', 'outfit', 'hat'] as const) {
     const item = equipment[slot];
     if (!item) continue;
+    // Legendary items contribute hpBonus only; they bypass the per-baseId base
+    // HP and of_vigor affix aggregation (the legendary's stats record is the
+    // sole stat source, applied separately by applyEquipmentStats).
+    if (item.legendaryId !== undefined) {
+      gear += LEGENDARY_DEFS[item.legendaryId].hpBonus ?? 0;
+      continue;
+    }
     const baseStats = BASE_ITEM_STATS[item.baseId];
     if (baseStats.hp !== undefined) gear += baseStats.hp;
     for (const a of item.affixes) {

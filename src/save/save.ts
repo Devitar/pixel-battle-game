@@ -1,3 +1,4 @@
+import { TRAINEE_SLOT_CAPACITY } from '@camp/building_levels';
 import { HIRE_COST } from '@camp/buildings/tavern';
 import type { Roster } from '@camp/roster';
 import { createStash, type Stash } from '@camp/stash';
@@ -24,6 +25,12 @@ export interface SaveFile {
   buildingLevels: BuildingLevels;
   hospitalTreatmentsRemaining: number;
   tavernCandidates: readonly Hero[];
+  /** Training Grounds trainee slots. Length matches
+   *  `TRAINEE_SLOT_CAPACITY[buildingLevels.training_grounds]`. Each entry is
+   *  either a roster hero's id (currently a trainee) or null (empty slot).
+   *  Normalized on load: orphan ids (not in roster) are scrubbed to null,
+   *  the array is padded/truncated to current capacity. */
+  traineeHeroIds: readonly (string | null)[];
   /** Persisted RNG state for camp-side actions (Tavern hire/reroll, Blacksmith
    *  upgrade rolls, expedition-start seeding). Read via createRngFromState,
    *  advanced by the action, written back via rng.getState(). Mirrors the
@@ -109,6 +116,7 @@ export function createDefaultUnlocks(): Unlocks {
     classes: ['knight', 'archer', 'priest', 'barbarian', 'rogue', 'mage'],
     dungeons: ['crypt'],
     buildings: [],
+    legendaryEnabled: false,
   };
 }
 
@@ -123,11 +131,20 @@ function isPlausibleRawSave(parsed: unknown): parsed is { version: number } {
 // forward should ship as migrations in `migration.ts` instead, but existing
 // defaults here stay until each is folded into an explicit migration.
 // Single point of defaulting — do not scatter `?? createStash()` reads.
-function normalizeSaveFile(file: SaveFile): SaveFile {
-  return {
+export function normalizeSaveFile(file: SaveFile): SaveFile {
+  // Defensive backfill for unlocks.legendaryEnabled. The v6→v7 migration sets
+  // this for all persisted saves; the shim covers fixtures / paths that reach
+  // load without passing through migrate().
+  const unlocks: Unlocks = typeof file.unlocks?.legendaryEnabled === 'boolean'
+    ? file.unlocks
+    : { ...file.unlocks, legendaryEnabled: false };
+  const withDefaults: SaveFile = {
     ...file,
+    unlocks,
     stash: file.stash ?? createStash(),
-    buildingLevels: file.buildingLevels ?? { tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1 },
+    buildingLevels: file.buildingLevels ?? {
+      tavern: 1, barracks: 1, blacksmith: 1, hospital: 1, chapel: 1, training_grounds: 1,
+    },
     hospitalTreatmentsRemaining: file.hospitalTreatmentsRemaining ?? 1,
     tavernCandidates: file.tavernCandidates ?? [],
     roster: {
@@ -142,23 +159,61 @@ function normalizeSaveFile(file: SaveFile): SaveFile {
           traversedNodeIds: file.runState.traversedNodeIds ?? [file.runState.currentNodeId],
           surprisesThisFloor: file.runState.surprisesThisFloor ?? 0,
           pendingMilestones: file.runState.pendingMilestones ?? [],
+          traineeXpBase: file.runState.traineeXpBase ?? 0,
         },
+  };
+  return {
+    ...withDefaults,
+    traineeHeroIds: normalizeTraineeSlots(withDefaults),
   };
 }
 
 function normalizeHero(hero: Hero): Hero {
   // Legacy saves (pre-traitIds) stored a single `traitId: TraitId` field.
   // Wrap it in an array when upgrading from that shape.
-  const raw = hero as Hero & { traitId?: string };
+  const raw = hero as Hero & {
+    traitId?: string;
+    pendingPerk?: boolean;
+    perkId?: import('@data/types').PerkId;
+  };
   const traitIds: readonly string[] = hero.traitIds
     ?? (raw.traitId !== undefined ? [raw.traitId] : []);
+  // Defensive backfill for hero perk fields. The v5→v6 migration already
+  // converts legacy singular `pendingPerk`/`perkId` to the plural arrays, so
+  // post-migration saves should always have `pendingPerks`/`pickedPerks`.
+  // This shim covers: (a) heroes built by tests without these fields, and
+  // (b) any path where a hero reaches load without passing through migrate().
+  // The legacy-singular fallback branches are redundant for migrated saves
+  // but kept as belt-and-braces against fixtures / edge cases.
+  const pendingPerks: readonly import('@data/types').PerkTier[] = hero.pendingPerks
+    ?? (raw.pendingPerk ? (['l5'] as const) : []);
+  const pickedPerks: readonly import('@data/types').PerkId[] = hero.pickedPerks
+    ?? (raw.perkId !== undefined ? [raw.perkId] : []);
   return {
     ...hero,
     traitIds: traitIds as Hero['traitIds'],
     xp: hero.xp ?? 0,
     level: hero.level ?? 1,
-    pendingPerk: hero.pendingPerk ?? false,
+    pendingPerks,
+    pickedPerks,
     legsSpriteId: hero.legsSpriteId ?? DEFAULT_LEGS_SPRITE,
     feetSpriteId: hero.feetSpriteId ?? DEFAULT_FEET_SPRITE,
   };
+}
+
+// Length-matches traineeHeroIds to TRAINEE_SLOT_CAPACITY[training_grounds level]
+// and scrubs any id that no longer corresponds to a roster hero (e.g., hero
+// died and was removed from roster). Pads with null when shorter than capacity,
+// truncates when longer.
+function normalizeTraineeSlots(file: SaveFile): readonly (string | null)[] {
+  const level = file.buildingLevels?.training_grounds ?? 1;
+  const capacity = TRAINEE_SLOT_CAPACITY[level];
+  const rosterIds = new Set(file.roster.heroes.map((h) => h.id));
+  const current = file.traineeHeroIds ?? [];
+  const scrubbed = current.map((id) => (id !== null && rosterIds.has(id) ? id : null));
+  if (scrubbed.length === capacity) return scrubbed;
+  if (scrubbed.length < capacity) {
+    return [...scrubbed, ...new Array(capacity - scrubbed.length).fill(null)];
+  }
+  return scrubbed.slice(0, capacity);
 }

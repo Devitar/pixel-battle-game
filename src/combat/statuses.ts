@@ -1,6 +1,7 @@
 import { PERKS } from '@data/perks';
 import { TRAITS } from '@data/traits';
 import type { BuffableStat, TraitCondition } from '@data/types';
+import { recomputeBelowHpAuras } from './perk_hooks';
 import type { Combatant, CombatantId, CombatEvent } from './types';
 
 function evaluateTraitCondition(
@@ -30,11 +31,13 @@ export function getEffectiveStat(combatant: Combatant, stat: BuffableStat): numb
     }
   }
 
-  if (stat !== 'hp' && combatant.perkId) {
-    const perk = PERKS[combatant.perkId];
-    for (const effect of perk.statEffects ?? []) {
-      if (effect.stat === stat && evaluateTraitCondition(effect.condition, combatant)) {
-        total += effect.delta;
+  if (stat !== 'hp' && combatant.pickedPerks.length > 0) {
+    for (const perkId of combatant.pickedPerks) {
+      const perk = PERKS[perkId];
+      for (const effect of perk.statEffects ?? []) {
+        if (effect.stat === stat && evaluateTraitCondition(effect.condition, combatant)) {
+          total += effect.delta;
+        }
       }
     }
   }
@@ -78,6 +81,9 @@ export function tickStatuses(combatant: Combatant, events: CombatEvent[]): void 
       const e = status.effect;
       if ((e.kind === 'buff' || e.kind === 'debuff') && e.stat === 'hp') {
         combatant.maxHp -= e.delta;
+        // hp-buff/debuff expiry restores maxHp; resync any whenBelowHp aura
+        // against the new ratio (mirror of the apply site in effects.ts).
+        recomputeBelowHpAuras(combatant, events);
       }
       delete combatant.statuses[id];
       events.push({ kind: 'status_expired', targetId: combatant.id, statusId: status.statusId });

@@ -217,22 +217,40 @@ describe('getEffectiveStat — trait evaluation', () => {
 
 describe('getEffectiveStat — perk evaluation', () => {
   it('Precise combatant adds +5 to crit', () => {
-    const c = makeHeroCombatant('archer', 1, 'p0', { perkId: 'precise' });
+    const c = makeHeroCombatant('archer', 1, 'p0', { pickedPerks: ['precise'] });
     expect(getEffectiveStat(c, 'crit')).toBe(c.baseStats.crit + 5);
   });
 
-  it('Combatant with no perkId reads base + statuses + traits only', () => {
+  it('Combatant with empty pickedPerks reads base + statuses + traits only', () => {
     const c = makeHeroCombatant('knight', 1, 'p0');
-    expect(c.perkId).toBeUndefined();
+    expect(c.pickedPerks).toEqual([]);
     expect(getEffectiveStat(c, 'attack')).toBe(c.baseStats.attack);
   });
 
   it('Trait Sturdy + perk Iron Will stack additively on defense', () => {
     const c = makeHeroCombatant('knight', 1, 'p0', {
       traitIds: ['sturdy'],
-      perkId: 'iron_will',
+      pickedPerks: ['iron_will'],
     });
     expect(getEffectiveStat(c, 'defense')).toBe(c.baseStats.defense + 1 + 1);
+  });
+});
+
+describe('getEffectiveStat with multiple pickedPerks', () => {
+  it('sums statEffects across all picked perks', () => {
+    // iron_will: +1 defense (Knight); eagle_eye: +1 attack (Archer).
+    // getEffectiveStat reads the perk's statEffects regardless of class membership
+    // at the combatant level, so we can stack them on a single test combatant.
+    const c = makeHeroCombatant('knight', 1, 'p0', {
+      pickedPerks: ['iron_will', 'eagle_eye'],
+    });
+    expect(getEffectiveStat(c, 'defense')).toBe(c.baseStats.defense + 1);
+    expect(getEffectiveStat(c, 'attack')).toBe(c.baseStats.attack + 1);
+  });
+
+  it('returns base value when pickedPerks is empty', () => {
+    const c = makeHeroCombatant('knight', 1, 'p0', { pickedPerks: [] });
+    expect(getEffectiveStat(c, 'defense')).toBe(c.baseStats.defense);
   });
 });
 

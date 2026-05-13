@@ -1,9 +1,10 @@
 import * as Phaser from 'phaser';
 import { resolveCombat } from '@combat/combat';
 import type { CombatantId, CombatResult, CombatState } from '@combat/types';
-import type { Item, Rarity } from '@data/types';
+import type { Item } from '@data/types';
 import { hospitalTickAmount, hospitalTreatmentCap } from '@camp/building_levels';
 import { removeHero, tickRosterWounds } from '@camp/roster';
+import { grantTraineeXp } from '@camp/trainee_xp';
 import { CHATTER, computeChatterCondition } from '@data/chatter';
 import { DUNGEONS } from '@data/dungeons';
 import { ENEMIES } from '@data/enemies';
@@ -12,6 +13,7 @@ import type { Hero } from '@heroes/hero';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import { CombatActor } from '@render/combat_actor';
 import { ENEMY_VISUALS } from '@render/enemy_sprites';
+import { RARITY_COLOR_HEX } from '@render/rarity_colors';
 import { buildCombatState } from '@run/combat_setup';
 import { applyPendingMilestones } from '@run/milestones';
 import {
@@ -72,12 +74,6 @@ const BOSS_BODY_SCALE = 4.5;
 
 const ENEMY_SLIDE_IN_MS = 600;       // duration of enemy slide-in from off-screen right
 const ENEMY_SLIDE_IN_OFFSET = 80;    // px past SCENE_W where enemies spawn before sliding in
-
-const RARITY_HEX: Record<Rarity, string> = {
-  common: '#cccccc',
-  uncommon: '#4488ff',
-  rare: '#ffcc66',
-};
 
 interface HeroVisual {
   actor: CombatActor;
@@ -516,7 +512,7 @@ export class CorridorScene extends Phaser.Scene {
     const prePackLen = run.pack.items.length;
 
     const rng = createRngFromState(rngStateAfter);
-    const { runState: nextRun, wipe } = completeSurpriseCombat(run, result, rng);
+    const { runState: nextRun, wipe } = completeSurpriseCombat(run, result, rng, appState.get().unlocks);
     this.combatLoot = nextRun.pack.items.slice(prePackLen);
 
     appState.update((s) => ({
@@ -624,7 +620,7 @@ export class CorridorScene extends Phaser.Scene {
             .text(0, y, text, {
               fontFamily: 'monospace',
               fontSize: '10px',
-              color: RARITY_HEX[item.rarity],
+              color: RARITY_COLOR_HEX[item.rarity],
             })
             .setOrigin(0.5),
         );
@@ -1031,7 +1027,7 @@ export class CorridorScene extends Phaser.Scene {
     // Loot roll consumes RNG; thread it through completeCombat so the post-loot
     // state is what gets persisted.
     const rng = createRngFromState(rngStateAfter);
-    const { runState: nextRun, wipe } = completeCombat(run, result, rng);
+    const { runState: nextRun, wipe } = completeCombat(run, result, rng, appState.get().unlocks);
     // Items added during this fight = rollLoot drop + recovered fallen-hero gear.
     // addItem appends, so the tail of pack.items past the pre-fight length is
     // exactly what was added. Stash for the result panel.
@@ -1164,7 +1160,7 @@ export class CorridorScene extends Phaser.Scene {
             .text(0, y, text, {
               fontFamily: 'monospace',
               fontSize: '10px',
-              color: RARITY_HEX[item.rarity],
+              color: RARITY_COLOR_HEX[item.rarity],
             })
             .setOrigin(0.5),
         );
@@ -1208,8 +1204,18 @@ export class CorridorScene extends Phaser.Scene {
       (fallenCount > 0 ? 1 : 0) +
       (lostCount > 0 ? 1 : 0);
 
+    // Preview trainee-xp grant for the toast (pure preview; actual grant runs
+    // in onWipeReturn). If eligibleCount > 0 we add one extra line to the panel.
+    const previewState = appState.get();
+    const previewActiveIds = [
+      ...wipe.heroesFallen.map((h) => h.id),
+      ...wipe.heroesLost.map((h) => h.id),
+    ];
+    const traineePreview = grantTraineeXp(previewState, wipe.traineeXpBase, previewActiveIds);
+    const showTraineeToast = traineePreview.eligibleCount > 0;
+
     const baseHeight = 220;
-    const extraLines = Math.max(0, totalLines - 4);
+    const extraLines = Math.max(0, totalLines - 4) + (showTraineeToast ? 1 : 0);
     const panelHeight = baseHeight + extraLines * 14;
 
     const bg = this.add
@@ -1276,6 +1282,23 @@ export class CorridorScene extends Phaser.Scene {
       }
     }
 
+    if (showTraineeToast) {
+      const trainees = traineePreview.eligibleCount;
+      const xp = traineePreview.xpPerTrainee;
+      y += 4;
+      lines.push(
+        this.add
+          .text(
+            0,
+            y,
+            `Training Grounds: ${trainees} trainee${trainees === 1 ? '' : 's'} will gain ${xp} XP.`,
+            { fontFamily: 'monospace', fontSize: '11px', color: '#aaddaa' },
+          )
+          .setOrigin(0.5),
+      );
+      y += 14;
+    }
+
     const btnY = panelHeight / 2 - 30;
     const btnBg = this.add
       .rectangle(0, btnY, 180, 34, 0x2a4a2a)
@@ -1298,6 +1321,11 @@ export class CorridorScene extends Phaser.Scene {
     const fallenIds = new Set(wipe.heroesFallen.map((h) => h.id));
     const lostIds = new Set(wipe.heroesLost.map((h) => h.id));
 
+    const activeIds = [
+      ...wipe.heroesFallen.map((h) => h.id),
+      ...wipe.heroesLost.map((h) => h.id),
+    ];
+
     appState.update((s) => {
       let roster = s.roster;
       for (const id of fallenIds) {
@@ -1318,7 +1346,8 @@ export class CorridorScene extends Phaser.Scene {
         runState: undefined,
         runRngState: undefined,
       };
-      return applyPendingMilestones(next, wipe.milestonesTriggered);
+      const grant = grantTraineeXp(next, wipe.traineeXpBase, activeIds);
+      return applyPendingMilestones(grant.state, wipe.milestonesTriggered);
     });
 
     this.scene.start('camp');

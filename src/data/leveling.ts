@@ -1,16 +1,23 @@
 import { CLASSES } from './classes';
+import { PERKS } from './perks';
 import type { Hero } from '@heroes/hero';
+import type { PerkTier } from './types';
 import type { Stats } from '@combat/types';
 
-export const MAX_LEVEL = 5;
+export const MAX_LEVEL = 10;
 
 // Cumulative XP required to reach each level. Index = level - 1.
 export const LEVEL_THRESHOLDS: readonly number[] = [
-  0,    // level 1
-  200,  // level 2
-  800,  // level 3
-  2000, // level 4
-  4000, // level 5
+  0,      // level 1
+  200,    // level 2
+  800,    // level 3
+  2000,   // level 4
+  4000,   // level 5
+  6000,   // level 6
+  9000,   // level 7
+  12500,  // level 8
+  16000,  // level 9
+  20000,  // level 10
 ];
 
 export function xpForCombatNode(floor: number): number {
@@ -42,12 +49,26 @@ export function applyLevelUps(hero: Hero, prevLevel: number, newLevel: number): 
   const primaryBump = (def.primaryStat === 'crit' ? 2 : 1) * levels;
   const newBaseStats: Stats = { ...hero.baseStats };
   newBaseStats[def.primaryStat] = newBaseStats[def.primaryStat] + primaryBump;
+
+  // Tier crossings — push 'l5' and 'l10' to pendingPerks when boundary crossed,
+  // guarded by hasPicked to avoid re-pushing tiers already chosen.
+  const hasPicked = (tier: PerkTier) =>
+    hero.pickedPerks.some((id) => PERKS[id].tier === tier);
+
+  const nextPending: PerkTier[] = [...hero.pendingPerks];
+  if (prevLevel < 5 && newLevel >= 5 && !nextPending.includes('l5') && !hasPicked('l5')) {
+    nextPending.push('l5');
+  }
+  if (prevLevel < 10 && newLevel >= 10 && !nextPending.includes('l10') && !hasPicked('l10')) {
+    nextPending.push('l10');
+  }
+
   return {
     ...hero,
     baseStats: newBaseStats,
     maxHp: hero.maxHp + hpBump,
     currentHp: hero.currentHp + hpBump,
     level: newLevel,
-    pendingPerk: hero.pendingPerk || newLevel >= MAX_LEVEL,
+    pendingPerks: nextPending,
   };
 }

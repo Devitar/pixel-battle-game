@@ -67,19 +67,54 @@ function rareWeapon(floor: number): Item {
   };
 }
 
+function epicWeapon(floor: number): Item {
+  return {
+    id: 'fixture-epic-weapon',
+    baseId: 'sword_basic',
+    slot: 'weapon',
+    rarity: 'epic',
+    weaponType: 'sword',
+    affixes: [
+      { affixId: 'of_power',     value: rollAffixValue('of_power', floor) },
+      { affixId: 'of_swiftness', value: rollAffixValue('of_swiftness', floor) },
+      { affixId: 'of_the_bear',  value: rollAffixValue('of_the_bear', floor) },
+    ],
+    rareProperty: { propertyId: 'of_burning', value: 2 },
+    floorRolledAt: floor,
+  };
+}
+
 describe('nextRarity', () => {
-  it('maps common → uncommon, uncommon → rare, rare → null', () => {
+  it('maps common → uncommon, uncommon → rare', () => {
     expect(nextRarity('common')).toBe('uncommon');
     expect(nextRarity('uncommon')).toBe('rare');
-    expect(nextRarity('rare')).toBeNull();
+  });
+});
+
+describe('nextRarity — Epic tier', () => {
+  it('rare upgrades to epic', () => {
+    expect(nextRarity('rare')).toBe('epic');
+  });
+  it('epic is the cap (no further upgrade)', () => {
+    expect(nextRarity('epic')).toBeNull();
+  });
+});
+
+describe('nextRarity — Legendary tier (cap)', () => {
+  it('epic still does not upgrade (Blacksmith caps at epic)', () => {
+    expect(nextRarity('epic')).toBeNull();
+  });
+  it('legendary does not upgrade (it is also a cap)', () => {
+    expect(nextRarity('legendary')).toBeNull();
   });
 });
 
 describe('canUpgrade', () => {
-  it('returns true for common and uncommon, false for rare', () => {
+  it('returns true for common, uncommon, and rare; false for epic', () => {
     expect(canUpgrade(commonSwordAtFloor(5))).toBe(true);
     expect(canUpgrade(uncommonSwordWithPower(5))).toBe(true);
-    expect(canUpgrade(rareWeapon(5))).toBe(false);
+    expect(canUpgrade(rareWeapon(5))).toBe(true);
+    expect(canUpgrade(epicWeapon(5))).toBe(false);
   });
 });
 
@@ -96,8 +131,12 @@ describe('canBlacksmithUpgrade', () => {
     expect(canBlacksmithUpgrade(rareWeapon(5), 2)).toBe(false);
   });
 
-  it('rare items remain unupgradeable at L3 (epic rarity not yet shipped)', () => {
-    expect(canBlacksmithUpgrade(rareWeapon(5), 3)).toBe(false);
+  it('L3 allows common→uncommon, uncommon→rare, AND rare→epic', () => {
+    expect(canBlacksmithUpgrade(commonSwordAtFloor(5), 3)).toBe(true);
+    expect(canBlacksmithUpgrade(uncommonSwordWithPower(5), 3)).toBe(true);
+    expect(canBlacksmithUpgrade(rareWeapon(5), 3)).toBe(true);
+    // Epic is the cap — even at L3, an epic item can't upgrade further.
+    expect(canBlacksmithUpgrade(epicWeapon(5), 3)).toBe(false);
   });
 });
 
@@ -112,8 +151,13 @@ describe('upgradeCost', () => {
     expect(upgradeCost(uncommonSwordWithPower(5))).toBe(300);
   });
 
-  it('throws on rare input', () => {
-    expect(() => upgradeCost(rareWeapon(5))).toThrow();
+  it('charges 900g for rare→epic', () => {
+    expect(upgradeCost(rareWeapon(5))).toBe(BLACKSMITH_UPGRADE_COST.epic);
+    expect(upgradeCost(rareWeapon(5))).toBe(900);
+  });
+
+  it('throws on epic input (epic is the cap)', () => {
+    expect(() => upgradeCost(epicWeapon(5))).toThrow();
   });
 });
 
@@ -166,8 +210,27 @@ describe('upgradeItem', () => {
     expect(upgraded.rareProperty).toBeUndefined();
   });
 
-  it('throws on rare input', () => {
+  it('upgrades rare → epic with one new affix and preserves the rare property', () => {
     const item = rareWeapon(5);
+    const rng = createRng(4);
+    const upgraded = upgradeItem(item, rng);
+
+    expect(upgraded.rarity).toBe('epic');
+    expect(upgraded.affixes.length).toBe(item.affixes.length + 1);
+    // Existing affixes are preserved verbatim.
+    expect(upgraded.affixes[0]).toEqual(item.affixes[0]);
+    expect(upgraded.affixes[1]).toEqual(item.affixes[1]);
+    // The new (third) affix is one of the unused affix IDs, not a duplicate.
+    const newAffix = upgraded.affixes[2];
+    expect(ALL_AFFIX_IDS).toContain(newAffix.affixId);
+    expect(newAffix.affixId).not.toBe('of_power');
+    expect(newAffix.affixId).not.toBe('of_swiftness');
+    // Rare property is preserved (already set on the rare input; epic does not reroll it).
+    expect(upgraded.rareProperty).toEqual(item.rareProperty);
+  });
+
+  it('throws on epic input (epic is the cap)', () => {
+    const item = epicWeapon(5);
     const rng = createRng(4);
     expect(() => upgradeItem(item, rng)).toThrow();
   });

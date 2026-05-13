@@ -9,13 +9,18 @@ const ALL_AFFIX_IDS: readonly AffixId[] = [
   'of_swiftness', 'of_the_hawk', 'of_evasion',
 ];
 
-const NEXT_RARITY: Record<Rarity, Exclude<Rarity, 'common'> | null> = {
+// Blacksmith targets exclude 'common' (start) and 'legendary' (cap — legendaries
+// are boss drops, not upgradeable). Both 'epic' and 'legendary' map to null:
+// 'epic' is the Blacksmith ceiling; 'legendary' is unreachable here.
+const NEXT_RARITY: Record<Rarity, Exclude<Rarity, 'common' | 'legendary'> | null> = {
   common: 'uncommon',
   uncommon: 'rare',
-  rare: null,
+  rare: 'epic',
+  epic: null,        // unchanged — Blacksmith caps at epic
+  legendary: null,
 };
 
-export function nextRarity(r: Rarity): Exclude<Rarity, 'common'> | null {
+export function nextRarity(r: Rarity): Exclude<Rarity, 'common' | 'legendary'> | null {
   return NEXT_RARITY[r];
 }
 
@@ -26,6 +31,7 @@ export function canUpgrade(item: Item): boolean {
 export function canBlacksmithUpgrade(item: Item, blacksmithLevel: BuildingLevel): boolean {
   if (!canUpgrade(item)) return false;
   if (item.rarity === 'uncommon' && blacksmithLevel < 2) return false;
+  if (item.rarity === 'rare' && blacksmithLevel < 3) return false;
   return true;
 }
 
@@ -64,7 +70,8 @@ function rollNewAffix(item: Item, rng: Rng): RolledAffix {
   const used = new Set(item.affixes.map((a) => a.affixId));
   const available = ALL_AFFIX_IDS.filter((id) => !used.has(id));
   if (available.length === 0) {
-    // Defensive — items max at 3 affixes (hat at rare); upgrade is blocked at rare.
+    // Defensive — items max at 4 affixes (hat at epic) so there are always at least
+    // 3 unused affix ids when this runs. Epic is the cap for upgrades.
     throw new Error('rollNewAffix: no available affixes');
   }
   const affixId = rng.pick(available);

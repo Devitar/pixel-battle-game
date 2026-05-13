@@ -4,7 +4,7 @@ import type { SaveFile } from './save';
 // like Hero, Roster, RunState, Vault, Unlocks, Preferences) and register a
 // migration in MIGRATIONS[previousVersion] that maps old raw shape to new.
 // Loaders newer than CURRENT_SCHEMA_VERSION are rejected at save.ts:load.
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 type MigrationFn = (raw: Record<string, unknown>) => Record<string, unknown>;
 
@@ -82,6 +82,74 @@ const MIGRATIONS: Record<number, MigrationFn> = {
     const unlocks = out.unlocks as Record<string, unknown> | undefined;
     if (unlocks && unlocks.buildings === undefined) unlocks.buildings = [];
 
+    return out;
+  },
+
+  // v4 → v5: introduce Training Grounds. Add buildingLevels.training_grounds = 1;
+  // traineeHeroIds = [null, null]; (mid-run) runState.traineeXpBase = 0.
+  // Training Grounds spec, 2026-05-11.
+  4: (raw) => {
+    const out: Record<string, unknown> = { ...raw, version: 5 };
+
+    const bl = out.buildingLevels as Record<string, unknown> | undefined;
+    if (bl && bl.training_grounds === undefined) bl.training_grounds = 1;
+
+    if (out.traineeHeroIds === undefined) {
+      out.traineeHeroIds = [null, null];
+    }
+
+    const runState = out.runState as Record<string, unknown> | undefined;
+    if (runState && runState.traineeXpBase === undefined) {
+      runState.traineeXpBase = 0;
+    }
+
+    return out;
+  },
+
+  // v5 → v6: Hero.pendingPerk:boolean → pendingPerks:readonly PerkTier[];
+  //          Hero.perkId?:PerkId    → pickedPerks:readonly PerkId[].
+  //          MAX_LEVEL + L10 perk tier spec, 2026-05-12.
+  5: (raw) => {
+    const out: Record<string, unknown> = { ...raw, version: 6 };
+
+    const migrateHero = (h: Record<string, unknown>): Record<string, unknown> => {
+      // Idempotency: if already migrated, return unchanged.
+      if (Array.isArray(h.pendingPerks) && Array.isArray(h.pickedPerks)) return h;
+      const { pendingPerk, perkId, ...rest } = h;
+      return {
+        ...rest,
+        pendingPerks: pendingPerk === true ? ['l5'] : [],
+        pickedPerks: typeof perkId === 'string' ? [perkId] : [],
+      };
+    };
+
+    const roster = out.roster as { heroes?: Array<Record<string, unknown>> } | undefined;
+    if (roster?.heroes) roster.heroes = roster.heroes.map(migrateHero);
+
+    const candidates = out.tavernCandidates as Array<Record<string, unknown>> | undefined;
+    if (candidates) out.tavernCandidates = candidates.map(migrateHero);
+
+    const runState = out.runState as Record<string, unknown> | undefined;
+    if (runState) {
+      const party = runState.party as Array<Record<string, unknown>> | undefined;
+      if (party) runState.party = party.map(migrateHero);
+      const fallen = runState.fallen as Array<Record<string, unknown>> | undefined;
+      if (fallen) runState.fallen = fallen.map(migrateHero);
+      const lost = runState.lost as Array<Record<string, unknown>> | undefined;
+      if (lost) runState.lost = lost.map(migrateHero);
+    }
+
+    return out;
+  },
+
+  // v6 → v7: introduce unlocks.legendaryEnabled (default false).
+  // Legendary tier + L10 milestone spec, 2026-05-12.
+  6: (raw) => {
+    const out: Record<string, unknown> = { ...raw, version: 7 };
+    const unlocks = out.unlocks as Record<string, unknown> | undefined;
+    if (unlocks && typeof unlocks.legendaryEnabled !== 'boolean') {
+      out.unlocks = { ...unlocks, legendaryEnabled: false };
+    }
     return out;
   },
 };

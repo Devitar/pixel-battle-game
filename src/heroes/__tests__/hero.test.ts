@@ -28,11 +28,15 @@ describe('createHero — basic shape', () => {
     expect(h.baseStats).not.toBe(CLASSES.priest.baseStats);
   });
 
-  it('defaults xp=0, level=1, pendingPerk=false; perkId undefined', () => {
+  it('defaults xp=0, level=1, pendingPerks=[], pickedPerks=[]', () => {
     const h = createHero('knight', 'K', 'h1', 'quick', 'body1');
     expect(h.xp).toBe(0);
     expect(h.level).toBe(1);
-    expect(h.pendingPerk).toBe(false);
+    expect(h.pendingPerks).toEqual([]);
+    expect(h.pickedPerks).toEqual([]);
+    // @ts-expect-error — old fields removed
+    expect(h.pendingPerk).toBeUndefined();
+    // @ts-expect-error — old fields removed
     expect(h.perkId).toBeUndefined();
   });
 });
@@ -98,12 +102,12 @@ describe('createHero — equipment', () => {
 });
 
 describe('applyPerk', () => {
-  it('stat-effect perk preserves HP, sets perkId, clears pendingPerk', () => {
+  it('stat-effect perk preserves HP, appends to pickedPerks, shifts pendingPerks', () => {
     const base = createHero('knight', 'K', 'h0', 'quick', 'body1');
-    const h: Hero = { ...base, pendingPerk: true };
+    const h: Hero = { ...base, pendingPerks: ['l5'] };
     const result = applyPerk(h, 'iron_will');
-    expect(result.perkId).toBe('iron_will');
-    expect(result.pendingPerk).toBe(false);
+    expect(result.pickedPerks).toEqual(['iron_will']);
+    expect(result.pendingPerks).toEqual([]);
     expect(result.maxHp).toBe(h.maxHp);
     expect(result.currentHp).toBe(h.currentHp);
   });
@@ -133,11 +137,19 @@ describe('applyPerk', () => {
     expect(result.currentHp).toBeGreaterThanOrEqual(1);
   });
 
-  it('clears pendingPerk regardless of effect kind', () => {
+  it('shifts the oldest pending tier off regardless of effect kind', () => {
     const base = createHero('knight', 'K', 'h0', 'quick', 'body1');
-    const h: Hero = { ...base, pendingPerk: true };
-    expect(applyPerk(h, 'iron_will').pendingPerk).toBe(false);
-    expect(applyPerk(h, 'resolute').pendingPerk).toBe(false);
+    const h: Hero = { ...base, pendingPerks: ['l5'] };
+    expect(applyPerk(h, 'iron_will').pendingPerks).toEqual([]);
+    expect(applyPerk(h, 'resolute').pendingPerks).toEqual([]);
+  });
+
+  it('keeps remaining pending tiers when picking from a multi-pending hero', () => {
+    const base = createHero('knight', 'K', 'h0', 'quick', 'body1');
+    const withTwo: Hero = { ...base, pendingPerks: ['l5', 'l10'] };
+    const picked = applyPerk(withTwo, 'iron_will');
+    expect(picked.pickedPerks).toEqual(['iron_will']);
+    expect(picked.pendingPerks).toEqual(['l10']);
   });
 });
 
@@ -148,7 +160,7 @@ describe('computeMaxHp — perk HP effect', () => {
       CLASSES.knight.baseStats.hp,
       [TRAITS.stout],
       knight.equipment,
-      PERKS.resolute,
+      [PERKS.resolute],
     );
     // 20 → round(20 * 1.1) = 22 → round(22 * 1.1) = 24, plus 0 gear HP.
     expect(result).toBe(24);
@@ -193,6 +205,96 @@ describe('multi-trait Hero shape', () => {
     // Sturdy = +1 Defense (no HP effect); Stout = +10% HP.
     // Recomputed maxHp should equal the single-stout case (sturdy does not change HP).
     expect(recomputed.maxHp).toBe(recomputeMaxHp(hero).maxHp);
+  });
+});
+
+describe('computeMaxHp — legendary hpBonus via gearTotal', () => {
+  it('Phylactery adds +15 HP via gearTotal', () => {
+    const hero = createHero('knight', 'Bran', 'h1', 'quick', 'body1');
+    const baseMaxHp = hero.maxHp;
+    const equipped: Hero = {
+      ...hero,
+      equipment: {
+        ...hero.equipment,
+        outfit: {
+          id: 'o0', baseId: 'outfit_cloth', slot: 'outfit', rarity: 'legendary',
+          affixes: [], floorRolledAt: 10, legendaryId: 'phylactery',
+        },
+      },
+    };
+    const newHero = recomputeMaxHp(equipped);
+    expect(newHero.maxHp).toBe(baseMaxHp + 15);
+  });
+
+  it('Tidewalker Helm adds +5 HP', () => {
+    const hero = createHero('knight', 'Bran', 'h1', 'quick', 'body1');
+    const baseMaxHp = hero.maxHp;
+    const equipped: Hero = {
+      ...hero,
+      equipment: {
+        ...hero.equipment,
+        hat: {
+          id: 'h0', baseId: 'hat_cap', slot: 'hat', rarity: 'legendary',
+          affixes: [], floorRolledAt: 10, legendaryId: 'tidewalker_helm',
+        },
+      },
+    };
+    const newHero = recomputeMaxHp(equipped);
+    expect(newHero.maxHp).toBe(baseMaxHp + 5);
+  });
+
+  it("King's Aegis adds +10 HP", () => {
+    const hero = createHero('knight', 'Bran', 'h1', 'quick', 'body1');
+    const baseMaxHp = hero.maxHp;
+    const equipped: Hero = {
+      ...hero,
+      equipment: {
+        ...hero.equipment,
+        shield: {
+          id: 's0', baseId: 'shield_basic', slot: 'shield', rarity: 'legendary',
+          affixes: [], floorRolledAt: 10, legendaryId: 'kings_aegis',
+        },
+      },
+    };
+    const newHero = recomputeMaxHp(equipped);
+    expect(newHero.maxHp).toBe(baseMaxHp + 10);
+  });
+
+  it("Lich's Crown adds 0 HP (no hpBonus)", () => {
+    const hero = createHero('knight', 'Bran', 'h1', 'quick', 'body1');
+    const baseMaxHp = hero.maxHp;
+    const equipped: Hero = {
+      ...hero,
+      equipment: {
+        ...hero.equipment,
+        hat: {
+          id: 'h0', baseId: 'hat_hood', slot: 'hat', rarity: 'legendary',
+          affixes: [], floorRolledAt: 10, legendaryId: 'lichs_crown',
+        },
+      },
+    };
+    const newHero = recomputeMaxHp(equipped);
+    expect(newHero.maxHp).toBe(baseMaxHp);
+  });
+
+  it('legendary skips base-stats HP and of_vigor affixes (no double-dipping)', () => {
+    const hero = createHero('knight', 'Bran', 'h1', 'quick', 'body1');
+    const baseMaxHp = hero.maxHp;
+    // outfit_cloth has +6 HP base stats — would normally add. Phylactery's
+    // hpBonus is +15. Verify we only see +15, not 6+15 or 6 alone.
+    const equipped: Hero = {
+      ...hero,
+      equipment: {
+        ...hero.equipment,
+        outfit: {
+          id: 'o0', baseId: 'outfit_cloth', slot: 'outfit', rarity: 'legendary',
+          affixes: [{ affixId: 'of_vigor', value: 99 }], // should be ignored
+          floorRolledAt: 10, legendaryId: 'phylactery',
+        },
+      },
+    };
+    const newHero = recomputeMaxHp(equipped);
+    expect(newHero.maxHp).toBe(baseMaxHp + 15);
   });
 });
 

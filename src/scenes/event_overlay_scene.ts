@@ -5,6 +5,7 @@ import { currentNode } from '@run/run_state';
 import { EVENTS, describePayload, type EventCard, type EventChoice } from '@data/events';
 import type { Item } from '@data/types';
 import { heroToLoadout } from '@render/hero_loadout';
+import { RARITY_COLOR_HEX } from '@render/rarity_colors';
 import { itemAffixDescription, itemDisplayName } from '@items/selectors';
 import {
   createBitmapText,
@@ -53,11 +54,6 @@ const DISMISS_BUTTON_W = 200;
 const DISMISS_BUTTON_H = 36;
 
 // Per-line outcome colors (raw Phaser text — bitmap text has only uniform tint).
-const RARITY_COLOR: Record<'common' | 'uncommon' | 'rare', string> = {
-  common: '#cccccc',
-  uncommon: '#4488ff',
-  rare: '#ffcc66',
-};
 const COLOR_HP_GAIN = '#44cc44';
 const COLOR_HP_LOSS = '#cc6666';
 const COLOR_GOLD = '#ffcc66';
@@ -297,7 +293,7 @@ export class EventOverlayScene extends Phaser.Scene {
       const affix = itemAffixDescription(item);
       lines.push({
         text: `Got: ${itemDisplayName(item)}`,
-        color: RARITY_COLOR[item.rarity],
+        color: RARITY_COLOR_HEX[item.rarity],
         subText: affix.length > 0 ? affix : undefined,
       });
     }

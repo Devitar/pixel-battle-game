@@ -1,4 +1,5 @@
 import { AFFIXES, BASE_ITEMS, RARE_PROPERTIES } from '@data/items';
+import { LEGENDARY_DEFS, LEGENDARY_PASSIVE_DEFS } from '@data/legendaries';
 import type { HeroEquipment, Item, ItemSlot, RolledAffix, RolledRareProperty } from '@data/types';
 import type { Stats } from '@combat/types';
 import type { Hero } from '@heroes/hero';
@@ -20,6 +21,13 @@ export function filterPackBySlot(pack: Pack, slot: ItemSlot): readonly Item[] {
 }
 
 export function itemDisplayName(item: Item): string {
+  if (item.legendaryId !== undefined) {
+    return LEGENDARY_DEFS[item.legendaryId].name;
+  }
+  if (item.legendaryPassive !== undefined) {
+    const baseName = BASE_ITEMS[item.baseId].name;
+    return `${LEGENDARY_PASSIVE_DEFS[item.legendaryPassive].adjective} ${baseName}`;
+  }
   const baseName = BASE_ITEMS[item.baseId].name;
   if (item.rareProperty) {
     return `${baseName} ${RARE_PROPERTIES[item.rareProperty.propertyId].name}`;
@@ -28,6 +36,17 @@ export function itemDisplayName(item: Item): string {
     return `${baseName} ${AFFIXES[item.affixes[0].affixId].name}`;
   }
   return baseName;
+}
+
+/**
+ * Returns the legendary flavor string for legendary items, or `undefined` otherwise.
+ * Surfaced in tooltips beneath the item name + affix lines.
+ */
+export function itemFlavor(item: Item): string | undefined {
+  if (item.legendaryId !== undefined) {
+    return LEGENDARY_DEFS[item.legendaryId].flavor;
+  }
+  return undefined;
 }
 
 export function itemAffixDescription(item: Item): string {
